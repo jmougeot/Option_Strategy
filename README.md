@@ -21,39 +21,19 @@ git clone https://github.com/jmougeot/Option_Strategy.git
 
 ## 💻 Étape 2: Ouvrir le Terminal (PREMIÈRE FOIS)
 
-### Sur Mac (votre cas):
-
-**Méthode 1 - Recherche Spotlight (Recommandée):**
+### Sur Mac:
 1. Appuyez sur `Cmd + Espace` (⌘ + Espace)
 2. Une petite barre de recherche apparaît en haut de l'écran
 3. Tapez: `Terminal`
 4. Appuyez sur `Entrée`
 5. ✅ Une fenêtre avec du texte noir/blanc s'ouvre - c'est le Terminal !
 
-**Méthode 2 - Via le Finder:**
-1. Ouvrez le **Finder**
-2. Cliquez sur **"Applications"** dans la barre latérale
-3. Ouvrez le dossier **"Utilitaires"**
-4. Double-cliquez sur **"Terminal"**
-
-**Méthode 3 - Raccourci rapide:**
-1. Faites un clic droit sur le dossier `Option_Strategy-main`
-2. Maintenez la touche `Option` (⌥) enfoncée
-3. Cliquez sur **"Copier 'Option_Strategy-main' comme nom de chemin"**
-4. Ouvrez le Terminal
-5. Tapez `cd ` (avec un espace après)
-6. Collez le chemin (`Cmd + V`)
-7. Appuyez sur `Entrée`
 
 ### Sur Windows:
 1. Ouvrez le dossier `Option_Strategy-main`
 2. Dans la barre d'adresse en haut, cliquez dedans
 3. Tapez `cmd` et appuyez sur `Entrée`
 4. ✅ Une fenêtre noire s'ouvre - c'est le Terminal !
-
-### Sur Linux:
-1. Appuyez sur `Ctrl + Alt + T`
-2. ✅ Le Terminal s'ouvre !
 
 ---
 
