@@ -1,5 +1,11 @@
 # 🎯 Guide d'Installation depuis GitHub - Pour Débutants Absolus
 
+> 💡 **Installation Rapide** :
+> - **Windows** : Double-cliquez sur `install.bat` puis `run.bat`
+> - **Mac/Linux** : Exécutez `./install.sh` puis `./run.sh` dans le Terminal
+
+---
+
 ## 📥 Étape 1: Télécharger le Projet
 
 ### Option A: Télécharger le ZIP (le plus simple)
@@ -19,46 +25,39 @@ git clone https://github.com/jmougeot/Option_Strategy.git
 
 ---
 
-## 💻 Étape 2: Ouvrir le Terminal (PREMIÈRE FOIS)
+## � Étape 2: Installation Automatique
 
-### Sur Mac:
-1. Appuyez sur `Cmd + Espace` (⌘ + Espace)
-2. Une petite barre de recherche apparaît en haut de l'écran
-3. Tapez: `Terminal`
-4. Appuyez sur `Entrée`
-5. ✅ Une fenêtre avec du texte noir/blanc s'ouvre - c'est le Terminal !
+### 💻 Sur Windows (Le Plus Simple)
 
+**Installation en 1 Double-Clic :**
+1. Allez dans le dossier `Option_Strategy-main`
+2. **Double-cliquez** sur `install.bat`
+3. Une fenêtre noire s'ouvre et installe tout automatiquement (1-2 minutes)
+4. ✅ Installation terminée !
 
-### Sur Windows:
-1. Ouvrez le dossier `Option_Strategy-main`
-2. Dans la barre d'adresse en haut, cliquez dedans
-3. Tapez `cmd` et appuyez sur `Entrée`
-4. ✅ Une fenêtre noire s'ouvre - c'est le Terminal !
+**Lancement en 1 Double-Clic :**
+1. **Double-cliquez** sur `run.bat`
+2. Votre navigateur s'ouvre automatiquement avec l'application !
+
+> 💡 **Prérequis Windows** : Python 3 doit être installé
+> - Téléchargez : https://www.python.org/downloads/windows/
+> - ⚠️ **IMPORTANT** : Cochez "Add Python to PATH" lors de l'installation !
+> 
+> 📘 **Guide détaillé Windows** : [GUIDE_WINDOWS.md](GUIDE_WINDOWS.md)
 
 ---
 
-## 🚀 Étape 3: Installation Automatique
+### 🍎 Sur Mac/Linux
 
-### Une fois le Terminal ouvert:
+**Installation en 1 Commande :**
 
-**1. Naviguez vers le dossier (si ce n'est pas déjà fait):**
-
+1. Ouvrez le **Terminal** (`Cmd + Espace`, tapez "Terminal")
+2. Naviguez vers le dossier :
 ```bash
 cd ~/Desktop/Option_Strategy-main
 ```
 
-> 💡 **Astuce**: Tapez `cd ~/Desktop/Opt` puis appuyez sur `Tab` → le nom complet se complète automatiquement !
-
-**2. Vérifiez que vous êtes au bon endroit:**
-
-```bash
-ls
-```
-
-> Vous devez voir apparaître: `app.py`, `install.sh`, `README.md`, etc.
-
-**3. Lancez l'installation automatique:**
-
+3. Lancez l'installation :
 ```bash
 ./install.sh
 ```
@@ -69,36 +68,22 @@ ls
 > - ✅ Dépendances installées
 > - ✅ Base de données générée
 
-**4. Si vous avez une erreur "Permission denied":**
-
+4. Si erreur "Permission denied" :
 ```bash
 chmod +x install.sh run.sh check.sh
 ./install.sh
 ```
 
----
-
-## ▶️ Étape 4: Lancer l'Application
-
-### Chaque fois que vous voulez utiliser l'application:
-
-**Dans le Terminal:**
-
+**Lancement :**
 ```bash
-cd ~/Desktop/Option_Strategy-main
 ./run.sh
 ```
 
 > 🌐 Votre navigateur s'ouvre automatiquement à http://localhost:8501
 
-**Ou en un seul clic:**
-1. Allez dans le dossier `Option_Strategy-main`
-2. **Double-cliquez** sur `run.sh`
-3. Choisissez **"Ouvrir avec Terminal"** ou **"Exécuter"**
-
 ---
 
-## 🎮 Étape 5: Utiliser l'Application
+## 🎮 Étape 3: Utiliser l'Application
 
 ### Interface Web - Aucune Programmation !
 
@@ -156,9 +141,19 @@ cd ~/Desktop/Option_Strategy-main
 
 ### "L'installation échoue avec 'command not found'"
 ➡️ Python 3 n'est pas installé. Installez-le:
-- Mac: `brew install python3` ou téléchargez sur python.org
-- Windows: Téléchargez sur python.org
-- Linux: `sudo apt install python3`
+- **Mac**: `brew install python3` ou téléchargez sur python.org
+- **Windows**: Téléchargez sur python.org (⚠️ Cochez "Add Python to PATH" !)
+- **Linux**: `sudo apt install python3`
+
+### "Sur Windows: Python n'est pas reconnu"
+➡️ Python n'est pas installé ou pas dans le PATH
+➡️ Réinstallez Python depuis https://www.python.org/downloads/windows/
+➡️ ⚠️ **COCHEZ "Add Python to PATH"** lors de l'installation !
+
+### "Sur Windows: L'installation échoue"
+➡️ Vérifiez que vous avez les droits d'administrateur
+➡️ Désactivez temporairement l'antivirus si nécessaire
+➡️ Utilisez PowerShell au lieu de l'invite de commande
 
 ### "Rien ne se passe quand je double-clique sur run.sh"
 ➡️ Utilisez le Terminal à la place (Étape 4 ci-dessus)
@@ -213,10 +208,10 @@ Option_Strategy-main/
 ├── 🐍 generate_full_database.py    ← Générateur de données
 ├── 🐍 bloomberg_connector.py       ← Connecteur Bloomberg (futur)
 │
-├── 🔧 install.sh                   ← Installation automatique ⭐
-├── 🔧 run.sh                       ← Lancement rapide ⭐
-├── 🔧 check.sh                     ← Vérification de l'installation
-├── 🔧 git_helper.sh                ← Aide pour Git
+├── 🔧 install.sh / install.bat     ← Installation automatique ⭐
+├── 🔧 run.sh / run.bat             ← Lancement rapide ⭐
+├── 🔧 check.sh                     ← Vérification (Mac/Linux)
+├── 🔧 update.sh                    ← Mise à jour depuis GitHub
 │
 ├── 📋 requirements.txt             ← Dépendances Python
 ├── 🗄️ calls_export.json           ← Données d'options (généré)
@@ -225,25 +220,41 @@ Option_Strategy-main/
 
 ---
 
-## 🎯 Commandes Essentielles à Retenir
+## 🎯 Commandes Essentielles
 
+### 💻 Windows
+```batch
+REM Installation (double-clic sur install.bat)
+install.bat
+
+REM Lancement (double-clic sur run.bat)
+run.bat
+
+REM Générer nouvelles données
+python generate_full_database.py
+
+REM Tester en ligne de commande
+python test_comparison.py
+```
+
+### 🍎 Mac/Linux
 ```bash
-# 1. Aller dans le dossier
-cd ~/Desktop/Option_Strategy-main
-
-# 2. Installer (une seule fois)
+# Installation
 ./install.sh
 
-# 3. Vérifier l'installation
-./check.sh
-
-# 4. Lancer l'application
+# Lancement
 ./run.sh
 
-# 5. Générer de nouvelles données
+# Vérification
+./check.sh
+
+# Mise à jour depuis GitHub
+./update.sh
+
+# Générer nouvelles données
 python3 generate_full_database.py
 
-# 6. Tester en ligne de commande
+# Tester en ligne de commande
 python3 test_comparison.py
 ```
 
