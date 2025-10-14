@@ -26,6 +26,6 @@ REM Activer l'environnement virtuel
 call venv\Scripts\activate.bat
 
 REM Lancer Streamlit
-streamlit run app.py
+streamlit run src/app.py
 
 pause
