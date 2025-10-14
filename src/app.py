@@ -1,7 +1,7 @@
 """
-Interface Streamlit pour la Comparaison de Stratégies Options
-Auteur: Système de Trading BGC
-Description: Interface utilisateur web pour comparer les stratégies short volatility
+Streamlit Interface for Options Strategy Comparison
+Author: BGC Trading System
+Description: Web user interface to compare short volatility strategies
 """
 
 import streamlit as st
@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
 import json
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from strategy_comparison import StrategyComparer, StrategyComparison
 
 # ============================================================================
@@ -18,7 +18,7 @@ from strategy_comparison import StrategyComparer, StrategyComparison
 # ============================================================================
 
 st.set_page_config(
-    page_title="Comparateur de Stratégies Options",
+    page_title="Options Strategy Comparator",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -74,49 +74,49 @@ st.markdown("""
 
 @st.cache_data
 def load_options_data(filepath: str = 'calls_export.json') -> Dict:
-    """Charge les données d'options depuis un fichier JSON."""
+    """Loads options data from a JSON file."""
     try:
         with open(filepath, 'r') as f:
             data = json.load(f)
         return data
     except FileNotFoundError:
-        st.error(f"❌ Fichier {filepath} introuvable. Exécutez d'abord generate_full_database.py")
+        st.error(f"❌ File {filepath} not found. Run generate_full_database.py first")
         st.stop()
     except json.JSONDecodeError:
-        st.error(f"❌ Erreur de lecture du fichier {filepath}")
+        st.error(f"❌ Error reading file {filepath}")
         st.stop()
 
 def prepare_options_data(data: Dict) -> Dict[str, List]:
-    """Sépare les calls et puts."""
+    """Separates calls and puts."""
     calls = [opt for opt in data['options'] if opt['option_type'] == 'call']
     puts = [opt for opt in data['options'] if opt['option_type'] == 'put']
     
     return {'calls': calls, 'puts': puts}
 
 def format_currency(value: float) -> str:
-    """Formate une valeur en devise."""
+    """Formats a value as currency."""
     if value == float('inf'):
-        return "Illimité"
+        return "Unlimited"
     return f"${value:.2f}"
 
 def format_percentage(value: float) -> str:
-    """Formate un pourcentage."""
+    """Formats a percentage."""
     return f"{value:.1f}%"
 
 def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: float):
-    """Crée un diagramme de P&L pour toutes les stratégies."""
+    """Creates a P&L diagram for all strategies."""
     
-    # Générer une plage de prix autour du prix cible
+    # Generate price range around target price
     price_range = [target_price * (1 + i/100) for i in range(-20, 21, 1)]
     
     fig = go.Figure()
     
-    # Ligne de référence à zéro
+    # Zero reference line
     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
     
-    # Ligne verticale au prix cible
+    # Vertical line at target price
     fig.add_vline(x=target_price, line_dash="dot", line_color="red", 
-                  annotation_text="Prix Cible", opacity=0.7)
+                  annotation_text="Target Price", opacity=0.7)
     
     # Couleurs pour chaque stratégie
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
