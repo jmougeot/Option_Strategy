@@ -18,13 +18,31 @@ python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo ERREUR: Python 3 n'est pas installe ou pas dans le PATH
     echo.
-    echo Veuillez installer Python 3 depuis:
-    echo https://www.python.org/downloads/windows/
-    echo.
-    echo IMPORTANT: Cochez "Add Python to PATH" lors de l'installation !
-    echo.
-    pause
-    exit /b 1
+    echo Voulez-vous l'installer automatiquement ? (O/N)
+    set /p response="Votre choix: "
+    if /i "!response!"=="O" (
+        echo.
+        echo Lancement de l'installation automatique de Python...
+        call setup_python.bat
+        if %errorlevel% neq 0 (
+            echo.
+            echo ERREUR: L'installation de Python a echoue
+            pause
+            exit /b 1
+        )
+        echo.
+        echo Relancez install.bat pour continuer l'installation
+        pause
+        exit /b 0
+    ) else (
+        echo.
+        echo Installation annulee.
+        echo Veuillez installer Python 3.8+ manuellement depuis python.org
+        echo IMPORTANT: Cochez "Add Python to PATH" lors de l'installation !
+        echo.
+        pause
+        exit /b 1
+    )
 )
 
 for /f "tokens=*" %%i in ('python --version') do set PYTHON_VERSION=%%i

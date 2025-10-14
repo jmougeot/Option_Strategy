@@ -18,11 +18,49 @@ echo ""
 # Étape 1: Vérifier Python
 echo "🔍 Vérification de Python..."
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 n'est pas installé. Veuillez l'installer d'abord."
-    exit 1
+    echo "❌ Python 3 n'est pas installé."
+    echo ""
+    echo "Voulez-vous l'installer automatiquement ? (y/n)"
+    read -r response
+    if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+        echo ""
+        echo "Lancement de l'installation automatique de Python..."
+        ./setup_python.sh
+        if [ $? -ne 0 ]; then
+            echo "❌ L'installation de Python a échoué"
+            exit 1
+        fi
+    else
+        echo ""
+        echo "Installation annulée."
+        echo "Veuillez installer Python 3.8+ manuellement depuis python.org"
+        exit 1
+    fi
 fi
-PYTHON_VERSION=$(python3 --version)
-echo "✅ $PYTHON_VERSION détecté"
+
+# Vérifier la version de Python
+PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+
+if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 8 ]); then
+    echo "⚠️  Python $PYTHON_VERSION trouvé, mais version 3.8+ requise"
+    echo ""
+    echo "Voulez-vous installer une version plus récente ? (y/n)"
+    read -r response
+    if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+        ./setup_python.sh
+        if [ $? -ne 0 ]; then
+            echo "❌ L'installation de Python a échoué"
+            exit 1
+        fi
+    else
+        echo "Installation annulée."
+        exit 1
+    fi
+fi
+
+echo "✅ Python $PYTHON_VERSION détecté"
 echo ""
 
 # Étape 2: Créer l'environnement virtuel
