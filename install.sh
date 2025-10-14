@@ -73,7 +73,7 @@ cat > run.sh << 'EOF'
 # Script de lancement rapide
 cd "$(dirname "$0")"
 source venv/bin/activate
-streamlit run app.py
+streamlit run src/app.py
 EOF
 chmod +x run.sh
 echo "✅ Script run.sh créé"
@@ -88,7 +88,7 @@ echo "📋 Prochaines étapes:"
 echo ""
 echo "   Pour lancer l'application:"
 echo "   → Option 1: ./run.sh"
-echo "   → Option 2: source venv/bin/activate && streamlit run app.py"
+echo "   → Option 2: source venv/bin/activate && streamlit run src/app.py"
 echo ""
 echo "   L'application s'ouvrira automatiquement dans votre navigateur"
 echo "   URL: http://localhost:8501"

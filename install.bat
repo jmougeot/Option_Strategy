@@ -83,7 +83,7 @@ echo Creation du script de lancement...
 echo @echo off
 echo cd /d "%%~dp0"
 echo call venv\Scripts\activate.bat
-echo streamlit run app.py
+echo streamlit run src/app.py
 echo pause
 ) > run.bat
 echo OK: Script run.bat cree
@@ -100,7 +100,7 @@ echo   Pour lancer l'application:
 echo   - Option 1: Double-cliquez sur run.bat
 echo   - Option 2: Dans PowerShell:
 echo       venv\Scripts\Activate.ps1
-echo       streamlit run app.py
+echo       streamlit run src/app.py
 echo.
 echo   L'application s'ouvrira automatiquement dans votre navigateur
 echo   URL: http://localhost:8501
