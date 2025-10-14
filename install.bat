@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 REM ============================================================================
 REM Script d'Installation Automatique - Options Strategy Analyzer (Windows)
 REM ============================================================================
@@ -18,29 +19,97 @@ python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo ERREUR: Python 3 n'est pas installe ou pas dans le PATH
     echo.
-    echo Voulez-vous l'installer automatiquement ? (I/N)
-    set /p response="Votre choix: "
-    if /i "!response!"=="I" (
+    echo Ce script peut installer Python 3.11 automatiquement.
+    echo.
+    echo Options:
+    echo   1. Installer automatiquement Python 3.11 ^(RECOMMANDE^)
+    echo   2. Ouvrir le site web de telechargement manuel
+    echo   3. Annuler
+    echo.
+    set /p choice="Votre choix (1-3): "
+    
+    if "!choice!"=="1" (
         echo.
-        echo Lancement de l'installation automatique de Python...
-        powershell -Command "Invoke-WebRequest -Uri https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe -OutFile python_installer.exe"
-        python_installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_pip=1
-        del python_installer.exe
-        if %errorlevel% neq 0 (
+        echo ========================================================================
+        echo   Installation automatique de Python 3.11
+        echo ========================================================================
+        echo.
+        
+        REM Detecter l'architecture
+        if "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
+            set PYTHON_URL=https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
+        ) else (
+            set PYTHON_URL=https://www.python.org/ftp/python/3.11.9/python-3.11.9.exe
+        )
+        
+        set INSTALLER=%TEMP%\python_installer.exe
+        
+        echo Telechargement de Python 3.11...
+        echo URL: !PYTHON_URL!
+        echo.
+        
+        REM Telecharger avec PowerShell
+        powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '!PYTHON_URL!' -OutFile '!INSTALLER!'}"
+        
+        if not exist "!INSTALLER!" (
             echo.
-            echo ERREUR: L'installation de Python a echoue
+            echo ERREUR: Echec du telechargement
+            echo Veuillez installer Python manuellement depuis python.org
             pause
             exit /b 1
         )
+        
         echo.
-        echo Relancez install.bat pour continuer l'installation
+        echo Installation de Python en cours...
+        echo IMPORTANT: L'installateur va s'ouvrir.
+        echo            Assurez-vous de cocher "Add Python to PATH" !
+        echo.
+        pause
+        
+        REM Lancer l'installateur avec les options recommandees
+        "!INSTALLER!" /passive InstallAllUsers=0 PrependPath=1 Include_test=0 Include_pip=1 Include_doc=0
+        
+        echo.
+        echo Nettoyage...
+        del "!INSTALLER!"
+        
+        echo.
+        echo ========================================================================
+        echo   Installation de Python terminee
+        echo ========================================================================
+        echo.
+        echo IMPORTANT: Vous devez FERMER cette fenetre et en ouvrir une NOUVELLE
+        echo            pour que Python soit reconnu dans le PATH.
+        echo.
+        echo Ensuite, executez a nouveau install.bat
+        echo.
         pause
         exit /b 0
+        
+    ) else if "!choice!"=="2" (
+        echo.
+        echo Ouverture du site de telechargement de Python...
+        start https://www.python.org/downloads/windows/
+        echo.
+        echo Instructions:
+        echo   1. Telechargez Python 3.8 ou superieur
+        echo   2. Lancez l'installateur
+        echo   3. COCHEZ "Add Python to PATH" ^(tres important!^)
+        echo   4. Cliquez sur "Install Now"
+        echo   5. Une fois termine, relancez install.bat
+        echo.
+        pause
+        exit /b 0
+        
     ) else (
         echo.
         echo Installation annulee.
-        echo Veuillez installer Python 3.8+ manuellement depuis python.org
-        echo IMPORTANT: Cochez "Add Python to PATH" lors de l'installation !
+        echo.
+        echo Pour installer Python manuellement:
+        echo   1. Visitez https://www.python.org/downloads/
+        echo   2. Telechargez Python 3.8+
+        echo   3. Lors de l'installation, cochez "Add Python to PATH"
+        echo   4. Relancez install.bat
         echo.
         pause
         exit /b 1
