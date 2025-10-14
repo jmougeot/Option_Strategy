@@ -3,15 +3,15 @@ Comparaison de Stratégies d'Options
 ====================================
 Compare différentes stratégies short volatility centrées autour d'un prix cible
 pour une date d'expiration donnée.
+
+Architecture V3 : Utilise le système auto-génératif de stratégies
 """
 
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from strategies import (
-    OptionStrategy, ShortPut, ShortCall, ShortStraddle, ShortStrangle,
-    IronCondor, IronButterfly, BullPutSpread, BearCallSpread
-)
+from strategies_v2_generic import OptionStrategy, GENERATED_STRATEGIES
+
 
 
 @dataclass
@@ -44,19 +44,22 @@ class StrategyComparison:
 
 
 class StrategyComparer:
-    """Compare différentes stratégies d'options"""
+    """
+    Compare différentes stratégies d'options
     
-    # Mapping des noms de stratégies vers les classes
-    STRATEGY_CLASSES = {
-        'iron_condor': IronCondor,
-        'iron_butterfly': IronButterfly,
-        'short_strangle': ShortStrangle,
-        'short_straddle': ShortStraddle,
-        'bull_put_spread': BullPutSpread,
-        'bear_call_spread': BearCallSpread,
-        'short_put': ShortPut,
-        'short_call': ShortCall
-    }
+    Utilise le système auto-génératif : les classes de stratégies sont créées 
+    dynamiquement à partir de configurations déclaratives.
+    
+    🔄 AUTO-INTÉGRATION : Toutes les stratégies de GENERATED_STRATEGIES sont 
+    automatiquement disponibles. Ajoutez une stratégie dans strategies_v2_generic.py
+    et elle apparaît instantanément ici !
+    """
+    
+    # Mapping automatique : TOUTES les stratégies générées sont directement incluses
+    STRATEGY_CLASSES = GENERATED_STRATEGIES.copy()
+    
+    # Liste des noms de stratégies disponibles (pour info)
+    AVAILABLE_STRATEGIES = list(STRATEGY_CLASSES.keys())
     
     def __init__(self, options_data: Dict[str, List[Dict]]):
         """
@@ -266,8 +269,8 @@ class StrategyComparer:
         Args:
             target_price: Prix cible
             days_to_expiry: Jours jusqu'à expiration
-            strategies_to_compare: Liste des stratégies à comparer
-                                  ['iron_condor', 'iron_butterfly', 'short_strangle', 'short_straddle']
+            strategies_to_compare: Liste des stratégies à comparer (noms en CamelCase)
+                                  Ex: ['IronCondor', 'IronButterfly', 'ShortStrangle', 'ShortStraddle']
             weights: Poids pour le scoring
                     {'max_profit': 0.3, 'risk_reward': 0.3, 'profit_zone': 0.2, 'target_performance': 0.2}
         
@@ -275,7 +278,8 @@ class StrategyComparer:
             Liste triée de StrategyComparison
         """
         if strategies_to_compare is None:
-            strategies_to_compare = ['iron_condor', 'iron_butterfly', 'short_strangle', 'short_straddle']
+            # Stratégies par défaut : les plus populaires pour short volatility
+            strategies_to_compare = ['IronCondor', 'IronButterfly', 'ShortStrangle', 'ShortStraddle']
         
         if weights is None:
             weights = {

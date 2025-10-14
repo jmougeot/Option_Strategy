@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
 import json
+import re
 from typing import Dict, List
 from strategy_comparison import StrategyComparer, StrategyComparison
 
@@ -72,6 +73,46 @@ st.markdown("""
 # FONCTIONS UTILITAIRES
 # ============================================================================
 
+def categorize_strategy(strategy: str) -> str:
+    """
+    Catégorise une stratégie dans une seule catégorie
+    
+    Args:
+        strategy: Nom de la stratégie en CamelCase
+        
+    Returns:
+        Nom de la catégorie avec emoji
+    """
+    if strategy.startswith('Short'):
+        return '📉 Short Strategies'
+    elif strategy.startswith('Iron'):
+        return '🔷 Iron Strategies'
+    elif strategy.startswith('Long') and 'Butterfly' in strategy:
+        return '🦋 Butterfly Strategies'
+    elif strategy.startswith('Long'):
+        return '📈 Long Strategies'
+    elif 'Butterfly' in strategy:
+        return '🦋 Butterfly Strategies'
+    elif 'Ratio' in strategy:
+        return '⚖️ Ratio Strategies'
+    elif 'Spread' in strategy:
+        return '📊 Spread Strategies'
+    else:
+        return '📦 Other'
+
+def camel_case_to_display_name(name: str) -> str:
+    """
+    Convertit un nom en CamelCase en format d'affichage
+    Ex: 'IronCondor' -> 'Iron Condor'
+    
+    Args:
+        name: Nom en CamelCase
+        
+    Returns:
+        Nom formaté pour l'affichage
+    """
+    return re.sub('([A-Z])', r' \1', name).strip()
+
 @st.cache_data
 def load_options_data(filepath: str = 'calls_export.json') -> Dict:
     """Loads options data from a JSON file."""
@@ -104,31 +145,38 @@ def format_percentage(value: float) -> str:
     return f"{value:.1f}%"
 
 def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: float):
-    """Creates a P&L diagram for all strategies."""
+    """
+    Crée un diagramme P&L interactif pour toutes les stratégies
     
-    # Generate price range around target price
+    Args:
+        comparisons: Liste des stratégies à afficher
+        target_price: Prix cible pour la référence verticale
+        
+    Returns:
+        Figure Plotly avec les courbes P&L
+    """
+    # Générer la plage de prix (±20% autour du prix cible)
     price_range = [target_price * (1 + i/100) for i in range(-20, 21, 1)]
     
     fig = go.Figure()
     
-    # Zero reference line
+    # Lignes de référence
     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-    
-    # Vertical line at target price
     fig.add_vline(x=target_price, line_dash="dot", line_color="red", 
-                  annotation_text="Target Price", opacity=0.7)
+                  annotation_text="Target", opacity=0.7)
     
-    # Couleurs pour chaque stratégie
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+    # Palette de couleurs
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', 
+              '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
     
+    # Tracer chaque stratégie
     for idx, comp in enumerate(comparisons):
-        strategy = comp.strategy
         color = colors[idx % len(colors)]
         
-        # Calculer P&L pour chaque prix
-        pnl_values = [strategy.profit_at_expiry(price) for price in price_range]
+        # Calculer P&L (optimisé avec list comprehension)
+        pnl_values = [comp.strategy.profit_at_expiry(price) for price in price_range]
         
-        # Tracer la courbe
+        # Courbe P&L
         fig.add_trace(go.Scatter(
             x=price_range,
             y=pnl_values,
@@ -137,34 +185,28 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
             line=dict(color=color, width=2.5),
             hovertemplate='<b>%{fullData.name}</b><br>' +
                          'Prix: $%{x:.2f}<br>' +
-                         'P&L: $%{y:.2f}<br>' +
-                         '<extra></extra>'
+                         'P&L: $%{y:.2f}<extra></extra>'
         ))
         
-        # Marquer les breakevens
-        for be in comp.breakeven_points:
+        # Markers de breakeven
+        if comp.breakeven_points:
             fig.add_trace(go.Scatter(
-                x=[be],
-                y=[0],
+                x=comp.breakeven_points,
+                y=[0] * len(comp.breakeven_points),
                 mode='markers',
                 marker=dict(size=10, color=color, symbol='circle-open', line=dict(width=2)),
                 showlegend=False,
-                hovertemplate=f'<b>Breakeven</b><br>Prix: ${be:.2f}<extra></extra>'
+                hovertemplate='<b>Breakeven</b><br>Prix: $%{x:.2f}<extra></extra>'
             ))
     
+    # Configuration du layout
     fig.update_layout(
         title="Diagramme de P&L à l'Expiration",
         xaxis_title="Prix du Sous-Jacent ($)",
         yaxis_title="Profit / Perte ($)",
         height=500,
         hovermode='x unified',
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         plot_bgcolor='white',
         xaxis=dict(gridcolor='lightgray'),
         yaxis=dict(gridcolor='lightgray', zeroline=True, zerolinecolor='gray')
@@ -173,28 +215,39 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
     return fig
 
 def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFrame:
-    """Crée un DataFrame pour l'affichage des comparaisons."""
+    """
+    Crée un DataFrame formaté pour l'affichage des comparaisons
     
-    data = []
-    for idx, comp in enumerate(comparisons, 1):
-        data.append({
-            'Rang': idx,
-            'Stratégie': comp.strategy_name,
-            'Crédit': format_currency(comp.net_credit),
-            'Max Profit': format_currency(comp.max_profit),
-            'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
-            'R/R Ratio': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
-            'Zone ±': format_currency(comp.profit_zone_width),
-            'P&L@Target': format_currency(comp.profit_at_target),
-            'Score': f"{comp.score:.3f}"
-        })
+    Args:
+        comparisons: Liste des stratégies comparées (déjà triées par score)
+        
+    Returns:
+        DataFrame avec toutes les métriques formatées
+    """
+    data = [{
+        'Rang': idx,
+        'Stratégie': comp.strategy_name,
+        'Crédit': format_currency(comp.net_credit),
+        'Max Profit': format_currency(comp.max_profit),
+        'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
+        'R/R Ratio': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
+        'Zone ±': format_currency(comp.profit_zone_width) if comp.profit_zone_width != float('inf') else 'Illimitée',
+        'P&L@Target': format_currency(comp.profit_at_target),
+        'Score': f"{comp.score:.3f}"
+    } for idx, comp in enumerate(comparisons, 1)]
     
     return pd.DataFrame(data)
 
 def create_score_breakdown_chart(comparison: StrategyComparison):
-    """Crée un graphique de décomposition du score."""
+    """
+    Crée un graphique de visualisation du score global
     
-    # Affichage simple du score global
+    Args:
+        comparison: StrategyComparison à visualiser
+        
+    Returns:
+        Figure Plotly avec le score affiché
+    """
     fig = go.Figure(data=[
         go.Bar(
             x=[comparison.score],
@@ -277,22 +330,52 @@ def main():
         # Section 3: Sélection des stratégies
         st.subheader("🎯 Stratégies à Comparer")
         
-        strategy_options = {
-            'iron_condor': 'Iron Condor',
-            'iron_butterfly': 'Iron Butterfly',
-            'short_strangle': 'Short Strangle',
-            'short_straddle': 'Short Straddle',
-            'short_put': 'Short Put',
-            'short_call': 'Short Call',
-            'bull_put_spread': 'Bull Put Spread',
-            'bear_call_spread': 'Bear Call Spread'
-        }
+        # 🔄 AUTO-DÉTECTION : Toutes les stratégies sont chargées automatiquement
+        available_strategies = sorted(StrategyComparer.AVAILABLE_STRATEGIES)
+        
+        # Stratégies par défaut (short volatility populaires)
+        default_strategies = {'IronCondor', 'IronButterfly', 'ShortStrangle', 'ShortStraddle'}
+        
+        # Grouper par catégories (chaque stratégie dans UNE SEULE catégorie)
+        categories = {}
+        for strategy in available_strategies:
+            category = categorize_strategy(strategy)
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(strategy)
         
         selected_strategies = []
-        for key, label in strategy_options.items():
-            if st.checkbox(label, value=(key in ['iron_condor', 'iron_butterfly', 
-                                                  'short_strangle', 'short_straddle'])):
-                selected_strategies.append(key)
+        
+        # Ordre d'affichage des catégories
+        category_order = [
+            '📉 Short Strategies', 
+            '🔷 Iron Strategies', 
+            '📊 Spread Strategies', 
+            '📈 Long Strategies', 
+            '🦋 Butterfly Strategies', 
+            '⚖️ Ratio Strategies', 
+            '📦 Other'
+        ]
+        
+        # Afficher par catégories avec expanders
+        for category in category_order:
+            if category in categories and categories[category]:
+                # Ouvrir par défaut les catégories Short et Iron
+                is_expanded = category in ['📉 Short Strategies', '🔷 Iron Strategies']
+                
+                with st.expander(f"{category} ({len(categories[category])})", expanded=is_expanded):
+                    for strategy in categories[category]:
+                        display_name = camel_case_to_display_name(strategy)
+                        
+                        if st.checkbox(
+                            display_name, 
+                            value=(strategy in default_strategies),
+                            key=f"strat_{strategy}"
+                        ):
+                            selected_strategies.append(strategy)
+        
+        # Info sur la sélection
+        st.info(f"📊 {len(selected_strategies)}/{len(available_strategies)} stratégies sélectionnées")
         
         st.markdown("---")
         
