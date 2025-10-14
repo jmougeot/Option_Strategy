@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Streamlit
+.streamlit/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Données temporaires
+*.log
+*.tmp
+*.bak
+
+# Base de données (optionnel - décommentez si vous ne voulez pas partager les données)
+# calls_export.json
+# options_data.json
+# calls_database.db
