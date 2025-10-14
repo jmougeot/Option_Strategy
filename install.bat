@@ -23,7 +23,9 @@ if %errorlevel% neq 0 (
     if /i "!response!"=="O" (
         echo.
         echo Lancement de l'installation automatique de Python...
-        call setup_python.bat
+        powershell -Command "Invoke-WebRequest -Uri https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe -OutFile python_installer.exe"
+        python_installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_pip=1
+        del python_installer.exe
         if %errorlevel% neq 0 (
             echo.
             echo ERREUR: L'installation de Python a echoue

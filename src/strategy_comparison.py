@@ -46,74 +46,16 @@ class StrategyComparison:
 class StrategyComparer:
     """Compare différentes stratégies d'options"""
     
-    # Configuration générique pour toutes les stratégies
-    STRATEGY_CONFIGS = {
-        'iron_condor': {
-            'class': IronCondor,
-            'legs': [
-                {'type': 'put', 'action': 'buy', 'offset': -6, 'strike_param': 'put_strike_low', 'premium_param': 'put_premium_low'},
-                {'type': 'put', 'action': 'sell', 'offset': -3, 'strike_param': 'put_strike_high', 'premium_param': 'put_premium_high'},
-                {'type': 'call', 'action': 'sell', 'offset': 3, 'strike_param': 'call_strike_low', 'premium_param': 'call_premium_low'},
-                {'type': 'call', 'action': 'buy', 'offset': 6, 'strike_param': 'call_strike_high', 'premium_param': 'call_premium_high'}
-            ],
-            'name_format': 'Iron Condor {put_strike_low:.0f}/{put_strike_high:.0f}/{call_strike_low:.0f}/{call_strike_high:.0f}'
-        },
-        'iron_butterfly': {
-            'class': IronButterfly,
-            'legs': [
-                {'type': 'put', 'action': 'buy', 'offset': -3, 'strike_param': 'long_put_strike', 'premium_param': 'long_put_premium'},
-                {'type': 'put', 'action': 'sell', 'offset': 0, 'strike_param': 'atm_strike', 'premium_param': 'short_put_premium'},
-                {'type': 'call', 'action': 'sell', 'offset': 0, 'strike_param': 'atm_strike', 'premium_param': 'short_call_premium'},
-                {'type': 'call', 'action': 'buy', 'offset': 3, 'strike_param': 'long_call_strike', 'premium_param': 'long_call_premium'}
-            ],
-            'name_format': 'Iron Butterfly {long_put_strike:.0f}/{atm_strike:.0f}/{long_call_strike:.0f}'
-        },
-        'short_strangle': {
-            'class': ShortStrangle,
-            'legs': [
-                {'type': 'put', 'action': 'sell', 'offset': -2, 'strike_param': 'put_strike', 'premium_param': 'put_premium'},
-                {'type': 'call', 'action': 'sell', 'offset': 2, 'strike_param': 'call_strike', 'premium_param': 'call_premium'}
-            ],
-            'name_format': 'Short Strangle {put_strike:.0f}/{call_strike:.0f}'
-        },
-        'short_straddle': {
-            'class': ShortStraddle,
-            'legs': [
-                {'type': 'put', 'action': 'sell', 'offset': 0, 'strike_param': 'strike', 'premium_param': 'put_premium'},
-                {'type': 'call', 'action': 'sell', 'offset': 0, 'strike_param': 'strike', 'premium_param': 'call_premium'}
-            ],
-            'name_format': 'Short Straddle {strike:.0f}'
-        },
-        'bull_put_spread': {
-            'class': BullPutSpread,
-            'legs': [
-                {'type': 'put', 'action': 'buy', 'offset': -6, 'strike_param': 'long_put_strike', 'premium_param': 'long_put_premium'},
-                {'type': 'put', 'action': 'sell', 'offset': -3, 'strike_param': 'short_put_strike', 'premium_param': 'short_put_premium'}
-            ],
-            'name_format': 'Bull Put Spread {long_put_strike:.0f}/{short_put_strike:.0f}'
-        },
-        'bear_call_spread': {
-            'class': BearCallSpread,
-            'legs': [
-                {'type': 'call', 'action': 'sell', 'offset': 3, 'strike_param': 'short_call_strike', 'premium_param': 'short_call_premium'},
-                {'type': 'call', 'action': 'buy', 'offset': 6, 'strike_param': 'long_call_strike', 'premium_param': 'long_call_premium'}
-            ],
-            'name_format': 'Bear Call Spread {short_call_strike:.0f}/{long_call_strike:.0f}'
-        },
-        'short_put': {
-            'class': ShortPut,
-            'legs': [
-                {'type': 'put', 'action': 'sell', 'offset': -2, 'strike_param': 'strike', 'premium_param': 'premium'}
-            ],
-            'name_format': 'Short Put {strike:.0f}'
-        },
-        'short_call': {
-            'class': ShortCall,
-            'legs': [
-                {'type': 'call', 'action': 'sell', 'offset': 2, 'strike_param': 'strike', 'premium_param': 'premium'}
-            ],
-            'name_format': 'Short Call {strike:.0f}'
-        }
+    # Mapping des noms de stratégies vers les classes
+    STRATEGY_CLASSES = {
+        'iron_condor': IronCondor,
+        'iron_butterfly': IronButterfly,
+        'short_strangle': ShortStrangle,
+        'short_straddle': ShortStraddle,
+        'bull_put_spread': BullPutSpread,
+        'bear_call_spread': BearCallSpread,
+        'short_put': ShortPut,
+        'short_call': ShortCall
     }
     
     def __init__(self, options_data: Dict[str, List[Dict]]):
@@ -131,6 +73,7 @@ class StrategyComparer:
                       days_to_expiry: int) -> Optional[OptionStrategy]:
         """
         Méthode générique pour construire n'importe quelle stratégie
+        La configuration est lue directement depuis la classe de stratégie.
         
         Args:
             strategy_name: Nom de la stratégie (ex: 'iron_condor', 'bull_put_spread')
@@ -141,11 +84,16 @@ class StrategyComparer:
             Instance de la stratégie ou None si impossible à construire
         """
         # Vérifier que la stratégie existe
-        if strategy_name not in self.STRATEGY_CONFIGS:
+        if strategy_name not in self.STRATEGY_CLASSES:
             print(f"❌ Stratégie inconnue: {strategy_name}")
             return None
         
-        config = self.STRATEGY_CONFIGS[strategy_name]
+        strategy_class = self.STRATEGY_CLASSES[strategy_name]
+        config = strategy_class.BUILD_CONFIG
+        
+        if not config:
+            print(f"❌ Configuration manquante pour {strategy_name}")
+            return None
         
         # Collecter les options et construire les paramètres
         strikes = {}
@@ -183,7 +131,7 @@ class StrategyComparer:
         
         # Instancier la stratégie
         try:
-            strategy = config['class'](**kwargs)
+            strategy = strategy_class(**kwargs)
             return strategy
         except Exception as e:
             print(f"❌ Erreur lors de la création de {strategy_name}: {e}")

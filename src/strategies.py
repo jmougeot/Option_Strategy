@@ -45,10 +45,13 @@ class Option:
 
 @dataclass
 class OptionStrategy:
-    """Classe de base pour les stratégies short volatility"""
-    name: str
-    underlying_price: float
+    """Classe de base pour toutes les stratégies d'options"""
+    name: str = ""
+    underlying_price: float = 0.0
     options: List[Option] = field(default_factory=list)
+    
+    # Configuration de construction (à surcharger dans les sous-classes)
+    BUILD_CONFIG: dict = field(default_factory=dict, init=False, repr=False)
     
     def add_option(self, option: Option):
         """Ajoute une option à la stratégie"""
@@ -98,6 +101,14 @@ class ShortPut(OptionStrategy):
     expiry: datetime = field(default_factory=datetime.now)
     quantity: int = 1
     
+    # Configuration pour construction automatique
+    BUILD_CONFIG = {
+        'legs': [
+            {'type': 'put', 'action': 'sell', 'offset': -2, 'strike_param': 'strike', 'premium_param': 'premium'}
+        ],
+        'name_format': 'Short Put {strike:.0f}'
+    }
+    
     def __post_init__(self):
         """Initialise la stratégie après création du dataclass"""
         if not self.name:
@@ -137,6 +148,14 @@ class ShortCall(OptionStrategy):
     expiry: datetime = field(default_factory=datetime.now)
     quantity: int = 1
     
+    # Configuration pour construction automatique
+    BUILD_CONFIG = {
+        'legs': [
+            {'type': 'call', 'action': 'sell', 'offset': 2, 'strike_param': 'strike', 'premium_param': 'premium'}
+        ],
+        'name_format': 'Short Call {strike:.0f}'
+    }
+    
     def __post_init__(self):
         if not self.name:
             self.name = "Short Call"
@@ -175,6 +194,15 @@ class ShortStraddle(OptionStrategy):
     put_premium: float = 0.0
     expiry: datetime = field(default_factory=datetime.now)
     quantity: int = 1
+    
+    # Configuration pour construction automatique
+    BUILD_CONFIG = {
+        'legs': [
+            {'type': 'put', 'action': 'sell', 'offset': 0, 'strike_param': 'strike', 'premium_param': 'put_premium'},
+            {'type': 'call', 'action': 'sell', 'offset': 0, 'strike_param': 'strike', 'premium_param': 'call_premium'}
+        ],
+        'name_format': 'Short Straddle {strike:.0f}'
+    }
     
     def __post_init__(self):
         if not self.name:
@@ -228,6 +256,15 @@ class ShortStrangle(OptionStrategy):
     call_premium: float = 0.0
     expiry: datetime = field(default_factory=datetime.now)
     quantity: int = 1
+    
+    # Configuration pour construction automatique
+    BUILD_CONFIG = {
+        'legs': [
+            {'type': 'put', 'action': 'sell', 'offset': -2, 'strike_param': 'put_strike', 'premium_param': 'put_premium'},
+            {'type': 'call', 'action': 'sell', 'offset': 2, 'strike_param': 'call_strike', 'premium_param': 'call_premium'}
+        ],
+        'name_format': 'Short Strangle {put_strike:.0f}/{call_strike:.0f}'
+    }
     
     def __post_init__(self):
         if not self.name:
@@ -288,6 +325,17 @@ class IronCondor(OptionStrategy):
     expiry: datetime = field(default_factory=datetime.now)
     quantity: int = 1
     
+    # Configuration pour construction automatique
+    BUILD_CONFIG = {
+        'legs': [
+            {'type': 'put', 'action': 'buy', 'offset': -6, 'strike_param': 'put_strike_low', 'premium_param': 'put_premium_low'},
+            {'type': 'put', 'action': 'sell', 'offset': -3, 'strike_param': 'put_strike_high', 'premium_param': 'put_premium_high'},
+            {'type': 'call', 'action': 'sell', 'offset': 3, 'strike_param': 'call_strike_low', 'premium_param': 'call_premium_low'},
+            {'type': 'call', 'action': 'buy', 'offset': 6, 'strike_param': 'call_strike_high', 'premium_param': 'call_premium_high'}
+        ],
+        'name_format': 'Iron Condor {put_strike_low:.0f}/{put_strike_high:.0f}/{call_strike_low:.0f}/{call_strike_high:.0f}'
+    }
+    
     def __post_init__(self):
         if not self.name:
             self.name = "Iron Condor"
@@ -335,6 +383,17 @@ class IronButterfly(OptionStrategy):
     long_call_strike: float = 0.0    # Call long (protection)
     
     long_put_premium: float = 0.0    # Prime payée
+    
+    # Configuration pour construction automatique  
+    BUILD_CONFIG = {
+        'legs': [
+            {'type': 'put', 'action': 'buy', 'offset': -3, 'strike_param': 'long_put_strike', 'premium_param': 'long_put_premium'},
+            {'type': 'put', 'action': 'sell', 'offset': 0, 'strike_param': 'atm_strike', 'premium_param': 'short_put_premium'},
+            {'type': 'call', 'action': 'sell', 'offset': 0, 'strike_param': 'atm_strike', 'premium_param': 'short_call_premium'},
+            {'type': 'call', 'action': 'buy', 'offset': 3, 'strike_param': 'long_call_strike', 'premium_param': 'long_call_premium'}
+        ],
+        'name_format': 'Iron Butterfly {long_put_strike:.0f}/{atm_strike:.0f}/{long_call_strike:.0f}'
+    }
     short_put_premium: float = 0.0   # Prime reçue
     short_call_premium: float = 0.0  # Prime reçue
     long_call_premium: float = 0.0   # Prime payée
@@ -391,6 +450,15 @@ class BullPutSpread(OptionStrategy):
     expiry: datetime = field(default_factory=datetime.now)
     quantity: int = 1
     
+    # Configuration pour construction automatique
+    BUILD_CONFIG = {
+        'legs': [
+            {'type': 'put', 'action': 'buy', 'offset': -6, 'strike_param': 'long_put_strike', 'premium_param': 'long_put_premium'},
+            {'type': 'put', 'action': 'sell', 'offset': -3, 'strike_param': 'short_put_strike', 'premium_param': 'short_put_premium'}
+        ],
+        'name_format': 'Bull Put Spread {long_put_strike:.0f}/{short_put_strike:.0f}'
+    }
+    
     def __post_init__(self):
         if not self.name:
             self.name = "Bull Put Spread"
@@ -425,6 +493,15 @@ class BearCallSpread(OptionStrategy):
     long_call_premium: float = 0.0    # Prime payée
     expiry: datetime = field(default_factory=datetime.now)
     quantity: int = 1
+    
+    # Configuration pour construction automatique
+    BUILD_CONFIG = {
+        'legs': [
+            {'type': 'call', 'action': 'sell', 'offset': 3, 'strike_param': 'short_call_strike', 'premium_param': 'short_call_premium'},
+            {'type': 'call', 'action': 'buy', 'offset': 6, 'strike_param': 'long_call_strike', 'premium_param': 'long_call_premium'}
+        ],
+        'name_format': 'Bear Call Spread {short_call_strike:.0f}/{long_call_strike:.0f}'
+    }
     
     def __post_init__(self):
         if not self.name:
