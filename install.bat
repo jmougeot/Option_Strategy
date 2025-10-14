@@ -18,9 +18,9 @@ python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo ERREUR: Python 3 n'est pas installe ou pas dans le PATH
     echo.
-    echo Voulez-vous l'installer automatiquement ? (O/N)
+    echo Voulez-vous l'installer automatiquement ? (I/N)
     set /p response="Votre choix: "
-    if /i "!response!"=="O" (
+    if /i "!response!"=="I" (
         echo.
         echo Lancement de l'installation automatique de Python...
         powershell -Command "Invoke-WebRequest -Uri https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe -OutFile python_installer.exe"
