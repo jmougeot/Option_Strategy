@@ -8,7 +8,6 @@ pour une date d'expiration donnée.
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-import json
 from strategies import (
     OptionStrategy, ShortPut, ShortCall, ShortStraddle, ShortStrangle,
     IronCondor, IronButterfly, BullPutSpread, BearCallSpread
@@ -47,6 +46,76 @@ class StrategyComparison:
 class StrategyComparer:
     """Compare différentes stratégies d'options"""
     
+    # Configuration générique pour toutes les stratégies
+    STRATEGY_CONFIGS = {
+        'iron_condor': {
+            'class': IronCondor,
+            'legs': [
+                {'type': 'put', 'action': 'buy', 'offset': -6, 'strike_param': 'put_strike_low', 'premium_param': 'put_premium_low'},
+                {'type': 'put', 'action': 'sell', 'offset': -3, 'strike_param': 'put_strike_high', 'premium_param': 'put_premium_high'},
+                {'type': 'call', 'action': 'sell', 'offset': 3, 'strike_param': 'call_strike_low', 'premium_param': 'call_premium_low'},
+                {'type': 'call', 'action': 'buy', 'offset': 6, 'strike_param': 'call_strike_high', 'premium_param': 'call_premium_high'}
+            ],
+            'name_format': 'Iron Condor {put_strike_low:.0f}/{put_strike_high:.0f}/{call_strike_low:.0f}/{call_strike_high:.0f}'
+        },
+        'iron_butterfly': {
+            'class': IronButterfly,
+            'legs': [
+                {'type': 'put', 'action': 'buy', 'offset': -3, 'strike_param': 'long_put_strike', 'premium_param': 'long_put_premium'},
+                {'type': 'put', 'action': 'sell', 'offset': 0, 'strike_param': 'atm_strike', 'premium_param': 'short_put_premium'},
+                {'type': 'call', 'action': 'sell', 'offset': 0, 'strike_param': 'atm_strike', 'premium_param': 'short_call_premium'},
+                {'type': 'call', 'action': 'buy', 'offset': 3, 'strike_param': 'long_call_strike', 'premium_param': 'long_call_premium'}
+            ],
+            'name_format': 'Iron Butterfly {long_put_strike:.0f}/{atm_strike:.0f}/{long_call_strike:.0f}'
+        },
+        'short_strangle': {
+            'class': ShortStrangle,
+            'legs': [
+                {'type': 'put', 'action': 'sell', 'offset': -2, 'strike_param': 'put_strike', 'premium_param': 'put_premium'},
+                {'type': 'call', 'action': 'sell', 'offset': 2, 'strike_param': 'call_strike', 'premium_param': 'call_premium'}
+            ],
+            'name_format': 'Short Strangle {put_strike:.0f}/{call_strike:.0f}'
+        },
+        'short_straddle': {
+            'class': ShortStraddle,
+            'legs': [
+                {'type': 'put', 'action': 'sell', 'offset': 0, 'strike_param': 'strike', 'premium_param': 'put_premium'},
+                {'type': 'call', 'action': 'sell', 'offset': 0, 'strike_param': 'strike', 'premium_param': 'call_premium'}
+            ],
+            'name_format': 'Short Straddle {strike:.0f}'
+        },
+        'bull_put_spread': {
+            'class': BullPutSpread,
+            'legs': [
+                {'type': 'put', 'action': 'buy', 'offset': -6, 'strike_param': 'long_put_strike', 'premium_param': 'long_put_premium'},
+                {'type': 'put', 'action': 'sell', 'offset': -3, 'strike_param': 'short_put_strike', 'premium_param': 'short_put_premium'}
+            ],
+            'name_format': 'Bull Put Spread {long_put_strike:.0f}/{short_put_strike:.0f}'
+        },
+        'bear_call_spread': {
+            'class': BearCallSpread,
+            'legs': [
+                {'type': 'call', 'action': 'sell', 'offset': 3, 'strike_param': 'short_call_strike', 'premium_param': 'short_call_premium'},
+                {'type': 'call', 'action': 'buy', 'offset': 6, 'strike_param': 'long_call_strike', 'premium_param': 'long_call_premium'}
+            ],
+            'name_format': 'Bear Call Spread {short_call_strike:.0f}/{long_call_strike:.0f}'
+        },
+        'short_put': {
+            'class': ShortPut,
+            'legs': [
+                {'type': 'put', 'action': 'sell', 'offset': -2, 'strike_param': 'strike', 'premium_param': 'premium'}
+            ],
+            'name_format': 'Short Put {strike:.0f}'
+        },
+        'short_call': {
+            'class': ShortCall,
+            'legs': [
+                {'type': 'call', 'action': 'sell', 'offset': 2, 'strike_param': 'strike', 'premium_param': 'premium'}
+            ],
+            'name_format': 'Short Call {strike:.0f}'
+        }
+    }
+    
     def __init__(self, options_data: Dict[str, List[Dict]]):
         """
         Args:
@@ -55,6 +124,70 @@ class StrategyComparer:
         """
         self.calls_data = options_data.get('calls', [])
         self.puts_data = options_data.get('puts', [])
+    
+    def build_strategy(self,
+                      strategy_name: str,
+                      target_price: float,
+                      days_to_expiry: int) -> Optional[OptionStrategy]:
+        """
+        Méthode générique pour construire n'importe quelle stratégie
+        
+        Args:
+            strategy_name: Nom de la stratégie (ex: 'iron_condor', 'bull_put_spread')
+            target_price: Prix cible
+            days_to_expiry: Jours jusqu'à expiration
+        
+        Returns:
+            Instance de la stratégie ou None si impossible à construire
+        """
+        # Vérifier que la stratégie existe
+        if strategy_name not in self.STRATEGY_CONFIGS:
+            print(f"❌ Stratégie inconnue: {strategy_name}")
+            return None
+        
+        config = self.STRATEGY_CONFIGS[strategy_name]
+        
+        # Collecter les options et construire les paramètres
+        strikes = {}
+        premiums = {}
+        exp_date = None
+        
+        for leg in config['legs']:
+            # Calculer le strike
+            strike = round((target_price + leg['offset']) * 2) / 2
+            
+            # Trouver l'option
+            option = self.find_closest_option(strike, days_to_expiry, leg['type'])
+            if not option:
+                print(f"⚠ Option {leg['type']} à {strike} introuvable pour {strategy_name}")
+                return None
+            
+            # Stocker strike et premium avec les noms corrects des paramètres
+            strikes[leg['strike_param']] = option['strike']
+            premiums[leg['premium_param']] = option['premium']
+            
+            # Prendre la date d'expiration de la première option
+            if exp_date is None:
+                exp_date = datetime.strptime(option['expiration_date'], "%Y-%m-%d")
+        
+        # Construire les kwargs pour la stratégie
+        kwargs = {
+            'underlying_price': target_price,
+            'expiry': exp_date,
+            **strikes,
+            **premiums
+        }
+        
+        # Créer le nom de la stratégie
+        kwargs['name'] = config['name_format'].format(**strikes)
+        
+        # Instancier la stratégie
+        try:
+            strategy = config['class'](**kwargs)
+            return strategy
+        except Exception as e:
+            print(f"❌ Erreur lors de la création de {strategy_name}: {e}")
+            return None
     
     def find_closest_option(self, 
                            strike_target: float,
@@ -100,167 +233,6 @@ class StrategyComparer:
                 best_option = opt
         
         return best_option
-    
-    def build_centered_iron_condor(self,
-                                   target_price: float,
-                                   days_to_expiry: int,
-                                   wing_width: float = 5.0,
-                                   body_width: float = 3.0) -> Optional[IronCondor]:
-        """
-        Construit un Iron Condor centré autour du prix cible
-        
-        Args:
-            target_price: Prix cible (centre de la stratégie)
-            days_to_expiry: Jours jusqu'à expiration
-            wing_width: Largeur des ailes (écart entre short et long)
-            body_width: Distance du corps au prix cible
-        
-        Returns:
-            IronCondor ou None si données insuffisantes
-        """
-        # Calculer les strikes
-        put_strike_high = target_price - body_width  # Short put
-        put_strike_low = put_strike_high - wing_width  # Long put (protection)
-        call_strike_low = target_price + body_width  # Short call
-        call_strike_high = call_strike_low + wing_width  # Long call (protection)
-        
-        # Trouver les options
-        long_put = self.find_closest_option(put_strike_low, days_to_expiry, 'put')
-        short_put = self.find_closest_option(put_strike_high, days_to_expiry, 'put')
-        short_call = self.find_closest_option(call_strike_low, days_to_expiry, 'call')
-        long_call = self.find_closest_option(call_strike_high, days_to_expiry, 'call')
-        
-        if not all([long_put, short_put, short_call, long_call]):
-            return None
-        
-        # Obtenir la date d'expiration
-        exp_date = datetime.strptime(short_put['expiration_date'], "%Y-%m-%d")
-        
-        return IronCondor(
-            name=f"Iron Condor {put_strike_low:.0f}/{put_strike_high:.0f}/{call_strike_low:.0f}/{call_strike_high:.0f}",
-            underlying_price=target_price,
-            put_strike_low=long_put['strike'],
-            put_strike_high=short_put['strike'],
-            call_strike_low=short_call['strike'],
-            call_strike_high=long_call['strike'],
-            put_premium_low=long_put['premium'],
-            put_premium_high=short_put['premium'],
-            call_premium_low=short_call['premium'],
-            call_premium_high=long_call['premium'],
-            expiry=exp_date
-        )
-    
-    def build_centered_iron_butterfly(self,
-                                     target_price: float,
-                                     days_to_expiry: int,
-                                     wing_width: float = 5.0) -> Optional[IronButterfly]:
-        """
-        Construit un Iron Butterfly centré sur le prix cible
-        
-        Args:
-            target_price: Prix cible (ATM strike)
-            days_to_expiry: Jours jusqu'à expiration
-            wing_width: Largeur des ailes
-        
-        Returns:
-            IronButterfly ou None
-        """
-        # Strikes
-        atm_strike = round(target_price * 2) / 2  # Arrondir au 0.5 le plus proche
-        put_strike_low = atm_strike - wing_width
-        call_strike_high = atm_strike + wing_width
-        
-        # Trouver les options
-        long_put = self.find_closest_option(put_strike_low, days_to_expiry, 'put')
-        short_put = self.find_closest_option(atm_strike, days_to_expiry, 'put')
-        short_call = self.find_closest_option(atm_strike, days_to_expiry, 'call')
-        long_call = self.find_closest_option(call_strike_high, days_to_expiry, 'call')
-        
-        if not all([long_put, short_put, short_call, long_call]):
-            return None
-        
-        exp_date = datetime.strptime(short_put['expiration_date'], "%Y-%m-%d")
-        
-        return IronButterfly(
-            name=f"Iron Butterfly {put_strike_low:.0f}/{atm_strike:.0f}/{call_strike_high:.0f}",
-            underlying_price=target_price,
-            long_put_strike=long_put['strike'],
-            atm_strike=short_put['strike'],
-            long_call_strike=long_call['strike'],
-            long_put_premium=long_put['premium'],
-            short_put_premium=short_put['premium'],
-            short_call_premium=short_call['premium'],
-            long_call_premium=long_call['premium'],
-            expiry=exp_date
-        )
-    
-    def build_centered_short_strangle(self,
-                                     target_price: float,
-                                     days_to_expiry: int,
-                                     wing_width: float = 3.0) -> Optional[ShortStrangle]:
-        """
-        Construit un Short Strangle centré autour du prix cible
-        
-        Args:
-            target_price: Prix cible
-            days_to_expiry: Jours jusqu'à expiration
-            wing_width: Distance des strikes au prix cible
-        
-        Returns:
-            ShortStrangle ou None
-        """
-        put_strike = target_price - wing_width
-        call_strike = target_price + wing_width
-        
-        put_opt = self.find_closest_option(put_strike, days_to_expiry, 'put')
-        call_opt = self.find_closest_option(call_strike, days_to_expiry, 'call')
-        
-        if not all([put_opt, call_opt]):
-            return None
-        
-        exp_date = datetime.strptime(put_opt['expiration_date'], "%Y-%m-%d")
-        
-        return ShortStrangle(
-            name=f"Short Strangle {put_strike:.0f}/{call_strike:.0f}",
-            underlying_price=target_price,
-            put_strike=put_opt['strike'],
-            call_strike=call_opt['strike'],
-            put_premium=put_opt['premium'],
-            call_premium=call_opt['premium'],
-            expiry=exp_date
-        )
-    
-    def build_centered_short_straddle(self,
-                                     target_price: float,
-                                     days_to_expiry: int) -> Optional[ShortStraddle]:
-        """
-        Construit un Short Straddle centré sur le prix cible (ATM)
-        
-        Args:
-            target_price: Prix cible (strike ATM)
-            days_to_expiry: Jours jusqu'à expiration
-        
-        Returns:
-            ShortStraddle ou None
-        """
-        atm_strike = round(target_price * 2) / 2  # Arrondir au 0.5
-        
-        put_opt = self.find_closest_option(atm_strike, days_to_expiry, 'put')
-        call_opt = self.find_closest_option(atm_strike, days_to_expiry, 'call')
-        
-        if not all([put_opt, call_opt]):
-            return None
-        
-        exp_date = datetime.strptime(put_opt['expiration_date'], "%Y-%m-%d")
-        
-        return ShortStraddle(
-            name=f"Short Straddle {atm_strike:.0f}",
-            underlying_price=target_price,
-            strike=atm_strike,
-            call_premium=call_opt['premium'],
-            put_premium=put_opt['premium'],
-            expiry=exp_date
-        )
     
     def analyze_strategy(self,
                         strategy: OptionStrategy,
@@ -367,18 +339,9 @@ class StrategyComparer:
         
         comparisons = []
         
-        # Construire et analyser chaque stratégie
+        # Construire et analyser chaque stratégie avec la méthode générique
         for strat_name in strategies_to_compare:
-            strategy = None
-            
-            if strat_name == 'iron_condor':
-                strategy = self.build_centered_iron_condor(target_price, days_to_expiry)
-            elif strat_name == 'iron_butterfly':
-                strategy = self.build_centered_iron_butterfly(target_price, days_to_expiry)
-            elif strat_name == 'short_strangle':
-                strategy = self.build_centered_short_strangle(target_price, days_to_expiry)
-            elif strat_name == 'short_straddle':
-                strategy = self.build_centered_short_straddle(target_price, days_to_expiry)
+            strategy = self.build_strategy(strat_name, target_price, days_to_expiry)
             
             if strategy is None:
                 print(f"⚠ Impossible de construire: {strat_name}")
@@ -420,20 +383,26 @@ class StrategyComparer:
             
             # 1. Max profit (plus élevé = mieux)
             if 'max_profit' in weights and max_profit_val > 0:
-                score += (comp.max_profit / max_profit_val) * weights['max_profit']
+                normalized_profit = comp.max_profit / max_profit_val if max_profit_val > 0 else 0
+                score += normalized_profit * weights['max_profit']
             
             # 2. Risk/Reward (plus bas = mieux)
             if 'risk_reward' in weights and comp.risk_reward_ratio != float('inf'):
-                normalized_rr = 1 - ((comp.risk_reward_ratio - min_rr) / (max_rr - min_rr))
+                if max_rr > min_rr:  # Éviter division par zéro
+                    normalized_rr = 1 - ((comp.risk_reward_ratio - min_rr) / (max_rr - min_rr))
+                else:
+                    normalized_rr = 1.0  # Si tous égaux, score maximum
                 score += normalized_rr * weights['risk_reward']
             
             # 3. Zone profitable (plus large = mieux)
             if 'profit_zone' in weights and comp.profit_zone_width != float('inf') and max_zone_width > 0:
-                score += (comp.profit_zone_width / max_zone_width) * weights['profit_zone']
+                normalized_zone = comp.profit_zone_width / max_zone_width if max_zone_width > 0 else 0
+                score += normalized_zone * weights['profit_zone']
             
             # 4. Performance au prix cible (plus proche de 100% = mieux)
             if 'target_performance' in weights and max_target_perf > 0:
-                score += (comp.profit_at_target_pct / max_target_perf) * weights['target_performance']
+                normalized_target = comp.profit_at_target_pct / max_target_perf if max_target_perf > 0 else 0
+                score += normalized_target * weights['target_performance']
             
             comp.score = score
         
