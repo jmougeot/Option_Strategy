@@ -2,9 +2,6 @@
 REM ============================================================================
 REM Script de Lancement Rapide - Options Strategy Analyzer (Windows)
 REM ============================================================================
-REM Lance l'application Streamlit dans l'environnement virtuel
-REM Usage: Double-cliquez sur run.bat
-REM ============================================================================
 
 cd /d "%~dp0"
 

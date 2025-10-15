@@ -61,16 +61,12 @@ if %errorlevel% neq 0 (
         
         echo.
         echo Installation de Python en cours...
-        echo IMPORTANT: L'installateur va s'ouvrir.
-        echo            Assurez-vous de cocher "Add Python to PATH" !
         echo.
         pause
         
         REM Lancer l'installateur avec les options recommandees
         "!INSTALLER!" /passive InstallAllUsers=0 PrependPath=1 Include_test=0 Include_pip=1 Include_doc=0
         
-        echo.
-        echo Nettoyage...
         del "!INSTALLER!"
         
         echo.

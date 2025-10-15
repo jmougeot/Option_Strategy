@@ -15,7 +15,7 @@ class Option:
     option_type: Literal['call', 'put']
     strike: float
     premium: float
-    expiry: datetime
+    expiry: datetime 
     quantity: int = 1
     position: Literal['long', 'short'] = 'short'
     
