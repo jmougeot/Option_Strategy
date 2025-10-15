@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import json
 import re
 from typing import Dict, List
-from strategy_comparison import StrategyComparer, StrategyComparison
+from strategy.comparer import StrategyComparer, StrategyComparison
 
 # ============================================================================
 # CONFIGURATION DE LA PAGE
@@ -215,39 +215,28 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
     return fig
 
 def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFrame:
-    """
-    Crée un DataFrame formaté pour l'affichage des comparaisons
+    """Crée un DataFrame pour l'affichage des comparaisons."""
     
-    Args:
-        comparisons: Liste des stratégies comparées (déjà triées par score)
-        
-    Returns:
-        DataFrame avec toutes les métriques formatées
-    """
-    data = [{
-        'Rang': idx,
-        'Stratégie': comp.strategy_name,
-        'Crédit': format_currency(comp.net_credit),
-        'Max Profit': format_currency(comp.max_profit),
-        'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
-        'R/R Ratio': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
-        'Zone ±': format_currency(comp.profit_zone_width) if comp.profit_zone_width != float('inf') else 'Illimitée',
-        'P&L@Target': format_currency(comp.profit_at_target),
-        'Score': f"{comp.score:.3f}"
-    } for idx, comp in enumerate(comparisons, 1)]
+    data = []
+    for idx, comp in enumerate(comparisons, 1):
+        data.append({
+            'Rang': idx,
+            'Stratégie': comp.strategy_name,
+            'Crédit': format_currency(comp.net_credit),
+            'Max Profit': format_currency(comp.max_profit),
+            'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
+            'R/R Ratio': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
+            'Zone ±': format_currency(comp.profit_zone_width),
+            'P&L@Target': format_currency(comp.profit_at_target),
+            'Score': f"{comp.score:.3f}"
+        })
     
     return pd.DataFrame(data)
 
 def create_score_breakdown_chart(comparison: StrategyComparison):
-    """
-    Crée un graphique de visualisation du score global
+    """Crée un graphique de décomposition du score."""
     
-    Args:
-        comparison: StrategyComparison à visualiser
-        
-    Returns:
-        Figure Plotly avec le score affiché
-    """
+    # Affichage simple du score global
     fig = go.Figure(data=[
         go.Bar(
             x=[comparison.score],
