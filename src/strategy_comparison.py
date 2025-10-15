@@ -12,8 +12,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from strategies_v2_generic import OptionStrategy, GENERATED_STRATEGIES
 
-
-
 @dataclass
 class StrategyComparison:
     """Résultat de comparaison d'une stratégie"""
@@ -44,6 +42,7 @@ class StrategyComparison:
 
 
 class StrategyComparer:
+
     """
     Compare différentes stratégies d'options
     
@@ -206,7 +205,6 @@ class StrategyComparer:
         days_to_expiry = (expiration_date - datetime.now()).days
         
         # Métriques de base
-        net_credit = strategy.total_premium_received()
         max_profit = strategy.max_profit()
         
         # Calculer la perte maximale
@@ -247,7 +245,6 @@ class StrategyComparer:
             target_price=target_price,
             expiration_date=expiration_date,
             days_to_expiry=days_to_expiry,
-            net_credit=net_credit,
             max_profit=max_profit,
             max_loss=max_loss,
             breakeven_points=breakeven_points,
@@ -437,3 +434,4 @@ class StrategyComparer:
         plt.legend(loc='best', fontsize=10)
         plt.tight_layout()
         plt.show()
+

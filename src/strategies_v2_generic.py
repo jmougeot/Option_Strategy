@@ -40,6 +40,7 @@ class Option:
 class OptionStrategy:
     """Classe de base pour toutes les stratégies d'options"""
     name: str = ""
+    underlying : str
     underlying_price: float = 0.0
     options: List[Option] = field(default_factory=list)
     
