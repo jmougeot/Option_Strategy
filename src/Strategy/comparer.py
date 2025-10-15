@@ -4,13 +4,6 @@ from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-# Ajouter src/ au path pour les imports
-_current_dir = Path(__file__).resolve().parent
-_src_dir = _current_dir.parent
-if str(_src_dir) not in sys.path:
-    sys.path.insert(0, str(_src_dir))
-
-# Imports des modules
 from options.option_avaible import STRATEGY_DEFINITIONS
 from options.option_class import OptionStrategy, GENERATED_STRATEGIES
 from strategy.comparison_class import StrategyComparison
