@@ -13,7 +13,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Dict, List
-from strategy.comparer import StrategyComparer, StrategyComparison
+from .strategy.comparer import StrategyComparer, StrategyComparison
 
 
 
