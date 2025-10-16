@@ -143,7 +143,7 @@ echo Installation des dependances...
 echo   - streamlit
 echo   - plotly
 echo   - pandas
-pip install streamlit plotly pandas --quiet
+pip install -r requirements.txt
 if %errorlevel% neq 0 (
     echo ERREUR: Echec de l'installation des dependances
     pause
