@@ -175,32 +175,7 @@ pip install streamlit plotly pandas
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-### L'application ne s'ouvre pas dans le navigateur
-**Solution** :
-1. Ouvrez manuellement : http://localhost:8501
-2. Si ça ne fonctionne toujours pas, vérifiez que Streamlit est lancé dans la console
 
-### "ModuleNotFoundError"
-**Cause** : Dépendances pas installées
-
-**Solution** :
-```powershell
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-### Antivirus bloque l'installation
-**Solution** :
-1. Désactivez temporairement l'antivirus
-2. Lancez `install.bat`
-3. Réactivez l'antivirus
-
-### Double-clic sur .bat ne fait rien
-**Solution** :
-1. Clic droit sur `install.bat` ou `run.bat`
-2. Choisissez **"Exécuter en tant qu'administrateur"**
-
----
 
 ## 🔄 Mise à Jour
 
@@ -209,14 +184,6 @@ pip install -r requirements.txt
 2. Décompressez-la
 3. Remplacez l'ancien dossier
 4. Double-cliquez sur `install.bat` pour mettre à jour les dépendances
-
-### Méthode Git (Avancée)
-```powershell
-git pull origin main
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt --upgrade
-```
-
 ---
 
 ## 🎯 Commandes Utiles
