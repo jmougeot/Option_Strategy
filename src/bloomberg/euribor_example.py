@@ -21,12 +21,13 @@ Date: 2025-10-16
 """
 
 from datetime import date
-from bloomberg import (
-    BloombergOptionFetcher,
-    format_euribor_option,
-    format_option_table,
-    format_term_structure
-)
+from fetcher import BloombergOptionFetcher
+from formatters import (
+        format_euribor_option,
+        format_option_table,
+        format_term_structure
+    )
+from models import EuriborOptionData
 
 
 def example_1_single_euribor_option():
@@ -51,7 +52,7 @@ def example_1_single_euribor_option():
             is_euribor=True
         )
         
-        if option:
+        if option and isinstance(option, EuriborOptionData):
             print(format_euribor_option(option))
             print(f"\nDétails:")
             print(f"  - Ticker Bloomberg: {option.ticker}")
@@ -138,6 +139,11 @@ def example_3_euribor_payoff_scenarios():
             print("❌ Option non trouvée")
             return
         
+        # Vérifier que c'est bien un EuriborOptionData
+        if not isinstance(option, EuriborOptionData):
+            print("❌ Erreur: option n'est pas de type EuriborOptionData")
+            return
+        
         print(f"Position: LONG {option.ticker}")
         print(f"Strike: {option.strike} (Taux implicite: {option.implied_rate:.2f}%)")
         
@@ -202,6 +208,11 @@ def example_4_euribor_spread_strategy():
         
         if not long_call or not short_call:
             print("❌ Options non trouvées")
+            return
+        
+        # Vérifier que ce sont bien des EuriborOptionData
+        if not isinstance(long_call, EuriborOptionData) or not isinstance(short_call, EuriborOptionData):
+            print("❌ Erreur: les options ne sont pas de type EuriborOptionData")
             return
         
         print("Stratégie: Bull Call Spread")

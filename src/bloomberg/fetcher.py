@@ -185,15 +185,6 @@ class BloombergOptionFetcher:
             option_type: "C"/"CALL" ou "P"/"PUT"
             strike: Prix d'exercice
             is_euribor: True pour options EURIBOR (auto-détecté si False)
-        
-        Returns:
-            OptionData ou EuriborOptionData rempli avec les données Bloomberg
-            None si l'option n'existe pas
-        
-        Exemple:
-            >>> with BloombergOptionFetcher() as fetcher:
-            ...     opt = fetcher.get_option_data("AAPL", date(2024, 12, 20), "C", 150.0)
-            ...     print(f"Delta: {opt.delta}, IV: {opt.implied_volatility}%")
         """
         # Construire le ticker
         ticker = build_option_ticker(underlying, expiry, option_type, strike, is_euribor)
