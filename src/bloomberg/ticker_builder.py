@@ -9,7 +9,7 @@ Supporte:
 - Options EURIBOR (taux): "ER H5 C97.50 Comdty"
 
 Auteur: BGC Trading Desk
-Date: 2025-10-16
+Date: 2026-10-16
 """
 
 from datetime import date, datetime
@@ -135,7 +135,7 @@ def build_euribor_option_ticker(
     Détails:
     - ER = symbole EURIBOR 3 mois sur Eurex
     - MonthCode = lettre pour le mois (H=Mars, M=Juin, U=Sept, Z=Déc)
-    - Year = dernière chiffre de l'année (5 pour 2025, 6 pour 2026)
+    - Year = dernière chiffre de l'année (5 pour 2026, 6 pour 2026)
     - Strike = prix du future (ex: 97.50 = taux implicite 2.50%)
     
     Format final: ERH6 C97.50 Comdty (SANS espace entre ER et H6)
@@ -149,10 +149,10 @@ def build_euribor_option_ticker(
         Ticker EURIBOR complet (ex: "ERH5 C97.50 Comdty")
     
     Exemples:
-        >>> build_euribor_option_ticker(date(2025, 3, 15), "C", 97.50)
+        >>> build_euribor_option_ticker(date(2026, 3, 15), "C", 97.50)
         'ERH5 C97.50 Comdty'
         
-        >>> build_euribor_option_ticker(date(2025, 6, 15), "PUT", 98.00)
+        >>> build_euribor_option_ticker(date(2026, 6, 15), "PUT", 98.00)
         'ERM5 P98.00 Comdty'
     """
     # Normaliser le type
@@ -194,10 +194,10 @@ def build_option_ticker(
         Ticker Bloomberg complet
     
     Exemples:
-        >>> build_option_ticker("AAPL", date(2024, 12, 20), "C", 150.0)
+        >>> build_option_ticker("AAPL", date(2026, 12, 20), "C", 150.0)
         'AAPL 12/20/24 C150 Equity'
         
-        >>> build_option_ticker("ER", date(2025, 3, 15), "C", 97.50)
+        >>> build_option_ticker("ER", date(2026, 3, 15), "C", 97.50)
         'ER H5 C97.50 Comdty'
     """
     # Auto-détection EURIBOR
@@ -214,7 +214,7 @@ def parse_euribor_expiry_code(code: str) -> date:
     """
     Convertit un code d'expiry EURIBOR en date.
     
-    Format: "{MonthCode}{Year}" (ex: "H5" = Mars 2025)
+    Format: "{MonthCode}{Year}" (ex: "H5" = Mars 2026)
     
     Args:
         code: Code d'expiry (ex: "H5", "M5", "U5", "Z5")
@@ -224,10 +224,10 @@ def parse_euribor_expiry_code(code: str) -> date:
     
     Exemples:
         >>> parse_euribor_expiry_code("H5")
-        datetime.date(2025, 3, 15)
+        datetime.date(2026, 3, 15)
         
         >>> parse_euribor_expiry_code("Z5")
-        datetime.date(2025, 12, 15)
+        datetime.date(2026, 12, 15)
     """
     month_code = code[0].upper()
     year_digit = int(code[1])
@@ -252,15 +252,15 @@ def parse_euribor_expiry_code(code: str) -> date:
 if __name__ == "__main__":
     # Tests de construction de tickers
     print("=== Test Equity Options ===")
-    print(build_option_ticker("AAPL", date(2024, 12, 20), "C", 150.0))
-    print(build_option_ticker("MSFT", date(2024, 12, 20), "P", 300.0))
+    print(build_option_ticker("AAPL", date(2026, 12, 20), "C", 150.0))
+    print(build_option_ticker("MSFT", date(2026, 12, 20), "P", 300.0))
     
     print("\n=== Test Index Options ===")
-    print(build_option_ticker("SPX", date(2024, 12, 20), "C", 4500.0))
-    print(build_option_ticker("NDX", date(2024, 12, 20), "P", 15000.0))
+    print(build_option_ticker("SPX", date(2026, 12, 20), "C", 4500.0))
+    print(build_option_ticker("NDX", date(2026, 12, 20), "P", 15000.0))
     
     print("\n=== Test EURIBOR Options ===")
-    print(build_option_ticker("ER", date(2025, 3, 15), "C", 97.50))
-    print(build_option_ticker("ER", date(2025, 6, 15), "P", 98.00))
-    print(build_option_ticker("ER", date(2025, 9, 15), "C", 97.75))
-    print(build_option_ticker("ER", date(2025, 12, 15), "P", 98.25))
+    print(build_option_ticker("ER", date(2026, 3, 15), "C", 97.50))
+    print(build_option_ticker("ER", date(2026, 6, 15), "P", 98.00))
+    print(build_option_ticker("ER", date(2026, 9, 15), "C", 97.75))
+    print(build_option_ticker("ER", date(2026, 12, 15), "P", 98.25))
