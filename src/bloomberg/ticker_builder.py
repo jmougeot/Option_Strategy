@@ -169,7 +169,7 @@ def build_euribor_option_ticker(
     
     # Construire le ticker (SANS espace entre ER et le code)
     # Format correct: ERH6 C97.50 Comdty (pas ER H6 C97.50 Comdty)
-    ticker = f"ER{month_code}{year_code} {opt_type}{strike_str} Comdty"
+    ticker = f"ER{month_code}{year_code}{opt_type} {strike_str} Comdty"
     return ticker
 
 
