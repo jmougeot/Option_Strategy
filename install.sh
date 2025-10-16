@@ -91,6 +91,8 @@ echo "   • streamlit"
 echo "   • plotly"
 echo "   • pandas"
 pip install -r requirements.txt --quiet
+echo "blpapiioiiii"
+pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi
 echo "✅ Dépendances installées"
 echo ""
 
