@@ -233,8 +233,8 @@ class StrategyComparer:
     def compare_strategies(self,
                           target_price: float,
                           days_to_expiry: int,
-                          strategies_to_compare: List[str] = None,
-                          weights: Dict[str, float] = None) -> List[StrategyComparison]:
+                          strategies_to_compare: Optional[List[str]] = None,
+                          weights: Optional[Dict[str, float]] = None) -> List[StrategyComparison]:
         """
         Compare plusieurs stratégies centrées sur le prix cible
         
@@ -364,7 +364,7 @@ class StrategyComparer:
     
     def plot_strategy_comparison(self,
                                 comparisons: List[StrategyComparison],
-                                price_range: Tuple[float, float] = None):
+                                price_range: Optional[Tuple[float, float]] = None):
         """
         Trace les diagrammes P&L de toutes les stratégies
         
