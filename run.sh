@@ -10,7 +10,7 @@
 cd "$(dirname "$0")"
 
 echo ""
-echo "🚀 Lancement de l'application..."
+echo " Lancement de l'application..."
 echo ""
 
 # Vérifier si l'environnement virtuel existe
@@ -23,5 +23,8 @@ fi
 # Activer l'environnement virtuel
 source venv/bin/activate
 
-# Lancer Streamlit
+# Ajouter src/ au PYTHONPATH
+export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+
+
 streamlit run src/app.py

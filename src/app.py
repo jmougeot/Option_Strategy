@@ -1,7 +1,6 @@
 """
 Streamlit Interface for Options Strategy Comparison
-Author: BGC Trading System
-Description: Web user interface to compare short volatility strategies
+Description: Web user interface to compare options strategies
 """
 
 import streamlit as st
@@ -15,21 +14,14 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
-# Ajouter src/ au path pour les imports
-_current_file = Path(__file__).resolve()
-_src_dir = _current_file.parent
-if str(_src_dir) not in sys.path:
-    sys.path.insert(0, str(_src_dir))
-
-# Import du module strategy
 try:
-    from strategy.comparer import StrategyComparer, StrategyComparison
+    from .strategy.comparer import StrategyComparer, StrategyComparison
 except ImportError:
-    try:
-        from Strategy.comparer import StrategyComparer, StrategyComparison
-    except ImportError:
-        st.error("❌ Impossible d'importer le module strategy. Vérifiez l'installation.")
-        st.stop()
+    src_dir = Path(__file__).resolve().parent
+    if str(src_dir) not in sys.path:
+        sys.path.append(str(src_dir))
+    from strategy.comparer import StrategyComparer, StrategyComparison
+
 
 # ============================================================================
 # CONFIGURATION DE LA PAGE

@@ -206,12 +206,19 @@ class StrategyComparer:
         profit_at_target = strategy.profit_at_expiry(target_price)
         profit_at_target_pct = (profit_at_target / max_profit * 100) if max_profit > 0 else 0
         
+        # Calculer le crédit net (prime reçue pour short strategies)
+        try:
+            net_credit = strategy.total_premium_received() if hasattr(strategy, 'total_premium_received') else max_profit
+        except:
+            net_credit = max_profit
+        
         return StrategyComparison(
             strategy_name=strategy.name,
             strategy=strategy,
             target_price=target_price,
             expiration_date=expiration_date,
             days_to_expiry=days_to_expiry,
+            net_credit=net_credit,
             max_profit=max_profit,
             max_loss=max_loss,
             breakeven_points=breakeven_points,
