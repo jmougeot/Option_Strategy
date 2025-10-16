@@ -90,7 +90,7 @@ echo "📥 Installation des dépendances..."
 echo "   • streamlit"
 echo "   • plotly"
 echo "   • pandas"
-pip install streamlit plotly pandas --quiet
+pip install -r requirement.txt --quiet
 echo "✅ Dépendances installées"
 echo ""
 
