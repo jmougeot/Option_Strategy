@@ -41,32 +41,57 @@ def example_1_single_euribor_option():
     print("EXEMPLE 1: Option EURIBOR spécifique")
     print("="*80)
     
-    with BloombergOptionFetcher() as fetcher:
-        # Option: CALL Mars 2025, strike 97.50
-        # Ticker Bloomberg: "ER H5 C97.50 Comdty"
-        option = fetcher.get_option_data(
-            underlying="ER",
-            expiry=date(2025, 3, 15),  # Mars 2025
-            option_type="C",            # CALL
-            strike=97.50,               # Strike = 97.50 → taux implicite 2.50%
-            is_euribor=True
-        )
-        
-        if option and isinstance(option, EuriborOptionData):
-            print(format_euribor_option(option))
-            print(f"\nDétails:")
-            print(f"  - Ticker Bloomberg: {option.ticker}")
-            print(f"  - Taux implicite: {option.implied_rate:.2f}%")
-            print(f"  - Valeur du tick: €{option.tick_value:.2f}")
+    print("[DEBUG] Création du BloombergOptionFetcher...")
+    try:
+        with BloombergOptionFetcher() as fetcher:
+            print("[DEBUG] ✓ Fetcher créé et connexion établie")
             
-            if option.last:
-                print(f"  - Dernier prix: ${option.last:.2f}")
-                print(f"  - Valeur notionnelle: €{option.last * option.contract_size:.2f}")
-        else:
-            print("❌ Option non trouvée. Vérifiez:")
-            print("  - Bloomberg Terminal est lancé")
-            print("  - La date d'expiry existe (contrats trimestriels)")
-            print("  - Le ticker est correct")
+            # Option: CALL Mars 2025, strike 97.50
+            # Ticker Bloomberg: "ER H5 C97.50 Comdty"
+            print("[DEBUG] Requête option EURIBOR:")
+            print("[DEBUG]   - Underlying: ER")
+            print("[DEBUG]   - Expiry: 2025-03-15")
+            print("[DEBUG]   - Type: CALL")
+            print("[DEBUG]   - Strike: 97.50")
+            print("[DEBUG]   - is_euribor: True")
+            
+            option = fetcher.get_option_data(
+                underlying="ER",
+                expiry=date(2025, 3, 15),  # Mars 2025
+                option_type="C",            # CALL
+                strike=97.50,               # Strike = 97.50 → taux implicite 2.50%
+                is_euribor=True
+            )
+            
+            print(f"[DEBUG] Option retournée: {option}")
+            print(f"[DEBUG] Type de l'option: {type(option)}")
+            print(f"[DEBUG] Est EuriborOptionData? {isinstance(option, EuriborOptionData)}")
+            
+            if option and isinstance(option, EuriborOptionData):
+                print("[DEBUG] ✓ Option EURIBOR valide trouvée")
+                print(format_euribor_option(option))
+                print(f"\nDétails:")
+                print(f"  - Ticker Bloomberg: {option.ticker}")
+                print(f"  - Taux implicite: {option.implied_rate:.2f}%")
+                print(f"  - Valeur du tick: €{option.tick_value:.2f}")
+                
+                if option.last:
+                    print(f"  - Dernier prix: ${option.last:.2f}")
+                    print(f"  - Valeur notionnelle: €{option.last * option.contract_size:.2f}")
+                else:
+                    print("[DEBUG] ⚠️ Pas de dernier prix disponible")
+            elif option:
+                print(f"[DEBUG] ⚠️ Option trouvée mais n'est pas EuriborOptionData (type: {type(option)})")
+            else:
+                print("[DEBUG] ✗ Option non trouvée (retour None)")
+                print("❌ Option non trouvée. Vérifiez:")
+                print("  - Bloomberg Terminal est lancé")
+                print("  - La date d'expiry existe (contrats trimestriels)")
+                print("  - Le ticker est correct")
+                
+    except Exception as e:
+        print(f"[DEBUG] ✗ Exception dans example_1: {type(e).__name__}: {e}")
+        raise  # Re-lever l'exception pour la gérer dans main()
 
 
 def example_2_euribor_term_structure():
@@ -256,24 +281,69 @@ def main():
     print("  4. Construire et analyser des spreads sur taux")
     
     try:
+        print("\n[DEBUG] Démarrage des exemples...")
+        
         # Exécuter chaque exemple
+        print("[DEBUG] Exécution de l'exemple 1: Option EURIBOR spécifique")
         example_1_single_euribor_option()
         
         # Décommenter pour exécuter les autres exemples
+        # print("[DEBUG] Exécution de l'exemple 2: Structure de terme")
         # example_2_euribor_term_structure()
+        # print("[DEBUG] Exécution de l'exemple 3: Scénarios de payoff")
         # example_3_euribor_payoff_scenarios()
+        # print("[DEBUG] Exécution de l'exemple 4: Bull Call Spread")
         # example_4_euribor_spread_strategy()
         
         print("\n" + "="*80)
-        print("✓ Exemples terminés")
+        print("✓ Exemples terminés avec succès")
         print("="*80)
         
+    except ImportError as e:
+        print(f"\n❌ ERREUR D'IMPORT: {e}")
+        print("\n[DEBUG] Type d'erreur: ImportError")
+        print("[DEBUG] Détails de l'erreur:")
+        import traceback
+        traceback.print_exc()
+        print("\nSolution:")
+        print("  - Installez le module manquant: pip install blpapi")
+        
+    except ConnectionError as e:
+        print(f"\n❌ ERREUR DE CONNEXION BLOOMBERG: {e}")
+        print("\n[DEBUG] Type d'erreur: ConnectionError")
+        print("[DEBUG] Détails de l'erreur:")
+        import traceback
+        traceback.print_exc()
+        print("\nSolution:")
+        print("  - Vérifiez que Bloomberg Terminal est lancé")
+        print("  - Vérifiez que vous êtes connecté (login Bloomberg)")
+        print("  - Redémarrez Bloomberg Terminal si nécessaire")
+        
+    except AttributeError as e:
+        print(f"\n❌ ERREUR D'ATTRIBUT: {e}")
+        print("\n[DEBUG] Type d'erreur: AttributeError")
+        print("[DEBUG] Cela arrive souvent quand l'option retournée n'est pas du bon type")
+        print("[DEBUG] Détails de l'erreur:")
+        import traceback
+        traceback.print_exc()
+        print("\nSolution:")
+        print("  - Vérifiez que is_euribor=True est bien passé")
+        print("  - Vérifiez que le ticker EURIBOR existe pour cette date")
+        
     except Exception as e:
-        print(f"\n❌ Erreur: {e}")
-        print("\nVérifiez que:")
+        print(f"\n❌ ERREUR INATTENDUE: {e}")
+        print(f"\n[DEBUG] Type d'erreur: {type(e).__name__}")
+        print("[DEBUG] Stack trace complet:")
+        import traceback
+        traceback.print_exc()
+        print("\nInformations de debug:")
+        print(f"  - Type d'exception: {type(e).__module__}.{type(e).__name__}")
+        print(f"  - Message: {str(e)}")
+        print("\nVérifications à faire:")
         print("  - Bloomberg Terminal est lancé et connecté")
         print("  - Le module blpapi est installé (pip install blpapi)")
         print("  - Vous avez accès aux données EURIBOR sur votre abonnement")
+        print("  - Les dates d'expiry sont correctes (contrats trimestriels)")
 
 
 if __name__ == "__main__":

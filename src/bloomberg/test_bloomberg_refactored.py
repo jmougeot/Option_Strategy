@@ -15,8 +15,8 @@ from datetime import date
 from unittest.mock import Mock, patch
 
 # Import des modules à tester
-from bloomberg.models import OptionData, EuriborOptionData
-from bloomberg.ticker_builder import (
+from models import OptionData, EuriborOptionData
+from ticker_builder import (
     get_suffix,
     build_equity_option_ticker,
     build_euribor_option_ticker,
@@ -24,7 +24,7 @@ from bloomberg.ticker_builder import (
     parse_euribor_expiry_code,
     MONTH_CODES
 )
-from bloomberg.formatters import (
+from formatters import (
     format_option_summary,
     format_euribor_option,
     format_greeks_summary
@@ -62,7 +62,8 @@ class TestOptionData:
             ask=5.20
         )
         
-        assert opt.spread == 0.20
+        # Utiliser pytest.approx pour gérer la précision des floats
+        assert opt.spread == pytest.approx(0.20, abs=1e-9)
     
     def test_spread_none_when_missing_data(self):
         """Test spread None si bid/ask manquants"""
@@ -417,12 +418,14 @@ class TestIntegration:
             last=5.20,
             bid=5.10,
             ask=5.30,
+            mid=5.20,
+            volume=1000,  # Ajouter volume pour is_liquid
             delta=0.45,
             implied_volatility=25.3
         )
         
         # 3. Vérifier propriétés
-        assert opt.spread == 0.20
+        assert opt.spread == pytest.approx(0.20, abs=1e-9)
         assert opt.is_liquid is True
         
         # 4. Formater

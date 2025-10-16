@@ -11,7 +11,7 @@ Date: 2025-10-16
 """
 
 from datetime import date, datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 import blpapi
 from connection import BloombergConnection
 from ticker_builder import build_option_ticker, parse_euribor_expiry_code
@@ -75,11 +75,19 @@ class BloombergOptionFetcher:
     
     def connect(self):
         """Établit la connexion Bloomberg."""
-        self.connection.connect()
+        print("[DEBUG fetcher] Tentative de connexion Bloomberg...")
+        try:
+            self.connection.connect()
+            print("[DEBUG fetcher] ✓ Connexion Bloomberg établie")
+        except Exception as e:
+            print(f"[DEBUG fetcher] ✗ Erreur de connexion: {type(e).__name__}: {e}")
+            raise
     
     def disconnect(self):
         """Ferme la connexion Bloomberg."""
+        print("[DEBUG fetcher] Fermeture de la connexion Bloomberg...")
         self.connection.disconnect()
+        print("[DEBUG fetcher] ✓ Connexion fermée")
     
     # Context Manager
     def __enter__(self):
@@ -172,7 +180,7 @@ class BloombergOptionFetcher:
         self,
         underlying: str,
         expiry: date,
-        option_type: str,
+        option_type: Literal['C', 'P', 'CALL', 'PUT'],
         strike: float,
         is_euribor: bool = False
     ) -> Optional[OptionData]:
@@ -185,18 +193,32 @@ class BloombergOptionFetcher:
             option_type: "C"/"CALL" ou "P"/"PUT"
             strike: Prix d'exercice
             is_euribor: True pour options EURIBOR (auto-détecté si False)
+        
+        Exemple:
+            >>> with BloombergOptionFetcher() as fetcher:
+            ...     opt = fetcher.get_option_data("AAPL", date(2024, 12, 20), "C", 150.0)
+            ...     print(f"Delta: {opt.delta}, IV: {opt.implied_volatility}%")
         """
         # Construire le ticker
+        print(f"[DEBUG fetcher] Construction du ticker: underlying={underlying}, expiry={expiry}, type={option_type}, strike={strike}, is_euribor={is_euribor}")
         ticker = build_option_ticker(underlying, expiry, option_type, strike, is_euribor)
+        print(f"[DEBUG fetcher] Ticker construit: {ticker}")
         
         # Récupérer les données
+        print(f"[DEBUG fetcher] Envoi de la requête Bloomberg pour {ticker}")
+        print(f"[DEBUG fetcher] Champs demandés: {len(self.fields)} champs")
         data = self._send_request(ticker, self.fields)
+        print(f"[DEBUG fetcher] Réponse Bloomberg reçue: {len(data)} champs retournés")
         
         if not data:
+            print(f"[DEBUG fetcher] ✗ Aucune donnée retournée pour {ticker}")
             return None
+        
+        print(f"[DEBUG fetcher] Données reçues: {list(data.keys())}")
         
         # Créer l'objet approprié
         if is_euribor or underlying.upper() in ['ER', 'EURIBOR']:
+            print(f"[DEBUG fetcher] Création d'un objet EuriborOptionData")
             option = EuriborOptionData(
                 ticker=ticker,
                 underlying=underlying.upper(),

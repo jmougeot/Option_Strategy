@@ -59,14 +59,16 @@ def get_suffix(underlying: str) -> str:
     underlying = underlying.upper()
     
     # Cas EURIBOR et futures de taux
-    if 'ER' in underlying or 'EURIBOR' in underlying:
+    if underlying in ['ER', 'EURIBOR'] or underlying.startswith('ER'):
         return 'Comdty'
     
-    # Cas indices (SPX, NDX, RUT, etc.)
-    if underlying.endswith('X') or sum(c.isupper() for c in underlying) > 2:
+    # Cas indices (finissent souvent par X: SPX, NDX, VIX, etc.)
+    # Liste explicite des indices courants
+    indices = ['SPX', 'NDX', 'RUT', 'VIX', 'DJX', 'OEX', 'XSP']
+    if underlying in indices or underlying.endswith('X'):
         return 'Index'
     
-    # Cas par défaut: actions
+    # Cas par défaut: actions (AAPL, MSFT, GOOGL, etc.)
     return 'Equity'
 
 
