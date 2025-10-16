@@ -144,6 +144,8 @@ echo   - streamlit
 echo   - plotly
 echo   - pandas
 pip install -r requirements.txt
+echo "blpapiioiiii"
+pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi
 if %errorlevel% neq 0 (
     echo ERREUR: Echec de l'installation des dependances
     pause
