@@ -10,7 +10,6 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import json
 import re
-import sys
 from pathlib import Path
 from typing import Dict, List
 from Strategy.comparer import StrategyComparer, StrategyComparison
