@@ -5,9 +5,6 @@ from typing import Dict, List, Literal, Optional, Type, Callable
 from .option_avaible import STRATEGY_DEFINITIONS
 
 """
-Module de base des options et stratégies
-=======================================
-
 Ce module définit deux niveaux de responsabilités complémentaires:
 
 - Option: Représente un leg individuel (call/put) avec son strike, sa prime, sa quantité, etc.
@@ -18,10 +15,6 @@ Ce module définit deux niveaux de responsabilités complémentaires:
     (STRATEGY_DEFINITIONS). Elle compose dynamiquement des sous-classes d'OptionStrategy en
     ajoutant les champs spécifiques, en implémentant max_loss() et breakeven_points() lorsque
     des formules sont fournies, et en préparant un BUILD_CONFIG pour la construction générique.
-
-Règle d'or: La logique générique et les valeurs par défaut vivent dans OptionStrategy.
-La logique spécifique à une famille de stratégies (ex: spreads protégés, straddles, etc.)
-peut être injectée par StrategyFactory via des surcharges propres à la stratégie générée.
 """
 
 @dataclass
@@ -38,6 +31,23 @@ class Option:
     expiry: datetime 
     quantity: int = 1
     position: Literal['long', 'short'] = 'short'
+
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    last: Optional[float] = None
+    mid: Optional[float] = None
+
+    # Greeks
+    delta: Optional[float] = None
+    gamma: Optional[float] = None
+    vega: Optional[float] = None
+    theta: Optional[float] = None
+    rho: Optional[float] = None
+
+    # Autres données
+    implied_volatility: Optional[float] = None
+    open_interest: Optional[int] = None
+    volume: Optional[int] = None
     
     def intrinsic_value(self, spot_price: float) -> float:
         """Calcule la valeur intrinsèque de l'option"""
