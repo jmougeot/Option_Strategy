@@ -376,5 +376,5 @@ def format_option_table(options: List[OptionData]) -> str:
 
 
 if __name__ == "__main__":
-    print("📊 Module Bloomberg Option Data Fetcher")
+    print(" Module Bloomberg Option Data Fetcher")
     print("Utilisez option_data_fetcher_test.py pour tester le module")
