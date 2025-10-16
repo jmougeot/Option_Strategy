@@ -57,7 +57,7 @@ def example_1_single_euribor_option():
             
             option = fetcher.get_option_data(
                 underlying="ER",
-                expiry=date(2025, 3, 15),  # Mars 2025
+                expiry=date(2026, 3, 15),  # Mars 2025
                 option_type="C",            # CALL
                 strike=97.50,               # Strike = 97.50 → taux implicite 2.50%
                 is_euribor=True

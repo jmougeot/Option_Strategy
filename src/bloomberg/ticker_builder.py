@@ -135,8 +135,10 @@ def build_euribor_option_ticker(
     Détails:
     - ER = symbole EURIBOR 3 mois sur Eurex
     - MonthCode = lettre pour le mois (H=Mars, M=Juin, U=Sept, Z=Déc)
-    - Year = dernière chiffre de l'année (5 pour 2025)
+    - Year = dernière chiffre de l'année (5 pour 2025, 6 pour 2026)
     - Strike = prix du future (ex: 97.50 = taux implicite 2.50%)
+    
+    Format final: ERH6 C97.50 Comdty (SANS espace entre ER et H6)
     
     Args:
         expiry: Date d'expiration du future
@@ -144,14 +146,14 @@ def build_euribor_option_ticker(
         strike: Strike en points de future (ex: 97.50)
     
     Returns:
-        Ticker EURIBOR complet (ex: "ER H5 C97.50 Comdty")
+        Ticker EURIBOR complet (ex: "ERH5 C97.50 Comdty")
     
     Exemples:
         >>> build_euribor_option_ticker(date(2025, 3, 15), "C", 97.50)
-        'ER H5 C97.50 Comdty'
+        'ERH5 C97.50 Comdty'
         
         >>> build_euribor_option_ticker(date(2025, 6, 15), "PUT", 98.00)
-        'ER M5 P98.00 Comdty'
+        'ERM5 P98.00 Comdty'
     """
     # Normaliser le type
     opt_type = option_type[0].upper()
@@ -165,8 +167,9 @@ def build_euribor_option_ticker(
     # Formater le strike (2 décimales)
     strike_str = f"{strike:.2f}"
     
-    # Construire le ticker
-    ticker = f"ER {month_code}{year_code} {opt_type}{strike_str} Comdty"
+    # Construire le ticker (SANS espace entre ER et le code)
+    # Format correct: ERH6 C97.50 Comdty (pas ER H6 C97.50 Comdty)
+    ticker = f"ER{month_code}{year_code} {opt_type}{strike_str} Comdty"
     return ticker
 
 
