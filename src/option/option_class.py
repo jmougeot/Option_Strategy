@@ -25,13 +25,14 @@ class Option:
     - Calculer la valeur intrinsèque à l'expiration
     - Calculer la valeur (payoff) à l'expiration selon la position (long/short)
     """
-    option_type: Literal['call', 'put']
+    option_type: str
     strike: float
     premium: float
     expiry: datetime 
     quantity: int = 1
     position: Literal['long', 'short'] = 'short'
-
+    
+    ticker: Optional[str] = None
     bid: Optional[float] = None
     ask: Optional[float] = None
     last: Optional[float] = None
@@ -64,6 +65,12 @@ class Option:
             return (intrinsic - self.premium) * self.quantity
         else:  # short
             return (self.premium - intrinsic) * self.quantity
+    
+    def __repr__(self) -> str:
+        return (
+            f"OptionData({self.ticker} | Strike={self.strike} | "
+            f"Last={self.last} | Delta={self.delta} | IV={self.implied_volatility})"
+        )
 
 
 @dataclass
