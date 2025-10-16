@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from option.option_avaible import STRATEGY_DEFINITIONS
 from option.option_class import OptionStrategy, GENERATED_STRATEGIES
-from strategy.comparison_class import StrategyComparison
+from .comparison_class import StrategyComparison
 
 class StrategyComparer:
 
