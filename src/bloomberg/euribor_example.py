@@ -17,7 +17,7 @@ Prérequis:
 - Module blpapi installé (pip install blpapi)
 
 Auteur: BGC Trading Desk
-Date: 2025-10-16
+Date: 2026-10-16
 """
 
 from datetime import date
@@ -34,7 +34,7 @@ def example_1_single_euribor_option():
     """
     Exemple 1: Récupérer une option EURIBOR spécifique.
     
-    On cherche un CALL sur le future EURIBOR Mars 2025, strike 97.50
+    On cherche un CALL sur le future EURIBOR Mars 2026, strike 98.00
     (ce qui correspond à un taux implicite de 2.50%)
     """
     print("\n" + "="*80)
@@ -46,20 +46,20 @@ def example_1_single_euribor_option():
         with BloombergOptionFetcher() as fetcher:
             print("[DEBUG] ✓ Fetcher créé et connexion établie")
             
-            # Option: CALL Mars 2025, strike 97.50
-            # Ticker Bloomberg: "ER H5 C97.50 Comdty"
+            # Option: CALL Mars 2026, strike 98.00
+            # Ticker Bloomberg: "ER H5 C98.00 Comdty"
             print("[DEBUG] Requête option EURIBOR:")
             print("[DEBUG]   - Underlying: ER")
-            print("[DEBUG]   - Expiry: 2025-03-15")
+            print("[DEBUG]   - Expiry: 2026-03-15")
             print("[DEBUG]   - Type: CALL")
-            print("[DEBUG]   - Strike: 97.50")
+            print("[DEBUG]   - Strike: 98.00")
             print("[DEBUG]   - is_euribor: True")
             
             option = fetcher.get_option_data(
                 underlying="ER",
-                expiry=date(2026, 3, 15),  # Mars 2025
+                expiry=date(2026, 3, 15),  # Mars 2026
                 option_type="C",            # CALL
-                strike=97.50,               # Strike = 97.50 → taux implicite 2.50%
+                strike=98.00,               # Strike = 98.00 → taux implicite 2.50%
                 is_euribor=True
             )
             
@@ -98,7 +98,7 @@ def example_2_euribor_term_structure():
     """
     Exemple 2: Analyser la structure de terme de la volatilité EURIBOR.
     
-    On scanne toutes les expiries disponibles pour un strike donné (ex: 97.50)
+    On scanne toutes les expiries disponibles pour un strike donné (ex: 98.00)
     et on affiche comment la volatilité implicite évolue dans le temps.
     """
     print("\n" + "="*80)
@@ -115,11 +115,11 @@ def example_2_euribor_term_structure():
             print(f"  Première: {expiries[0]}")
             print(f"  Dernière: {expiries[-1]}")
             
-            # Scanner toutes les options CALL à strike 97.50
-            print("\nRécupération des options CALL strike 97.50...")
+            # Scanner toutes les options CALL à strike 98.00
+            print("\nRécupération des options CALL strike 98.00...")
             options = fetcher.get_options_by_strike(
                 underlying="ER",
-                strike=97.50,
+                strike=98.00,
                 option_type="C",
                 expiries=expiries[:6],  # Limiter aux 6 premières pour l'exemple
                 is_euribor=True
@@ -132,7 +132,7 @@ def example_2_euribor_term_structure():
                 print(format_term_structure(options, "implied_volatility"))
                 
                 # Afficher aussi le tableau complet
-                print(format_option_table(options, "EURIBOR CALLs Strike 97.50"))
+                print(format_option_table(options, "EURIBOR CALLs Strike 98.00"))
             else:
                 print("❌ Aucune option récupérée")
         else:
@@ -143,7 +143,7 @@ def example_3_euribor_payoff_scenarios():
     """
     Exemple 3: Calculer les payoffs d'une option EURIBOR sous différents scénarios.
     
-    On prend une position (ex: CALL strike 97.50) et on calcule le P&L
+    On prend une position (ex: CALL strike 98.00) et on calcule le P&L
     selon différents scénarios de taux EURIBOR à l'expiration.
     """
     print("\n" + "="*80)
@@ -154,9 +154,9 @@ def example_3_euribor_payoff_scenarios():
         # Récupérer une option CALL
         option = fetcher.get_option_data(
             underlying="ER",
-            expiry=date(2025, 3, 15),
+            expiry=date(2026, 3, 15),
             option_type="C",
-            strike=97.50,  # Taux implicite: 2.50%
+            strike=98.00,  # Taux implicite: 2.50%
             is_euribor=True
         )
         
@@ -193,7 +193,7 @@ def example_3_euribor_payoff_scenarios():
         
         print("-" * 60)
         print("\nInterprétation:")
-        print(f"  - Strike 97.50 = Taux implicite {option.implied_rate:.2f}%")
+        print(f"  - Strike 98.00 = Taux implicite {option.implied_rate:.2f}%")
         print(f"  - CALL profitable si taux final < {option.implied_rate:.2f}%")
         print(f"  - Perte limitée à la prime payée: €{premium_paid:.2f}")
 
@@ -203,7 +203,7 @@ def example_4_euribor_spread_strategy():
     Exemple 4: Analyser un spread sur EURIBOR (Bull Call Spread).
     
     Stratégie:
-    - Acheter CALL strike 97.50 (taux implicite 2.50%)
+    - Acheter CALL strike 98.00 (taux implicite 2.50%)
     - Vendre CALL strike 98.00 (taux implicite 2.00%)
     
     C'est un pari que les taux vont baisser (prix du future monte).
@@ -213,19 +213,19 @@ def example_4_euribor_spread_strategy():
     print("="*80)
     
     with BloombergOptionFetcher() as fetcher:
-        # Jambe longue: BUY CALL 97.50
+        # Jambe longue: BUY CALL 98.00
         long_call = fetcher.get_option_data(
             underlying="ER",
-            expiry=date(2025, 3, 15),
+            expiry=date(2026, 3, 15),
             option_type="C",
-            strike=97.50,
+            strike=98.00,
             is_euribor=True
         )
         
         # Jambe courte: SELL CALL 98.00
         short_call = fetcher.get_option_data(
             underlying="ER",
-            expiry=date(2025, 3, 15),
+            expiry=date(2026, 3, 15),
             option_type="C",
             strike=98.00,
             is_euribor=True

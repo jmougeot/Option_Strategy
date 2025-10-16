@@ -311,7 +311,7 @@ class BloombergOptionFetcher:
         self,
         underlying: str,
         strike: float,
-        option_type: str,
+        option_type: Literal["P", "C"],
         expiries: Optional[List[date]] = None,
         is_euribor: bool = False
     ) -> List[OptionData]:
