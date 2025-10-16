@@ -10,8 +10,6 @@ plotly>=5.17.0
 # Manipulation de données
 pandas>=2.1.0
 
-blpapi
-
 matplotlib
 
 # Bloomberg API (à installer séparément - voir bloomberg_connector.py)
