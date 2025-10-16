@@ -1,22 +1,37 @@
 from dataclasses import dataclass, field, make_dataclass
-from typing import Literal, Optional, List, Dict, Type
 from datetime import datetime
+from typing import Dict, List, Literal, Optional, Type, Callable
 
-try:
-    from .option_avaible import STRATEGY_DEFINITIONS
-except ImportError:
-    from option_avaible import STRATEGY_DEFINITIONS
+from .option_avaible import STRATEGY_DEFINITIONS
 
 """
-Système Générique de Stratégies d'Options
-==========================================
-Architecture auto-génératrice où les stratégies complexes sont créées
-automatiquement à partir d'une simple configuration déclarative.
+Module de base des options et stratégies
+=======================================
+
+Ce module définit deux niveaux de responsabilités complémentaires:
+
+- Option: Représente un leg individuel (call/put) avec son strike, sa prime, sa quantité, etc.
+- OptionStrategy: Base commune des stratégies. Elle gère la liste des options (legs),
+    le calcul des primes nettes, le P&L à l'expiration et expose des hooks génériques
+    comme max_loss() et breakeven_points() que les stratégies concrètes peuvent surcharger.
+- StrategyFactory: Fabrique des classes de stratégies à partir de définitions déclaratives
+    (STRATEGY_DEFINITIONS). Elle compose dynamiquement des sous-classes d'OptionStrategy en
+    ajoutant les champs spécifiques, en implémentant max_loss() et breakeven_points() lorsque
+    des formules sont fournies, et en préparant un BUILD_CONFIG pour la construction générique.
+
+Règle d'or: La logique générique et les valeurs par défaut vivent dans OptionStrategy.
+La logique spécifique à une famille de stratégies (ex: spreads protégés, straddles, etc.)
+peut être injectée par StrategyFactory via des surcharges propres à la stratégie générée.
 """
 
 @dataclass
 class Option:
-    """Représente une option (call ou put) - Brique de base"""
+    """Brique de base: un leg d'option (call ou put).
+
+    Responsabilités:
+    - Calculer la valeur intrinsèque à l'expiration
+    - Calculer la valeur (payoff) à l'expiration selon la position (long/short)
+    """
     option_type: Literal['call', 'put']
     strike: float
     premium: float
@@ -43,11 +58,20 @@ class Option:
 
 @dataclass
 class OptionStrategy:
-    """Classe de base pour toutes les stratégies d'options"""
+    """Base commune de toutes les stratégies d'options.
+
+    Responsabilités:
+    - Conserver la liste des legs (options)
+    - Calculer la prime nette reçue/versée (total_premium_received)
+    - Fournir un calcul par défaut de max_profit et max_loss
+    - Calculer le P&L à l'expiration pour un prix spot donné
+    - Déclarer un hook breakeven_points() (par défaut non implémenté)
+    """
     underlying : str = "" # Champ obligatoire sans valeur par défaut
     name: str = ""  # Champs avec valeurs par défaut après
     underlying_price: float = 0.0
     options: List[Option] = field(default_factory=list)
+    expiry: datetime = field(default_factory=datetime.now)
     
     # Configuration de construction (définie par les sous-classes ou générée)
     BUILD_CONFIG: Dict = field(default_factory=dict, init=False, repr=False)
@@ -70,14 +94,44 @@ class OptionStrategy:
         """Profit maximum de la stratégie"""
         return self.total_premium_received()
     
+    def max_loss(self):
+        """Perte maximale par défaut.
+
+        Par défaut, on approxime la perte maximale comme:
+            (largeur maximale de spread entre les strikes) - crédit net reçu
+        multiplié par la quantité. Le résultat est une perte → valeur négative.
+
+        Les stratégies avec perte illimitée (ex: short call découvert) doivent
+        surcharger cette méthode pour retourner "Illimité".
+        """
+        if not self.options:
+            return 0.0
+
+        # Largeur maximale observée entre strikes (approximation générique)
+        strikes = [o.strike for o in self.options if hasattr(o, "strike")]
+        if len(strikes) < 2:
+            return 0.0
+
+        total_width = max(strikes) - min(strikes)
+
+        # Crédit net reçu (positif) – on ne permet pas que le crédit rende la perte positive
+        credit = max(0.0, float(self.total_premium_received()))
+
+        # Quantité globale (si présente)
+        qty = abs(getattr(self, "quantity", 1))
+
+        loss = (total_width - credit) * qty
+        return -abs(loss)
+
     def profit_at_expiry(self, spot_price: float) -> float:
         """Calcule le profit/perte à l'expiration pour un prix spot donné"""
         total_value = sum(opt.value_at_expiry(spot_price) for opt in self.options)
         return total_value
-    
+        
     def breakeven_points(self) -> List[float]:
         """Points de breakeven (à implémenter dans les sous-classes)"""
         raise NotImplementedError("Les sous-classes doivent implémenter cette méthode")
+
 
 
 # =============================================================================
@@ -96,10 +150,10 @@ class StrategyFactory:
         description: str,
         legs: List[Dict],
         max_loss_formula: str = 'defined',
-        breakeven_formula: Optional[callable] = None
+        breakeven_formula: Optional[Callable[["OptionStrategy"], List[float]]] = None,
     ) -> Type[OptionStrategy]:
         """
-        Crée dynamiquement une classe de stratégie
+        Crée dynamiquement une sous-classe d'OptionStrategy.
         
         Args:
             name: Nom de la stratégie (ex: "IronCondor")
@@ -122,10 +176,9 @@ class StrategyFactory:
             fields.append((f"{prefix}_strike", float, 0.0))
             fields.append((f"{prefix}_premium", float, 0.0))
         
-        # Champs communs
+        # Champs communs (expiry est déjà dans OptionStrategy)
         fields.extend([
-            ('expiry', datetime, field(default_factory=datetime.now)),
-            ('quantity', int, 1)
+            ('quantity', int, 1),
         ])
         
         # 2. Créer la méthode __post_init__
@@ -148,34 +201,44 @@ class StrategyFactory:
                     position=leg['position']
                 ))
         
-        # 3. Créer la méthode max_loss
-        if max_loss_formula == 'unlimited':
-            def max_loss(self):
-                return "Illimité"
-        elif callable(max_loss_formula):
-            def max_loss(self):
-                return max_loss_formula(self)
-        else:
-            def max_loss(self):
-                # Formule par défaut pour les spreads
-                total_width = 0
-                for i in range(0, len(self.options), 2):
-                    if i + 1 < len(self.options):
-                        width = abs(self.options[i].strike - self.options[i+1].strike)
-                        total_width = max(total_width, width)
-                return (total_width - self.total_premium_received()) * self.quantity
-        
+        # 3. Créer la méthode max_loss (spécifique à la stratégie si formule fournie)
+        def max_loss(self):
+            """Perte maximale spécifique à la stratégie générée.
+
+            Cases:
+            - 'unlimited'/'illimité' → retourne la chaîne "Illimité"
+            - callable → utilise la formule fournie et renvoie une valeur négative
+            - sinon → fallback vers une approximation de spread (comme OptionStrategy)
+            """
+            try:
+                # 1) cas "illimité"
+                if isinstance(max_loss_formula, str) and max_loss_formula.lower() in ("unlimited", "illimité"):
+                    return "Illimité"
+
+                # 2) cas formule fournie (callable)
+                if callable(max_loss_formula):
+                    res = max_loss_formula(self)
+                    if isinstance(res, str) and res.lower() in ("unlimited", "illimité"):
+                        return "Illimité"
+                    return -abs(float(res))  # perte => négative
+
+                # 3) fallback: se rabattre sur le calcul par défaut d'OptionStrategy
+                return OptionStrategy.max_loss(self)
+            except Exception:
+                # garde-fou (cohérent avec l'analyseur côté UI)
+                return -999999.0
+            
         # 4. Créer la méthode breakeven_points
-        if breakeven_formula:
-            breakeven_points = breakeven_formula
-        else:
-            # Formule par défaut
-            def breakeven_points(self):
-                # Pour les stratégies symétriques
+        def breakeven_points(self):
+            if breakeven_formula:
+            # Utiliser la formule fournie par la définition de stratégie
+                return breakeven_formula(self)
+            else:
+            # Formule par défaut (simple approximation pour stratégies symétriques)
                 net_credit = self.total_premium_received()
                 if len(self.options) == 2:
                     return [self.options[0].strike - net_credit,
-                           self.options[1].strike + net_credit]
+                            self.options[1].strike + net_credit]
                 return []
         
         # 5. Créer le BUILD_CONFIG

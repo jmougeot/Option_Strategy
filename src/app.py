@@ -13,14 +13,8 @@ import re
 import sys
 from pathlib import Path
 from typing import Dict, List
+from strategy.comparer import StrategyComparer, StrategyComparison
 
-try:
-    from .strategy.comparer import StrategyComparer, StrategyComparison
-except ImportError:
-    src_dir = Path(__file__).resolve().parent
-    if str(src_dir) not in sys.path:
-        sys.path.append(str(src_dir))
-    from strategy.comparer import StrategyComparer, StrategyComparison
 
 
 # ============================================================================
@@ -292,6 +286,9 @@ def main():
             ["JSON Local", "Bloomberg API (À venir)"],
             help="Choisissez la source des données d'options"
         )
+        
+        # Ensure json_file is always defined to avoid "possibly unbound" errors.
+        json_file = "calls_export.json"
         
         if data_source == "JSON Local":
             json_file = st.text_input(

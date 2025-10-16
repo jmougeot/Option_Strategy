@@ -1,11 +1,12 @@
 import sys
-from pathlib import Path
+import matplotlib.pyplot as plt
+import numpy as np
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from options.option_avaible import STRATEGY_DEFINITIONS
-from options.option_class import OptionStrategy, GENERATED_STRATEGIES
+from option.option_avaible import STRATEGY_DEFINITIONS
+from option.option_class import OptionStrategy, GENERATED_STRATEGIES
 from strategy.comparison_class import StrategyComparison
 
 class StrategyComparer:
@@ -155,7 +156,7 @@ class StrategyComparer:
                         strategy: OptionStrategy,
                         target_price: float,
                         expiration_date: datetime,
-                        price_range: Tuple[float, float] = None) -> StrategyComparison:
+                        price_range: Optional[Tuple[float, float]] = None) -> StrategyComparison:
         """
         Analyse complète d'une stratégie
         
@@ -271,7 +272,7 @@ class StrategyComparer:
                 continue
             
             # Analyser la stratégie
-            exp_date = strategy.expiry if hasattr(strategy, 'expiry') else datetime.now() + timedelta(days=days_to_expiry)
+            exp_date = datetime.now() + timedelta(days=days_to_expiry)
             comparison = self.analyze_strategy(strategy, target_price, exp_date)
             comparisons.append(comparison)
         
@@ -371,12 +372,7 @@ class StrategyComparer:
             comparisons: Liste des stratégies à tracer
             price_range: Range de prix (min, max) pour le graphique
         """
-        try:
-            import matplotlib.pyplot as plt
-            import numpy as np
-        except ImportError:
-            print("⚠ matplotlib et numpy requis pour les graphiques")
-            return
+
         
         if not comparisons:
             return
