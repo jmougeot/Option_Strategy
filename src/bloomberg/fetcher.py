@@ -332,19 +332,7 @@ class BloombergOptionFetcher:
         
         Returns:
             Liste des OptionData pour tous les strikes dans l'intervalle
-            
-        Example:
-            # Pour EURIBOR Mars 2025, strike 97.50, intervalle ±30
-            # Va chercher strikes de 67.50 à 127.50 par pas de 0.25
-            fetcher.get_options_by_range_strike(
-                underlying="ER",
-                strike_center=97.50,
-                option_type="C",
-                expiry_month="H",
-                expiry_year=5,
-                strike_range=30.0,
-                strike_step=0.25
-            )
+
         """
         
         # Calculer les bornes de l'intervalle
