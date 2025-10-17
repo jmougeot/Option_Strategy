@@ -363,14 +363,44 @@ def main():
         # Section 2: Paramètres de marché
         st.subheader("💹 Paramètres de Marché")
         
-        target_price = st.number_input(
-            "Prix Cible ($)",
-            min_value=50.0,
-            max_value=200.0,
-            value=100.0,
-            step=0.5,
-            help="Prix autour duquel centrer les stratégies"
+        # Intervalle de prix au lieu d'un prix unique
+        col1, col2 = st.columns(2)
+        with col1:
+            price_min = st.number_input(
+                "Prix Min ($)",
+                min_value=50.0,
+                max_value=200.0,
+                value=97.0,
+                step=0.5,
+                help="Borne inférieure de l'intervalle de prix"
+            )
+        
+        with col2:
+            price_max = st.number_input(
+                "Prix Max ($)",
+                min_value=50.0,
+                max_value=200.0,
+                value=103.0,
+                step=0.5,
+                help="Borne supérieure de l'intervalle de prix"
+            )
+        
+        price_step = st.number_input(
+            "Pas de Prix ($)",
+            min_value=0.1,
+            max_value=5.0,
+            value=0.5,
+            step=0.1,
+            help="Incrément entre chaque prix cible à tester"
         )
+        
+        # Validation
+        if price_min >= price_max:
+            st.error("⚠️ Le prix minimum doit être inférieur au prix maximum")
+        else:
+            target_prices = [round(price_min + i * price_step, 2) 
+                           for i in range(int((price_max - price_min) / price_step) + 1)]
+            st.info(f"📊 {len(target_prices)} prix cibles seront testés: {target_prices[0]}$ à {target_prices[-1]}$")
         
         days_to_expiry = st.slider(
             "Jours jusqu'à l'Expiration",
@@ -494,32 +524,60 @@ def main():
             st.error("❌ Aucun put trouvé dans les données. Régénérez la base avec generate_full_database.py")
             return
         
-        # Comparaison des stratégies
-        with st.spinner("🔄 Comparaison des stratégies en cours..."):
+        # Validation de l'intervalle de prix
+        if price_min >= price_max:
+            st.error("❌ Le prix minimum doit être inférieur au prix maximum")
+            return
+        
+        # Calculer les prix cibles
+        target_prices = [round(price_min + i * price_step, 2) 
+                        for i in range(int((price_max - price_min) / price_step) + 1)]
+        
+        # Comparaison des stratégies pour TOUS les prix cibles
+        with st.spinner(f"🔄 Comparaison des stratégies en cours pour {len(target_prices)} prix cibles..."):
             comparer = StrategyComparer(options_data)
             
-            comparisons = comparer.compare_strategies(
-                target_price=target_price,
-                days_to_expiry=days_to_expiry,
-                strategies_to_compare=selected_strategies,
-                weights=scoring_weights
-            )
+            all_comparisons = []
+            
+            # Tester chaque prix cible
+            for target_price in target_prices:
+                comparisons = comparer.compare_strategies(
+                    target_price=target_price,
+                    days_to_expiry=days_to_expiry,
+                    strategies_to_compare=selected_strategies,
+                    weights=scoring_weights
+                )
+                
+                if comparisons:
+                    all_comparisons.extend(comparisons)
         
-        if not comparisons:
+        if not all_comparisons:
             st.error(" Aucune stratégie n'a pu être construite avec les paramètres donnés")
             return
         
-        st.success(f"✅ {len(comparisons)} stratégies comparées avec succès!")
+        # Trouver la meilleure combinaison globale
+        all_comparisons.sort(key=lambda x: x.score, reverse=True)
+        
+        # Pour l'affichage, on utilise la meilleure stratégie
+        best_comparison = all_comparisons[0]
+        best_target_price = best_comparison.target_price
+        
+        # Filtrer les comparaisons pour ce prix optimal
+        comparisons = [c for c in all_comparisons if c.target_price == best_target_price]
+        
+        st.success(f"✅ {len(all_comparisons)} combinaisons analysées ({len(target_prices)} prix × ~{len(selected_strategies)} stratégies)")
+        st.info(f"🎯 **Meilleur prix cible identifié : ${best_target_price:.2f}**")
         
         # ====================================================================
         # TABS POUR L'AFFICHAGE
         # ====================================================================
         
-        tab1, tab2, tab3, tab4 = st.tabs([
-            " Vue d'Ensemble", 
-            " Diagramme P&L", 
-            " Analyse Détaillée",
-            " Données Brutes"
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "🏆 Vue d'Ensemble", 
+            "📈 Diagramme P&L", 
+            "🔍 Analyse Détaillée",
+            "🎯 Toutes les Combinaisons",
+            "📋 Données Brutes"
         ])
         
         # ----------------------------------------------------------------
@@ -603,7 +661,7 @@ def main():
         with tab2:
             st.header("Diagramme de Profit/Perte à l'Expiration")
             
-            fig_payoff = create_payoff_diagram(comparisons, target_price)
+            fig_payoff = create_payoff_diagram(comparisons, best_target_price)
             st.plotly_chart(fig_payoff, use_container_width=True)
             
             # Tableau des breakevens
@@ -653,7 +711,7 @@ def main():
                     st.write(f"**Range:** {format_currency(winner.breakeven_points[0])} - {format_currency(winner.breakeven_points[1])}")
                 
                 st.subheader("💰 Performance au Prix Cible")
-                st.write(f"**Prix cible:** {format_currency(target_price)}")
+                st.write(f"**Prix cible optimal:** {format_currency(best_target_price)}")
                 st.write(f"**P&L:** {format_currency(winner.profit_at_target)}")
                 if winner.max_profit != float('inf') and winner.max_profit > 0:
                     pct = (winner.profit_at_target / winner.max_profit) * 100
@@ -686,11 +744,11 @@ def main():
             st.subheader("📉 Simulation P&L à Différents Prix")
             
             price_scenarios = [
-                target_price * 0.90,
-                target_price * 0.95,
-                target_price,
-                target_price * 1.05,
-                target_price * 1.10
+                best_target_price * 0.90,
+                best_target_price * 0.95,
+                best_target_price,
+                best_target_price * 1.05,
+                best_target_price * 1.10
             ]
             
             sim_data = []
@@ -698,16 +756,148 @@ def main():
                 row = {'Stratégie': comp.strategy_name}
                 for price in price_scenarios:
                     pnl = comp.strategy.profit_at_expiry(price)
-                    pct_change = ((price - target_price) / target_price) * 100
+                    pct_change = ((price - best_target_price) / best_target_price) * 100
                     row[f"${price:.2f}\n({pct_change:+.0f}%)"] = format_currency(pnl)
                 sim_data.append(row)
             
             st.dataframe(pd.DataFrame(sim_data), use_container_width=True, hide_index=True)
         
         # ----------------------------------------------------------------
-        # TAB 4: DONNÉES BRUTES
+        # TAB 4: TOUTES LES COMBINAISONS
         # ----------------------------------------------------------------
         with tab4:
+            st.header("🎯 Toutes les Combinaisons Prix/Stratégie Testées")
+            
+            st.write(f"**Total de combinaisons:** {len(all_comparisons)}")
+            st.write(f"**Prix testés:** {len(target_prices)} prix de ${min(target_prices):.2f} à ${max(target_prices):.2f}")
+            
+            # Créer un DataFrame complet
+            all_data = []
+            for comp in all_comparisons:
+                all_data.append({
+                    'Prix Cible': f"${comp.target_price:.2f}",
+                    'Stratégie': comp.strategy_name,
+                    'Score': f"{comp.score:.4f}",
+                    'Crédit': format_currency(comp.net_credit),
+                    'Max Profit': format_currency(comp.max_profit),
+                    'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
+                    'R/R': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
+                    'P&L@Target': format_currency(comp.profit_at_target),
+                    'Zone Profitable': format_currency(comp.profit_zone_width)
+                })
+            
+            df_all = pd.DataFrame(all_data)
+            
+            # Filtres interactifs
+            st.subheader("🔎 Filtrer les Résultats")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                filter_strategies = st.multiselect(
+                    "Stratégies:",
+                    options=sorted(set([comp.strategy_name for comp in all_comparisons])),
+                    default=None
+                )
+            
+            with col2:
+                filter_prices = st.multiselect(
+                    "Prix Cibles:",
+                    options=sorted(set([f"${comp.target_price:.2f}" for comp in all_comparisons])),
+                    default=None
+                )
+            
+            with col3:
+                min_score = st.slider(
+                    "Score minimum:",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=0.0,
+                    step=0.05
+                )
+            
+            # Appliquer les filtres
+            df_filtered = df_all.copy()
+            
+            if filter_strategies:
+                df_filtered = df_filtered[df_filtered['Stratégie'].isin(filter_strategies)]
+            
+            if filter_prices:
+                df_filtered = df_filtered[df_filtered['Prix Cible'].isin(filter_prices)]
+            
+            if min_score > 0:
+                df_filtered['Score_num'] = df_filtered['Score'].astype(float)
+                df_filtered = df_filtered[df_filtered['Score_num'] >= min_score]
+                df_filtered = df_filtered.drop('Score_num', axis=1)
+            
+            st.write(f"**{len(df_filtered)} / {len(df_all)} combinaisons affichées**")
+            
+            # Tableau avec tri
+            st.dataframe(
+                df_filtered,
+                use_container_width=True,
+                hide_index=True,
+                height=500
+            )
+            
+            # Graphiques d'analyse
+            st.subheader("📊 Analyse Visuelle")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Heatmap: Score par prix et stratégie
+                pivot_data = df_all.copy()
+                pivot_data['Score_num'] = pivot_data['Score'].astype(float)
+                pivot_table = pivot_data.pivot_table(
+                    index='Stratégie',
+                    columns='Prix Cible',
+                    values='Score_num',
+                    aggfunc='mean'
+                )
+                
+                fig_heatmap = go.Figure(data=go.Heatmap(
+                    z=pivot_table.values,
+                    x=pivot_table.columns,
+                    y=pivot_table.index,
+                    colorscale='RdYlGn',
+                    text=pivot_table.values,
+                    texttemplate='%{text:.3f}',
+                    textfont={"size":10},
+                    colorbar=dict(title="Score")
+                ))
+                
+                fig_heatmap.update_layout(
+                    title="Heatmap des Scores",
+                    xaxis_title="Prix Cible",
+                    yaxis_title="Stratégie",
+                    height=400
+                )
+                
+                st.plotly_chart(fig_heatmap, use_container_width=True)
+            
+            with col2:
+                # Top 10 des meilleures combinaisons
+                top_10 = df_all.head(10)
+                
+                fig_top10 = px.bar(
+                    top_10,
+                    x='Score',
+                    y=[f"{row['Stratégie']}\n@{row['Prix Cible']}" for _, row in top_10.iterrows()],
+                    orientation='h',
+                    title="Top 10 des Combinaisons",
+                    labels={'y': 'Stratégie @ Prix'},
+                    color='Score',
+                    color_continuous_scale='viridis'
+                )
+                
+                fig_top10.update_layout(height=400, showlegend=False)
+                st.plotly_chart(fig_top10, use_container_width=True)
+        
+        # ----------------------------------------------------------------
+        # TAB 5: DONNÉES BRUTES
+        # ----------------------------------------------------------------
+        with tab5:
             st.header("📋 Données Brutes")
             
             for idx, comp in enumerate(comparisons, 1):
