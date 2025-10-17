@@ -12,7 +12,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.bloomberg.ticker_builder import build_option_ticker
-from src.bloomberg.connection import BloombergConnection
 from src.bloomberg.fetcher import BloombergOptionFetcher
 
 
