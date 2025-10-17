@@ -1,20 +1,15 @@
 """
 Générateur Automatique de Butterflies
 ======================================
-Génère toutes les combinaisons possibles de Butterfly (Fly) à partir des données Bloomberg.
-
-Le module explore toutes les combinaisons où:
-- La tête du Fly (middle strike) est comprise entre price_min et price_max
-- Les jambes (lower et upper strikes) sont comprises entre strike_min et strike_max
-- Les intervalles entre strikes respectent les contraintes définies
+Génère toutes les combinaisons possibles de Butterfly à partir des données Bloomberg
+et retourne une liste d'options standardisée.
 
 Auteur: BGC Trading Desk
 Date: 2025-10-17
 """
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional, Union
 from dataclasses import dataclass
-from datetime import datetime
 
 
 @dataclass
@@ -61,6 +56,73 @@ class FlyConfiguration:
             - self.upper_option['premium']  # Long = payer
         )
         return round(cost, 4)
+    
+    @property
+    def center_strike(self) -> float:
+        """Strike central (middle strike)"""
+        return self.middle_strike
+    
+    @property
+    def lower_wing_width(self) -> float:
+        """Alias pour compatibilité avec comparateur"""
+        return self.wing_width_lower
+    
+    @property
+    def upper_wing_width(self) -> float:
+        """Alias pour compatibilité avec comparateur"""
+        return self.wing_width_upper
+    
+    def to_standard_options_list(self) -> List[Dict]:
+        """
+        Convertit la configuration en liste d'options standardisée
+        Compatible avec StrategyComparer et autres modules
+        
+        Returns:
+            Liste de dictionnaires d'options au format standard Bloomberg
+        """
+        options_list = []
+        
+        if self.lower_option:
+            options_list.append(self.lower_option.copy())
+        
+        if self.middle_option:
+            # Pour un Fly, on a besoin de 2x le middle (short 2 contracts)
+            options_list.append(self.middle_option.copy())
+            options_list.append(self.middle_option.copy())
+        
+        if self.upper_option:
+            options_list.append(self.upper_option.copy())
+        
+        return options_list
+    
+    def to_strategy_dict(self) -> Dict:
+        """
+        Convertit la configuration en dictionnaire de stratégie standard
+        
+        Returns:
+            Dictionnaire avec tous les champs nécessaires pour créer une stratégie
+        """
+        return {
+            'name': self.name,
+            'type': 'butterfly',
+            'option_type': self.option_type,
+            'strikes': [self.lower_strike, self.middle_strike, self.upper_strike],
+            'expiration_date': self.expiration_date,
+            'structure': {
+                'lower_strike': self.lower_strike,
+                'middle_strike': self.middle_strike,
+                'upper_strike': self.upper_strike,
+                'wing_width_lower': self.wing_width_lower,
+                'wing_width_upper': self.wing_width_upper,
+                'is_symmetric': self.is_symmetric
+            },
+            'metrics': {
+                'estimated_cost': self.estimated_cost,
+                'center_strike': self.center_strike,
+                'avg_wing_width': (self.wing_width_lower + self.wing_width_upper) / 2
+            },
+            'options': self.to_standard_options_list()
+        }
 
 
 class FlyGenerator:
@@ -229,147 +291,48 @@ class FlyGenerator:
         
         return flies
     
-    def filter_flies(self,
-                    flies: List[FlyConfiguration],
-                    symmetric_only: bool = False,
-                    max_cost: Optional[float] = None,
-                    min_cost: Optional[float] = None,
-                    wing_width: Optional[float] = None) -> List[FlyConfiguration]:
+    def get_options_list(self,
+                        price_min: float,
+                        price_max: float,
+                        strike_min: float,
+                        strike_max: float,
+                        option_type: str = 'call',
+                        expiration_date: Optional[str] = None,
+                        require_symmetric: bool = False,
+                        min_wing_width: float = 0.25,
+                        max_wing_width: float = 5.0,
+                        deduplicate: bool = True) -> List[Dict]:
         """
-        Filtre les configurations de Butterfly selon des critères
-        
-        Args:
-            flies: Liste de configurations à filtrer
-            symmetric_only: Garder uniquement les Flies symétriques
-            max_cost: Coût maximum acceptable
-            min_cost: Coût minimum acceptable
-            wing_width: Largeur d'aile spécifique (pour Flies symétriques)
-        
-        Returns:
-            Liste filtrée de configurations
+        Génère tous les Flies et retourne directement une liste d'options standardisée
         """
-        filtered = flies.copy()
+        # Générer tous les Flies selon les critères
+        flies = self.generate_all_flies(
+            price_min=price_min,
+            price_max=price_max,
+            strike_min=strike_min,
+            strike_max=strike_max,
+            option_type=option_type,
+            expiration_date=expiration_date,
+            require_symmetric=require_symmetric,
+            min_wing_width=min_wing_width,
+            max_wing_width=max_wing_width
+        )
         
-        if symmetric_only:
-            filtered = [f for f in filtered if f.is_symmetric]
-        
-        if wing_width is not None:
-            filtered = [f for f in filtered 
-                       if abs(f.wing_width_lower - wing_width) < 0.01 
-                       and abs(f.wing_width_upper - wing_width) < 0.01]
-        
-        if max_cost is not None:
-            filtered = [f for f in filtered if f.estimated_cost <= max_cost]
-        
-        if min_cost is not None:
-            filtered = [f for f in filtered if f.estimated_cost >= min_cost]
-        
-        return filtered
-    
-    def get_best_flies(self,
-                      flies: List[FlyConfiguration],
-                      criterion: str = 'cost',
-                      top_n: int = 10) -> List[FlyConfiguration]:
-        """
-        Sélectionne les meilleurs Butterflies selon un critère
-        
-        Args:
-            flies: Liste de configurations
-            criterion: Critère de sélection ('cost', 'wing_width', 'symmetric')
-            top_n: Nombre de résultats à retourner
-        
-        Returns:
-            Liste des meilleurs Butterflies
-        """
-        if criterion == 'cost':
-            # Trier par coût (débit le plus faible = meilleur)
-            sorted_flies = sorted(flies, key=lambda f: abs(f.estimated_cost))
-        elif criterion == 'wing_width':
-            # Trier par largeur d'aile (plus étroit = meilleur)
-            sorted_flies = sorted(flies, key=lambda f: (f.wing_width_lower + f.wing_width_upper) / 2)
-        elif criterion == 'symmetric':
-            # Trier par symétrie (plus symétrique = meilleur)
-            sorted_flies = sorted(flies, key=lambda f: abs(f.wing_width_lower - f.wing_width_upper))
-        else:
-            sorted_flies = flies
-        
-        return sorted_flies[:top_n]
-    
-    def generate_statistics(self, flies: List[FlyConfiguration]) -> Dict:
-        """
-        Génère des statistiques sur les Butterflies générés
-        
-        Args:
-            flies: Liste de configurations
-        
-        Returns:
-            Dictionnaire avec les statistiques
-        """
         if not flies:
-            return {
-                'total': 0,
-                'symmetric': 0,
-                'call_flies': 0,
-                'put_flies': 0,
-                'avg_cost': 0.0,
-                'avg_wing_width': 0.0,
-                'unique_middle_strikes': 0,
-                'unique_expirations': 0
-            }
+            return []
         
-        symmetric_count = sum(1 for f in flies if f.is_symmetric)
-        call_count = sum(1 for f in flies if f.option_type.lower() == 'call')
-        put_count = sum(1 for f in flies if f.option_type.lower() == 'put')
-        
-        avg_cost = sum(f.estimated_cost for f in flies) / len(flies)
-        avg_wing = sum((f.wing_width_lower + f.wing_width_upper) / 2 for f in flies) / len(flies)
-        
-        unique_middles = len(set(f.middle_strike for f in flies))
-        unique_exps = len(set(f.expiration_date for f in flies))
-        
-        return {
-            'total': len(flies),
-            'symmetric': symmetric_count,
-            'call_flies': call_count,
-            'put_flies': put_count,
-            'avg_cost': round(avg_cost, 4),
-            'avg_wing_width': round(avg_wing, 2),
-            'unique_middle_strikes': unique_middles,
-            'unique_expirations': unique_exps,
-            'min_cost': round(min(f.estimated_cost for f in flies), 4),
-            'max_cost': round(max(f.estimated_cost for f in flies), 4),
-            'min_wing_width': round(min(f.wing_width_lower for f in flies), 2),
-            'max_wing_width': round(max(f.wing_width_upper for f in flies), 2)
-        }
+        if deduplicate:
+            # Retourner une liste dédupliquée
+            all_options = {}
+            for fly in flies:
+                for opt in fly.to_standard_options_list():
+                    key = (opt['strike'], opt['expiration_date'], opt['option_type'])
+                    all_options[key] = opt
+            return list(all_options.values())
+        else:
+            # Retourner toutes les options (avec duplicatas possibles)
+            all_options = []
+            for fly in flies:
+                all_options.extend(fly.to_standard_options_list())
+            return all_options
 
-
-def main():
-    """Exemple d'utilisation"""
-    print("=" * 70)
-    print("GÉNÉRATEUR DE BUTTERFLIES")
-    print("=" * 70)
-    print()
-    print("Ce module sera utilisé dans app.py pour générer")
-    print("automatiquement toutes les combinaisons de Fly possibles.")
-    print()
-    print("Exemple d'utilisation:")
-    print()
-    print("  generator = FlyGenerator(options_data)")
-    print("  flies = generator.generate_all_flies(")
-    print("      price_min=97.0,")
-    print("      price_max=103.0,")
-    print("      strike_min=96.0,")
-    print("      strike_max=104.0,")
-    print("      option_type='call'")
-    print("  )")
-    print()
-    print(f"Fonctionnalités:")
-    print("  ✓ Génération automatique de toutes les combinaisons")
-    print("  ✓ Filtrage par symétrie, coût, largeur d'aile")
-    print("  ✓ Sélection des meilleurs Flies selon critères")
-    print("  ✓ Statistiques détaillées")
-    print()
-
-
-if __name__ == "__main__":
-    main()

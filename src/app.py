@@ -7,12 +7,11 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 import re
-from pathlib import Path
 from typing import Dict, List
-from Strategy.comparer import StrategyComparer, StrategyComparison
+from option.multi_structure_comparer import MultiStructureComparer, StrategyComparison
 
 
 
@@ -74,46 +73,6 @@ st.markdown("""
 # ============================================================================
 # FONCTIONS UTILITAIRES
 # ============================================================================
-
-def categorize_strategy(strategy: str) -> str:
-    """
-    Catégorise une stratégie dans une seule catégorie
-    
-    Args:
-        strategy: Nom de la stratégie en CamelCase
-        
-    Returns:
-        Nom de la catégorie avec emoji
-    """
-    if strategy.startswith('Short'):
-        return '📉 Short Strategies'
-    elif strategy.startswith('Iron'):
-        return '🔷 Iron Strategies'
-    elif strategy.startswith('Long') and 'Butterfly' in strategy:
-        return '🦋 Butterfly Strategies'
-    elif strategy.startswith('Long'):
-        return '📈 Long Strategies'
-    elif 'Butterfly' in strategy:
-        return '🦋 Butterfly Strategies'
-    elif 'Ratio' in strategy:
-        return '⚖️ Ratio Strategies'
-    elif 'Spread' in strategy:
-        return '📊 Spread Strategies'
-    else:
-        return '📦 Other'
-
-def camel_case_to_display_name(name: str) -> str:
-    """
-    Convertit un nom en CamelCase en format d'affichage
-    Ex: 'IronCondor' -> 'Iron Condor'
-    
-    Args:
-        name: Nom en CamelCase
-        
-    Returns:
-        Nom formaté pour l'affichage
-    """
-    return re.sub('([A-Z])', r' \1', name).strip()
 
 @st.cache_data
 def load_options_from_bloomberg(params: Dict) -> Dict:
@@ -413,55 +372,22 @@ def main():
         
         st.markdown("---")
         
-        # Section 3: Sélection des stratégies
-        st.subheader("🎯 Stratégies à Comparer")
+        # Section 3: Options d'auto-génération
+        st.subheader("� Options de Génération")
         
-        # 🔄 AUTO-DÉTECTION : Toutes les stratégies sont chargées automatiquement
-        available_strategies = sorted(StrategyComparer.AVAILABLE_STRATEGIES)
+        st.info("� **Mode Auto-Génération** : Exploration exhaustive de toutes les combinaisons Butterflies et Condors")
         
-        # Stratégies par défaut (short volatility populaires)
-        default_strategies = {'IronCondor', 'IronButterfly', 'ShortStrangle', 'ShortStraddle'}
-        
-        # Grouper par catégories (chaque stratégie dans UNE SEULE catégorie)
-        categories = {}
-        for strategy in available_strategies:
-            category = categorize_strategy(strategy)
-            if category not in categories:
-                categories[category] = []
-            categories[category].append(strategy)
-        
-        selected_strategies = []
-        
-        # Ordre d'affichage des catégories
-        category_order = [
-            '📉 Short Strategies', 
-            '🔷 Iron Strategies', 
-            '📊 Spread Strategies', 
-            '📈 Long Strategies', 
-            '🦋 Butterfly Strategies', 
-            '⚖️ Ratio Strategies', 
-            '📦 Other'
-        ]
-        
-        # Afficher par catégories avec expanders
-        for category in category_order:
-            if category in categories and categories[category]:
-                # Ouvrir par défaut les catégories Short et Iron
-                is_expanded = category in ['📉 Short Strategies', '🔷 Iron Strategies']
-                
-                with st.expander(f"{category} ({len(categories[category])})", expanded=is_expanded):
-                    for strategy in categories[category]:
-                        display_name = camel_case_to_display_name(strategy)
-                        
-                        if st.checkbox(
-                            display_name, 
-                            value=(strategy in default_strategies),
-                            key=f"strat_{strategy}"
-                        ):
-                            selected_strategies.append(strategy)
-        
-        # Info sur la sélection
-        st.info(f"📊 {len(selected_strategies)}/{len(available_strategies)} stratégies sélectionnées")
+        with st.expander("Paramètres de génération", expanded=True):
+            include_flies = st.checkbox("Inclure les Butterflies", value=True)
+            include_condors = st.checkbox("Inclure les Condors", value=True)
+            require_symmetric = st.checkbox("Uniquement structures symétriques", value=False)
+            top_n_structures = st.number_input(
+                "Nombre de meilleures structures à afficher:",
+                min_value=5,
+                max_value=50,
+                value=10,
+                step=5
+            )
         
         st.markdown("---")
         
@@ -495,10 +421,6 @@ def main():
     # ========================================================================
     
     if compare_button:
-        if not selected_strategies:
-            st.error("❌ Veuillez sélectionner au moins une stratégie à comparer")
-            return
-        
         # Chargement des données depuis Bloomberg
         with st.spinner("� Import depuis Bloomberg en cours..."):
             data = load_options_from_bloomberg(bloomberg_params)
@@ -533,18 +455,23 @@ def main():
         target_prices = [round(price_min + i * price_step, 2) 
                         for i in range(int((price_max - price_min) / price_step) + 1)]
         
-        # Comparaison des stratégies pour TOUS les prix cibles
-        with st.spinner(f"🔄 Comparaison des stratégies en cours pour {len(target_prices)} prix cibles..."):
-            comparer = StrategyComparer(options_data)
+        # Comparaison avec auto-génération pour TOUS les prix cibles
+        with st.spinner(f"🔄 Auto-génération et comparaison pour {len(target_prices)} prix cibles..."):
+            multi_comparer = MultiStructureComparer(options_data)
             
             all_comparisons = []
             
             # Tester chaque prix cible
             for target_price in target_prices:
-                comparisons = comparer.compare_strategies(
+                comparisons = multi_comparer.compare_all_structures(
                     target_price=target_price,
+                    strike_min=strike_min,
+                    strike_max=strike_max,
                     days_to_expiry=days_to_expiry,
-                    strategies_to_compare=selected_strategies,
+                    include_flies=include_flies,
+                    include_condors=include_condors,
+                    require_symmetric=require_symmetric,
+                    top_n=top_n_structures,
                     weights=scoring_weights
                 )
                 
@@ -552,7 +479,7 @@ def main():
                     all_comparisons.extend(comparisons)
         
         if not all_comparisons:
-            st.error(" Aucune stratégie n'a pu être construite avec les paramètres donnés")
+            st.error("❌ Aucune stratégie n'a pu être construite avec les paramètres donnés")
             return
         
         # Trouver la meilleure combinaison globale
@@ -565,7 +492,15 @@ def main():
         # Filtrer les comparaisons pour ce prix optimal
         comparisons = [c for c in all_comparisons if c.target_price == best_target_price]
         
-        st.success(f"✅ {len(all_comparisons)} combinaisons analysées ({len(target_prices)} prix × ~{len(selected_strategies)} stratégies)")
+        # Message de succès
+        structures_info = []
+        if include_flies:
+            structures_info.append("Butterflies")
+        if include_condors:
+            structures_info.append("Condors")
+        structures_text = ' + '.join(structures_info) if structures_info else "Aucune structure"
+        
+        st.success(f"✅ {len(all_comparisons)} combinaisons analysées - Structures: {structures_text}")
         st.info(f"🎯 **Meilleur prix cible identifié : ${best_target_price:.2f}**")
         
         # ====================================================================
