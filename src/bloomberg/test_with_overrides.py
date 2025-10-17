@@ -29,7 +29,7 @@ def test_with_overrides():
     # Champs Greeks
     fields = [
         'PX_LAST',
-        'OPT_DELTA', 'OPT_GAMMA', 'OPT_VEGA', 'OPT_THETA', 'OPT_RHO',
+        'DELTA_MID', 'GAMMA_MID', 'VEGA_MID', 'THETA_MID', 'OPT_RHO',
         'OPT_IMP_VOL',
         'OPT_UNDL_PX',
         'OPT_STRIKE_PX',
@@ -117,7 +117,7 @@ def test_with_overrides():
             print()
             
             # Analyse
-            greeks = ['OPT_DELTA', 'OPT_GAMMA', 'OPT_VEGA', 'OPT_THETA', 'OPT_RHO']
+            greeks = ['DELTA_MID', 'OPT_GAMMA', 'OPT_VEGA', 'OPT_THETA', 'OPT_RHO']
             greeks_found = [g for g in greeks if g in fields_found]
             
             if greeks_found:
