@@ -17,6 +17,7 @@ Auteur: BGC Trading Desk
 Date: 2025-10-17
 """
 
+import blpapi
 from typing import Union, List, Dict, Any, Optional
 from connection import BloombergConnection
 
@@ -96,10 +97,10 @@ def bbg_fetch(
             results = {}
             
             while True:
-                event = conn.session.nextEvent(timeout=5000)
+                event = conn.next_event(timeout_ms=5000)
                 
-                if event.eventType() == conn.names.RESPONSE or \
-                   event.eventType() == conn.names.PARTIAL_RESPONSE:
+                if event.eventType() == blpapi.Event.RESPONSE or \
+                   event.eventType() == blpapi.Event.PARTIAL_RESPONSE:
                     
                     for msg in event:
                         if msg.hasElement("securityData"):
@@ -119,7 +120,7 @@ def bbg_fetch(
                                         else:
                                             results[field] = None
                 
-                if event.eventType() == conn.names.RESPONSE:
+                if event.eventType() == blpapi.Event.RESPONSE:
                     break
             
             # Retourner la valeur directement si un seul champ
@@ -194,10 +195,10 @@ def bbg_fetch_multi(
             results = {ticker: {} for ticker in tickers}
             
             while True:
-                event = conn.session.nextEvent(timeout=5000)
+                event = conn.next_event(timeout_ms=5000)
                 
-                if event.eventType() == conn.names.RESPONSE or \
-                   event.eventType() == conn.names.PARTIAL_RESPONSE:
+                if event.eventType() == blpapi.Event.RESPONSE or \
+                   event.eventType() == blpapi.Event.PARTIAL_RESPONSE:
                     
                     for msg in event:
                         if msg.hasElement("securityData"):
@@ -220,7 +221,7 @@ def bbg_fetch_multi(
                                         else:
                                             results[ticker][field] = None
                 
-                if event.eventType() == conn.names.RESPONSE:
+                if event.eventType() == blpapi.Event.RESPONSE:
                     break
             
             # Simplifier si un seul champ
