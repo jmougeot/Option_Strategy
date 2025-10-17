@@ -53,12 +53,12 @@ class BloombergConnection:
         Établit la connexion au Bloomberg Terminal.
         """
         # Créer les options de session
-        sessionOptions = blpapi.SessionOptions()
+        sessionOptions = blpapi.SessionOptions()  # type: ignore
         sessionOptions.setServerHost(self.host)
         sessionOptions.setServerPort(self.port)
         
         # Créer et démarrer la session
-        self.session = blpapi.Session(sessionOptions)
+        self.session = blpapi.Session(sessionOptions)  # type: ignore
         
         if not self.session.start():
             raise ConnectionError(
@@ -106,6 +106,7 @@ class BloombergConnection:
         if not self.is_connected():
             raise RuntimeError("Pas de connexion active. Appelez connect() d'abord.")
         
+        assert self.service is not None, "Service should be available"
         return self.service.createRequest(request_type)
     
     def send_request(self, request):
@@ -121,6 +122,7 @@ class BloombergConnection:
         if not self.is_connected():
             raise RuntimeError("Pas de connexion active. Appelez connect() d'abord.")
         
+        assert self.session is not None, "Session should be available"
         self.session.sendRequest(request)
     
     def next_event(self, timeout_ms: int = 500):
@@ -139,6 +141,7 @@ class BloombergConnection:
         if not self.is_connected():
             raise RuntimeError("Pas de connexion active. Appelez connect() d'abord.")
         
+        assert self.session is not None, "Session should be available"
         return self.session.nextEvent(timeout_ms)
     
     # Context Manager Protocol (pour utilisation avec 'with')

@@ -204,7 +204,7 @@ class BloombergOptionFetcher:
 
         # Construire le ticker
         print(f"[DEBUG fetcher] Construction du ticker: underlying={underlying}, expiry_month={expiry_month}, expiry_year=202{expiry_year} type={option_type}, strike={strike}")
-        ticker = build_option_ticker(underlying, expiry_month, expiry_year, option_type, strike)
+        ticker = build_option_ticker(underlying, expiry_month, expiry_year, option_type, strike, suffix="Comdty")
         print(f"[DEBUG fetcher] Ticker construit: {ticker}")
         
         # Récupérer les données

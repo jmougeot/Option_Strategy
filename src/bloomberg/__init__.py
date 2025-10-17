@@ -62,7 +62,6 @@ except ImportError as e:
 __all__ = [
     # Models
     'OptionData',
-    'EuriborOptionData',
     
     # Connection
     'BloombergConnection',

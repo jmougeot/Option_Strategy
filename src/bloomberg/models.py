@@ -1,10 +1,6 @@
 """
 Bloomberg Data Models
 ====================
-Dataclasses pour représenter les données d'options et de taux (EURIBOR).
-
-Auteur: BGC Trading Desk
-Date: 2025-10-16
 """
 
 from dataclasses import dataclass
