@@ -62,14 +62,14 @@ sys.path.insert(0, str(current_dir))
 
 # Import depuis le répertoire bloomberg
 try:
-    from bloomberg.fetcher_v2 import bbg_fetch
+    from bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
     from bloomberg.ticker_builder import build_option_ticker
 except ImportError:
     # Fallback pour imports directs
     import os
     bloomberg_dir = os.path.join(os.path.dirname(__file__), 'bloomberg')
     sys.path.insert(0, bloomberg_dir)
-    from fetcher_v2 import bbg_fetch
+    from fetcher_batch import fetch_options_batch, extract_best_values
     from ticker_builder import build_option_ticker
 
 # Type pour les mois valides
@@ -117,127 +117,69 @@ def get_expiration_date(month: str, year: int) -> str:
     return f"{full_year:04d}-{month_number:02d}-{day:02d}"
 
 
-def fetch_option_data(
+def build_ticker_info(
     underlying: str,
     month: MonthCode,
     year: int,
     option_type: Literal['C', 'P'],
     strike: float,
     suffix: str = "Comdty"
-) -> Optional[Dict[str, Any]]:
+) -> tuple[str, str, str]:
     """
-    Récupère les données d'une option depuis Bloomberg
+    Construit le ticker et les métadonnées.
+    
+    Returns:
+        (ticker, expiration_date, option_type_str)
+    """
+    ticker = build_option_ticker(underlying, month, year, option_type, strike, suffix)
+    expiration_date = get_expiration_date(month, year)
+    option_type_str = "call" if option_type == 'C' else "put"
+    
+    return ticker, expiration_date, option_type_str
+
+
+def convert_to_option_dict(
+    ticker: str,
+    underlying: str,
+    strike: float,
+    expiration_date: str,
+    option_type_str: str,
+    bloomberg_data: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Convertit les données Bloomberg brutes en format attendu par l'app.
     
     Args:
-        underlying: Code du sous-jacent (ex: "ER" pour EURIBOR)
-        month: Mois d'expiration (F, G, H, etc.)
-        year: Année sur 1 chiffre (6 = 2026)
-        option_type: 'C' pour Call, 'P' pour Put
+        ticker: Ticker Bloomberg
+        underlying: Symbole du sous-jacent
         strike: Prix d'exercice
-        suffix: Suffixe Bloomberg (défaut: "Comdty")
+        expiration_date: Date d'expiration
+        option_type_str: "call" ou "put"
+        bloomberg_data: Données extraites de Bloomberg
         
     Returns:
-        Dictionnaire avec les données de l'option ou None si erreur
+        Dictionnaire formaté pour l'app
     """
-    # Construire le ticker
-    ticker = build_option_ticker(underlying, month, year, option_type, strike, suffix)
-    
-    # Champs à récupérer
-    fields = [
-        "PX_LAST",           # Prix (premium)
-        "PX_BID",            # Bid
-        "PX_ASK",            # Ask
-        "PX_MID",            # Mid
-        "DELTA_MID",         # Delta
-        "DELTA",             # Delta alternatif
-        "OPT_DELTA",         # Delta alternatif 2
-        "GAMMA_MID",         # Gamma
-        "GAMMA",
-        "OPT_GAMMA",
-        "VEGA_MID",          # Vega
-        "VEGA",
-        "OPT_VEGA",
-        "THETA_MID",         # Theta
-        "THETA",
-        "OPT_THETA",
-        "RHO_MID",           # Rho
-        "RHO",
-        "OPT_RHO",
-        "OPT_IMP_VOL",       # Volatilité implicite
-        "IMP_VOL",
-        "IVOL_MID",
-        "OPT_UNDL_PX",       # Prix du sous-jacent
-        "OPT_STRIKE_PX",     # Strike
-        "OPEN_INT",          # Open interest
-        "VOLUME",            # Volume
-        "PX_VOLUME",         # Volume alternatif
-    ]
-    
-    try:
-        # Récupérer les données
-        data = bbg_fetch(ticker, fields)
-        
-        if not data or all(v is None for v in data.values()):
-            print(f"⚠️  Aucune donnée pour {ticker}")
-            return None
-        
-        # Extraire le prix (premium) - essayer plusieurs champs
-        premium = data.get('PX_LAST') or data.get('PX_MID') or 0.0
-        bid = data.get('PX_BID') or premium * 0.98
-        ask = data.get('PX_ASK') or premium * 1.02
-        
-        # Greeks - essayer plusieurs formats
-        delta = data.get('DELTA_MID') or data.get('DELTA') or data.get('OPT_DELTA') or 0.0
-        gamma = data.get('GAMMA_MID') or data.get('GAMMA') or data.get('OPT_GAMMA') or 0.0
-        vega = data.get('VEGA_MID') or data.get('VEGA') or data.get('OPT_VEGA') or 0.0
-        theta = data.get('THETA_MID') or data.get('THETA') or data.get('OPT_THETA') or 0.0
-        rho = data.get('RHO_MID') or data.get('RHO') or data.get('OPT_RHO') or 0.0
-        
-        # Volatilité implicite
-        iv = data.get('OPT_IMP_VOL') or data.get('IMP_VOL') or data.get('IVOL_MID') or 0.15
-        
-        # Prix du sous-jacent
-        underlying_price = data.get('OPT_UNDL_PX') or strike
-        
-        # Volume et Open Interest
-        volume = data.get('VOLUME') or data.get('PX_VOLUME') or 0
-        open_interest = data.get('OPEN_INT') or 0
-        
-        # Calculer la date d'expiration
-        expiration_date = get_expiration_date(month, year)
-        
-        # Convertir le type d'option
-        option_type_str = "call" if option_type == 'C' else "put"
-        
-        # Construire le dictionnaire de données
-        option_data = {
-            "symbol": underlying,
-            "strike": float(strike),
-            "option_type": option_type_str,
-            "premium": float(premium) if premium else 0.0,
-            "expiration_date": expiration_date,
-            "underlying_price": float(underlying_price) if underlying_price else strike,
-            "bid": float(bid) if bid else 0.0,
-            "ask": float(ask) if ask else 0.0,
-            "volume": int(volume) if volume else 0,
-            "open_interest": int(open_interest) if open_interest else 0,
-            "implied_volatility": float(iv) if iv else 0.15,
-            "delta": float(delta) if delta else 0.0,
-            "gamma": float(gamma) if gamma else 0.0,
-            "theta": float(theta) if theta else 0.0,
-            "vega": float(vega) if vega else 0.0,
-            "rho": float(rho) if rho else 0.0,
-            "timestamp": datetime.now().isoformat(),
-            "bloomberg_ticker": ticker
-        }
-        
-        print(f"✓ {ticker}: Premium={premium:.4f}, Delta={delta:.4f}, IV={iv:.2%}")
-        
-        return option_data
-        
-    except Exception as e:
-        print(f"✗ Erreur pour {ticker}: {e}")
-        return None
+    return {
+        "symbol": underlying,
+        "strike": float(strike),
+        "option_type": option_type_str,
+        "premium": float(bloomberg_data['premium']),
+        "expiration_date": expiration_date,
+        "underlying_price": float(bloomberg_data['underlying_price']),
+        "bid": float(bloomberg_data['bid']),
+        "ask": float(bloomberg_data['ask']),
+        "volume": int(bloomberg_data['volume']),
+        "open_interest": int(bloomberg_data['open_interest']),
+        "implied_volatility": float(bloomberg_data['implied_volatility']),
+        "delta": float(bloomberg_data['delta']),
+        "gamma": float(bloomberg_data['gamma']),
+        "theta": float(bloomberg_data['theta']),
+        "vega": float(bloomberg_data['vega']),
+        "rho": float(bloomberg_data['rho']),
+        "timestamp": datetime.now().isoformat(),
+        "bloomberg_ticker": ticker
+    }
 
 
 def import_euribor_options(
@@ -290,31 +232,104 @@ def import_euribor_options(
     total_attempts = 0
     total_success = 0
     
-    # Boucler sur toutes les combinaisons
+    # OPTIMISATION: Construire tous les tickers d'abord, puis fetch en batch
+    all_tickers = []
+    ticker_metadata = {}  # Stocke les métadonnées pour chaque ticker
+    
+    print("\n🔨 Construction des tickers...")
     for year in years:
         for month in months:
-            # Cast month to MonthCode for type safety
             month_code = cast(MonthCode, month)
-            
-            print(f"\n📅 {MONTH_NAMES[month]} 20{20+year}")
-            print("-" * 70)
             
             for strike in strikes:
                 # Calls
                 if include_calls:
+                    ticker, exp_date, opt_type = build_ticker_info(underlying, month_code, year, 'C', strike, suffix)
+                    all_tickers.append(ticker)
+                    ticker_metadata[ticker] = {
+                        'underlying': underlying,
+                        'strike': strike,
+                        'expiration_date': exp_date,
+                        'option_type': opt_type,
+                        'month': month,
+                        'year': year
+                    }
                     total_attempts += 1
-                    call_data = fetch_option_data(underlying, month_code, year, 'C', strike, suffix)
-                    if call_data:
-                        options.append(call_data)
-                        total_success += 1
                 
                 # Puts
                 if include_puts:
+                    ticker, exp_date, opt_type = build_ticker_info(underlying, month_code, year, 'P', strike, suffix)
+                    all_tickers.append(ticker)
+                    ticker_metadata[ticker] = {
+                        'underlying': underlying,
+                        'strike': strike,
+                        'expiration_date': exp_date,
+                        'option_type': opt_type,
+                        'month': month,
+                        'year': year
+                    }
                     total_attempts += 1
-                    put_data = fetch_option_data(underlying, month_code, year, 'P', strike, suffix)
-                    if put_data:
-                        options.append(put_data)
+    
+    print(f"✓ {len(all_tickers)} tickers construits")
+    print(f"\n📡 Récupération des données Bloomberg en batch...")
+    print(f"   (UN SEUL appel pour TOUS les tickers - beaucoup plus rapide!)")
+    
+    # FETCH EN BATCH - UN SEUL APPEL BLOOMBERG POUR TOUS LES TICKERS!
+    try:
+        batch_data = fetch_options_batch(all_tickers, use_overrides=True)
+        
+        # Traiter les résultats par mois pour l'affichage
+        for year in years:
+            for month in months:
+                month_options = []
+                
+                print(f"\n📅 {MONTH_NAMES[month]} 20{20+year}")
+                print("-" * 70)
+                
+                for ticker in all_tickers:
+                    meta = ticker_metadata[ticker]
+                    
+                    # Filtrer par mois/année courant
+                    if meta['month'] != month or meta['year'] != year:
+                        continue
+                    
+                    # Récupérer les données brutes
+                    raw_data = batch_data.get(ticker, {})
+                    
+                    if raw_data and not all(v is None for v in raw_data.values()):
+                        # Extraire les meilleures valeurs
+                        extracted = extract_best_values(raw_data)
+                        
+                        # Convertir au format attendu
+                        option_dict = convert_to_option_dict(
+                            ticker=ticker,
+                            underlying=meta['underlying'],
+                            strike=meta['strike'],
+                            expiration_date=meta['expiration_date'],
+                            option_type_str=meta['option_type'],
+                            bloomberg_data=extracted
+                        )
+                        
+                        options.append(option_dict)
+                        month_options.append(option_dict)
                         total_success += 1
+                        
+                        # Afficher un résumé
+                        opt_symbol = "C" if option_dict['option_type'] == "call" else "P"
+                        print(f"✓ {opt_symbol} {option_dict['strike']:6.2f}: "
+                              f"Premium={option_dict['premium']:.4f}, "
+                              f"Delta={option_dict['delta']:+.4f}, "
+                              f"IV={option_dict['implied_volatility']:.2%}")
+                
+                if month_options:
+                    print(f"\n   ✓ {len(month_options)} options récupérées pour ce mois")
+                else:
+                    print(f"\n   ⚠️  Aucune option récupérée pour ce mois")
+    
+    except Exception as e:
+        print(f"\n✗ Erreur lors du fetch batch: {e}")
+        import traceback
+        traceback.print_exc()
     
     print("\n" + "=" * 70)
     print("RÉSUMÉ DE L'IMPORT")

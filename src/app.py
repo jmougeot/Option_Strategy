@@ -116,19 +116,6 @@ def camel_case_to_display_name(name: str) -> str:
     return re.sub('([A-Z])', r' \1', name).strip()
 
 @st.cache_data
-def load_options_data(filepath: str = 'calls_export.json') -> Dict:
-    """Loads options data from a JSON file."""
-    try:
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-        return data
-    except FileNotFoundError:
-        st.error(f"❌ File {filepath} not found. Run generate_full_database.py first")
-        st.stop()
-    except json.JSONDecodeError:
-        st.error(f"❌ Error reading file {filepath}")
-        st.stop()
-
 def load_options_from_bloomberg(params: Dict) -> Dict:
     """
     Charge les données d'options depuis Bloomberg
@@ -308,46 +295,68 @@ def main():
     with st.sidebar:
         st.header("⚙️ Paramètres")
         
-        # Section 1: Données source
-        st.subheader("📂 Source de Données")
-        data_source = st.radio(
-            "Source:",
-            ["JSON Local", "Bloomberg API"],
-            help="Choisissez la source des données d'options"
+        # Section 1: Données Bloomberg
+        st.subheader("� Import Bloomberg")
+        
+        # Paramètres d'import Bloomberg
+        underlying = st.text_input(
+            "Sous-jacent:",
+            value="ER",
+            help="Code Bloomberg (ex: ER pour EURIBOR)"
         )
         
-        # Ensure json_file is always defined to avoid "possibly unbound" errors.
-        json_file = "calls_export.json"
-        bloomberg_params = None
-        
-        if data_source == "JSON Local":
-            json_file = st.text_input(
-                "Fichier JSON:",
-                value="calls_export.json",
-                help="Nom du fichier JSON contenant les données"
+        col1, col2 = st.columns(2)
+        with col1:
+            months_input = st.text_input(
+                "Mois d'expiration:",
+                value="F,G,H,K,M,N",
+                help="Codes séparés par virgule (F=Jan, G=Feb, H=Mar, K=Apr, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec)"
             )
-        else:
-            # Bloomberg API - Paramètres d'import
-            st.write("**Paramètres Bloomberg:**")
-            
-            underlying = st.text_input("Sous-jacent:", value="ER", help="Code Bloomberg (ex: ER pour EURIBOR)")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                months_input = st.text_input("Mois:", value="F,G,H,K,M,N", help="Codes séparés par virgule (F=Jan, G=Feb, etc.)")
-                years_input = st.text_input("Années:", value="6,7", help="Années sur 1 chiffre (6=2026, 7=2027)")
-            with col2:
-                strike_min = st.number_input("Strike min:", value=96.0, step=0.25)
-                strike_max = st.number_input("Strike max:", value=99.0, step=0.25)
-                strike_step = st.number_input("Pas:", value=0.25, step=0.05)
-            
-            bloomberg_params = {
-                'underlying': underlying,
-                'months': [m.strip() for m in months_input.split(',')],
-                'years': [int(y.strip()) for y in years_input.split(',')],
-                'strikes': [round(strike_min + i * strike_step, 2) 
-                           for i in range(int((strike_max - strike_min) / strike_step) + 1)]
-            }
+            years_input = st.text_input(
+                "Années:",
+                value="6,7",
+                help="Années sur 1 chiffre séparées par virgule (6=2026, 7=2027)"
+            )
+        
+        with col2:
+            strike_min = st.number_input(
+                "Strike minimum:",
+                value=96.0,
+                step=0.25,
+                help="Prix d'exercice minimum"
+            )
+            strike_max = st.number_input(
+                "Strike maximum:",
+                value=99.0,
+                step=0.25,
+                help="Prix d'exercice maximum"
+            )
+        
+        strike_step = st.number_input(
+            "Pas des strikes:",
+            value=0.25,
+            step=0.05,
+            help="Incrément entre chaque strike"
+        )
+        
+        # Construire les paramètres
+        bloomberg_params = {
+            'underlying': underlying,
+            'months': [m.strip() for m in months_input.split(',')],
+            'years': [int(y.strip()) for y in years_input.split(',')],
+            'strikes': [round(strike_min + i * strike_step, 2) 
+                       for i in range(int((strike_max - strike_min) / strike_step) + 1)]
+        }
+        
+        # Afficher un résumé
+        st.info(f"""
+        📋 **Résumé de l'import:**
+        - Sous-jacent: {underlying}
+        - Mois: {len(bloomberg_params['months'])} mois
+        - Années: {len(bloomberg_params['years'])} années
+        - Strikes: {len(bloomberg_params['strikes'])} strikes ({strike_min} à {strike_max})
+        - Total options estimé: {len(bloomberg_params['months']) * len(bloomberg_params['years']) * len(bloomberg_params['strikes']) * 2} (calls + puts)
+        """)
         
         st.markdown("---")
         
@@ -460,34 +469,25 @@ def main():
             st.error("❌ Veuillez sélectionner au moins une stratégie à comparer")
             return
         
-        # Chargement des données
-        with st.spinner("📂 Chargement des données..."):
-            if data_source == "JSON Local":
-                data = load_options_data(json_file)
-            else:
-                # Bloomberg API
-                if bloomberg_params is None:
-                    st.error("❌ Paramètres Bloomberg non configurés")
-                    return
-                
-                st.info("🔄 Import depuis Bloomberg en cours...")
-                data = load_options_from_bloomberg(bloomberg_params)
-                
-                # Optionnellement sauvegarder
-                if st.checkbox("Sauvegarder les données importées en JSON", value=True):
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    save_filename = f"bloomberg_import_{timestamp}.json"
-                    with open(save_filename, 'w') as f:
-                        json.dump(data, f, indent=2)
-                    st.success(f"💾 Données sauvegardées dans {save_filename}")
+        # Chargement des données depuis Bloomberg
+        with st.spinner("� Import depuis Bloomberg en cours..."):
+            data = load_options_from_bloomberg(bloomberg_params)
+            
+            # Optionnellement sauvegarder
+            save_data = st.checkbox("Sauvegarder les données importées en JSON", value=True)
+            if save_data:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                save_filename = f"bloomberg_import_{timestamp}.json"
+                with open(save_filename, 'w') as f:
+                    json.dump(data, f, indent=2)
+                st.success(f"💾 Données sauvegardées dans {save_filename}")
             
             options_data = prepare_options_data(data)
             
             nb_calls = len(options_data['calls'])
             nb_puts = len(options_data['puts'])
             
-            source_label = "JSON" if data_source == "JSON Local" else "Bloomberg"
-            st.success(f"✅ {nb_calls + nb_puts} options chargées depuis {source_label} ({nb_calls} calls, {nb_puts} puts)")
+            st.success(f"✅ {nb_calls + nb_puts} options chargées depuis Bloomberg ({nb_calls} calls, {nb_puts} puts)")
         
         # Vérification des puts
         if nb_puts == 0:
