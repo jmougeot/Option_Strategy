@@ -25,7 +25,7 @@ def diagnose_bloomberg_fields():
     print()
     
     # Configuration
-    ticker = "ERH5C 97.5 Comdty"  # EURIBOR Mars 2025 Call Strike 97.5
+    ticker = "ERH6C 97.5 Comdty"  # EURIBOR Mars 2025 Call Strike 97.5
     
     # Liste de tous les champs possibles à tester
     all_fields = [
