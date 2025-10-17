@@ -136,26 +136,18 @@ def test_bloomberg_data(ticker):
             if option_data.spread:
                 print(f"  SPREAD:      {option_data.spread:.4f}")
             
-            # Greeks - Formats _MID
-            print("\nGREEKS (format _MID):")
-            delta_mid = raw_data.get('DELTA_MID', 'N/A')
-            gamma_mid = raw_data.get('GAMMA_MID', 'N/A')
-            vega_mid = raw_data.get('VEGA_MID', 'N/A')
-            theta_mid = raw_data.get('THETA_MID', 'N/A')
-            rho_mid = raw_data.get('RHO_MID', 'N/A')
-            print(f"  DELTA_MID:   {delta_mid}")
-            print(f"  GAMMA_MID:   {gamma_mid}")
-            print(f"  VEGA_MID:    {vega_mid}")
-            print(f"  THETA_MID:   {theta_mid}")
-            print(f"  RHO_MID:     {rho_mid}")
+            # Greeks - GREEK_MID (depuis données brutes)
+            print("\nGREEKS (via GREEK_MID):")
+            greek_mid = raw_data.get('GREEK_MID', 'N/A')
+            print(f"  GREEK_MID:   {greek_mid}")
             
             # Greeks - Individuels (depuis OptionData)
-            print("\nGREEKS (format OPT_ - via OptionData):")
-            print(f"  Delta:       {option_data.delta or 'N/A'} (depuis OPT_DELTA)")
-            print(f"  Gamma:       {option_data.gamma or 'N/A'} (depuis OPT_GAMMA)")
-            print(f"  Vega:        {option_data.vega or 'N/A'} (depuis OPT_VEGA)")
-            print(f"  Theta:       {option_data.theta or 'N/A'} (depuis OPT_THETA)")
-            print(f"  Rho:         {option_data.rho or 'N/A'} (depuis OPT_RHO)")
+            print("\nGREEKS (individuels - via OptionData):")
+            print(f"  Delta:       {option_data.delta or 'N/A'}")
+            print(f"  Gamma:       {option_data.gamma or 'N/A'}")
+            print(f"  Vega:        {option_data.vega or 'N/A'}")
+            print(f"  Theta:       {option_data.theta or 'N/A'}")
+            print(f"  Rho:         {option_data.rho or 'N/A'}")
             
             # Informations du contrat
             print("\nINFORMATIONS CONTRAT:")
