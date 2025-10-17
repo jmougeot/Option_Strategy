@@ -42,9 +42,6 @@ class BloombergConnection:
         Args:
             host: Adresse du Bloomberg Terminal (défaut: localhost)
             port: Port de connexion (défaut: 8194)
-        
-        Note:
-            Le Bloomberg Terminal doit être lancé et connecté avant d'utiliser l'API.
         """
         self.host = host
         self.port = port
@@ -54,19 +51,6 @@ class BloombergConnection:
     def connect(self) -> bool:
         """
         Établit la connexion au Bloomberg Terminal.
-        
-        Returns:
-            True si connexion réussie, False sinon
-        
-        Raises:
-            ConnectionError: Si le Terminal n'est pas accessible
-        
-        Exemple:
-            >>> conn = BloombergConnection()
-            >>> if conn.connect():
-            ...     print("Connecté à Bloomberg")
-            ... else:
-            ...     print("Erreur de connexion")
         """
         # Créer les options de session
         sessionOptions = blpapi.SessionOptions()
@@ -94,9 +78,6 @@ class BloombergConnection:
     def disconnect(self):
         """
         Ferme proprement la connexion Bloomberg.
-        
-        À appeler systématiquement après usage pour libérer les ressources.
-        Avec le context manager, c'est automatique.
         """
         if self.session:
             self.session.stop()
@@ -106,11 +87,59 @@ class BloombergConnection:
     def is_connected(self) -> bool:
         """
         Vérifie si la connexion est active.
-        
-        Returns:
-            True si session et service sont disponibles
         """
         return self.session is not None and self.service is not None
+    
+    def create_request(self, request_type: str = "ReferenceDataRequest"):
+        """
+        Crée une requête Bloomberg.
+        
+        Args:
+            request_type: Type de requête (défaut: "ReferenceDataRequest")
+        
+        Returns:
+            Objet Request Bloomberg
+        
+        Raises:
+            RuntimeError: Si non connecté
+        """
+        if not self.is_connected():
+            raise RuntimeError("Pas de connexion active. Appelez connect() d'abord.")
+        
+        return self.service.createRequest(request_type)
+    
+    def send_request(self, request):
+        """
+        Envoie une requête Bloomberg.
+        
+        Args:
+            request: Requête à envoyer
+        
+        Raises:
+            RuntimeError: Si non connecté
+        """
+        if not self.is_connected():
+            raise RuntimeError("Pas de connexion active. Appelez connect() d'abord.")
+        
+        self.session.sendRequest(request)
+    
+    def next_event(self, timeout_ms: int = 500):
+        """
+        Récupère le prochain événement de la session.
+        
+        Args:
+            timeout_ms: Timeout en millisecondes
+        
+        Returns:
+            Événement Bloomberg
+        
+        Raises:
+            RuntimeError: Si non connecté
+        """
+        if not self.is_connected():
+            raise RuntimeError("Pas de connexion active. Appelez connect() d'abord.")
+        
+        return self.session.nextEvent(timeout_ms)
     
     # Context Manager Protocol (pour utilisation avec 'with')
     def __enter__(self):
@@ -131,15 +160,6 @@ def test_connection(host: str = "localhost", port: int = 8194) -> bool:
     Args:
         host: Adresse du Terminal (défaut: localhost)
         port: Port (défaut: 8194)
-    
-    Returns:
-        True si la connexion fonctionne
-    
-    Exemple:
-        >>> if test_connection():
-        ...     print("Bloomberg Terminal accessible")
-        ... else:
-        ...     print("Vérifiez que le Terminal est lancé")
     """
     try:
         with BloombergConnection(host, port) as conn:

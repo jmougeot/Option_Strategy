@@ -14,8 +14,8 @@ from datetime import date, datetime
 from typing import List, Optional, Dict, Any, Literal
 import blpapi
 from connection import BloombergConnection
-from ticker_builder import build_option_ticker, parse_euribor_expiry_code
-from models import OptionData, EuriborOptionData
+from ticker_builder import build_option_ticker
+from models import OptionData
 
 
 # Champs Bloomberg standards pour les options
@@ -74,29 +74,26 @@ class BloombergOptionFetcher:
         self.fields = fields or DEFAULT_OPTION_FIELDS
     
     def connect(self):
-        """Établit la connexion Bloomberg."""
-        print("[DEBUG fetcher] Tentative de connexion Bloomberg...")
-        try:
-            self.connection.connect()
-            print("[DEBUG fetcher] ✓ Connexion Bloomberg établie")
-        except Exception as e:
-            print(f"[DEBUG fetcher] ✗ Erreur de connexion: {type(e).__name__}: {e}")
-            raise
+        """Établit la connexion Bloomberg (délégué à BloombergConnection)."""
+        return self.connection.connect()
     
     def disconnect(self):
-        """Ferme la connexion Bloomberg."""
-        print("[DEBUG fetcher] Fermeture de la connexion Bloomberg...")
-        self.connection.disconnect()
-        print("[DEBUG fetcher] ✓ Connexion fermée")
+        """Ferme la connexion Bloomberg (délégué à BloombergConnection)."""
+        return self.connection.disconnect()
     
-    # Context Manager
+    def is_connected(self) -> bool:
+        """Vérifie si la connexion est active (délégué à BloombergConnection)."""
+        return self.connection.is_connected()
+    
+    # Context Manager - délégué à BloombergConnection
     def __enter__(self):
-        self.connect()
+        """Permet d'utiliser 'with BloombergOptionFetcher() as fetcher:'"""
+        self.connection.__enter__()
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.disconnect()
-        return False
+        """Ferme automatiquement la connexion à la sortie du bloc 'with'."""
+        return self.connection.__exit__(exc_type, exc_val, exc_tb)
     
     def _parse_field(self, field_data: blpapi.Element) -> Any:
         """
@@ -144,25 +141,40 @@ class BloombergOptionFetcher:
         Returns:
             Dictionnaire {field_name: value}
         """
-        # Créer la requête
-        request = self.connection.service.createRequest("ReferenceDataRequest")
+        print(f"[DEBUG fetcher._send_request] Création requête pour ticker={ticker}")
+        print(f"[DEBUG fetcher._send_request] Champs demandés: {fields[:5]}... ({len(fields)} total)")
+        
+        # Créer la requête en utilisant la méthode de connection
+        request = self.connection.create_request("ReferenceDataRequest")
         request.append("securities", ticker)
         
         for field in fields:
             request.append("fields", field)
         
-        # Envoyer et attendre la réponse
-        self.connection.session.sendRequest(request)
+        print(f"[DEBUG fetcher._send_request] Envoi de la requête...")
+        
+        # Envoyer la requête en utilisant la méthode de connection
+        self.connection.send_request(request)
         
         # Parser la réponse
         result = {}
+        print(f"[DEBUG fetcher._send_request] En attente de la réponse...")
+        
         while True:
-            event = self.connection.session.nextEvent(500)  # timeout 500ms
+            # Utiliser la méthode next_event de connection
+            event = self.connection.next_event(500)  # timeout 500ms
             
             for msg in event:
                 if msg.hasElement("securityData"):
                     sec_data = msg.getElement("securityData")
                     sec_data_element = sec_data.getValueAsElement(0)
+                    
+                    # Vérifier les erreurs de sécurité
+                    if sec_data_element.hasElement("securityError"):
+                        error = sec_data_element.getElement("securityError")
+                        error_msg = error.getElementAsString("message") if error.hasElement("message") else "Unknown error"
+                        print(f"[DEBUG fetcher._send_request] ✗ Erreur Bloomberg pour {ticker}: {error_msg}")
+                        return {}
                     
                     if sec_data_element.hasElement("fieldData"):
                         field_data = sec_data_element.getElement("fieldData")
@@ -174,34 +186,25 @@ class BloombergOptionFetcher:
             if event.eventType() == blpapi.Event.RESPONSE:
                 break
         
+        print(f"[DEBUG fetcher._send_request] ✓ Réponse reçue: {len(result)} champs")
         return result
     
     def get_option_data(
         self,
         underlying: str,
-        expiry: date,
-        option_type: Literal['C', 'P', 'CALL', 'PUT'],
+        expiry_month : Literal['F' , 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z' ],
+        expiry_year : int,
+        option_type: Literal['C', 'P'],
         strike: float,
-        is_euribor: bool = False
     ) -> Optional[OptionData]:
+        
         """
         Récupère toutes les données d'une option spécifique.
-        
-        Args:
-            underlying: Symbole du sous-jacent (ex: "AAPL", "ER")
-            expiry: Date d'expiration
-            option_type: "C"/"CALL" ou "P"/"PUT"
-            strike: Prix d'exercice
-            is_euribor: True pour options EURIBOR (auto-détecté si False)
-        
-        Exemple:
-            >>> with BloombergOptionFetcher() as fetcher:
-            ...     opt = fetcher.get_option_data("AAPL", date(2024, 12, 20), "C", 150.0)
-            ...     print(f"Delta: {opt.delta}, IV: {opt.implied_volatility}%")
         """
+
         # Construire le ticker
-        print(f"[DEBUG fetcher] Construction du ticker: underlying={underlying}, expiry={expiry}, type={option_type}, strike={strike}, is_euribor={is_euribor}")
-        ticker = build_option_ticker(underlying, expiry, option_type, strike, is_euribor)
+        print(f"[DEBUG fetcher] Construction du ticker: underlying={underlying}, expiry_month={expiry_month}, expiry_year=202{expiry_year} type={option_type}, strike={strike}")
+        ticker = build_option_ticker(underlying, expiry_month, expiry_year, option_type, strike)
         print(f"[DEBUG fetcher] Ticker construit: {ticker}")
         
         # Récupérer les données
@@ -215,95 +218,41 @@ class BloombergOptionFetcher:
             return None
         
         print(f"[DEBUG fetcher] Données reçues: {list(data.keys())}")
-        
-        # Créer l'objet approprié
-        if is_euribor or underlying.upper() in ['ER', 'EURIBOR']:
-            print(f"[DEBUG fetcher] Création d'un objet EuriborOptionData")
-            option = EuriborOptionData(
-                ticker=ticker,
-                underlying=underlying.upper(),
-                option_type=option_type.upper() if len(option_type) > 1 else ('CALL' if option_type == 'C' else 'PUT'),
-                strike=strike,
-                expiry=expiry,
-                
-                bid=data.get('PX_BID'),
-                ask=data.get('PX_ASK'),
-                last=data.get('PX_LAST'),
-                mid=data.get('PX_MID'),
-                volume=data.get('PX_VOLUME'),
-                open_interest=data.get('OPEN_INT'),
-                
-                delta=data.get('DELTA'),
-                gamma=data.get('GAMMA'),
-                vega=data.get('VEGA'),
-                theta=data.get('THETA'),
-                rho=data.get('RHO'),
-                
-                implied_volatility=data.get('IVOL_MID'),
-            )
-        else:
-            option = OptionData(
-                ticker=ticker,
-                underlying=underlying.upper(),
-                option_type=option_type.upper() if len(option_type) > 1 else ('CALL' if option_type == 'C' else 'PUT'),
-                strike=strike,
-                expiry=expiry,
-                
-                bid=data.get('PX_BID'),
-                ask=data.get('PX_ASK'),
-                last=data.get('PX_LAST'),
-                mid=data.get('PX_MID'),
-                volume=data.get('PX_VOLUME'),
-                open_interest=data.get('OPEN_INT'),
-                
-                delta=data.get('DELTA'),
-                gamma=data.get('GAMMA'),
-                vega=data.get('VEGA'),
-                theta=data.get('THETA'),
-                rho=data.get('RHO'),
-                
-                implied_volatility=data.get('IVOL_MID'),
+        option = OptionData(
+            ticker=ticker,
+            underlying=underlying.upper(),
+            option_type=option_type.upper() if len(option_type) > 1 else ('CALL' if option_type == 'C' else 'PUT'),
+            strike=strike,
+            expiry_month=expiry_month,
+            expiry_year=expiry_year,
+            bid=data.get('PX_BID'),
+            ask=data.get('PX_ASK'),
+            last=data.get('PX_LAST'),
+            mid=data.get('PX_MID'),
+            volume=data.get('PX_VOLUME'),
+            open_interest=data.get('OPEN_INT'),
+            delta=data.get('DELTA'),
+            gamma=data.get('GAMMA'),
+            vega=data.get('VEGA'),
+            theta=data.get('THETA'),
+            rho=data.get('RHO'),
+            implied_volatility=data.get('IVOL_MID'),
             )
         
         return option
     
-    def list_expiries(self, underlying: str, is_euribor: bool = False) -> List[date]:
+    def list_expiries(self, underlying: str) -> List[date]:
         """
         Liste toutes les dates d'expiration disponibles pour un sous-jacent.
-        
-        Args:
-            underlying: Symbole du sous-jacent (ex: "AAPL", "ER")
-            is_euribor: True pour EURIBOR (format différent)
-        
-        Returns:
-            Liste des dates d'expiration triées
-        
-        Exemple:
-            >>> with BloombergOptionFetcher() as fetcher:
-            ...     expiries = fetcher.list_expiries("AAPL")
-            ...     print(f"Prochaine expiration: {expiries[0]}")
         """
-        # Pour EURIBOR, on liste les contrats trimestriels standard
-        if is_euribor or underlying.upper() in ['ER', 'EURIBOR']:
-            # Requête sur le ticker EURIBOR générique
-            ticker = "ER1 Comdty"
-            data = self._send_request(ticker, ['OPT_EXPIRE_DT_LIST'])
-            
-            if 'OPT_EXPIRE_DT_LIST' in data and data['OPT_EXPIRE_DT_LIST']:
-                # Parser la liste de dates
-                expiry_list = data['OPT_EXPIRE_DT_LIST']
-                if isinstance(expiry_list, list):
-                    return sorted([d for d in expiry_list if isinstance(d, date)])
-                
-        else:
-            # Pour actions/indices, utiliser le ticker standard
-            ticker = f"{underlying.upper()} US Equity" if ' ' not in underlying else underlying
-            data = self._send_request(ticker, ['OPT_EXPIRE_DT_LIST'])
-            
-            if 'OPT_EXPIRE_DT_LIST' in data and data['OPT_EXPIRE_DT_LIST']:
-                expiry_list = data['OPT_EXPIRE_DT_LIST']
-                if isinstance(expiry_list, list):
-                    return sorted([d for d in expiry_list if isinstance(d, date)])
+    
+        ticker = f"{underlying.upper()} US Equity" if ' ' not in underlying else underlying
+        data = self._send_request(ticker, ['OPT_EXPIRE_DT_LIST'])
+        
+        if 'OPT_EXPIRE_DT_LIST' in data and data['OPT_EXPIRE_DT_LIST']:
+            expiry_list = data['OPT_EXPIRE_DT_LIST']
+            if isinstance(expiry_list, list):
+                return sorted([d for d in expiry_list if isinstance(d, date)])
         
         return []
     
@@ -312,76 +261,125 @@ class BloombergOptionFetcher:
         underlying: str,
         strike: float,
         option_type: Literal["P", "C"],
-        expiries: Optional[List[date]] = None,
+        expiry_year: int,
         is_euribor: bool = False
     ) -> List[OptionData]:
         """
         Récupère toutes les options pour un strike donné sur plusieurs expiries.
-        
-        Utile pour analyser la structure de terme (term structure) de la volatilité.
-        
+                
         Args:
             underlying: Symbole du sous-jacent
             strike: Prix d'exercice fixe
             option_type: "C"/"CALL" ou "P"/"PUT"
-            expiries: Liste des expiries (liste auto si None)
+            expiry_year: Année maximale à scanner (format 1 chiffre: 5 pour 2025)
             is_euribor: True pour EURIBOR
         
         Returns:
             Liste des OptionData pour chaque expiry
-        
-        Exemple:
-            >>> with BloombergOptionFetcher() as fetcher:
-            ...     # Toutes les calls à 150 sur AAPL
-            ...     chain = fetcher.get_options_by_strike("AAPL", 150.0, "C")
-            ...     for opt in chain:
-            ...         print(f"{opt.expiry}: IV={opt.implied_volatility}%")
         """
+        
         # Récupérer les expiries si non fournies
-        if expiries is None:
-            expiries = self.list_expiries(underlying, is_euribor)
+        year = date.today().year % 10
+        list_year = []
+
+        # Liste typée des mois Bloomberg
+        list_month: List[Literal['F', 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z']] = [
+            'F', 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z'
+        ]
+
+        while year <= expiry_year:
+            list_year.append(year)
+            year += 1
+            
+        # Récupérer chaque option
+        options = []
+        for year in list_year:
+            for month in list_month:
+                try:
+                    opt = self.get_option_data(underlying, month, year, option_type, strike)
+                    if opt:
+                        options.append(opt)
+                except Exception as e:
+                    # Continuer si une option échoue
+                    print(f"Erreur pour {underlying}{month}{year} {option_type} {strike}: {e}")
+                    continue
+        
+        return options
+    
+    def get_options_by_range_strike(
+        self,
+        underlying: str,
+        strike_center: float,
+        option_type: Literal["P", "C"],
+        expiry_month: Literal['F', 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z'],
+        expiry_year: int,
+        strike_range: float = 30.0,
+        strike_step: float = 0.25,
+        is_euribor: bool = False
+    ) -> List[OptionData]:
+        """
+        Récupère toutes les options dans un intervalle de strikes autour d'un strike central.
+        
+        Args:
+            underlying: Symbole du sous-jacent (ex: "ER" pour EURIBOR)
+            strike_center: Strike central (ex: 97.50)
+            option_type: "C" pour Call ou "P" pour Put
+            expiry_month: Mois d'expiration (ex: 'H' pour Mars)
+            expiry_year: Année d'expiration sur 1 chiffre (ex: 5 pour 2025)
+            strike_range: Intervalle autour du strike central (défaut: ±30)
+            strike_step: Pas entre chaque strike (défaut: 0.25 pour EURIBOR)
+            is_euribor: True pour EURIBOR
+        
+        Returns:
+            Liste des OptionData pour tous les strikes dans l'intervalle
+            
+        Example:
+            # Pour EURIBOR Mars 2025, strike 97.50, intervalle ±30
+            # Va chercher strikes de 67.50 à 127.50 par pas de 0.25
+            fetcher.get_options_by_range_strike(
+                underlying="ER",
+                strike_center=97.50,
+                option_type="C",
+                expiry_month="H",
+                expiry_year=5,
+                strike_range=30.0,
+                strike_step=0.25
+            )
+        """
+        
+        # Calculer les bornes de l'intervalle
+        strike_min = strike_center - strike_range
+        strike_max = strike_center + strike_range
+        
+        print(f"[DEBUG] Recherche options {underlying} {option_type} pour {expiry_month}{expiry_year}")
+        print(f"[DEBUG] Intervalle strikes: {strike_min} à {strike_max} (pas: {strike_step})")
+        
+        # Générer la liste de tous les strikes à tester
+        strikes = []
+        current_strike = strike_min
+        while current_strike <= strike_max:
+            strikes.append(round(current_strike, 2))  # Arrondir à 2 décimales
+            current_strike += strike_step
+        
+        print(f"[DEBUG] Nombre de strikes à tester: {len(strikes)}")
         
         # Récupérer chaque option
         options = []
-        for expiry in expiries:
+        for strike in strikes:
             try:
-                opt = self.get_option_data(underlying, expiry, option_type, strike, is_euribor)
+                opt = self.get_option_data(
+                    underlying=underlying,
+                    expiry_month=expiry_month,
+                    expiry_year=expiry_year,
+                    option_type=option_type,
+                    strike=strike
+                )
                 if opt:
                     options.append(opt)
+                    print(f"[DEBUG] ✓ Trouvé: {opt.ticker}")
             except Exception as e:
-                # Continuer si une option échoue
-                print(f"Erreur pour {underlying} {expiry} {option_type}{strike}: {e}")
+                # Continuer silencieusement si un strike n'existe pas
                 continue
         
+        print(f"[DEBUG] ✓ Total options trouvées: {len(options)}/{len(strikes)}")
         return options
-
-
-if __name__ == "__main__":
-    # Test rapide
-    print("=== Test Bloomberg Option Fetcher ===")
-    print("Assurez-vous que Bloomberg Terminal est lancé.\n")
-    
-    try:
-        with BloombergOptionFetcher() as fetcher:
-            # Test EURIBOR
-            print("Test EURIBOR option:")
-            euribor_opt = fetcher.get_option_data("ER", date(2025, 3, 15), "C", 97.50, is_euribor=True)
-            if euribor_opt:
-                print(f"  Ticker: {euribor_opt.ticker}")
-                print(f"  Last: {euribor_opt.last}")
-                print(f"  Delta: {euribor_opt.delta}")
-                print(f"  IV: {euribor_opt.implied_volatility}%")
-                if isinstance(euribor_opt, EuriborOptionData):
-                    print(f"  Implied Rate: {euribor_opt.implied_rate:.2f}%")
-            else:
-                print("  Option non trouvée (vérifier que la date d'expiry existe)")
-            
-            # Test liste des expiries
-            print("\nListe des expiries EURIBOR:")
-            expiries = fetcher.list_expiries("ER", is_euribor=True)
-            for exp in expiries[:5]:  # Afficher les 5 premières
-                print(f"  - {exp}")
-                
-    except Exception as e:
-        print(f"Erreur: {e}")
-        print("Vérifiez que Bloomberg Terminal est lancé et connecté.")
