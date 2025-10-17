@@ -21,28 +21,35 @@ from models import OptionData
 # Champs Bloomberg standards pour les options
 DEFAULT_OPTION_FIELDS = [
     # Prix de marché
+    'PX_LAST',          # Dernier prix traité
     'PX_BID',           # Prix bid (acheteur)
     'PX_ASK',           # Prix ask (vendeur)
-    'PX_LAST',          # Dernier prix traité
     'PX_MID',           # Prix mid (bid+ask)/2
     'PX_VOLUME',        # Volume du jour
     'OPEN_INT',         # Intérêt ouvert (nombre de contrats ouverts)
     
-    # Greeks (sensibilités)
-    'DELTA',            # Sensibilité au prix du sous-jacent
-    'GAMMA',            # Sensibilité du delta
-    'VEGA',             # Sensibilité à la volatilité
-    'THETA',            # Déclin temporel (perte de valeur/jour)
-    'RHO',              # Sensibilité aux taux d'intérêt
+    # Greeks (sensibilités) - Noms corrects Bloomberg
+    'OPT_DELTA',        # Sensibilité au prix du sous-jacent
+    'OPT_GAMMA',        # Sensibilité du delta
+    'OPT_VEGA',         # Sensibilité à la volatilité
+    'OPT_THETA',        # Déclin temporel (perte de valeur/jour)
+    'OPT_RHO',          # Sensibilité aux taux d'intérêt
     
-    # Volatilité
-    'IVOL_MID',         # Volatilité implicite mid
+    # Volatilité implicite
+    'OPT_IMP_VOL',      # Volatilité implicite
+    'OPT_IVOL_BID',     # Volatilité implicite bid
+    'OPT_IVOL_ASK',     # Volatilité implicite ask
+    
+    # Delta bid/ask
+    'OPT_DELTA_BID',    # Delta bid
+    'OPT_DELTA_ASK',    # Delta ask
     
     # Informations contractuelles
     'OPT_STRIKE_PX',    # Prix d'exercice (strike)
-    'OPT_EXPIRE_DT',    # Date d'expiration
+    'OPT_EXPIR_DT',     # Date d'expiration
     'OPT_PUT_CALL',     # Type: 'CALL' ou 'PUT'
-    'OPT_UNDL_TICKER',  # Ticker du sous-jacent
+    'OPT_UNDL_PX',      # Prix du sous-jacent
+    'OPT_REF_PRICE',    # Prix de référence
 ]
 
 
@@ -231,12 +238,12 @@ class BloombergOptionFetcher:
             mid=data.get('PX_MID'),
             volume=data.get('PX_VOLUME'),
             open_interest=data.get('OPEN_INT'),
-            delta=data.get('DELTA'),
-            gamma=data.get('GAMMA'),
-            vega=data.get('VEGA'),
-            theta=data.get('THETA'),
-            rho=data.get('RHO'),
-            implied_volatility=data.get('IVOL_MID'),
+            delta=data.get('OPT_DELTA'),       # Changé: DELTA -> OPT_DELTA
+            gamma=data.get('OPT_GAMMA'),       # Changé: GAMMA -> OPT_GAMMA
+            vega=data.get('OPT_VEGA'),         # Changé: VEGA -> OPT_VEGA
+            theta=data.get('OPT_THETA'),       # Changé: THETA -> OPT_THETA
+            rho=data.get('OPT_RHO'),           # Changé: RHO -> OPT_RHO
+            implied_volatility=data.get('OPT_IMP_VOL'),  # Changé: IVOL_MID -> OPT_IMP_VOL
             )
         
         return option
