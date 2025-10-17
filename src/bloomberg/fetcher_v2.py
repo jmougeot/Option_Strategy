@@ -250,7 +250,7 @@ if __name__ == "__main__":
     print("Test 1: Récupération d'un seul champ")
     print("-"*70)
     try:
-        delta = bbg_fetch("ERH6C 97.5 ", "OPT_DELTA")
+        delta = bbg_fetch("ERH6C 97.5 Comdity ", "DELTA_MId")
         print(f"✓ Delta: {delta}")
     except Exception as e:
         print(f"✗ Erreur: {e}")
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     print("Test 2: Récupération de plusieurs champs")
     print("-"*70)
     try:
-        data = bbg_fetch("ERH6C 97.5 Comdty", ["OPT_DELTA", "PX_LAST", "OPT_IMP_VOL", "OPT_GAMMA"])
+        data = bbg_fetch("ERH6C 97.5 Comdty", ["DELTA_MID", "PX_LAST", "OPT_IMP_VOL", "GAMMA_MID"])
         for field, value in data.items():
             print(f"  {field:20} = {value}")
     except Exception as e:
@@ -272,11 +272,11 @@ if __name__ == "__main__":
     print("-"*70)
     try:
         tickers = [
-            "ERH6C 97.5 ",
-            "ERH6C 98.0 ",
-            "ERH6P 97.5 "
+            "ERH6C 97.5 Comdty",
+            "ERH6C 98.0 Comdty",
+            "ERH6P 97.5 Comdty"
         ]
-        data = bbg_fetch_multi(tickers, ["OPT_DELTA", "PX_LAST"])
+        data = bbg_fetch_multi(tickers, ["DELTA_MID", "PX_LAST"])
         
         for ticker, fields in data.items():
             print(f"\n{ticker}:")
@@ -290,7 +290,7 @@ if __name__ == "__main__":
     print("Test 4: Test de l'alias bdp() (style Excel)")
     print("-"*70)
     try:
-        price = bdp("ERH6C 97.5", "PX_LAST")
+        price = bdp("ERH6C 97.5 Comdity", "PX_LAST")
         print(f"✓ Prix (via bdp): {price}")
     except Exception as e:
         print(f"✗ Erreur: {e}")

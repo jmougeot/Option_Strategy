@@ -3,7 +3,7 @@ from blpapi import SessionOptions, Session
 
 # -------- PARAMÈTRES À ADAPTER --------
 TICKER = "ERH6C 97.50 Comdty"   # exemple : Call Euribor H6 97.50
-FIELDS = ["OPT_DELTA", "OPT_GAMMA", "OPT_VEGA", "OPT_THETA", "OPT_RHO", "PX_LAST"]
+FIELDS = ["DELTA_MID", "GAMMA_MID", "VEGA_MID", "THETA_MID", "RHO_MID", "PX_LAST"]
 # ---------------------------------------
 
 # Connexion locale
