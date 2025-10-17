@@ -2,7 +2,7 @@ import blpapi
 from blpapi import SessionOptions, Session
 
 # -------- PARAMÈTRES À ADAPTER --------
-TICKER = "EURH6C 97.50 Comdty"   # exemple : Call Euribor H6 97.50
+TICKER = "ERH6C 97.50 Comdty"   # exemple : Call Euribor H6 97.50
 FIELDS = ["OPT_DELTA", "OPT_GAMMA", "OPT_VEGA", "OPT_THETA", "OPT_RHO", "PX_LAST"]
 # ---------------------------------------
 

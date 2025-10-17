@@ -137,13 +137,14 @@ class BloombergOptionFetcher:
         else:
             return str(field_data.getValue())
     
-    def _send_request(self, ticker: str, fields: List[str]) -> Dict[str, Any]:
+    def _send_request(self, ticker: str, fields: List[str], with_overrides: bool = True) -> Dict[str, Any]:
         """
         Envoie une requête ReferenceDataRequest à Bloomberg.
         
         Args:
             ticker: Ticker Bloomberg complet
             fields: Liste des champs à récupérer
+            with_overrides: Si True, ajoute les overrides pour forcer le calcul des Greeks
         
         Returns:
             Dictionnaire {field_name: value}
@@ -157,6 +158,21 @@ class BloombergOptionFetcher:
         
         for field in fields:
             request.append("fields", field)
+        
+        # AJOUT DES OVERRIDES - CRUCIAL POUR LES GREEKS SUR OPTIONS EURIBOR
+        if with_overrides:
+            print(f"[DEBUG fetcher._send_request] Ajout des overrides pour forcer le calcul des Greeks...")
+            overrides = request.getElement("overrides")
+            
+            # Override pour forcer le pricing model
+            override1 = overrides.appendElement()
+            override1.setElement("fieldId", "PRICING_SOURCE")
+            override1.setElement("value", "BGNE")  # Bloomberg Generic Pricing
+            
+            # Override pour la date de pricing (aujourd'hui)
+            override2 = overrides.appendElement()
+            override2.setElement("fieldId", "REFERENCE_DATE")
+            override2.setElement("value", "TODAY")
         
         print(f"[DEBUG fetcher._send_request] Envoi de la requête...")
         
