@@ -250,7 +250,7 @@ if __name__ == "__main__":
     print("Test 1: Récupération d'un seul champ")
     print("-"*70)
     try:
-        delta = bbg_fetch("ERH6C 97.5 Comdty", "OPT_DELTA")
+        delta = bbg_fetch("ERH6C 97.5 ", "OPT_DELTA")
         print(f"✓ Delta: {delta}")
     except Exception as e:
         print(f"✗ Erreur: {e}")
@@ -272,9 +272,9 @@ if __name__ == "__main__":
     print("-"*70)
     try:
         tickers = [
-            "ERH6C 97.5 Comdty",
-            "ERH6C 98.0 Comdty",
-            "ERH6P 97.5 Comdty"
+            "ERH6C 97.5 ",
+            "ERH6C 98.0 ",
+            "ERH6P 97.5 "
         ]
         data = bbg_fetch_multi(tickers, ["OPT_DELTA", "PX_LAST"])
         
@@ -290,7 +290,7 @@ if __name__ == "__main__":
     print("Test 4: Test de l'alias bdp() (style Excel)")
     print("-"*70)
     try:
-        price = bdp("ERH6C 97.5 Comdty", "PX_LAST")
+        price = bdp("ERH6C 97.5", "PX_LAST")
         print(f"✓ Prix (via bdp): {price}")
     except Exception as e:
         print(f"✗ Erreur: {e}")
