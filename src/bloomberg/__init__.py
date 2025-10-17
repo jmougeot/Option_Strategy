@@ -29,18 +29,16 @@ Date: 2025-10-16
 
 # Imports principaux
 try:
-    from .models import OptionData, EuriborOptionData
+    from .models import OptionData
     from .connection import BloombergConnection, test_connection
     from .ticker_builder import (
         build_option_ticker,
-        build_euribor_option_ticker,
-        build_equity_option_ticker
+
     )
     from .fetcher import BloombergOptionFetcher, DEFAULT_OPTION_FIELDS
     from .formatters import (
         format_option_summary,
         format_option_table,
-        format_euribor_option,
         format_greeks_summary,
         format_liquidity_check,
         format_term_structure
@@ -49,14 +47,13 @@ try:
 except ImportError as e:
     # Fallback pour imports absolus
     print(f"Warning: Relative imports failed ({e}), trying absolute imports")
-    from models import OptionData, EuriborOptionData
+    from models import OptionData
     from connection import BloombergConnection, test_connection
-    from ticker_builder import build_option_ticker, build_euribor_option_ticker, build_equity_option_ticker
+    from ticker_builder import build_option_ticker
     from fetcher import BloombergOptionFetcher, DEFAULT_OPTION_FIELDS
     from formatters import (
         format_option_summary,
         format_option_table,
-        format_euribor_option,
         format_greeks_summary,
         format_liquidity_check,
         format_term_structure
@@ -73,9 +70,7 @@ __all__ = [
     
     # Ticker building
     'build_option_ticker',
-    'build_euribor_option_ticker',
-    'build_equity_option_ticker',
-    
+
     # Fetching
     'BloombergOptionFetcher',
     'DEFAULT_OPTION_FIELDS',
@@ -83,7 +78,6 @@ __all__ = [
     # Formatters
     'format_option_summary',
     'format_option_table',
-    'format_euribor_option',
     'format_greeks_summary',
     'format_liquidity_check',
     'format_term_structure',
