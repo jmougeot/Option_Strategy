@@ -22,7 +22,9 @@ if not exist "venv\" (
 REM Activer l'environnement virtuel
 call venv\Scripts\activate.bat
 
+REM Définir le PYTHONPATH pour Windows
+set PYTHONPATH=%cd%\src;%PYTHONPATH%
+
 REM Lancer Streamlit
-export PYTHONPATH="${PWD}/src:${PYTHONPATH}"
 streamlit run src/myproject/app.py
 
