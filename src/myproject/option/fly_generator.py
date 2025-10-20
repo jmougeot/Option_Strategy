@@ -10,8 +10,8 @@ Date: 2025-10-17
 
 from typing import List, Dict, Optional, Union
 from dataclasses import dataclass, field
-from .option_class import Option
-from .option_utils import dict_to_option, calculate_greeks_from_options
+from myproject.option.option_class import Option
+from myproject.option.option_utils import dict_to_option, calculate_greeks_from_options
 
 
 @dataclass

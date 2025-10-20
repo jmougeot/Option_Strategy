@@ -25,4 +25,3 @@ call venv\Scripts\activate.bat
 REM Lancer Streamlit
 streamlit run src/app.py
 
-pause

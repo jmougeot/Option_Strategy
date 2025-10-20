@@ -3,74 +3,14 @@ Bloomberg Data Importer for Options Strategy App
 =================================================
 Importe les données d'options depuis Bloomberg et les convertit au format
 JSON attendu par app.py
-
-Structure de données attendue:
-{
-    "options": [
-        {
-            "symbol": "ER",
-            "strike": 97.5,
-            "option_type": "call" ou "put",
-            "premium": 0.5625,
-            "expiration_date": "2026-01-20",
-            "underlying_price": 98.065,
-            "bid": 0.55,
-            "ask": 0.575,
-            "volume": 1000,
-            "open_interest": 5000,
-            "implied_volatility": 0.15,
-            "delta": 0.62,
-            "gamma": 0.05,
-            "theta": -0.02,
-            "vega": 0.10,
-            "rho": 0.03,
-            "timestamp": "2025-10-17T10:00:00"
-        },
-        ...
-    ]
-}
-
-Usage:
-    from bloomberg_data_importer import import_euribor_options
-    
-    # Importer toutes les options EURIBOR disponibles
-    data = import_euribor_options(
-        underlying="ER",
-        months=["F", "G", "H"],  # Jan, Feb, Mar
-        years=[6, 7],  # 2026, 2027
-        strikes=[96.0, 96.5, 97.0, 97.5, 98.0, 98.5, 99.0]
-    )
-    
-    # Sauvegarder en JSON
-    save_to_json(data, "euribor_options.json")
-
-Auteur: BGC Trading Desk
-Date: 2025-10-17
 """
 
-import sys
 from pathlib import Path
 from typing import List, Dict, Any, Literal, Optional, cast
 from datetime import datetime
 import json
-import os
-
-# Add parent directory and bloomberg directory to path for imports
-current_dir = Path(__file__).parent
-sys.path.insert(0, str(current_dir.parent.parent))
-sys.path.insert(0, str(current_dir))
-
-# Import depuis le répertoire bloomberg
-try:
-    from bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
-    from bloomberg.ticker_builder import build_option_ticker
-except ImportError:
-    # Fallback pour imports directs
-    import os
-    bloomberg_dir = os.path.join(os.path.dirname(__file__), 'bloomberg')
-    sys.path.insert(0, bloomberg_dir)
-    from fetcher_batch import fetch_options_batch, extract_best_values
-    from ticker_builder import build_option_ticker
+from myproject.bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
+from myproject.bloomberg.ticker_builder import build_option_ticker
 
 # Type pour les mois valides
 MonthCode = Literal['F', 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z']

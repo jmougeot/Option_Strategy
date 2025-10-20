@@ -13,13 +13,12 @@ Plus efficace que de faire plusieurs appels pour chaque champ.
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Any
-from datetime import datetime
 
 # Add paths for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
 import blpapi
-from connection import BloombergConnection
+from myproject.bloomberg.connection import BloombergConnection
 
 
 # Liste complète des champs à récupérer (tous en un coup)

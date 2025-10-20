@@ -6,7 +6,7 @@ Fonctions communes pour convertir et manipuler les options.
 
 from typing import Dict, List, Optional, Literal, Any
 from datetime import datetime
-from .option_class import Option
+from myproject.option.option_class import Option
 
 
 def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long', quantity: int = 1) -> Optional[Option]:

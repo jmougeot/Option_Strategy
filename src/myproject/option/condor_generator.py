@@ -8,8 +8,8 @@ Génère toutes les combinaisons possibles de Condor à partir des données Bloo
 from typing import List, Dict, Tuple, Optional, Union, Literal
 from dataclasses import dataclass, field
 from datetime import datetime
-from .option_class import Option
-from .option_utils import dict_to_option, calculate_greeks_from_options
+from myproject.option.option_class import Option
+from myproject.option.option_utils import dict_to_option, calculate_greeks_from_options
 
 
 @dataclass

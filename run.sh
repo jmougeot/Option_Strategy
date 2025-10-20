@@ -27,4 +27,4 @@ source venv/bin/activate
 export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
 
 
-streamlit run src/app.py
+streamlit run src/myproject/app.py

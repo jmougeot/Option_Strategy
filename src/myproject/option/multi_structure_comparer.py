@@ -8,12 +8,10 @@ et retourne des résultats au format StrategyComparison.
 
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
-import numpy as np
-
-from .fly_generator import FlyGenerator, FlyConfiguration
-from .condor_generator import CondorGenerator, CondorConfiguration
-from .comparison_class import StrategyComparison
-from .option_utils import calculate_greeks_by_type, calculate_avg_implied_volatility, get_expiration_info
+from myproject.option.fly_generator import FlyGenerator, FlyConfiguration
+from myproject.option.condor_generator import CondorGenerator, CondorConfiguration
+from myproject.option.comparison_class import StrategyComparison
+from myproject.option.option_utils import calculate_greeks_by_type, calculate_avg_implied_volatility, get_expiration_info
 
 
 class MultiStructureComparer:

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Optional
 from datetime import datetime
 from typing import Any
-from .option_class import Option
+from myproject.option.option_class import Option
 
 @dataclass
 class StrategyComparison:

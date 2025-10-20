@@ -10,7 +10,7 @@ import plotly.express as px
 from datetime import datetime
 import json
 from typing import Dict, List
-from option.multi_structure_comparer import MultiStructureComparer, StrategyComparison
+from myproject.option.multi_structure_comparer import (MultiStructureComparer, StrategyComparison)
 
 
 
@@ -85,7 +85,7 @@ def load_options_from_bloomberg(params: Dict) -> Dict:
         Dictionnaire au format {options: [...]}
     """
     try:
-        from bloomberg_data_importer import import_euribor_options
+        from src.myproject.bloomberg_data_importer import import_euribor_options
         
         data = import_euribor_options(
             underlying=params['underlying'],
