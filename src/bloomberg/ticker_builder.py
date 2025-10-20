@@ -16,22 +16,6 @@ from datetime import date, datetime
 from typing import Literal, Optional
 
 
-# Codes mensuels Bloomberg (pour les futures et options de taux)
-MONTH_CODES = {
-    1: 'F',   # Janvier
-    2: 'G',   # Février
-    3: 'H',   # Mars
-    4: 'J',   # Avril
-    5: 'K',   # Mai
-    6: 'M',   # Juin
-    7: 'N',   # Juillet
-    8: 'Q',   # Août
-    9: 'U',   # Septembre
-    10: 'V',  # Octobre
-    11: 'X',  # Novembre
-    12: 'Z'   # Décembre
-}
-
 def build_option_ticker(
     underlying: str,
     expiry_month : Literal['F' , 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z' ],

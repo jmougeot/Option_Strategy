@@ -36,19 +36,14 @@ ALL_OPTION_FIELDS = [
     
     # Greeks - tous les formats possibles
     "DELTA_MID",
-    "DELTA",
     "OPT_DELTA",
     "GAMMA_MID",
-    "GAMMA",
     "OPT_GAMMA",
     "VEGA_MID",
-    "VEGA",
     "OPT_VEGA",
     "THETA_MID",
-    "THETA",
     "OPT_THETA",
     "RHO_MID",
-    "RHO",
     "OPT_RHO",
     
     # Greeks bid/ask

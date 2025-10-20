@@ -4,10 +4,6 @@ Comparateur Multi-Structures pour Fly et Condor
 Compare les différentes structures générées (Butterfly, Iron Condor, etc.)
 et retourne des résultats au format StrategyComparison.
 
-Compatible avec le système de comparaison existant.
-
-Auteur: BGC Trading Desk
-Date: 2025-10-17
 """
 
 from typing import List, Dict, Optional
@@ -17,6 +13,7 @@ import numpy as np
 from .fly_generator import FlyGenerator, FlyConfiguration
 from .condor_generator import CondorGenerator, CondorConfiguration
 from .comparison_class import StrategyComparison
+from .option_utils import calculate_greeks_by_type, calculate_avg_implied_volatility, get_expiration_info
 
 
 class MultiStructureComparer:
@@ -35,6 +32,88 @@ class MultiStructureComparer:
         self.fly_generator = FlyGenerator(options_data)
         self.condor_generator = CondorGenerator(options_data)
         self.options_data = options_data
+    
+    # ========================================================================
+    # MÉTHODES UTILITAIRES COMMUNES
+    # ========================================================================
+    
+    @staticmethod
+    def _build_greeks_dict(structure) -> Dict[str, float]:
+        """
+        Construit un dictionnaire complet des Greeks pour une structure.
+        Utilise la liste all_options simplifiée.
+        
+        Args:
+            structure: FlyConfiguration ou CondorConfiguration
+        
+        Returns:
+            Dict avec tous les Greeks (calls, puts, total)
+        """
+        # Utiliser la fonction utilitaire avec all_options
+        greeks_by_type = calculate_greeks_by_type(structure.all_options)
+        
+        return {
+            # Calls
+            'total_delta_calls': greeks_by_type['calls']['delta'],
+            'total_gamma_calls': greeks_by_type['calls']['gamma'],
+            'total_vega_calls': greeks_by_type['calls']['vega'],
+            'total_theta_calls': greeks_by_type['calls']['theta'],
+            # Puts
+            'total_delta_puts': greeks_by_type['puts']['delta'],
+            'total_gamma_puts': greeks_by_type['puts']['gamma'],
+            'total_vega_puts': greeks_by_type['puts']['vega'],
+            'total_theta_puts': greeks_by_type['puts']['theta'],
+            # Total
+            'total_delta': greeks_by_type['total']['delta'],
+            'total_gamma': greeks_by_type['total']['gamma'],
+            'total_vega': greeks_by_type['total']['vega'],
+            'total_theta': greeks_by_type['total']['theta']
+        }
+    
+    @staticmethod
+    def _calculate_profit_zone(breakeven_points: List[float], 
+                               center_strike: float) -> tuple:
+        """
+        Calcule la zone de profit à partir des breakevens.
+        Méthode commune pour éviter la duplication.
+        
+        Args:
+            breakeven_points: Liste des points de breakeven
+            center_strike: Strike central
+        
+        Returns:
+            (profit_range, profit_zone_width)
+        """
+        if len(breakeven_points) >= 2:
+            profit_range = (min(breakeven_points), max(breakeven_points))
+            profit_zone_width = profit_range[1] - profit_range[0]
+        else:
+            profit_range = (center_strike, center_strike)
+            profit_zone_width = 0.0
+        
+        return profit_range, profit_zone_width
+    
+    @staticmethod
+    def _calculate_risk_reward(max_loss: float, max_profit: float) -> float:
+        """
+        Calcule le ratio risque/rendement.
+        Méthode commune pour éviter la duplication.
+        
+        Args:
+            max_loss: Perte maximale
+            max_profit: Profit maximum
+        
+        Returns:
+            Risk/Reward ratio
+        """
+        if max_loss != 0:
+            return abs(max_loss) / max_profit if max_profit > 0 else 0
+        else:
+            return float('inf')
+    
+    # ========================================================================
+    # MÉTHODES DE COMPARAISON
+    # ========================================================================
     
     def compare_all_structures(self,
                               target_price: float,
@@ -175,39 +254,41 @@ class MultiStructureComparer:
                           target_price: float,
                           days_to_expiry: int) -> Optional[StrategyComparison]:
         """
-        Convertit une FlyConfiguration en StrategyComparison
+        Convertit une FlyConfiguration en StrategyComparison.
+        Version simplifiée utilisant all_options.
         """
         try:
-            # Calcul des métriques
-            net_credit = fly.estimated_cost  # Négatif si débit, positif si crédit
+            # Calcul des métriques financières
+            net_credit = fly.estimated_cost
             max_profit = self._calculate_fly_max_profit(fly)
             max_loss = self._calculate_fly_max_loss(fly)
             breakeven_points = self._calculate_fly_breakeven(fly)
             
-            # Zone de profit
-            if len(breakeven_points) >= 2:
-                profit_range = (min(breakeven_points), max(breakeven_points))
-                profit_zone_width = profit_range[1] - profit_range[0]
-            else:
-                profit_range = (fly.middle_strike, fly.middle_strike)
-                profit_zone_width = 0.0
+            # Zone de profit (méthode commune)
+            profit_range, profit_zone_width = self._calculate_profit_zone(
+                breakeven_points, fly.middle_strike
+            )
             
-            # Risk/Reward
-            if max_loss != 0:
-                risk_reward_ratio = abs(max_loss) / max_profit if max_profit > 0 else 0
-            else:
-                risk_reward_ratio = float('inf')
+            # Risk/Reward (méthode commune)
+            risk_reward_ratio = self._calculate_risk_reward(max_loss, max_profit)
             
             # Profit au prix cible
             profit_at_target = self._calculate_fly_profit_at_price(fly, target_price)
             profit_at_target_pct = (profit_at_target / max_profit * 100) if max_profit > 0 else 0
             
-            # Date d'expiration
-            exp_date = datetime.now() + timedelta(days=days_to_expiry)
+            # Greeks (méthode commune depuis all_options)
+            greeks = self._build_greeks_dict(fly)
+            
+            # Volatilité implicite moyenne (depuis all_options)
+            avg_iv = calculate_avg_implied_volatility(fly.all_options)
+            
+            # Date d'expiration (depuis all_options)
+            exp_info = get_expiration_info(fly.all_options)
+            exp_date = exp_info['expiration_date'] or datetime.now() + timedelta(days=days_to_expiry)
             
             return StrategyComparison(
                 strategy_name=fly.name,
-                strategy=None,  # Pas d'objet OptionStrategy ici
+                strategy=None,
                 target_price=target_price,
                 expiration_date=exp_date,
                 days_to_expiry=days_to_expiry,
@@ -218,9 +299,25 @@ class MultiStructureComparer:
                 profit_range=profit_range,
                 profit_zone_width=profit_zone_width,
                 risk_reward_ratio=risk_reward_ratio,
+                # Greeks - déballage explicite
+                total_delta_calls=greeks['total_delta_calls'],
+                total_gamma_calls=greeks['total_gamma_calls'],
+                total_vega_calls=greeks['total_vega_calls'],
+                total_theta_calls=greeks['total_theta_calls'],
+                total_delta_puts=greeks['total_delta_puts'],
+                total_gamma_puts=greeks['total_gamma_puts'],
+                total_vega_puts=greeks['total_vega_puts'],
+                total_theta_puts=greeks['total_theta_puts'],
+                total_delta=greeks['total_delta'],
+                total_gamma=greeks['total_gamma'],
+                total_vega=greeks['total_vega'],
+                total_theta=greeks['total_theta'],
+                # Performance
                 profit_at_target=profit_at_target,
                 profit_at_target_pct=profit_at_target_pct,
-                score=0.0  # Sera calculé plus tard
+                score=0.0,
+                # Options unifiées
+                all_options=fly.all_options.copy()
             )
         except Exception as e:
             print(f"⚠️ Erreur lors de la conversion du Fly {fly.name}: {e}")
@@ -231,35 +328,40 @@ class MultiStructureComparer:
                              target_price: float,
                              days_to_expiry: int) -> Optional[StrategyComparison]:
         """
-        Convertit une CondorConfiguration en StrategyComparison
+        Convertit une CondorConfiguration en StrategyComparison.
+        Version simplifiée utilisant all_options.
         """
         try:
-            # Calcul des métriques
+            # Calcul des métriques financières
             net_credit = condor.estimated_credit
             max_profit = self._calculate_condor_max_profit(condor)
             max_loss = self._calculate_condor_max_loss(condor)
             breakeven_points = self._calculate_condor_breakeven(condor)
             
-            # Zone de profit
-            if len(breakeven_points) >= 2:
-                profit_range = (min(breakeven_points), max(breakeven_points))
-                profit_zone_width = profit_range[1] - profit_range[0]
-            else:
-                profit_range = (condor.center_strike, condor.center_strike)
+            # Zone de profit (méthode commune)
+            profit_range, profit_zone_width = self._calculate_profit_zone(
+                breakeven_points, condor.center_strike
+            )
+            # Override pour Condor: utiliser body_width si pas de breakeven
+            if len(breakeven_points) < 2:
                 profit_zone_width = condor.body_width
             
-            # Risk/Reward
-            if max_loss != 0:
-                risk_reward_ratio = abs(max_loss) / max_profit if max_profit > 0 else 0
-            else:
-                risk_reward_ratio = float('inf')
+            # Risk/Reward (méthode commune)
+            risk_reward_ratio = self._calculate_risk_reward(max_loss, max_profit)
             
             # Profit au prix cible
             profit_at_target = self._calculate_condor_profit_at_price(condor, target_price)
             profit_at_target_pct = (profit_at_target / max_profit * 100) if max_profit > 0 else 0
             
-            # Date d'expiration
-            exp_date = datetime.now() + timedelta(days=days_to_expiry)
+            # Greeks (méthode commune depuis all_options)
+            greeks = self._build_greeks_dict(condor)
+            
+            # Volatilité implicite moyenne (depuis all_options)
+            avg_iv = calculate_avg_implied_volatility(condor.all_options)
+            
+            # Date d'expiration (depuis all_options)
+            exp_info = get_expiration_info(condor.all_options)
+            exp_date = exp_info['expiration_date'] or datetime.now() + timedelta(days=days_to_expiry)
             
             return StrategyComparison(
                 strategy_name=condor.name,
@@ -274,9 +376,25 @@ class MultiStructureComparer:
                 profit_range=profit_range,
                 profit_zone_width=profit_zone_width,
                 risk_reward_ratio=risk_reward_ratio,
+                # Greeks - déballage explicite
+                total_delta_calls=greeks['total_delta_calls'],
+                total_gamma_calls=greeks['total_gamma_calls'],
+                total_vega_calls=greeks['total_vega_calls'],
+                total_theta_calls=greeks['total_theta_calls'],
+                total_delta_puts=greeks['total_delta_puts'],
+                total_gamma_puts=greeks['total_gamma_puts'],
+                total_vega_puts=greeks['total_vega_puts'],
+                total_theta_puts=greeks['total_theta_puts'],
+                total_delta=greeks['total_delta'],
+                total_gamma=greeks['total_gamma'],
+                total_vega=greeks['total_vega'],
+                total_theta=greeks['total_theta'],
+                # Performance
                 profit_at_target=profit_at_target,
                 profit_at_target_pct=profit_at_target_pct,
-                score=0.0
+                score=0.0,
+                # Options unifiées
+                all_options=condor.all_options.copy()
             )
         except Exception as e:
             print(f"⚠️ Erreur lors de la conversion du Condor {condor.name}: {e}")

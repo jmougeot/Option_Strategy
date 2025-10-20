@@ -9,9 +9,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 import json
-import re
 from typing import Dict, List
-from option.multi_structure_comparer import MultiStructureComparer, StrategyComparison
+from src.option.multi_structure_comparer import MultiStructureComparer, StrategyComparison
 
 
 
@@ -206,6 +205,10 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
             'R/R Ratio': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
             'Zone ±': format_currency(comp.profit_zone_width),
             'P&L@Target': format_currency(comp.profit_at_target),
+            'Delta': f"{comp.total_delta:.3f}",
+            'Gamma': f"{comp.total_gamma:.3f}",
+            'Vega': f"{comp.total_vega:.3f}",
+            'Theta': f"{comp.total_theta:.3f}",
             'Score': f"{comp.score:.3f}"
         })
     
@@ -651,6 +654,29 @@ def main():
                 if winner.max_profit != float('inf') and winner.max_profit > 0:
                     pct = (winner.profit_at_target / winner.max_profit) * 100
                     st.write(f"**% du max profit:** {format_percentage(pct)}")
+                
+                st.subheader("📊 Greeks - Exposition")
+                st.write("**Total Stratégie:**")
+                st.write(f"  • Delta: {winner.total_delta:.4f}")
+                st.write(f"  • Gamma: {winner.total_gamma:.4f}")
+                st.write(f"  • Vega: {winner.total_vega:.4f}")
+                st.write(f"  • Theta: {winner.total_theta:.4f}")
+                
+                # Détail Calls vs Puts
+                with st.expander("📈 Détail Calls / Puts"):
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.write("**Calls:**")
+                        st.write(f"  • Delta: {winner.total_delta_calls:.4f}")
+                        st.write(f"  • Gamma: {winner.total_gamma_calls:.4f}")
+                        st.write(f"  • Vega: {winner.total_vega_calls:.4f}")
+                        st.write(f"  • Theta: {winner.total_theta_calls:.4f}")
+                    with col_b:
+                        st.write("**Puts:**")
+                        st.write(f"  • Delta: {winner.total_delta_puts:.4f}")
+                        st.write(f"  • Gamma: {winner.total_gamma_puts:.4f}")
+                        st.write(f"  • Vega: {winner.total_vega_puts:.4f}")
+                        st.write(f"  • Theta: {winner.total_theta_puts:.4f}")
             
             with col2:
                 # Décomposition du score
@@ -718,7 +744,10 @@ def main():
                     'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
                     'R/R': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
                     'P&L@Target': format_currency(comp.profit_at_target),
-                    'Zone Profitable': format_currency(comp.profit_zone_width)
+                    'Zone Profitable': format_currency(comp.profit_zone_width),
+                    'Delta': f"{comp.total_delta:.3f}",
+                    'Vega': f"{comp.total_vega:.3f}",
+                    'Theta': f"{comp.total_theta:.3f}"
                 })
             
             df_all = pd.DataFrame(all_data)
@@ -837,7 +866,7 @@ def main():
             
             for idx, comp in enumerate(comparisons, 1):
                 with st.expander(f"{idx}. {comp.strategy_name} (Score: {comp.score:.3f})"):
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2, col3, col4 = st.columns(4)
                     
                     with col1:
                         st.write("**Métriques Financières:**")
@@ -849,17 +878,30 @@ def main():
                         })
                     
                     with col2:
-                        st.write("**Scores:**")
+                        st.write("**Greeks - Total:**")
                         st.json({
-                            "score": round(comp.score, 4)
+                            "delta": round(comp.total_delta, 4),
+                            "gamma": round(comp.total_gamma, 4),
+                            "vega": round(comp.total_vega, 4),
+                            "theta": round(comp.total_theta, 4)
                         })
                     
                     with col3:
-                        st.write("**Autres:**")
+                        st.write("**Greeks - Calls:**")
                         st.json({
-                            "breakeven_points": comp.breakeven_points,
-                            "profit_zone_width": comp.profit_zone_width,
-                            "profit_at_target": comp.profit_at_target
+                            "delta_calls": round(comp.total_delta_calls, 4),
+                            "gamma_calls": round(comp.total_gamma_calls, 4),
+                            "vega_calls": round(comp.total_vega_calls, 4),
+                            "theta_calls": round(comp.total_theta_calls, 4)
+                        })
+                    
+                    with col4:
+                        st.write("**Greeks - Puts:**")
+                        st.json({
+                            "delta_puts": round(comp.total_delta_puts, 4),
+                            "gamma_puts": round(comp.total_gamma_puts, 4),
+                            "vega_puts": round(comp.total_vega_puts, 4),
+                            "theta_puts": round(comp.total_theta_puts, 4)
                         })
 
 # ============================================================================

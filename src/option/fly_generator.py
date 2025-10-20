@@ -9,12 +9,14 @@ Date: 2025-10-17
 """
 
 from typing import List, Dict, Optional, Union
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from .option_class import Option
+from .option_utils import dict_to_option, calculate_greeks_from_options
 
 
 @dataclass
 class FlyConfiguration:
-    """Configuration d'un Butterfly"""
+    """Configuration d'un Butterfly avec liste d'options standardisée"""
     name: str
     lower_strike: float
     middle_strike: float
@@ -22,7 +24,10 @@ class FlyConfiguration:
     option_type: str  # 'call' ou 'put'
     expiration_date: str
     
-    # Données des options (si disponibles)
+    # Liste unifiée d'options (simplifie tout!)
+    all_options: List[Option] = field(default_factory=list)
+    
+    # Données des options Bloomberg (temporaire, pour compatibilité)
     lower_option: Optional[Dict] = None
     middle_option: Optional[Dict] = None
     upper_option: Optional[Dict] = None
@@ -33,10 +38,36 @@ class FlyConfiguration:
     is_symmetric: bool = False
     
     def __post_init__(self):
-        """Calcule les métriques après initialisation"""
+        """Calcule les métriques et construit all_options"""
         self.wing_width_lower = round(self.middle_strike - self.lower_strike, 2)
         self.wing_width_upper = round(self.upper_strike - self.middle_strike, 2)
         self.is_symmetric = abs(self.wing_width_lower - self.wing_width_upper) < 0.01
+        
+        # Construire all_options à partir des dicts Bloomberg
+        if self.lower_option and self.middle_option and self.upper_option:
+            self._build_options_list()
+    
+    def _build_options_list(self):
+        """Construit la liste unifiée d'Option objects"""
+        self.all_options = []
+        
+        # Butterfly = Long 1 lower + Short 2 middle + Long 1 upper
+        if self.lower_option:
+            lower_opt = dict_to_option(self.lower_option, position='long', quantity=1)
+            if lower_opt:
+                self.all_options.append(lower_opt)
+        
+        # Middle: Short 2 contrats
+        if self.middle_option:
+            middle_opt = dict_to_option(self.middle_option, position='short', quantity=2)
+            if middle_opt:
+                self.all_options.append(middle_opt)
+        
+        # Upper: Long 1 contrat
+        if self.upper_option:
+            upper_opt = dict_to_option(self.upper_option, position='long', quantity=1)
+            if upper_opt:
+                self.all_options.append(upper_opt)
     
     @property
     def strikes_str(self) -> str:
@@ -45,17 +76,17 @@ class FlyConfiguration:
     
     @property
     def estimated_cost(self) -> float:
-        """Coût estimé (premium net)"""
-        if not all([self.lower_option, self.middle_option, self.upper_option]):
+        """Coût estimé calculé depuis all_options"""
+        if not self.all_options:
             return 0.0
         
-        # Fly = Long 1 lower + Short 2 middle + Long 1 upper
-        cost = (
-            -self.lower_option['premium']  # Long = payer
-            + 2 * self.middle_option['premium']  # Short = recevoir
-            - self.upper_option['premium']  # Long = payer
-        )
-        return round(cost, 4)
+        total_cost = 0.0
+        for opt in self.all_options:
+            # Long = payer (négatif), Short = recevoir (positif)
+            multiplier = opt.quantity * (-1 if opt.position == 'long' else 1)
+            total_cost += opt.premium * multiplier
+        
+        return round(total_cost, 4)
     
     @property
     def center_strike(self) -> float:
@@ -71,6 +102,30 @@ class FlyConfiguration:
     def upper_wing_width(self) -> float:
         """Alias pour compatibilité avec comparateur"""
         return self.wing_width_upper
+    
+    @property
+    def total_delta(self) -> float:
+        """Delta total calculé depuis all_options"""
+        greeks = calculate_greeks_from_options(self.all_options)
+        return greeks['delta']
+    
+    @property
+    def total_gamma(self) -> float:
+        """Gamma total calculé depuis all_options"""
+        greeks = calculate_greeks_from_options(self.all_options)
+        return greeks['gamma']
+    
+    @property
+    def total_vega(self) -> float:
+        """Vega total calculé depuis all_options"""
+        greeks = calculate_greeks_from_options(self.all_options)
+        return greeks['vega']
+    
+    @property
+    def total_theta(self) -> float:
+        """Theta total calculé depuis all_options"""
+        greeks = calculate_greeks_from_options(self.all_options)
+        return greeks['theta']
     
     def to_standard_options_list(self) -> List[Dict]:
         """

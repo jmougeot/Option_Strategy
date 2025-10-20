@@ -17,16 +17,18 @@ Auteur: BGC Trading Desk
 Date: 2025-10-17
 """
 
-from typing import List, Dict, Tuple, Optional, Union
-from dataclasses import dataclass
+from typing import List, Dict, Tuple, Optional, Union, Literal
+from dataclasses import dataclass, field
 from datetime import datetime
+from src.option.option_class import Option
+from src.option.option_utils import dict_to_option, calculate_greeks_from_options
 
 
 @dataclass
 class CondorConfiguration:
-    """Configuration d'un Condor"""
+    """Configuration d'un Condor avec liste d'options unifiée"""
     name: str
-    condor_type: str  # 'iron', 'call', 'put'
+    condor_type: Literal['iron', 'call', 'put']
     
     # 4 strikes pour un Condor
     strike1: float  # Lower
@@ -36,7 +38,10 @@ class CondorConfiguration:
     
     expiration_date: str
     
-    # Données des options (si disponibles)
+    # Liste unifiée d'options (simplifie tout!)
+    all_options: List[Option] = field(default_factory=list)
+    
+    # Données des options Bloomberg (temporaire, pour compatibilité)
     option1: Optional[Dict] = None
     option2: Optional[Dict] = None
     option3: Optional[Dict] = None
@@ -50,7 +55,7 @@ class CondorConfiguration:
     center_strike: float = 0.0
     
     def __post_init__(self):
-        """Calcule les métriques après initialisation"""
+        """Calcule les métriques et construit all_options"""
         self.lower_spread_width = round(self.strike2 - self.strike1, 2)
         self.upper_spread_width = round(self.strike4 - self.strike3, 2)
         self.body_width = round(self.strike3 - self.strike2, 2)
@@ -58,6 +63,61 @@ class CondorConfiguration:
         
         # Symétrique si les spreads ont la même largeur
         self.is_symmetric = abs(self.lower_spread_width - self.upper_spread_width) < 0.01
+        
+        # Construire all_options à partir des dicts Bloomberg
+        if all([self.option1, self.option2, self.option3, self.option4]):
+            self._build_options_list()
+    
+    def _build_options_list(self):
+        """Construit la liste unifiée d'Option objects selon le type de Condor"""
+        self.all_options = []
+        
+        if self.condor_type == 'iron':
+            # Iron Condor = Short Put Spread + Short Call Spread
+            # Option1: Long lower put, Option2: Short higher put
+            # Option3: Short lower call, Option4: Long higher call
+            
+            if self.option1:
+                opt1 = dict_to_option(self.option1, position='long', quantity=1)
+                if opt1:
+                    self.all_options.append(opt1)
+            
+            if self.option2:
+                opt2 = dict_to_option(self.option2, position='short', quantity=1)
+                if opt2:
+                    self.all_options.append(opt2)
+            
+            if self.option3:
+                opt3 = dict_to_option(self.option3, position='short', quantity=1)
+                if opt3:
+                    self.all_options.append(opt3)
+            
+            if self.option4:
+                opt4 = dict_to_option(self.option4, position='long', quantity=1)
+                if opt4:
+                    self.all_options.append(opt4)
+        
+        else:
+            # Call/Put Condor: Long 1 + Short 1 + Short 1 + Long 1
+            if self.option1:
+                opt1 = dict_to_option(self.option1, position='long', quantity=1)
+                if opt1:
+                    self.all_options.append(opt1)
+            
+            if self.option2:
+                opt2 = dict_to_option(self.option2, position='short', quantity=1)
+                if opt2:
+                    self.all_options.append(opt2)
+            
+            if self.option3:
+                opt3 = dict_to_option(self.option3, position='short', quantity=1)
+                if opt3:
+                    self.all_options.append(opt3)
+            
+            if self.option4:
+                opt4 = dict_to_option(self.option4, position='long', quantity=1)
+                if opt4:
+                    self.all_options.append(opt4)
     
     @property
     def strikes_str(self) -> str:
@@ -66,41 +126,41 @@ class CondorConfiguration:
     
     @property
     def estimated_credit(self) -> float:
-        """Crédit estimé (pour Iron Condor - net credit reçu)"""
-        if not all([self.option1, self.option2, self.option3, self.option4]):
+        """Crédit estimé calculé depuis all_options"""
+        if not self.all_options:
             return 0.0
         
-        if self.condor_type == 'iron':
-            # Iron Condor = Short Put Spread + Short Call Spread
-            # Short put spread: Short strike2 put + Long strike1 put
-            # Short call spread: Short strike3 call + Long strike4 call
-            
-            # Pour simplifier, on utilise les premiums
-            # Dans la réalité, il faudrait vérifier les types (put/call)
-            credit = (
-                self.option2['premium']  # Short put higher strike
-                - self.option1['premium']  # Long put lower strike
-                + self.option3['premium']  # Short call lower strike
-                - self.option4['premium']  # Long call higher strike
-            )
-        elif self.condor_type == 'call':
-            # Long Call Condor = Long lower + Short 2 middle + Long upper
-            credit = (
-                -self.option1['premium']  # Long lower call
-                + 2 * (self.option2['premium'] + self.option3['premium']) / 2  # Short 2 middle
-                - self.option4['premium']  # Long upper call
-            )
-        elif self.condor_type == 'put':
-            # Long Put Condor = Long lower + Short 2 middle + Long upper
-            credit = (
-                -self.option1['premium']  # Long lower put
-                + 2 * (self.option2['premium'] + self.option3['premium']) / 2  # Short 2 middle
-                - self.option4['premium']  # Long upper put
-            )
-        else:
-            credit = 0.0
+        total_credit = 0.0
+        for opt in self.all_options:
+            # Long = payer (négatif), Short = recevoir (positif)
+            multiplier = opt.quantity * (-1 if opt.position == 'long' else 1)
+            total_credit += opt.premium * multiplier
         
-        return round(credit, 4)
+        return round(total_credit, 4)
+    
+    @property
+    def total_delta(self) -> float:
+        """Delta total calculé depuis all_options"""
+        greeks = calculate_greeks_from_options(self.all_options)
+        return greeks['delta']
+    
+    @property
+    def total_gamma(self) -> float:
+        """Gamma total calculé depuis all_options"""
+        greeks = calculate_greeks_from_options(self.all_options)
+        return greeks['gamma']
+    
+    @property
+    def total_vega(self) -> float:
+        """Vega total calculé depuis all_options"""
+        greeks = calculate_greeks_from_options(self.all_options)
+        return greeks['vega']
+    
+    @property
+    def total_theta(self) -> float:
+        """Theta total calculé depuis all_options"""
+        greeks = calculate_greeks_from_options(self.all_options)
+        return greeks['theta']
     
     def to_standard_options_list(self) -> List[Dict]:
         """

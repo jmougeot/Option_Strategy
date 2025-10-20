@@ -19,48 +19,6 @@ Ce module définit deux niveaux de responsabilités complémentaires:
 @dataclass
 class Option:
     """Brique de base: un leg d'option (call ou put).
-
-    Responsabilités:
-    - Calculer la valeur intrinsèque à l'expiration
-    - Calculer la valeur (payoff) à l'expiration selon la position (long/short)
-    - Fournir tous les critères nécessaires pour comparaison standardisée
-    
-    Critères de comparaison standardisés:
-    =====================================
-    1. Identification:
-       - option_type: Type d'option ('call' ou 'put')
-       - strike: Prix d'exercice
-       - expiry: Date d'expiration
-       - ticker: Symbole Bloomberg/identifiant
-    
-    2. Prix et valorisation:
-       - premium: Prime de l'option
-       - bid: Prix acheteur
-       - ask: Prix vendeur
-       - mid: Prix moyen (bid+ask)/2
-       - last: Dernier prix traité
-    
-    3. Greeks (sensibilités):
-       - delta: Sensibilité au prix du sous-jacent
-       - gamma: Sensibilité du delta
-       - vega: Sensibilité à la volatilité
-       - theta: Décroissance temporelle
-       - rho: Sensibilité aux taux d'intérêt
-    
-    4. Volatilité et liquidité:
-       - implied_volatility: Volatilité implicite
-       - open_interest: Positions ouvertes
-       - volume: Volume de transactions
-    
-    5. Valeur intrinsèque et temporelle:
-       - intrinsic_value: Valeur intrinsèque (calculée)
-       - time_value: Valeur temps (calculée)
-       - moneyness: Degré ITM/ATM/OTM (calculé)
-    
-    6. Structure de position:
-       - quantity: Nombre de contrats
-       - position: 'long' (achat) ou 'short' (vente)
-       - notional: Valeur nominale totale
     """
     
     # ============ CHAMPS OBLIGATOIRES ============
@@ -108,7 +66,6 @@ class Option:
     underlying_price_change: Optional[float] = None  # Variation du sous-jacent
     
     # ============ DATES ET TEMPS ============
-    trading_date: Optional[datetime] = None  # Date de négociation
     days_to_expiration: Optional[int] = None  # Jours jusqu'à expiration
     years_to_expiration: Optional[float] = None  # Années jusqu'à expiration
     
@@ -123,4 +80,3 @@ class Option:
     timestamp: Optional[datetime] = None  # Timestamp des données
 
     
-  
