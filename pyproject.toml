@@ -9,4 +9,4 @@ description = "Option strategy Streamlit app"
 dependencies = []                     # ou laisse vide si tout est dans requirements.txt
 
 [tool.setuptools.packages.find]
-where = ["src/myproject"]
+where = ["src"]
