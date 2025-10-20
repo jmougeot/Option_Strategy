@@ -101,22 +101,57 @@ class MultiStructureComparer:
         # Butterflies
         if include_flies:
             try:
+                # generate_all_flies(price_min, price_max, target_price, option_type='call', expiration_date=None, require_symmetric=False)
                 all_comparisons.extend(self.fly_generator.generate_all_flies(
-                    price_min, price_max, target_price, 'call', None, require_symmetric))
+                    price_min=price_min,
+                    price_max=price_max,
+                    target_price=target_price,
+                    option_type='call',
+                    expiration_date=None,
+                    require_symmetric=require_symmetric
+                ))
                 all_comparisons.extend(self.fly_generator.generate_all_flies(
-                    price_min, price_max, target_price, 'put', None, require_symmetric))
+                    price_min=price_min,
+                    price_max=price_max,
+                    target_price=target_price,
+                    option_type='put',
+                    expiration_date=None,
+                    require_symmetric=require_symmetric
+                ))
             except Exception as e:
                 print(f"⚠️  Erreur lors de la génération des butterflies: {e}")
         
         # Condors
         if include_condors:
             try:
+                # generate_iron_condors(price_min, price_max, target_price, expiration_date=None, require_symmetric=False)
                 all_comparisons.extend(self.condor_generator.generate_iron_condors(
-                    price_min, price_max, target_price, None, require_symmetric))
+                    price_min=price_min,
+                    price_max=price_max,
+                    target_price=target_price,
+                    expiration_date=None,
+                    require_symmetric=require_symmetric
+                ))
+                # generate_call_condors et generate_put_condors passent à _generate_single_type_condors
+                # _generate_single_type_condors(price_min, price_max, strike_min, strike_max, target_price, option_type, ...)
                 all_comparisons.extend(self.condor_generator.generate_call_condors(
-                    price_min, price_max, strike_min, strike_max, target_price, 'call', None, require_symmetric))
+                    price_min=price_min,
+                    price_max=price_max,
+                    strike_min=strike_min,
+                    strike_max=strike_max,
+                    target_price=target_price,
+                    expiration_date=None,
+                    require_symmetric=require_symmetric
+                ))
                 all_comparisons.extend(self.condor_generator.generate_put_condors(
-                    price_min, price_max, strike_min, strike_max, target_price, 'put', None, require_symmetric))
+                    price_min=price_min,
+                    price_max=price_max,
+                    strike_min=strike_min,
+                    strike_max=strike_max,
+                    target_price=target_price,
+                    expiration_date=None,
+                    require_symmetric=require_symmetric
+                ))
             except Exception as e:
                 print(f"⚠️  Erreur lors de la génération des condors: {e}")
         
