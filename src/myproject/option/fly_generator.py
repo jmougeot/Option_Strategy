@@ -1,188 +1,24 @@
 """
-Générateur Automatique de Butterflies
-======================================
-Génère toutes les combinaisons possibles de Butterfly à partir des données Bloomberg
-et retourne une liste d'options standardisée.
-
-Auteur: BGC Trading Desk
-Date: 2025-10-17
+Générateur Automatique de Butterflies - Version Simplifiée
+===========================================================
+Génère directement des objets StrategyComparison sans classe intermédiaire.
 """
 
-from typing import List, Dict, Optional, Union
-from dataclasses import dataclass, field
+from typing import List, Dict, Optional
+from datetime import datetime, timedelta
 from myproject.option.option_class import Option
-from myproject.option.option_utils import dict_to_option, calculate_greeks_from_options
-
-
-@dataclass
-class FlyConfiguration:
-    """Configuration d'un Butterfly avec liste d'options standardisée"""
-    name: str
-    lower_strike: float
-    middle_strike: float
-    upper_strike: float
-    option_type: str  # 'call' ou 'put'
-    expiration_date: str
-    
-    # Liste unifiée d'options (simplifie tout!)
-    all_options: List[Option] = field(default_factory=list)
-    
-    # Données des options Bloomberg (temporaire, pour compatibilité)
-    lower_option: Optional[Dict] = None
-    middle_option: Optional[Dict] = None
-    upper_option: Optional[Dict] = None
-    
-    # Métriques
-    wing_width_lower: float = 0.0  # middle - lower
-    wing_width_upper: float = 0.0  # upper - middle
-    is_symmetric: bool = False
-    
-    def __post_init__(self):
-        """Calcule les métriques et construit all_options"""
-        self.wing_width_lower = round(self.middle_strike - self.lower_strike, 2)
-        self.wing_width_upper = round(self.upper_strike - self.middle_strike, 2)
-        self.is_symmetric = abs(self.wing_width_lower - self.wing_width_upper) < 0.01
-        
-        # Construire all_options à partir des dicts Bloomberg
-        if self.lower_option and self.middle_option and self.upper_option:
-            self._build_options_list()
-    
-    def _build_options_list(self):
-        """Construit la liste unifiée d'Option objects"""
-        self.all_options = []
-        
-        # Butterfly = Long 1 lower + Short 2 middle + Long 1 upper
-        if self.lower_option:
-            lower_opt = dict_to_option(self.lower_option, position='long', quantity=1)
-            if lower_opt:
-                self.all_options.append(lower_opt)
-        
-        # Middle: Short 2 contrats
-        if self.middle_option:
-            middle_opt = dict_to_option(self.middle_option, position='short', quantity=2)
-            if middle_opt:
-                self.all_options.append(middle_opt)
-        
-        # Upper: Long 1 contrat
-        if self.upper_option:
-            upper_opt = dict_to_option(self.upper_option, position='long', quantity=1)
-            if upper_opt:
-                self.all_options.append(upper_opt)
-    
-    @property
-    def strikes_str(self) -> str:
-        """Format lisible des strikes"""
-        return f"{self.lower_strike}/{self.middle_strike}/{self.upper_strike}"
-    
-    @property
-    def estimated_cost(self) -> float:
-        """Coût estimé calculé depuis all_options"""
-        if not self.all_options:
-            return 0.0
-        
-        total_cost = 0.0
-        for opt in self.all_options:
-            # Long = payer (négatif), Short = recevoir (positif)
-            multiplier = opt.quantity * (-1 if opt.position == 'long' else 1)
-            total_cost += opt.premium * multiplier
-        
-        return round(total_cost, 4)
-    
-    @property
-    def center_strike(self) -> float:
-        """Strike central (middle strike)"""
-        return self.middle_strike
-    
-    @property
-    def lower_wing_width(self) -> float:
-        """Alias pour compatibilité avec comparateur"""
-        return self.wing_width_lower
-    
-    @property
-    def upper_wing_width(self) -> float:
-        """Alias pour compatibilité avec comparateur"""
-        return self.wing_width_upper
-    
-    @property
-    def total_delta(self) -> float:
-        """Delta total calculé depuis all_options"""
-        greeks = calculate_greeks_from_options(self.all_options)
-        return greeks['delta']
-    
-    @property
-    def total_gamma(self) -> float:
-        """Gamma total calculé depuis all_options"""
-        greeks = calculate_greeks_from_options(self.all_options)
-        return greeks['gamma']
-    
-    @property
-    def total_vega(self) -> float:
-        """Vega total calculé depuis all_options"""
-        greeks = calculate_greeks_from_options(self.all_options)
-        return greeks['vega']
-    
-    @property
-    def total_theta(self) -> float:
-        """Theta total calculé depuis all_options"""
-        greeks = calculate_greeks_from_options(self.all_options)
-        return greeks['theta']
-    
-    def to_standard_options_list(self) -> List[Dict]:
-        """
-        Convertit la configuration en liste d'options standardisée
-        Compatible avec StrategyComparer et autres modules
-        
-        Returns:
-            Liste de dictionnaires d'options au format standard Bloomberg
-        """
-        options_list = []
-        
-        if self.lower_option:
-            options_list.append(self.lower_option.copy())
-        
-        if self.middle_option:
-            # Pour un Fly, on a besoin de 2x le middle (short 2 contracts)
-            options_list.append(self.middle_option.copy())
-            options_list.append(self.middle_option.copy())
-        
-        if self.upper_option:
-            options_list.append(self.upper_option.copy())
-        
-        return options_list
-    
-    def to_strategy_dict(self) -> Dict:
-        """
-        Convertit la configuration en dictionnaire de stratégie standard
-        
-        Returns:
-            Dictionnaire avec tous les champs nécessaires pour créer une stratégie
-        """
-        return {
-            'name': self.name,
-            'type': 'butterfly',
-            'option_type': self.option_type,
-            'strikes': [self.lower_strike, self.middle_strike, self.upper_strike],
-            'expiration_date': self.expiration_date,
-            'structure': {
-                'lower_strike': self.lower_strike,
-                'middle_strike': self.middle_strike,
-                'upper_strike': self.upper_strike,
-                'wing_width_lower': self.wing_width_lower,
-                'wing_width_upper': self.wing_width_upper,
-                'is_symmetric': self.is_symmetric
-            },
-            'metrics': {
-                'estimated_cost': self.estimated_cost,
-                'center_strike': self.center_strike,
-                'avg_wing_width': (self.wing_width_lower + self.wing_width_upper) / 2
-            },
-            'options': self.to_standard_options_list()
-        }
+from myproject.option.option_utils import (
+    dict_to_option,
+    calculate_greeks_by_type,
+    calculate_avg_implied_volatility,
+    get_expiration_info
+)
+from myproject.option.comparison_class import StrategyComparison
 
 
 class FlyGenerator:
     """
-    Générateur de toutes les combinaisons possibles de Butterfly
+    Générateur de stratégies Butterfly qui retourne directement des StrategyComparison
     """
     
     def __init__(self, options_data: Dict[str, List[Dict]]):
@@ -194,8 +30,6 @@ class FlyGenerator:
         """
         self.calls_data = options_data.get('calls', [])
         self.puts_data = options_data.get('puts', [])
-        
-        # Créer des index pour accès rapide
         self._index_options()
     
     def _index_options(self):
@@ -211,38 +45,17 @@ class FlyGenerator:
             key = (put['strike'], put['expiration_date'])
             self.puts_by_strike_exp[key] = put
     
-    def get_available_strikes(self, 
-                             option_type: str = 'call',
-                             expiration_date: Optional[str] = None) -> List[float]:
-        """
-        Récupère la liste des strikes disponibles
-        
-        Args:
-            option_type: 'call' ou 'put'
-            expiration_date: Filtrer par date d'expiration (optionnel)
-        
-        Returns:
-            Liste triée des strikes disponibles
-        """
+    def get_available_strikes(self, option_type: str = 'call', expiration_date: Optional[str] = None) -> List[float]:
+        """Récupère la liste des strikes disponibles"""
         data = self.calls_data if option_type.lower() == 'call' else self.puts_data
-        
         if expiration_date:
             strikes = [opt['strike'] for opt in data if opt['expiration_date'] == expiration_date]
         else:
             strikes = [opt['strike'] for opt in data]
-        
         return sorted(set(strikes))
     
     def get_available_expirations(self, option_type: str = 'call') -> List[str]:
-        """
-        Récupère la liste des dates d'expiration disponibles
-        
-        Args:
-            option_type: 'call' ou 'put'
-        
-        Returns:
-            Liste triée des dates d'expiration
-        """
+        """Récupère la liste des dates d'expiration disponibles"""
         data = self.calls_data if option_type.lower() == 'call' else self.puts_data
         expirations = [opt['expiration_date'] for opt in data]
         return sorted(set(expirations))
@@ -252,31 +65,35 @@ class FlyGenerator:
                           price_max: float,
                           strike_min: float,
                           strike_max: float,
+                          target_price: float,
                           option_type: str = 'call',
                           expiration_date: Optional[str] = None,
                           require_symmetric: bool = False,
                           min_wing_width: float = 0.25,
-                          max_wing_width: float = 5.0) -> List[FlyConfiguration]:
+                          max_wing_width: float = 5.0) -> List[StrategyComparison]:
         """
-        Génère toutes les combinaisons possibles de Butterfly
+        Génère toutes les combinaisons possibles de Butterfly directement en StrategyComparison
+        
+        Butterfly = Long 1 lower + Short 2 middle + Long 1 upper
         
         Args:
-            price_min: Prix minimum pour la tête du Fly (middle strike)
-            price_max: Prix maximum pour la tête du Fly (middle strike)
-            strike_min: Strike minimum pour les jambes (lower et upper)
-            strike_max: Strike maximum pour les jambes (lower et upper)
+            price_min: Prix minimum pour le strike central
+            price_max: Prix maximum pour le strike central  
+            strike_min: Strike minimum
+            strike_max: Strike maximum
+            target_price: Prix cible du sous-jacent
             option_type: 'call' ou 'put'
-            expiration_date: Date d'expiration (optionnel, sinon toutes)
-            require_symmetric: Si True, ne génère que des Flies symétriques
+            expiration_date: Date d'expiration (optionnel)
+            require_symmetric: N'accepter que les structures symétriques
             min_wing_width: Largeur minimale des ailes
             max_wing_width: Largeur maximale des ailes
-        
+            
         Returns:
-            Liste de configurations de Butterfly
+            Liste de StrategyComparison
         """
-        flies = []
+        strategies = []
         
-        # Déterminer les expirations à traiter
+        # Déterminer les expirations
         if expiration_date:
             expirations = [expiration_date]
         else:
@@ -287,107 +104,159 @@ class FlyGenerator:
             # Récupérer les strikes disponibles
             available_strikes = self.get_available_strikes(option_type, exp_date)
             
-            # Filtrer les strikes dans les bornes
+            # Filtrer dans les bornes
             valid_strikes = [s for s in available_strikes if strike_min <= s <= strike_max]
             
             if len(valid_strikes) < 3:
-                continue  # Pas assez de strikes pour un Fly
+                continue  # Pas assez de strikes pour un Butterfly
             
             # Générer toutes les combinaisons de 3 strikes
-            for i, lower in enumerate(valid_strikes):
-                for j, middle in enumerate(valid_strikes[i+1:], start=i+1):
-                    # Vérifier que middle est dans l'intervalle de prix
-                    if not (price_min <= middle <= price_max):
-                        continue
-                    
-                    for k, upper in enumerate(valid_strikes[j+1:], start=j+1):
-                        # Calculer les largeurs d'ailes
-                        wing_lower = middle - lower
-                        wing_upper = upper - middle
+            for i, lower_strike in enumerate(valid_strikes):
+                for j, middle_strike in enumerate(valid_strikes[i+1:], start=i+1):
+                    for k, upper_strike in enumerate(valid_strikes[j+1:], start=j+1):
+                        # Calculer les métriques
+                        wing_width_lower = middle_strike - lower_strike
+                        wing_width_upper = upper_strike - middle_strike
+                        
+                        # Vérifier que le middle strike est dans l'intervalle de prix
+                        if not (price_min <= middle_strike <= price_max):
+                            continue
                         
                         # Vérifier les contraintes de largeur
-                        if wing_lower < min_wing_width or wing_lower > max_wing_width:
+                        if wing_width_lower < min_wing_width or wing_width_lower > max_wing_width:
                             continue
-                        if wing_upper < min_wing_width or wing_upper > max_wing_width:
+                        if wing_width_upper < min_wing_width or wing_width_upper > max_wing_width:
                             continue
                         
                         # Vérifier la symétrie si requis
-                        if require_symmetric and abs(wing_lower - wing_upper) > 0.01:
+                        if require_symmetric and abs(wing_width_lower - wing_width_upper) > 0.01:
                             continue
                         
                         # Récupérer les options
                         index = self.calls_by_strike_exp if option_type.lower() == 'call' else self.puts_by_strike_exp
                         
-                        lower_opt = index.get((lower, exp_date))
-                        middle_opt = index.get((middle, exp_date))
-                        upper_opt = index.get((upper, exp_date))
+                        lower_opt = index.get((lower_strike, exp_date))
+                        middle_opt = index.get((middle_strike, exp_date))
+                        upper_opt = index.get((upper_strike, exp_date))
                         
                         # Vérifier que toutes les options existent
                         if not all([lower_opt, middle_opt, upper_opt]):
                             continue
                         
-                        # Créer la configuration
-                        fly_type = "Long" if option_type.lower() == 'call' else "Long"
-                        fly_name = f"{fly_type}CallFly" if option_type.lower() == 'call' else f"{fly_type}PutFly"
-                        
-                        fly = FlyConfiguration(
-                            name=f"{fly_name} {lower}/{middle}/{upper}",
-                            lower_strike=lower,
-                            middle_strike=middle,
-                            upper_strike=upper,
-                            option_type=option_type,
-                            expiration_date=exp_date,
-                            lower_option=lower_opt,
-                            middle_option=middle_opt,
-                            upper_option=upper_opt
+                        # Créer la stratégie directement
+                        strategy = self._create_butterfly_strategy(
+                            lower_strike, middle_strike, upper_strike,
+                            exp_date, target_price, option_type,
+                            lower_opt, middle_opt, upper_opt,
+                            wing_width_lower, wing_width_upper
                         )
                         
-                        flies.append(fly)
+                        if strategy:
+                            strategies.append(strategy)
         
-        return flies
+        return strategies
     
-    def get_options_list(self,
-                        price_min: float,
-                        price_max: float,
-                        strike_min: float,
-                        strike_max: float,
-                        option_type: str = 'call',
-                        expiration_date: Optional[str] = None,
-                        require_symmetric: bool = False,
-                        min_wing_width: float = 0.25,
-                        max_wing_width: float = 5.0,
-                        deduplicate: bool = True) -> List[Dict]:
-        """
-        Génère tous les Flies et retourne directement une liste d'options standardisée
-        """
-        # Générer tous les Flies selon les critères
-        flies = self.generate_all_flies(
-            price_min=price_min,
-            price_max=price_max,
-            strike_min=strike_min,
-            strike_max=strike_max,
-            option_type=option_type,
-            expiration_date=expiration_date,
-            require_symmetric=require_symmetric,
-            min_wing_width=min_wing_width,
-            max_wing_width=max_wing_width
-        )
-        
-        if not flies:
-            return []
-        
-        if deduplicate:
-            # Retourner une liste dédupliquée
-            all_options = {}
-            for fly in flies:
-                for opt in fly.to_standard_options_list():
-                    key = (opt['strike'], opt['expiration_date'], opt['option_type'])
-                    all_options[key] = opt
-            return list(all_options.values())
-        else:
-            # Retourner toutes les options (avec duplicatas possibles)
+    def _create_butterfly_strategy(self, lower_strike: float, middle_strike: float, upper_strike: float,
+                                   exp_date: str, target_price: float, option_type: str,
+                                   lower_opt_dict: Dict, middle_opt_dict: Dict, upper_opt_dict: Dict,
+                                   wing_width_lower: float, wing_width_upper: float) -> Optional[StrategyComparison]:
+        """Crée un objet StrategyComparison pour un Butterfly"""
+        try:
+            # Construire la liste d'options (Long 1 + Short 2 + Long 1)
             all_options = []
-            for fly in flies:
-                all_options.extend(fly.to_standard_options_list())
-            return all_options
-
+            
+            opt1 = dict_to_option(lower_opt_dict, position='long', quantity=1)
+            if opt1: all_options.append(opt1)
+            
+            opt2 = dict_to_option(middle_opt_dict, position='short', quantity=2)
+            if opt2: all_options.append(opt2)
+            
+            opt3 = dict_to_option(upper_opt_dict, position='long', quantity=1)
+            if opt3: all_options.append(opt3)
+            
+            if len(all_options) != 3:
+                return None
+            
+            # Calculer débit net
+            net_debit = sum(
+                opt.premium * opt.quantity * (-1 if opt.position == 'long' else 1)
+                for opt in all_options
+            )
+            debit = abs(net_debit)
+            
+            # Métriques financières
+            wing_width = min(wing_width_lower, wing_width_upper)
+            max_profit = max(0, wing_width - debit)
+            max_loss = -debit
+            
+            # Breakeven
+            breakeven_points = [
+                lower_strike + debit,
+                upper_strike - debit
+            ]
+            profit_range = (breakeven_points[0], breakeven_points[1])
+            profit_zone_width = profit_range[1] - profit_range[0]
+            
+            # Risk/Reward
+            risk_reward_ratio = abs(max_loss) / max_profit if max_profit > 0 else 0
+            
+            # Profit au prix cible
+            profit_at_target = self._calculate_butterfly_pnl(
+                target_price, lower_strike, middle_strike, upper_strike, debit, wing_width
+            )
+            profit_at_target_pct = (profit_at_target / max_profit * 100) if max_profit > 0 else 0
+            
+            # Greeks
+            greeks = calculate_greeks_by_type(all_options)
+            avg_iv = calculate_avg_implied_volatility(all_options)
+            
+            # Date d'expiration
+            exp_info = get_expiration_info(all_options)
+            
+            return StrategyComparison(
+                strategy_name=f"{'Call' if option_type == 'call' else 'Put'}Fly {lower_strike}/{middle_strike}/{upper_strike}",
+                strategy=None,
+                target_price=target_price,
+                max_profit=max_profit,
+                max_loss=max_loss,
+                breakeven_points=breakeven_points,
+                profit_range=profit_range,
+                profit_zone_width=profit_zone_width,
+                surface_profit=0.0,
+                surface_loss=0.0,
+                surface_gauss=0.0,
+                risk_reward_ratio=risk_reward_ratio,
+                all_options=all_options,
+                total_delta_calls=greeks['calls']['delta'],
+                total_gamma_calls=greeks['calls']['gamma'],
+                total_vega_calls=greeks['calls']['vega'],
+                total_theta_calls=greeks['calls']['theta'],
+                total_delta_puts=greeks['puts']['delta'],
+                total_gamma_puts=greeks['puts']['gamma'],
+                total_vega_puts=greeks['puts']['vega'],
+                total_theta_puts=greeks['puts']['theta'],
+                total_delta=greeks['total']['delta'],
+                total_gamma=greeks['total']['gamma'],
+                total_vega=greeks['total']['vega'],
+                total_theta=greeks['total']['theta'],
+                avg_implied_volatility=avg_iv,
+                profit_at_target=profit_at_target,
+                profit_at_target_pct=profit_at_target_pct,
+                score=0.0,
+                rank=0
+            )
+        except Exception as e:
+            print(f"⚠️ Erreur création Butterfly {lower_strike}/{middle_strike}/{upper_strike}: {e}")
+            return None
+    
+    def _calculate_butterfly_pnl(self, price: float, lower_strike: float, middle_strike: float, 
+                                upper_strike: float, debit: float, wing_width: float) -> float:
+        """Calcule le P&L d'un Butterfly à un prix donné"""
+        if price <= lower_strike or price >= upper_strike:
+            return -debit
+        elif price < middle_strike:
+            return (price - lower_strike) - debit
+        elif price > middle_strike:
+            return (upper_strike - price) - debit
+        else:  # price == middle_strike
+            return wing_width - debit

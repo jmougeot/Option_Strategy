@@ -10,11 +10,8 @@ class StrategyComparison:
     strategy_name: str
     strategy: Any  # OptionStrategy-like
     target_price: float
-    expiration_date: datetime
-    days_to_expiry: int
 
     # Métriques financières
-    net_credit: float
     max_profit: float
     max_loss: float
     breakeven_points: List[float]
@@ -22,6 +19,9 @@ class StrategyComparison:
     # Métriques de risque
     profit_range: Tuple[float, float]  # Range de prix profitable
     profit_zone_width: float  # Largeur de la zone profitable
+    surface_profit: float # surface of profit btw min price and max price 
+    surface_loss:float # surface of loss btw min price and max price 
+    surface_gauss : float # surface of profit in commun with the surface of gauss center around the strike
     risk_reward_ratio: float  # Max loss / Max profit
 
 

@@ -439,7 +439,6 @@ def main():
                     target_price=target_price,
                     strike_min=strike_min,
                     strike_max=strike_max,
-                    days_to_expiry=days_to_expiry,
                     include_flies=include_flies,
                     include_condors=include_condors,
                     require_symmetric=require_symmetric,

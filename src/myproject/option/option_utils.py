@@ -16,30 +16,25 @@ def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long
     Args:
         option_dict: Dictionnaire avec les données de l'option
         position: 'long' ou 'short'
-        quantity: Nombre de contrats
+        quantity: Quantité
     
     Returns:
         Objet Option ou None si données invalides
     """
-    if not option_dict:
-        return None
-    
     try:
-        # Parser la date d'expiration
-        expiry_str = option_dict.get('expiration_date')
-        if isinstance(expiry_str, str):
-            expiry = datetime.strptime(expiry_str, '%Y-%m-%d')
-        elif isinstance(expiry_str, datetime):
-            expiry = expiry_str
-        else:
-            expiry = datetime.now()
+        # Extraire la date d'expiration
+        day = option_dict.get('day_of_expiration', 1)
+        month = option_dict.get('month_of_expiration', 1)
+        year = option_dict.get('year_of_expiration', 2025)
         
         return Option(
             # Obligatoires
             option_type=option_dict.get('option_type', 'call'),
             strike=float(option_dict.get('strike', 0.0)),
             premium=float(option_dict.get('premium', 0.0)),
-            expiry=expiry,
+            day_of_expirition=day,
+            month_of_expiration=month,
+            year_of_expiration=year,
             
             # Position
             quantity=quantity,
@@ -178,11 +173,31 @@ def get_expiration_info(options: List[Option]) -> Dict[str, Any]:
     if not options:
         return {'expiration_date': None, 'month': None, 'year': None}
     
-    # Prendre la première expiration (toutes devraient être identiques dans une stratégie)
-    expiry = options[0].expiry
+    # Prendre la première option
+    opt = options[0]
     
-    return {
-        'expiration_date': expiry,
-        'month': expiry.strftime('%B'),  # Nom complet du mois
-        'year': expiry.year
-    }
+    try:
+        # Mapping des codes Bloomberg de mois en nombres
+        month_map = {
+            'F': 1, 'G': 2, 'H': 3, 'K': 5,
+            'M': 6, 'N': 7, 'Q': 8, 'U': 9,
+            'V': 10, 'X': 11, 'Z': 12
+        }
+        
+        month_num = month_map.get(opt.month_of_expiration, 1)
+        day_num = int(opt.day_of_expirition) if isinstance(opt.day_of_expirition, str) else opt.day_of_expirition
+        
+        # Construire la date
+        expiry = datetime(
+            year=opt.year_of_expiration,
+            month=month_num,
+            day=day_num
+        )
+        
+        return {
+            'expiration_date': expiry,
+            'month': expiry.strftime('%B'),  # Nom complet du mois
+            'year': expiry.year
+        }
+    except (AttributeError, ValueError, KeyError):
+        return {'expiration_date': None, 'month': None, 'year': None}

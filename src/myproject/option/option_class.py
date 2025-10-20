@@ -25,7 +25,12 @@ class Option:
     option_type: str  # 'call' ou 'put'
     strike: float  # Prix d'exercice
     premium: float  # Prime de l'option
-    expiry: datetime  # Date d'expiration
+
+    # ============ CHAMPS OBLIGATOIRES ============
+    day_of_expirition : str
+    month_of_expiration : Literal['F' , 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z' ]
+    year_of_expiration : int
+
     
     # ============ STRUCTURE DE POSITION ============
     quantity: int = 1  # Nombre de contrats
@@ -65,9 +70,6 @@ class Option:
     underlying_price: Optional[float] = None  # Prix actuel du sous-jacent
     underlying_price_change: Optional[float] = None  # Variation du sous-jacent
     
-    # ============ DATES ET TEMPS ============
-    days_to_expiration: Optional[int] = None  # Jours jusqu'à expiration
-    years_to_expiration: Optional[float] = None  # Années jusqu'à expiration
     
     # ============ CARACTÉRISTIQUES CONTRACTUELLES ============
     contract_size: int = 100  # Taille du contrat (actions/unités)
