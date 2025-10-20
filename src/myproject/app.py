@@ -10,9 +10,8 @@ import plotly.express as px
 from datetime import datetime
 import json
 from typing import Dict, List
-from myproject.option.multi_structure_comparer import MultiStructureComparer, StrategyComparison
-
-
+from myproject.option.multi_structure_comparer import MultiStructureComparer
+from myproject.option.comparison_class import StrategyComparison
 
 # ============================================================================
 # CONFIGURATION DE LA PAGE

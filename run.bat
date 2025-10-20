@@ -23,5 +23,6 @@ REM Activer l'environnement virtuel
 call venv\Scripts\activate.bat
 
 REM Lancer Streamlit
-streamlit run src/app.py
+export PYTHONPATH="${PWD}/src:${PYTHONPATH}"
+streamlit run src/myproject/app.py
 
