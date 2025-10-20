@@ -4,9 +4,68 @@ Utilitaires pour la manipulation des options
 Fonctions communes pour convertir et manipuler les options.
 """
 
-from typing import Dict, List, Optional, Literal, Any
+from typing import Dict, List, Optional, Literal, Any, Tuple
 from datetime import datetime
+import math
 from myproject.option.option_class import Option
+
+
+def get_expiration_key(day: str, month: str, year: int) -> str:
+    """
+    Crée une clé unique d'expiration à partir de day/month/year.
+    
+    Args:
+        day: Jour d'expiration (str ou int)
+        month: Mois d'expiration (code Bloomberg: F, G, H, K, M, N, Q, U, V, X, Z)
+        year: Année d'expiration
+    
+    Returns:
+        Clé sous forme "YYYY-MM-DD" (ex: "2025-01-15")
+    """
+    month_map = {
+        'F': 1, 'G': 2, 'H': 3, 'K': 5,
+        'M': 6, 'N': 7, 'Q': 8, 'U': 9,
+        'V': 10, 'X': 11, 'Z': 12
+    }
+    
+    day_num = int(day) if isinstance(day, str) else day
+    
+    # Si month est un code Bloomberg (lettre), le convertir en nombre
+    if isinstance(month, str) and month in month_map:
+        month_num = month_map[month]
+    elif isinstance(month, str):
+        month_num = int(month)  # Si c'est déjà un nombre en string
+    else:
+        month_num = month
+    
+    return f"{year:04d}-{month_num:02d}-{day_num:02d}"
+
+
+def parse_expiration_key(exp_key: str) -> Tuple[int, str, int]:
+    """
+    Parse une clé d'expiration en day/month/year.
+    
+    Args:
+        exp_key: Clé sous forme "YYYY-MM-DD"
+    
+    Returns:
+        Tuple (day, month_code, year)
+    """
+    parts = exp_key.split('-')
+    year = int(parts[0])
+    month_num = int(parts[1])
+    day = int(parts[2])
+    
+    # Reverse mapping: month number -> Bloomberg code
+    reverse_month_map = {
+        1: 'F', 2: 'G', 3: 'H', 5: 'K',
+        6: 'M', 7: 'N', 8: 'Q', 9: 'U',
+        10: 'V', 11: 'X', 12: 'Z'
+    }
+    
+    month_code = reverse_month_map.get(month_num, 'F')
+    
+    return (day, month_code, year)
 
 
 def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long', quantity: int = 1) -> Optional[Option]:
@@ -201,3 +260,259 @@ def get_expiration_info(options: List[Option]) -> Dict[str, Any]:
         }
     except (AttributeError, ValueError, KeyError):
         return {'expiration_date': None, 'month': None, 'year': None}
+
+
+def calculate_strategy_pnl(options: List[Option], price: float) -> float:
+    """
+    Calcule le P&L d'une stratégie d'options à un prix donné à l'expiration.
+    
+    Args:
+        options: Liste d'options constituant la stratégie
+        price: Prix du sous-jacent
+    
+    Returns:
+        P&L total de la stratégie
+    """
+    total_pnl = 0.0
+    
+    for opt in options:
+        # Coût initial (négatif si long, positif si short)
+        cost = opt.premium * opt.quantity * (-1 if opt.position == 'long' else 1)
+        
+        # Valeur intrinsèque à l'expiration
+        if opt.option_type == 'call':
+            intrinsic_value = max(0, price - opt.strike)
+        else:  # put
+            intrinsic_value = max(0, opt.strike - price)
+        
+        # P&L pour cette option (long: on reçoit la valeur, short: on la paye)
+        if opt.position == 'long':
+            option_pnl = (intrinsic_value * opt.quantity) + cost
+        else:  # short
+            option_pnl = cost - (intrinsic_value * opt.quantity)
+        
+        total_pnl += option_pnl
+    
+    return total_pnl
+
+
+def calculate_profit_surface(options: List[Option], 
+                         price_min: float, 
+                         price_max: float, 
+                         num_points: int = 1000) -> float:
+    """
+    Calcule l'aire sous la courbe de P&L positive (zone de profit) entre prix_min et prix_max.
+    Utilise la méthode des trapèzes pour l'intégration numérique.
+    
+    Args:
+        options: Liste d'options constituant la stratégie
+        price_min: Prix minimum du sous-jacent
+        price_max: Prix maximum du sous-jacent
+        num_points: Nombre de points pour l'intégration (plus = plus précis)
+    
+    Returns:
+        Aire de profit (surface positive sous la courbe P&L)
+    """
+    if price_min >= price_max:
+        return 0.0
+    
+    # Générer les points de prix
+    step = (price_max - price_min) / (num_points - 1)
+    profit_surface = 0.0
+    
+    for i in range(num_points - 1):
+        price1 = price_min + i * step
+        price2 = price_min + (i + 1) * step
+        
+        # Calculer P&L aux deux points
+        pnl1 = calculate_strategy_pnl(options, price1)
+        pnl2 = calculate_strategy_pnl(options, price2)
+        
+        # Ne compter que les parties positives (profit)
+        pnl1_positive = max(0, pnl1)
+        pnl2_positive = max(0, pnl2)
+        
+        # Aire du trapèze pour ce segment
+        trapezoid_area = (pnl1_positive + pnl2_positive) * step / 2
+        profit_surface += trapezoid_area
+    
+    return profit_surface
+
+
+def calculate_loss_surface(options: List[Option], 
+                       price_min: float, 
+                       price_max: float, 
+                       num_points: int = 100) -> float:
+    """
+    Calcule l'aire sous la courbe de P&L négative (zone de perte) entre prix_min et prix_max.
+    Utilise la méthode des trapèzes pour l'intégration numérique.
+
+    Returns:
+        Aire de perte (valeur absolue de la surface négative sous la courbe P&L)
+    """
+    if price_min >= price_max:
+        return 0.0
+    
+    # Générer les points de prix
+    step = (price_max - price_min) / (num_points - 1)
+    loss_surface = 0.0
+    
+    for i in range(num_points - 1):
+        price1 = price_min + i * step
+        price2 = price_min + (i + 1) * step
+        
+        # Calculer P&L aux deux points
+        pnl1 = calculate_strategy_pnl(options, price1)
+        pnl2 = calculate_strategy_pnl(options, price2)
+        
+        # Ne compter que les parties négatives (perte), en valeur absolue
+        pnl1_negative = abs(min(0, pnl1))
+        pnl2_negative = abs(min(0, pnl2))
+        
+        # Aire du trapèze pour ce segment
+        trapezoid_area = (pnl1_negative + pnl2_negative) * step / 2
+        loss_surface += trapezoid_area
+    
+    return loss_surface
+
+
+def calculate_pnl_areas(options: List[Option],
+                       price_min: float,
+                       price_max: float,
+                       num_points: int = 1000) -> Dict[str, float]:
+    """
+    Calcule à la fois l'aire de profit et l'aire de perte d'une stratégie.
+    
+    Returns:
+        Dict avec 'profit_surface', 'loss_surface', et 'net_area'
+    """
+    profit_surface = calculate_profit_surface(options, price_min, price_max, num_points)
+    loss_surface = calculate_loss_surface(options, price_min, price_max, num_points)
+    
+    return {
+        'profit_surface': profit_surface,
+        'loss_surface': loss_surface,
+        'net_area': profit_surface - loss_surface,
+        'profit_loss_ratio': profit_surface / loss_surface if loss_surface > 0 else float('inf')
+    }
+
+
+def gaussian_pdf(x: float, mean: float, std_dev: float) -> float:
+    """
+    Calcule la densité de probabilité d'une distribution gaussienne.
+    
+    Args:
+        x: Point où évaluer la densité
+        mean: Moyenne (centre) de la gaussienne
+        std_dev: Écart-type de la gaussienne
+    
+    Returns:
+        Densité de probabilité au point x
+    """
+    variance = std_dev ** 2
+    coefficient = 1.0 / math.sqrt(2 * math.pi * variance)
+    exponent = -((x - mean) ** 2) / (2 * variance)
+    return coefficient * math.exp(exponent)
+
+
+def calculate_gaussian_weighted_profit(options: List[Option],
+                                       price_min: float,
+                                       price_max: float,
+                                       center_strike: float,
+                                       num_points: int = 1000) -> float:
+    """
+    Calcule l'aire sous min(0, f(x), g(x)) où:
+    - f(x) est la densité gaussienne centrée sur center_strike
+    - g(x) est le P&L de la stratégie
+    
+    La gaussienne est calibrée pour que ses points à 0.1% se situent à price_min ou price_max
+    (selon lequel est le plus éloigné du centre).
+    
+    Cette métrique représente l'espérance de profit pondérée par la probabilité que le
+    prix du sous-jacent soit proche du strike central.
+    
+    Args:
+        options: Liste d'options constituant la stratégie
+        price_min: Prix minimum du sous-jacent
+        price_max: Prix maximum du sous-jacent
+        center_strike: Strike central (centre de la gaussienne)
+        num_points: Nombre de points pour l'intégration
+    
+    Returns:
+        Aire pondérée par la gaussienne (surface_gauss)
+    """
+    if price_min >= price_max:
+        return 0.0
+    
+    # Déterminer la distance maximale du centre aux bornes
+    dist_to_min = abs(center_strike - price_min)
+    dist_to_max = abs(center_strike - price_max)
+    max_distance = max(dist_to_min, dist_to_max)
+    
+    # Calibrer l'écart-type pour que P(|X - center| > max_distance) = 0.001
+    # Pour une gaussienne: P(|X - μ| > k*σ) = 0.001 => k ≈ 3.29 (percentile 99.9%)
+    # Donc: max_distance = 3.29 * std_dev => std_dev = max_distance / 3.29
+    std_dev = max_distance / 3.29
+    
+    # Calculer la hauteur maximale de la gaussienne (au centre)
+    max_gaussian_height = gaussian_pdf(center_strike, center_strike, std_dev)
+    
+    # Intégration numérique avec méthode des trapèzes
+    step = (price_max - price_min) / (num_points - 1)
+    weighted_area = 0.0
+    
+    for i in range(num_points - 1):
+        price1 = price_min + i * step
+        price2 = price_min + (i + 1) * step
+        
+        # Calculer P&L aux deux points
+        pnl1 = calculate_strategy_pnl(options, price1)
+        pnl2 = calculate_strategy_pnl(options, price2)
+        
+        # Calculer densité gaussienne aux deux points
+        gauss1 = gaussian_pdf(price1, center_strike, std_dev)
+        gauss2 = gaussian_pdf(price2, center_strike, std_dev)
+        
+        # Calculer min(0, pnl, gauss) aux deux points
+        # On prend seulement la partie positive du P&L, limitée par la gaussienne
+        value1 = min(max(0, pnl1), gauss1) if pnl1 > 0 else 0
+        value2 = min(max(0, pnl2), gauss2) if pnl2 > 0 else 0
+        
+        # Aire du trapèze pour ce segment
+        trapezoid_area = (value1 + value2) * step / 2
+        weighted_area += trapezoid_area
+    
+    return weighted_area
+
+
+def calculate_all_surfaces(options: List[Option],
+                          price_min: float,
+                          price_max: float,
+                          center_strike: float,
+                          num_points: int = 1000) -> Dict[str, float]:
+    """
+    Calcule toutes les surfaces (profit, loss, et gaussienne) d'une stratégie.
+    
+    Args:
+        options: Liste d'options constituant la stratégie
+        price_min: Prix minimum du sous-jacent
+        price_max: Prix maximum du sous-jacent
+        center_strike: Strike central pour la gaussienne
+        num_points: Nombre de points pour l'intégration
+    
+    Returns:
+        Dict avec 'profit_surface', 'loss_surface', 'surface_gauss', et ratios
+    """
+    profit_surface = calculate_profit_surface(options, price_min, price_max, num_points)
+    loss_surface = calculate_loss_surface(options, price_min, price_max, num_points)
+    surface_gauss = calculate_gaussian_weighted_profit(options, price_min, price_max, center_strike, num_points)
+    
+    return {
+        'profit_surface': profit_surface,
+        'loss_surface': loss_surface,
+        'surface_gauss': surface_gauss,
+        'net_area': profit_surface - loss_surface,
+        'profit_loss_ratio': profit_surface / loss_surface if loss_surface > 0 else float('inf'),
+        'gauss_profit_ratio': surface_gauss / profit_surface if profit_surface > 0 else 0
+    }
+

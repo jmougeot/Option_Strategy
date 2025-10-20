@@ -7,6 +7,7 @@ Les générateurs retournent maintenant directement des StrategyComparison.
 from typing import List, Dict, Optional
 from myproject.option.fly_generator import FlyGenerator
 from myproject.option.condor_generator import CondorGenerator
+from myproject.option.option_generator import OptionStrategyGenerator
 from myproject.option.comparison_class import StrategyComparison
 
 
@@ -16,45 +17,108 @@ class MultiStructureComparer:
     def __init__(self, options_data: Dict[str, List[Dict]]):
         self.fly_generator = FlyGenerator(options_data)
         self.condor_generator = CondorGenerator(options_data)
+        self.option_generator = OptionStrategyGenerator(options_data)
         self.options_data = options_data
     
     def compare_all_structures(self,
                               target_price: float,
                               strike_min: float,
                               strike_max: float,
-                              days_to_expiry: int,
                               include_flies: bool = True,
                               include_condors: bool = True,
+                              include_spreads: bool = True,
+                              include_straddles: bool = True,
+                              include_single_legs: bool = False,
                               require_symmetric: bool = False,
                               top_n: int = 10,
+                              max_legs: int = 4,
                               weights: Optional[Dict[str, float]] = None) -> List[StrategyComparison]:
-        """Compare toutes les structures possibles et retourne les meilleures."""
+        """
+        Compare toutes les structures possibles et retourne les meilleures.
+        
+        Args:
+            target_price: Prix cible du sous-jacent
+            strike_min: Strike minimum
+            strike_max: Strike maximum
+            include_flies: Inclure les butterflies
+            include_condors: Inclure les condors (iron, call, put)
+            include_spreads: Inclure les spreads (bull/bear call/put)
+            include_straddles: Inclure les straddles et strangles
+            include_single_legs: Inclure les single legs (long/short call/put)
+            require_symmetric: N'accepter que les structures symétriques
+            top_n: Nombre de meilleures stratégies à retourner
+            max_legs: Nombre maximum de legs pour option_generator
+            weights: Poids personnalisés pour le scoring
+        """
         if weights is None:
-            weights = {'max_profit': 0.25, 'risk_reward': 0.25, 'profit_zone': 0.25, 'target_performance': 0.25}
+            # Nouveaux poids avec les surfaces gaussiennes
+            weights = {
+                'max_profit': 0.15,           # Profit max (réduit)
+                'risk_reward': 0.15,          # Ratio risque/récompense (réduit)
+                'profit_zone': 0.10,          # Largeur de zone de profit (réduit)
+                'target_performance': 0.10,   # Performance au prix cible (réduit)
+                'surface_gauss': 0.35,        # Profit pondéré par gaussienne (NOUVEAU - prioritaire)
+                'profit_loss_ratio': 0.15     # Ratio surface_profit/surface_loss (NOUVEAU)
+            }
         
         all_comparisons = []
         price_min, price_max = target_price - 2.0, target_price + 2.0
         
+        # Stratégies via OptionStrategyGenerator (spreads, straddles, single legs)
+        if include_spreads or include_straddles or include_single_legs:
+            try:
+                generated_strategies = self.option_generator.generate_all_strategies(
+                    price_min=price_min,
+                    price_max=price_max,
+                    strike_min=strike_min,
+                    strike_max=strike_max,
+                    target_price=target_price,
+                    expiration_date=None,
+                    max_legs=max_legs
+                )
+                
+                # Filtrer selon les options choisies
+                for strat in generated_strategies:
+                    name_lower = strat.strategy_name.lower()
+                    
+                    # Single legs
+                    if include_single_legs and ('long call' in name_lower or 'short call' in name_lower or 
+                                                'long put' in name_lower or 'short put' in name_lower) and \
+                       'spread' not in name_lower and 'straddle' not in name_lower:
+                        all_comparisons.append(strat)
+                    
+                    # Spreads
+                    elif include_spreads and 'spread' in name_lower:
+                        all_comparisons.append(strat)
+                    
+                    # Straddles et Strangles
+                    elif include_straddles and ('straddle' in name_lower or 'strangle' in name_lower):
+                        all_comparisons.append(strat)
+                    
+            except Exception as e:
+                print(f"⚠️  Erreur lors de la génération avec OptionStrategyGenerator: {e}")
+        
         # Butterflies
         if include_flies:
-            all_comparisons.extend(self.fly_generator.generate_all_flies(
-                price_min, price_max, strike_min, strike_max, target_price,
-                'call', None, require_symmetric, 0.25, 3.0))
-            all_comparisons.extend(self.fly_generator.generate_all_flies(
-                price_min, price_max, strike_min, strike_max, target_price,
-                'put', None, require_symmetric, 0.25, 3.0))
+            try:
+                all_comparisons.extend(self.fly_generator.generate_all_flies(
+                    price_min, price_max, target_price, 'call', None, require_symmetric))
+                all_comparisons.extend(self.fly_generator.generate_all_flies(
+                    price_min, price_max, target_price, 'put', None, require_symmetric))
+            except Exception as e:
+                print(f"⚠️  Erreur lors de la génération des butterflies: {e}")
         
         # Condors
         if include_condors:
-            all_comparisons.extend(self.condor_generator.generate_iron_condors(
-                price_min, price_max, strike_min, strike_max, target_price,
-                None, require_symmetric, 0.25, 2.5, 0.5, 5.0))
-            all_comparisons.extend(self.condor_generator.generate_call_condors(
-                price_min, price_max, strike_min, strike_max, target_price,
-                None, require_symmetric, 0.25, 2.5, 0.5, 5.0))
-            all_comparisons.extend(self.condor_generator.generate_put_condors(
-                price_min, price_max, strike_min, strike_max, target_price,
-                None, require_symmetric, 0.25, 2.5, 0.5, 5.0))
+            try:
+                all_comparisons.extend(self.condor_generator.generate_iron_condors(
+                    price_min, price_max, target_price, None, require_symmetric))
+                all_comparisons.extend(self.condor_generator.generate_call_condors(
+                    price_min, price_max, strike_min, strike_max, target_price, 'call', None, require_symmetric))
+                all_comparisons.extend(self.condor_generator.generate_put_condors(
+                    price_min, price_max, strike_min, strike_max, target_price, 'put', None, require_symmetric))
+            except Exception as e:
+                print(f"⚠️  Erreur lors de la génération des condors: {e}")
         
         # Scoring et tri
         if all_comparisons:
@@ -67,57 +131,129 @@ class MultiStructureComparer:
         return all_comparisons
     
     def _calculate_scores(self, comparisons: List[StrategyComparison], weights: Dict[str, float]) -> List[StrategyComparison]:
-        """Calcule les scores composites."""
+        """Calcule les scores composites avec les nouveaux critères de surfaces."""
         if not comparisons:
             return comparisons
         
+        # Normalisation des anciennes métriques
         max_profit_val = max(c.max_profit for c in comparisons if c.max_profit != float('inf'))
         max_zone_width = max(c.profit_zone_width for c in comparisons if c.profit_zone_width != float('inf'))
         max_target_perf = max(abs(c.profit_at_target_pct) for c in comparisons)
         risk_rewards = [c.risk_reward_ratio for c in comparisons if c.risk_reward_ratio != float('inf')]
         min_rr, max_rr = (min(risk_rewards), max(risk_rewards)) if risk_rewards else (1, 10)
         
+        # Normalisation des nouvelles métriques de surfaces
+        max_surface_gauss = max(c.surface_gauss for c in comparisons if c.surface_gauss > 0)
+        profit_loss_ratios = []
+        for c in comparisons:
+            if c.surface_loss > 0:
+                ratio = c.surface_profit / c.surface_loss
+                profit_loss_ratios.append(ratio)
+        max_pl_ratio = max(profit_loss_ratios) if profit_loss_ratios else 1.0
+        min_pl_ratio = min(profit_loss_ratios) if profit_loss_ratios else 0.0
+        
         for comp in comparisons:
             score = 0.0
+            
+            # Anciennes métriques (pondération réduite)
             if 'max_profit' in weights and max_profit_val > 0:
                 score += (comp.max_profit / max_profit_val) * weights['max_profit']
+            
             if 'risk_reward' in weights and comp.risk_reward_ratio != float('inf') and max_rr > min_rr:
                 score += (1 - (comp.risk_reward_ratio - min_rr) / (max_rr - min_rr)) * weights['risk_reward']
+            
             if 'profit_zone' in weights and comp.profit_zone_width != float('inf') and max_zone_width > 0:
                 score += (comp.profit_zone_width / max_zone_width) * weights['profit_zone']
+            
             if 'target_performance' in weights and max_target_perf > 0:
                 score += (abs(comp.profit_at_target_pct) / max_target_perf) * weights['target_performance']
+            
+            # NOUVELLES MÉTRIQUES - Surfaces pondérées par gaussienne
+            if 'surface_gauss' in weights and max_surface_gauss > 0:
+                # Score normalisé entre 0 et 1 pour la surface gaussienne
+                gauss_score = comp.surface_gauss / max_surface_gauss
+                score += gauss_score * weights['surface_gauss']
+            
+            if 'profit_loss_ratio' in weights and comp.surface_loss > 0:
+                # Ratio profit/loss normalisé
+                pl_ratio = comp.surface_profit / comp.surface_loss
+                if max_pl_ratio > min_pl_ratio:
+                    pl_score = (pl_ratio - min_pl_ratio) / (max_pl_ratio - min_pl_ratio)
+                    score += pl_score * weights['profit_loss_ratio']
+            
             comp.score = score
         
         return comparisons
     
+    def _get_ticker_and_expiration(self, comp: StrategyComparison) -> tuple[str, str]:
+        """
+        Extrait le ticker et la date d'expiration d'une stratégie.
+        
+        Returns:
+            tuple: (ticker, expiration_date)
+        """
+        if not comp.all_options or len(comp.all_options) == 0:
+            return ("N/A", "N/A")
+        
+        # Prendre la première option pour le ticker
+        first_option = comp.all_options[0]
+        ticker = first_option.ticker if first_option.ticker else "N/A"
+        
+        # Construire la date d'expiration à partir de day/month/year
+        try:
+            from myproject.option.option_utils import get_expiration_key
+            exp_date = get_expiration_key(
+                first_option.day_of_expirition,
+                first_option.month_of_expiration,
+                first_option.year_of_expiration
+            )
+        except Exception:
+            exp_date = f"{first_option.day_of_expirition}/{first_option.month_of_expiration}/{first_option.year_of_expiration}"
+        
+        return (ticker, exp_date)
+    
     def display_comparison(self, comparisons: List[StrategyComparison]):
-        """Affiche le tableau de comparaison."""
+        """Affiche le tableau de comparaison avec les nouveaux critères de surfaces."""
         if not comparisons:
             print("Aucune stratégie à comparer")
             return
         
-        print("\n" + "="*130)
+        # Extraire ticker et expiration de la première stratégie
+        ticker, expiration = self._get_ticker_and_expiration(comparisons[0]) if comparisons else ("N/A", "N/A")
+        
+        print("\n" + "="*180)
         print(f"COMPARAISON DES STRUCTURES - Prix cible: ${comparisons[0].target_price:.2f}")
-        print("="*130)
-        print(f"{'Rank':<6} {'Structure':<35} {'Max Profit':<12} {'Max Loss':<12} "
-              f"{'R/R Ratio':<10} {'Zone ±':<10} {'P&L@Target':<12} {'Score':<8}")
-        print("-"*130)
+        print(f"Ticker: {ticker} | Expiration: {expiration}")
+        print("="*180)
+        print(f"{'Rank':<6} {'Structure':<40} {'Max Profit':<12} {'Max Loss':<12} "
+              f"{'R/R Ratio':<10} {'Zone ±':<10} {'P&L@Target':<12} {'Surf.Gauss':<12} {'P/L Ratio':<10} {'Score':<8}")
+        print("-"*180)
         
         for comp in comparisons:
             max_loss_str = f"${abs(comp.max_loss):.2f}" if comp.max_loss != -999999.0 else "Illimité"
             rr_str = f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else "∞"
             zone_str = f"${comp.profit_zone_width:.2f}" if comp.profit_zone_width != float('inf') else "Illimité"
+            pl_ratio_str = f"{comp.surface_profit/comp.surface_loss:.2f}" if comp.surface_loss > 0 else "N/A"
             
-            print(f"{comp.rank:<6} {comp.strategy_name:<35} "
+            print(f"{comp.rank:<6} {comp.strategy_name:<40} "
                   f"${comp.max_profit:<11.2f} {max_loss_str:<12} {rr_str:<10} {zone_str:<10} "
-                  f"${comp.profit_at_target:<11.2f} {comp.score:<8.3f}")
+                  f"${comp.profit_at_target:<11.2f} {comp.surface_gauss:<12.4f} {pl_ratio_str:<10} {comp.score:<8.3f}")
         
-        print("="*130)
+        print("="*180)
+        print("\nMÉTRIQUES DE SURFACES DÉTAILLÉES:")
+        print("-"*140)
+        print(f"{'Structure':<40} {'Ticker':<10} {'Expiration':<15} {'Surface Profit':<18} {'Surface Loss':<18} {'Surface Gauss':<18} {'Ratio P/L':<12}")
+        print("-"*140)
+        for comp in comparisons:
+            ticker, expiration = self._get_ticker_and_expiration(comp)
+            pl_ratio = comp.surface_profit/comp.surface_loss if comp.surface_loss > 0 else 0
+            print(f"{comp.strategy_name:<40} {ticker:<10} {expiration:<15} {comp.surface_profit:<18.2f} {comp.surface_loss:<18.2f} "
+                  f"{comp.surface_gauss:<18.4f} {pl_ratio:<12.2f}")
+        
         print("\nPOINTS DE BREAKEVEN:")
-        print("-"*80)
+        print("-"*100)
         for comp in comparisons:
             if comp.breakeven_points:
                 be_str = ", ".join([f"${be:.2f}" for be in comp.breakeven_points])
-                print(f"{comp.strategy_name:<35} : {be_str}")
-        print("="*130 + "\n")
+                print(f"{comp.strategy_name:<40} : {be_str}")
+        print("="*180 + "\n")

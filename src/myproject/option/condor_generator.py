@@ -5,13 +5,14 @@ Génère directement des objets StrategyComparison sans classe intermédiaire.
 """
 
 from typing import List, Dict, Optional, Literal
-from datetime import datetime, timedelta
 from myproject.option.option_class import Option
 from myproject.option.option_utils import (
     dict_to_option, 
     calculate_greeks_by_type, 
     calculate_avg_implied_volatility,
-    get_expiration_info
+    get_expiration_info,
+    get_expiration_key,
+    calculate_all_surfaces
 )
 from myproject.option.comparison_class import StrategyComparison
 
@@ -31,6 +32,49 @@ class CondorGenerator:
         self.calls_data = options_data.get('calls', [])
         self.puts_data = options_data.get('puts', [])
         self._index_options()
+        
+        # Paramètres pour le calcul des surfaces (seront mis à jour par generate_*)
+        self.price_min = None
+        self.price_max = None
+    
+    def _calculate_surfaces(self, all_options: List[Option], center_strike: float) -> Dict[str, float]:
+        """
+        Calcule les surfaces (profit, loss, gauss) pour une stratégie.
+        
+        Args:
+            all_options: Liste des options de la stratégie
+            center_strike: Strike central pour la gaussienne
+        
+        Returns:
+            Dict avec 'profit_surface', 'loss_surface', 'surface_gauss'
+        """
+        if self.price_min is None or self.price_max is None:
+            return {
+                'profit_surface': 0.0,
+                'loss_surface': 0.0,
+                'surface_gauss': 0.0
+            }
+        
+        try:
+            surfaces = calculate_all_surfaces(
+                all_options,
+                self.price_min,
+                self.price_max,
+                center_strike,
+                num_points=500  # Compromis entre précision et performance
+            )
+            return {
+                'profit_surface': surfaces['profit_surface'],
+                'loss_surface': surfaces['loss_surface'],
+                'surface_gauss': surfaces['surface_gauss']
+            }
+        except Exception as e:
+            print(f"⚠️  Erreur calcul surfaces: {e}")
+            return {
+                'profit_surface': 0.0,
+                'loss_surface': 0.0,
+                'surface_gauss': 0.0
+            }
     
     def _index_options(self):
         """Crée des index pour accès rapide par strike et expiration"""
@@ -38,18 +82,37 @@ class CondorGenerator:
         self.puts_by_strike_exp = {}
         
         for call in self.calls_data:
-            key = (call['strike'], call['expiration_date'])
+            # Créer clé d'expiration à partir de day/month/year
+            exp_key = get_expiration_key(
+                call.get('day_of_expiration', 1),
+                call.get('month_of_expiration', 'F'),
+                call.get('year_of_expiration', 2025)
+            )
+            key = (call['strike'], exp_key)
             self.calls_by_strike_exp[key] = call
         
         for put in self.puts_data:
-            key = (put['strike'], put['expiration_date'])
+            # Créer clé d'expiration à partir de day/month/year
+            exp_key = get_expiration_key(
+                put.get('day_of_expiration', 1),
+                put.get('month_of_expiration', 'F'),
+                put.get('year_of_expiration', 2025)
+            )
+            key = (put['strike'], exp_key)
             self.puts_by_strike_exp[key] = put
     
     def get_available_strikes(self, option_type: str = 'call', expiration_date: Optional[str] = None) -> List[float]:
         """Récupère la liste des strikes disponibles"""
         data = self.calls_data if option_type.lower() == 'call' else self.puts_data
         if expiration_date:
-            strikes = [opt['strike'] for opt in data if opt['expiration_date'] == expiration_date]
+            strikes = [
+                opt['strike'] for opt in data 
+                if get_expiration_key(
+                    opt.get('day_of_expiration', 1),
+                    opt.get('month_of_expiration', 'F'),
+                    opt.get('year_of_expiration', 2025)
+                ) == expiration_date
+            ]
         else:
             strikes = [opt['strike'] for opt in data]
         return sorted(set(strikes))
@@ -57,27 +120,33 @@ class CondorGenerator:
     def get_available_expirations(self, option_type: str = 'call') -> List[str]:
         """Récupère la liste des dates d'expiration disponibles"""
         data = self.calls_data if option_type.lower() == 'call' else self.puts_data
-        expirations = [opt['expiration_date'] for opt in data]
+        expirations = [
+            get_expiration_key(
+                opt.get('day_of_expiration', 1),
+                opt.get('month_of_expiration', 'F'),
+                opt.get('year_of_expiration', 2025)
+            )
+            for opt in data
+        ]
         return sorted(set(expirations))
     
     def generate_iron_condors(self,
                               price_min: float,
                               price_max: float,
-                              strike_min: float,
-                              strike_max: float,
                               target_price: float,
                               expiration_date: Optional[str] = None,
                               require_symmetric: bool = False,
-                              min_spread_width: float = 0.25,
-                              max_spread_width: float = 5.0,
-                              min_body_width: float = 0.5,
-                              max_body_width: float = 10.0) -> List[StrategyComparison]:
+                              ) -> List[StrategyComparison]:
         """
         Génère toutes les combinaisons possibles d'Iron Condor directement en StrategyComparison
         
         Iron Condor = Short Put Spread + Short Call Spread
         Structure: Long Put (strike1) + Short Put (strike2) + Short Call (strike3) + Long Call (strike4)
         """
+        # Stocker les paramètres de prix pour le calcul des surfaces
+        self.price_min = price_min
+        self.price_max = price_max
+        
         strategies = []
         
         # Déterminer les expirations
@@ -93,7 +162,7 @@ class CondorGenerator:
             call_strikes = self.get_available_strikes('call', exp_date)
             put_strikes = self.get_available_strikes('put', exp_date)
             common_strikes = sorted(set(call_strikes) & set(put_strikes))
-            valid_strikes = [s for s in common_strikes if strike_min <= s <= strike_max]
+            valid_strikes = [s for s in common_strikes]
             
             if len(valid_strikes) < 4:
                 continue
@@ -111,12 +180,6 @@ class CondorGenerator:
                             
                             # Vérifier contraintes
                             if not (price_min <= center <= price_max):
-                                continue
-                            if lower_spread < min_spread_width or lower_spread > max_spread_width:
-                                continue
-                            if upper_spread < min_spread_width or upper_spread > max_spread_width:
-                                continue
-                            if body < min_body_width or body > max_body_width:
                                 continue
                             if require_symmetric and abs(lower_spread - upper_spread) > 0.01:
                                 continue
@@ -194,6 +257,10 @@ class CondorGenerator:
             greeks = calculate_greeks_by_type(all_options)
             avg_iv = calculate_avg_implied_volatility(all_options)
             
+            # Calcul des surfaces (centre = milieu entre s2 et s3, le body du condor)
+            center_strike = (s2 + s3) / 2
+            surfaces = self._calculate_surfaces(all_options, center_strike)
+            
             # Date d'expiration
             exp_info = get_expiration_info(all_options)
             
@@ -206,9 +273,9 @@ class CondorGenerator:
                 breakeven_points=breakeven_points,
                 profit_range=profit_range,
                 profit_zone_width=profit_zone_width,
-                surface_profit=0.0,
-                surface_loss=0.0,
-                surface_gauss=0.0,
+                surface_profit=surfaces['profit_surface'],
+                surface_loss=surfaces['loss_surface'],
+                surface_gauss=surfaces['surface_gauss'],
                 risk_reward_ratio=risk_reward_ratio,
                 all_options=all_options,
                 total_delta_calls=greeks['calls']['delta'],
@@ -272,6 +339,10 @@ class CondorGenerator:
                                      min_body_width: float = 0.5,
                                      max_body_width: float = 10.0) -> List[StrategyComparison]:
         """Génère des Condors d'un seul type (call ou put)"""
+        # Stocker les paramètres de prix pour le calcul des surfaces
+        self.price_min = price_min
+        self.price_max = price_max
+        
         strategies = []
         
         # Déterminer les expirations
@@ -380,6 +451,10 @@ class CondorGenerator:
             greeks = calculate_greeks_by_type(all_options)
             avg_iv = calculate_avg_implied_volatility(all_options)
             
+            # Calcul des surfaces (centre = milieu du body entre s2 et s3)
+            center_strike = (s2 + s3) / 2
+            surfaces = self._calculate_surfaces(all_options, center_strike)
+            
             return StrategyComparison(
                 strategy_name=f"Long{'Call' if option_type == 'call' else 'Put'}Condor {s1}/{s2}/{s3}/{s4}",
                 strategy=None,
@@ -389,9 +464,9 @@ class CondorGenerator:
                 breakeven_points=breakeven_points,
                 profit_range=profit_range,
                 profit_zone_width=profit_zone_width,
-                surface_profit=0.0,
-                surface_loss=0.0,
-                surface_gauss=0.0,
+                surface_profit=surfaces['profit_surface'],
+                surface_loss=surfaces['loss_surface'],
+                surface_gauss=surfaces['surface_gauss'],
                 risk_reward_ratio=risk_reward_ratio,
                 all_options=all_options,
                 total_delta_calls=greeks['calls']['delta'],
