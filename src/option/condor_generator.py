@@ -3,25 +3,13 @@ Générateur Automatique de Condors (Iron Condor, Call/Put Condor)
 =================================================================
 Génère toutes les combinaisons possibles de Condor à partir des données Bloomberg.
 
-Le module explore toutes les combinaisons où:
-- Les strikes sont compris entre strike_min et strike_max
-- Le centre du Condor est compris entre price_min et price_max
-- Les intervalles entre strikes respectent les contraintes définies
-
-Types de Condors supportés:
-- Iron Condor: Short Put Spread + Short Call Spread
-- Long Call Condor: Long lower call, Short 2 middle calls, Long upper call
-- Long Put Condor: Long lower put, Short 2 middle puts, Long upper put
-
-Auteur: BGC Trading Desk
-Date: 2025-10-17
 """
 
 from typing import List, Dict, Tuple, Optional, Union, Literal
 from dataclasses import dataclass, field
 from datetime import datetime
-from src.option.option_class import Option
-from src.option.option_utils import dict_to_option, calculate_greeks_from_options
+from .option_class import Option
+from .option_utils import dict_to_option, calculate_greeks_from_options
 
 
 @dataclass
@@ -274,12 +262,6 @@ class CondorGenerator:
     def get_available_expirations(self, option_type: str = 'call') -> List[str]:
         """
         Récupère la liste des dates d'expiration disponibles
-        
-        Args:
-            option_type: 'call' ou 'put'
-        
-        Returns:
-            Liste triée des dates d'expiration
         """
         data = self.calls_data if option_type.lower() == 'call' else self.puts_data
         expirations = [opt['expiration_date'] for opt in data]
@@ -301,21 +283,6 @@ class CondorGenerator:
         
         Iron Condor = Short Put Spread + Short Call Spread
         Structure: Long Put (strike1) + Short Put (strike2) + Short Call (strike3) + Long Call (strike4)
-        
-        Args:
-            price_min: Prix minimum pour le centre du Condor
-            price_max: Prix maximum pour le centre du Condor
-            strike_min: Strike minimum
-            strike_max: Strike maximum
-            expiration_date: Date d'expiration (optionnel)
-            require_symmetric: Si True, spreads symétriques uniquement
-            min_spread_width: Largeur minimale des spreads
-            max_spread_width: Largeur maximale des spreads
-            min_body_width: Largeur minimale du corps (entre strike2 et strike3)
-            max_body_width: Largeur maximale du corps
-        
-        Returns:
-            Liste de configurations d'Iron Condor
         """
         condors = []
         
@@ -414,21 +381,6 @@ class CondorGenerator:
         Génère toutes les combinaisons possibles de Call Condor
         
         Call Condor = Long lower call + Short 2 middle calls + Long upper call
-        
-        Args:
-            price_min: Prix minimum pour le centre du Condor
-            price_max: Prix maximum pour le centre du Condor
-            strike_min: Strike minimum
-            strike_max: Strike maximum
-            expiration_date: Date d'expiration (optionnel)
-            require_symmetric: Si True, spreads symétriques uniquement
-            min_wing_width: Largeur minimale des ailes extérieures
-            max_wing_width: Largeur maximale des ailes extérieures
-            min_body_width: Largeur minimale du corps central
-            max_body_width: Largeur maximale du corps central
-        
-        Returns:
-            Liste de configurations de Call Condor
         """
         return self._generate_single_type_condors(
             option_type='call',
@@ -460,20 +412,6 @@ class CondorGenerator:
         
         Put Condor = Long lower put + Short 2 middle puts + Long upper put
         
-        Args:
-            price_min: Prix minimum pour le centre du Condor
-            price_max: Prix maximum pour le centre du Condor
-            strike_min: Strike minimum
-            strike_max: Strike maximum
-            expiration_date: Date d'expiration (optionnel)
-            require_symmetric: Si True, spreads symétriques uniquement
-            min_wing_width: Largeur minimale des ailes extérieures
-            max_wing_width: Largeur maximale des ailes extérieures
-            min_body_width: Largeur minimale du corps central
-            max_body_width: Largeur maximale du corps central
-        
-        Returns:
-            Liste de configurations de Put Condor
         """
         return self._generate_single_type_condors(
             option_type='put',
@@ -596,46 +534,7 @@ class CondorGenerator:
         Génère tous les Condors et retourne directement une liste d'options standardisée
         
         MÉTHODE PRINCIPALE pour obtenir une liste d'options prête à l'emploi.
-        
-        Args:
-            price_min: Prix minimum pour le centre du Condor
-            price_max: Prix maximum pour le centre du Condor
-            strike_min: Strike minimum
-            strike_max: Strike maximum
-            condor_type: Type de Condor ('iron', 'call', 'put')
-            expiration_date: Date d'expiration (optionnel)
-            require_symmetric: Si True, uniquement les Condors symétriques
-            min_spread_width: Largeur minimale des spreads (ou ailes)
-            max_spread_width: Largeur maximale des spreads (ou ailes)
-            min_body_width: Largeur minimale du corps
-            max_body_width: Largeur maximale du corps
-            deduplicate: Si True, déduplique les options (recommandé)
-        
-        Returns:
-            Liste de dictionnaires d'options au format standardisé Bloomberg
-            Chaque option contient: strike, premium, expiration_date, option_type,
-            bid, ask, volume, open_interest, implied_volatility, delta, etc.
-        
-        Example:
-            >>> generator = CondorGenerator(options_data)
-            >>> # Iron Condors
-            >>> options = generator.get_options_list(
-            ...     price_min=97.0,
-            ...     price_max=103.0,
-            ...     strike_min=96.0,
-            ...     strike_max=104.0,
-            ...     condor_type='iron'
-            ... )
-            >>> # Call Condors
-            >>> call_options = generator.get_options_list(
-            ...     price_min=99.0,
-            ...     price_max=101.0,
-            ...     strike_min=97.0,
-            ...     strike_max=103.0,
-            ...     condor_type='call'
-            ... )
-            >>> # Utiliser directement avec StrategyComparer
-            >>> comparer = StrategyComparer(options)
+
         """
         # Générer les Condors selon le type
         if condor_type.lower() == 'iron':

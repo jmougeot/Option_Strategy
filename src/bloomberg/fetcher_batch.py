@@ -4,14 +4,10 @@ Bloomberg Batch Fetcher - Optimisé
 Récupère toutes les données d'options en un seul appel Bloomberg par ticker.
 Plus efficace que de faire plusieurs appels pour chaque champ.
 
-Cette version optimisée :
 - Fait UN SEUL appel Bloomberg par ticker
 - Récupère TOUS les champs nécessaires d'un coup
 - Réduit drastiquement le temps d'import
 - Minimise la charge sur l'API Bloomberg
-
-Auteur: BGC Trading Desk
-Date: 2025-10-17
 """
 
 import sys
