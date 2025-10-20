@@ -41,7 +41,7 @@ st.markdown("""
         background-color: #f0f2f6;
         padding: 1rem;
         border-radius: 0.5rem;
-        border-left: 4px solid #1f77b4;
+        border-left: 5px solid #1f77b4;
     }
     .winner-card {
         background-color: #d4edda;
@@ -198,7 +198,6 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
         data.append({
             'Rang': idx,
             'Stratégie': comp.strategy_name,
-            'Crédit': format_currency(comp.net_credit),
             'Max Profit': format_currency(comp.max_profit),
             'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
             'R/R Ratio': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
@@ -256,9 +255,6 @@ def main():
     with st.sidebar:
         st.header("⚙️ Paramètres")
         
-        # Section 1: Données Bloomberg
-        st.subheader("� Import Bloomberg")
-        
         # Paramètres d'import Bloomberg
         underlying = st.text_input(
             "Sous-jacent:",
@@ -275,7 +271,7 @@ def main():
             )
             years_input = st.text_input(
                 "Années:",
-                value="6,7",
+                value="6",
                 help="Années sur 1 chiffre séparées par virgule (6=2026, 7=2027)"
             )
         
@@ -296,7 +292,7 @@ def main():
         strike_step = st.number_input(
             "Pas des strikes:",
             value=0.25,
-            step=0.05,
+            step=0.01,
             help="Incrément entre chaque strike"
         )
         
@@ -308,17 +304,7 @@ def main():
             'strikes': [round(strike_min + i * strike_step, 2) 
                        for i in range(int((strike_max - strike_min) / strike_step) + 1)]
         }
-        
-        # Afficher un résumé
-        st.info(f"""
-        📋 **Résumé de l'import:**
-        - Sous-jacent: {underlying}
-        - Mois: {len(bloomberg_params['months'])} mois
-        - Années: {len(bloomberg_params['years'])} années
-        - Strikes: {len(bloomberg_params['strikes'])} strikes ({strike_min} à {strike_max})
-        - Total options estimé: {len(bloomberg_params['months']) * len(bloomberg_params['years']) * len(bloomberg_params['strikes']) * 2} (calls + puts)
-        """)
-        
+                
         st.markdown("---")
         
         # Section 2: Paramètres de marché
@@ -348,10 +334,10 @@ def main():
         
         price_step = st.number_input(
             "Pas de Prix ($)",
-            min_value=0.1,
+            min_value=0.01,
             max_value=5.0,
-            value=0.5,
-            step=0.1,
+            value=0.1,
+            step=0.01,
             help="Incrément entre chaque prix cible à tester"
         )
         
@@ -361,24 +347,10 @@ def main():
         else:
             target_prices = [round(price_min + i * price_step, 2) 
                            for i in range(int((price_max - price_min) / price_step) + 1)]
-            st.info(f"📊 {len(target_prices)} prix cibles seront testés: {target_prices[0]}$ à {target_prices[-1]}$")
-        
-        days_to_expiry = st.slider(
-            "Jours jusqu'à l'Expiration",
-            min_value=7,
-            max_value=90,
-            value=30,
-            step=1,
-            help="Horizon temporel pour les stratégies"
-        )
-        
-        st.markdown("---")
-        
+                
         # Section 3: Options d'auto-génération
-        st.subheader("� Options de Génération")
-        
-        st.info("� **Mode Auto-Génération** : Exploration exhaustive de toutes les combinaisons Butterflies et Condors")
-        
+        st.subheader("Options de Génération")
+                
         with st.expander("Paramètres de génération", expanded=True):
             include_flies = st.checkbox("Inclure les Butterflies", value=True)
             include_condors = st.checkbox("Inclure les Condors", value=True)
@@ -390,9 +362,7 @@ def main():
                 value=10,
                 step=5
             )
-        
-        st.markdown("---")
-        
+                
         # Section 4: Pondération du scoring
         st.subheader("⚖️ Pondération du Score")
         
