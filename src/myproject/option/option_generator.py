@@ -160,6 +160,9 @@ class OptionStrategyGenerator:
         self.price_min = price_min
         self.price_max = price_max
         
+        # Calculer le strike central pour les stratégies multi-legs (3-4 legs)
+        strike = (strike_min + strike_max) / 2
+        
         all_strategies = []
         
         # 1 leg strategies
@@ -177,13 +180,13 @@ class OptionStrategyGenerator:
         # 3 legs strategies
         if max_legs >= 3:
             all_strategies.extend(self._generate_three_leg_strategies(
-                price_min, price_max, strike_min, strike_max, target_price, expiration_date
+                price_min, price_max, strike, target_price, expiration_date
             ))
         
         # 4 legs strategies
         if max_legs >= 4:
             all_strategies.extend(self._generate_four_leg_strategies(
-                price_min, price_max, strike_min, strike_max, target_price, expiration_date
+                price_min, price_max, strike, target_price, expiration_date
             ))
         
         return all_strategies
@@ -765,8 +768,7 @@ class OptionStrategyGenerator:
     def _generate_three_leg_strategies(self,
                                        price_min: float,
                                        price_max: float,
-                                       strike_min: float,
-                                       strike_max: float,
+                                       strike: float,
                                        target_price: float,
                                        expiration_date: Optional[str] = None) -> List[StrategyComparison]:
         """Génère stratégies à 3 legs: Butterfly (call/put)"""
@@ -779,12 +781,20 @@ class OptionStrategyGenerator:
         
         # Call Butterfly
         strategies.extend(fly_gen.generate_all_flies(
-            price_min, price_max, target_price, option_type='call', expiration_date=expiration_date))
+            price_min=price_min,
+            price_max=price_max,
+            target_price=target_price,
+            option_type='call',
+            expiration_date=expiration_date
+        ))
         
         # Put Butterfly
         strategies.extend(fly_gen.generate_all_flies(
-            price_min, price_max, strike_min, strike_max, target_price,
-            option_type='put', expiration_date=expiration_date
+            price_min=price_min,
+            price_max=price_max,
+            target_price=target_price,
+            option_type='put',
+            expiration_date=expiration_date
         ))
         
         return strategies
@@ -794,8 +804,7 @@ class OptionStrategyGenerator:
     def _generate_four_leg_strategies(self,
                                       price_min: float,
                                       price_max: float,
-                                      strike_min: float,
-                                      strike_max: float,
+                                      strike: float,
                                       target_price: float,
                                       expiration_date: Optional[str] = None) -> List[StrategyComparison]:
         """Génère stratégies à 4 legs: Iron Condor, Call/Put Condor, Iron Butterfly"""
@@ -808,19 +817,27 @@ class OptionStrategyGenerator:
         
         # Iron Condor
         strategies.extend(condor_gen.generate_iron_condors(
-            price_min, price_max, strike_min, strike_max, target_price,
+            price_min=price_min,
+            price_max=price_max,
+            target_price=target_price,
             expiration_date=expiration_date
         ))
         
         # Call Condor
         strategies.extend(condor_gen.generate_call_condors(
-            price_min, price_max, strike_min, strike_max, target_price,
+            price_min=price_min,
+            price_max=price_max,
+            strike=strike,
+            target_price=target_price,
             expiration_date=expiration_date
         ))
         
         # Put Condor
         strategies.extend(condor_gen.generate_put_condors(
-            price_min, price_max, strike_min, strike_max, target_price,
+            price_min=price_min,
+            price_max=price_max,
+            strike=strike,
+            target_price=target_price,
             expiration_date=expiration_date
         ))
         

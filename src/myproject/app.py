@@ -501,22 +501,22 @@ def main():
                 )
             with col2:
                 st.metric(
-                    "💰 Crédit Net",
-                    format_currency(winner.net_credit),
-                    ""
-                )
-            with col3:
-                st.metric(
-                    "📊 Max Profit",
+                    "� Max Profit",
                     format_currency(winner.max_profit),
                     ""
                 )
-            with col4:
+            with col3:
                 max_loss_str = format_currency(winner.max_loss) if winner.max_loss != float('inf') else "Illimité"
                 st.metric(
                     "⚠️ Max Loss",
                     max_loss_str,
                     ""
+                )
+            with col4:
+                st.metric(
+                    "🎯 P&L au Prix Cible",
+                    format_currency(winner.profit_at_target),
+                    f"{winner.profit_at_target_pct:.1f}% du max"
                 )
             
             st.markdown("---")

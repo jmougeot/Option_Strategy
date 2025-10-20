@@ -328,8 +328,7 @@ class CondorGenerator:
     def _generate_single_type_condors(self,
                                      price_min: float,
                                      price_max: float,
-                                     strike_min: float,
-                                     strike_max: float,
+                                     strike: float,
                                      target_price: float,
                                      option_type: str,
                                      expiration_date: Optional[str] = None,
@@ -353,7 +352,9 @@ class CondorGenerator:
         
         for exp_date in expirations:
             available_strikes = self.get_available_strikes(option_type, exp_date)
-            valid_strikes = [s for s in available_strikes if strike_min <= s <= strike_max]
+            # Filtrer les strikes autour du strike central avec une plage raisonnable
+            strike_range = max_wing_width + max_body_width + max_wing_width  # largeur totale max
+            valid_strikes = [s for s in available_strikes if strike - strike_range <= s <= strike + strike_range]
             
             if len(valid_strikes) < 4:
                 continue
