@@ -291,24 +291,22 @@ def main():
         
         with col2:
             strike = st.number_input(
-                "Strike minimum:",
-                value=96.0,
-                step=0.25,
-                help="Prix d'exercice minimum"
+                "Strike :",
+                value=97.0,
+                step=0.625,
+                help="Target Price"
             )
         
         strike_step = st.number_input(
             "Pas des strikes:",
-            value=0.25,
-            step=0.01,
+            value=0.625,
+            step=0.001,
             help="Incrément entre chaque strike"
         )
         
         # Nombre de strikes à générer
         nb_strikes = st.number_input(
             "Nombre de strikes:",
-            min_value=1,
-            max_value=50,
             value=13,
             step=1,
             help="Nombre de strikes à générer à partir du strike minimum"
@@ -335,29 +333,23 @@ def main():
         with col1:
             price_min = st.number_input(
                 "Prix Min ($)",
-                min_value=50.0,
-                max_value=200.0,
-                value=97.0,
-                step=0.5,
+                value=96.0,
+                step=0.001,
                 help="Borne inférieure de l'intervalle de prix"
             )
         
         with col2:
             price_max = st.number_input(
                 "Prix Max ($)",
-                min_value=50.0,
-                max_value=200.0,
-                value=103.0,
-                step=0.5,
+                value=98,
+                step=0.001,
                 help="Borne supérieure de l'intervalle de prix"
             )
         
         price_step = st.number_input(
             "Pas de Prix ($)",
-            min_value=0.01,
-            max_value=5.0,
-            value=0.1,
-            step=0.01,
+            value=0.625,
+            step=0.001,
             help="Incrément entre chaque prix cible à tester"
         )
         
@@ -472,7 +464,7 @@ def main():
                     include_condors=include_condors,
                     require_symmetric=require_symmetric,
                     top_n=top_n_structures,
-                    weights=scoring_weights
+                    weights=scoring_weights 
                 )
                 
                 if comparisons:
@@ -507,7 +499,7 @@ def main():
                 st.write(f"• Performance Cible: **{scoring_weights['target_performance']*100:.0f}%**")
             with col2:
                 st.markdown("**Critères de Surfaces**")
-                st.write(f"• Surface Gaussienne: **{scoring_weights['surface_gauss']*100:.0f}%**")
+                st.write(f"• Poximité avec le strike: **{scoring_weights['surface_gauss']*100:.0f}%**")
                 st.write(f"• Ratio Profit/Loss: **{scoring_weights['profit_loss_ratio']*100:.0f}%**")
                 st.markdown("---")
                 total = sum(scoring_weights.values())
