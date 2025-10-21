@@ -252,6 +252,14 @@ def create_score_breakdown_chart(comparison: StrategyComparison):
     
     return fig
 
+def strike_list(strike_min: float, strike_max : float, step:float)->List[str]:
+    strike_list = []
+    strike = strike_min
+    while strike<=strike_max:
+        strike_list.append(strike)
+        strike+=step
+    return strike_list
+
 # ============================================================================
 # INTERFACE PRINCIPALE
 # ============================================================================
@@ -306,27 +314,6 @@ def main():
             help="Incrément entre chaque strike"
         )
         
-        # Nombre de strikes à générer
-        nb_strikes = st.number_input(
-            "Nombre de strikes:",
-            value=13,
-            step=1,
-            help="Nombre de strikes à générer à partir du strike minimum"
-        )
-        
-        # Construire les paramètres
-        # Générer la liste de strikes basée sur le strike minimum
-        strikes_list = [round(strike + i * strike_step, 2) for i in range(nb_strikes)]
-        
-        bloomberg_params = {
-            'underlying': underlying,
-            'months': [m.strip() for m in months_input.split(',')],
-            'years': [int(y.strip()) for y in years_input.split(',')],
-            'strikes': strikes_list
-        }
-                
-        st.markdown("---")
-        
         # Section 2: Paramètres de marché
         st.subheader("💹 Paramètres de Marché")
         
@@ -364,6 +351,15 @@ def main():
         else:
             target_prices = [round(price_min + i * price_step, 2) 
                            for i in range(int((price_max - price_min) / price_step) + 1)]
+        
+        strikes_list = strike_list(price_min, price_max, price_step)
+        
+        bloomberg_params = {
+            'underlying': underlying,
+            'months': [m.strip() for m in months_input.split(',')],
+            'years': [int(y.strip()) for y in years_input.split(',')],
+            'strikes': strikes_list
+        }
                 
         # Section 3: Options d'auto-génération
         st.subheader("Options de Génération")
