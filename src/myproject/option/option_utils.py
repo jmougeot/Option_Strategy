@@ -9,65 +9,6 @@ from datetime import datetime
 import math
 from myproject.option.option_class import Option
 
-
-def get_expiration_key(day: str, month: str, year: int) -> str:
-    """
-    Crée une clé unique d'expiration à partir de day/month/year.
-    
-    Args:
-        day: Jour d'expiration (str ou int)
-        month: Mois d'expiration (code Bloomberg: F, G, H, K, M, N, Q, U, V, X, Z)
-        year: Année d'expiration
-    
-    Returns:
-        Clé sous forme "YYYY-MM-DD" (ex: "2025-01-15")
-    """
-    month_map = {
-        'F': 1, 'G': 2, 'H': 3, 'K': 5,
-        'M': 6, 'N': 7, 'Q': 8, 'U': 9,
-        'V': 10, 'X': 11, 'Z': 12
-    }
-    
-    day_num = int(day) if isinstance(day, str) else day
-    
-    # Si month est un code Bloomberg (lettre), le convertir en nombre
-    if isinstance(month, str) and month in month_map:
-        month_num = month_map[month]
-    elif isinstance(month, str):
-        month_num = int(month)  # Si c'est déjà un nombre en string
-    else:
-        month_num = month
-    
-    return f"{year:04d}-{month_num:02d}-{day_num:02d}"
-
-
-def parse_expiration_key(exp_key: str) -> Tuple[int, str, int]:
-    """
-    Parse une clé d'expiration en day/month/year.
-    
-    Args:
-        exp_key: Clé sous forme "YYYY-MM-DD"
-    
-    Returns:
-        Tuple (day, month_code, year)
-    """
-    parts = exp_key.split('-')
-    year = int(parts[0])
-    month_num = int(parts[1])
-    day = int(parts[2])
-    
-    # Reverse mapping: month number -> Bloomberg code
-    reverse_month_map = {
-        1: 'F', 2: 'G', 3: 'H', 5: 'K',
-        6: 'M', 7: 'N', 8: 'Q', 9: 'U',
-        10: 'V', 11: 'X', 12: 'Z'
-    }
-    
-    month_code = reverse_month_map.get(month_num, 'F')
-    
-    return (day, month_code, year)
-
-
 def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long', quantity: int = 1) -> Optional[Option]:
     """
     Convertit un dictionnaire d'option (format Bloomberg) en objet Option.
@@ -83,15 +24,17 @@ def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long
     try:
         # Extraire la date d'expiration
         day = option_dict.get('day_of_expiration', 1)
-        month = option_dict.get('month_of_expiration', 1)
-        year = option_dict.get('year_of_expiration', 2025)
+        expiration_month = option_dict.get('month_of_expiration', 1)
+        expiration_year = option_dict.get('year_of_expiration', 2025)
         
         return Option(
             # Obligatoires
             option_type=option_dict.get('option_type', 'call'),
             strike=float(option_dict.get('strike', 0.0)),
             premium=float(option_dict.get('premium', 0.0)),
-            day_of_expirition=day,
+            expiration_month= expiration_month,
+            expiration_year=expiration_year,
+            day_of_expirition=Optional[day]= None,
             month_of_expiration=month,
             year_of_expiration=year,
             
@@ -217,49 +160,6 @@ def calculate_avg_implied_volatility(options: List[Option]) -> float:
     # Fallback: moyenne simple
     ivs = [opt.implied_volatility for opt in options if opt.implied_volatility is not None]
     return sum(ivs) / len(ivs) if ivs else 0.0
-
-
-def get_expiration_info(options: List[Option]) -> Dict[str, Any]:
-    """
-    Extrait les informations d'expiration commune.
-    
-    Args:
-        options: Liste d'objets Option
-    
-    Returns:
-        Dict avec expiration_date, month, year
-    """
-    if not options:
-        return {'expiration_date': None, 'month': None, 'year': None}
-    
-    # Prendre la première option
-    opt = options[0]
-    
-    try:
-        # Mapping des codes Bloomberg de mois en nombres
-        month_map = {
-            'F': 1, 'G': 2, 'H': 3, 'K': 5,
-            'M': 6, 'N': 7, 'Q': 8, 'U': 9,
-            'V': 10, 'X': 11, 'Z': 12
-        }
-        
-        month_num = month_map.get(opt.month_of_expiration, 1)
-        day_num = int(opt.day_of_expirition) if isinstance(opt.day_of_expirition, str) else opt.day_of_expirition
-        
-        # Construire la date
-        expiry = datetime(
-            year=opt.year_of_expiration,
-            month=month_num,
-            day=day_num
-        )
-        
-        return {
-            'expiration_date': expiry,
-            'month': expiry.strftime('%B'),  # Nom complet du mois
-            'year': expiry.year
-        }
-    except (AttributeError, ValueError, KeyError):
-        return {'expiration_date': None, 'month': None, 'year': None}
 
 
 def calculate_strategy_pnl(options: List[Option], price: float) -> float:

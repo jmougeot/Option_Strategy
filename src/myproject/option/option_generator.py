@@ -136,8 +136,7 @@ class OptionStrategyGenerator:
     def generate_all_strategies(self,
                                 price_min: float,
                                 price_max: float,
-                                strike_min: float,
-                                strike_max: float,
+                                strike: float,
                                 target_price: float,
                                 expiration_date: Optional[str] = None,
                                 max_legs: int = 4) -> List[StrategyComparison]:
@@ -147,8 +146,7 @@ class OptionStrategyGenerator:
         Args:
             price_min: Prix minimum pour le filtre
             price_max: Prix maximum pour le filtre
-            strike_min: Strike minimum
-            strike_max: Strike maximum
+            strike: traget price
             target_price: Prix cible du sous-jacent
             expiration_date: Date d'expiration (optionnel, format 'YYYY-MM-DD')
             max_legs: Nombre maximum de legs (1 à 4)
@@ -159,22 +157,19 @@ class OptionStrategyGenerator:
         # Stocker les paramètres de prix pour le calcul des surfaces
         self.price_min = price_min
         self.price_max = price_max
-        
-        # Calculer le strike central pour les stratégies multi-legs (3-4 legs)
-        strike = (strike_min + strike_max) / 2
+    
         
         all_strategies = []
         
         # 1 leg strategies
         if max_legs >= 1:
-            all_strategies.extend(self._generate_single_leg_strategies(
-                strike_min, strike_max, target_price, expiration_date
+            all_strategies.extend(self._generate_single_leg_strategies( strike, target_price, expiration_date
             ))
         
         # 2 legs strategies
         if max_legs >= 2:
             all_strategies.extend(self._generate_two_leg_strategies(
-                price_min, price_max, strike_min, strike_max, target_price, expiration_date
+                price_min, price_max, strike, target_price, expiration_date
             ))
         
         # 3 legs strategies
@@ -194,8 +189,6 @@ class OptionStrategyGenerator:
     # ==================== 1 LEG STRATEGIES ====================
     
     def _generate_single_leg_strategies(self,
-                                       strike_min: float,
-                                       strike_max: float,
                                        target_price: float,
                                        expiration_date: Optional[str] = None) -> List[StrategyComparison]:
         """Génère toutes les stratégies à 1 leg: Long/Short Call/Put"""
@@ -212,47 +205,43 @@ class OptionStrategyGenerator:
         for exp_date in expirations:
             # Long Call
             for strike in self.get_available_strikes('call', exp_date):
-                if strike_min <= strike <= strike_max:
-                    opt_dict = self.calls_by_strike_exp.get((strike, exp_date))
-                    if opt_dict:
-                        strategy = self._create_single_leg_strategy(
-                            opt_dict, 'long', 'call', strike, target_price
-                        )
-                        if strategy:
-                            strategies.append(strategy)
+                opt_dict = self.calls_by_strike_exp.get((strike, exp_date))
+                if opt_dict:
+                    strategy = self._create_single_leg_strategy(
+                        opt_dict, 'long', 'call', strike, target_price
+                    )
+                    if strategy:
+                        strategies.append(strategy)
             
             # Short Call
             for strike in self.get_available_strikes('call', exp_date):
-                if strike_min <= strike <= strike_max:
-                    opt_dict = self.calls_by_strike_exp.get((strike, exp_date))
-                    if opt_dict:
-                        strategy = self._create_single_leg_strategy(
-                            opt_dict, 'short', 'call', strike, target_price
-                        )
-                        if strategy:
-                            strategies.append(strategy)
+                opt_dict = self.calls_by_strike_exp.get((strike, exp_date))
+                if opt_dict:
+                    strategy = self._create_single_leg_strategy(
+                        opt_dict, 'short', 'call', strike, target_price
+                    )
+                    if strategy:
+                        strategies.append(strategy)
             
             # Long Put
             for strike in self.get_available_strikes('put', exp_date):
-                if strike_min <= strike <= strike_max:
-                    opt_dict = self.puts_by_strike_exp.get((strike, exp_date))
-                    if opt_dict:
-                        strategy = self._create_single_leg_strategy(
-                            opt_dict, 'long', 'put', strike, target_price
-                        )
-                        if strategy:
-                            strategies.append(strategy)
+                opt_dict = self.puts_by_strike_exp.get((strike, exp_date))
+                if opt_dict:
+                    strategy = self._create_single_leg_strategy(
+                        opt_dict, 'long', 'put', strike, target_price
+                    )
+                    if strategy:
+                        strategies.append(strategy)
             
             # Short Put
             for strike in self.get_available_strikes('put', exp_date):
-                if strike_min <= strike <= strike_max:
-                    opt_dict = self.puts_by_strike_exp.get((strike, exp_date))
-                    if opt_dict:
-                        strategy = self._create_single_leg_strategy(
-                            opt_dict, 'short', 'put', strike, target_price
-                        )
-                        if strategy:
-                            strategies.append(strategy)
+                opt_dict = self.puts_by_strike_exp.get((strike, exp_date))
+                if opt_dict:
+                    strategy = self._create_single_leg_strategy(
+                        opt_dict, 'short', 'put', strike, target_price
+                    )
+                    if strategy:
+                        strategies.append(strategy)
         
         return strategies
     
@@ -307,6 +296,8 @@ class OptionStrategyGenerator:
                 strategy_name=strategy_name,
                 strategy=None,
                 target_price=target_price,
+                expiration_month='F',
+                expiration_year=6,
                 max_profit=max_profit if max_profit != float('inf') else 999999.0,
                 max_loss=max_loss if max_loss != float('-inf') else -999999.0,
                 breakeven_points=[breakeven],
@@ -344,8 +335,6 @@ class OptionStrategyGenerator:
     def _generate_two_leg_strategies(self,
                                      price_min: float,
                                      price_max: float,
-                                     strike_min: float,
-                                     strike_max: float,
                                      target_price: float,
                                      expiration_date: Optional[str] = None) -> List[StrategyComparison]:
         """Génère stratégies à 2 legs: Spreads, Straddle, Strangle"""
@@ -360,10 +349,8 @@ class OptionStrategyGenerator:
             expirations = sorted(call_exps & put_exps)
         
         for exp_date in expirations:
-            call_strikes = [s for s in self.get_available_strikes('call', exp_date) 
-                           if strike_min <= s <= strike_max]
-            put_strikes = [s for s in self.get_available_strikes('put', exp_date) 
-                          if strike_min <= s <= strike_max]
+            call_strikes = [s for s in self.get_available_strikes('call', exp_date)]
+            put_strikes = [s for s in self.get_available_strikes('put', exp_date)]
             
             # Bull Call Spread (Long lower strike call + Short higher strike call)
             for i, s1 in enumerate(call_strikes):
@@ -464,6 +451,8 @@ class OptionStrategyGenerator:
             strategy = StrategyComparison(
                 strategy_name=name,
                 strategy=None,
+                expiration_month='F',
+                expiration_year=6,
                 target_price=target_price,
                 max_profit=max_profit,
                 max_loss=max_loss,
@@ -553,6 +542,8 @@ class OptionStrategyGenerator:
             strategy = StrategyComparison(
                 strategy_name=name,
                 strategy=None,
+                expiration_month='F',
+                expiration_year=6,
                 target_price=target_price,
                 max_profit=max_profit,
                 max_loss=max_loss,
@@ -635,6 +626,8 @@ class OptionStrategyGenerator:
             strategy = StrategyComparison(
                 strategy_name=name,
                 strategy=None,
+                expiration_month='F',
+                expiration_year=6,
                 target_price=target_price,
                 max_profit=max_profit if max_profit != float('inf') else 999999.0,
                 max_loss=max_loss if max_loss != float('-inf') else -999999.0,
@@ -727,6 +720,8 @@ class OptionStrategyGenerator:
             strategy = StrategyComparison(
                 strategy_name=name,
                 strategy=None,
+                expiration_month='F',
+                expiration_year=6,
                 target_price=target_price,
                 max_profit=max_profit if max_profit != float('inf') else 999999.0,
                 max_loss=max_loss if max_loss != float('-inf') else -999999.0,

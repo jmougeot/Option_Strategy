@@ -134,6 +134,8 @@ class CondorGenerator:
                               price_min: float,
                               price_max: float,
                               target_price: float,
+                              month_expiry : Optional[Literal['F' , 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z' ]] = None,
+                              expiration_year: Optional[int]= None,
                               expiration_date: Optional[str] = None,
                               require_symmetric: bool = False,
                               ) -> List[StrategyComparison]:
@@ -208,8 +210,7 @@ class CondorGenerator:
     def _create_iron_condor_strategy(self, s1: float, s2: float, s3: float, s4: float,
                                     exp_date: str, target_price: float,
                                     put1: Dict, put2: Dict, call3: Dict, call4: Dict,
-                                    lower_spread: float, upper_spread: float,
-                                    body: float, center: float) -> Optional[StrategyComparison]:
+                                    lower_spread: float, upper_spread: float) -> Optional[StrategyComparison]:
         """Crée un objet StrategyComparison pour un Iron Condor"""
         try:
             # Construire la liste d'options
@@ -267,6 +268,8 @@ class CondorGenerator:
             return StrategyComparison(
                 strategy_name=f"IronCondor {s1}/{s2}/{s3}/{s4}",
                 strategy=None,
+                month='', 
+                year=5, 
                 target_price=target_price,
                 max_profit=max_profit,
                 max_loss=max_loss,

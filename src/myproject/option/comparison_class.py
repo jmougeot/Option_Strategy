@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Literal, Optional
 from datetime import datetime
 from typing import Any
 from myproject.option.option_class import Option
@@ -10,6 +10,12 @@ class StrategyComparison:
     strategy_name: str
     strategy: Any  # OptionStrategy-like
     target_price: float
+
+    # Epiration date
+    expiration_day : Optional[str]
+    expiration_week : Optional[str]
+    expiration_month : Literal['F' , 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z' ]
+    expiration_year : int
 
     # Métriques financières
     max_profit: float

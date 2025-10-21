@@ -276,17 +276,11 @@ def main():
             )
         
         with col2:
-            strike_min = st.number_input(
+            strike = st.number_input(
                 "Strike minimum:",
                 value=96.0,
                 step=0.25,
                 help="Prix d'exercice minimum"
-            )
-            strike_max = st.number_input(
-                "Strike maximum:",
-                value=99.0,
-                step=0.25,
-                help="Prix d'exercice maximum"
             )
         
         strike_step = st.number_input(
@@ -301,8 +295,7 @@ def main():
             'underlying': underlying,
             'months': [m.strip() for m in months_input.split(',')],
             'years': [int(y.strip()) for y in years_input.split(',')],
-            'strikes': [round(strike_min + i * strike_step, 2) 
-                       for i in range(int((strike_max - strike_min) / strike_step) + 1)]
+            'strikes': strike
         }
                 
         st.markdown("---")
@@ -437,8 +430,7 @@ def main():
             for target_price in target_prices:
                 comparisons = multi_comparer.compare_all_structures(
                     target_price=target_price,
-                    strike_min=strike_min,
-                    strike_max=strike_max,
+                    strike=strike, 
                     include_flies=include_flies,
                     include_condors=include_condors,
                     require_symmetric=require_symmetric,

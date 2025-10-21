@@ -22,8 +22,7 @@ class MultiStructureComparer:
     
     def compare_all_structures(self,
                               target_price: float,
-                              strike_min: float,
-                              strike_max: float,
+                              strike : float,
                               include_flies: bool = True,
                               include_condors: bool = True,
                               include_spreads: bool = True,
@@ -70,8 +69,7 @@ class MultiStructureComparer:
                 generated_strategies = self.option_generator.generate_all_strategies(
                     price_min=price_min,
                     price_max=price_max,
-                    strike_min=strike_min,
-                    strike_max=strike_max,
+                    strike=strike,
                     target_price=target_price,
                     expiration_date=None,
                     max_legs=max_legs
@@ -137,8 +135,7 @@ class MultiStructureComparer:
                 all_comparisons.extend(self.condor_generator.generate_call_condors(
                     price_min=price_min,
                     price_max=price_max,
-                    strike_min=strike_min,
-                    strike_max=strike_max,
+                    strike= strike,
                     target_price=target_price,
                     expiration_date=None,
                     require_symmetric=require_symmetric
@@ -146,8 +143,7 @@ class MultiStructureComparer:
                 all_comparisons.extend(self.condor_generator.generate_put_condors(
                     price_min=price_min,
                     price_max=price_max,
-                    strike_min=strike_min,
-                    strike_max=strike_max,
+                    strike_min=strike,
                     target_price=target_price,
                     expiration_date=None,
                     require_symmetric=require_symmetric
@@ -219,76 +215,3 @@ class MultiStructureComparer:
             comp.score = score
         
         return comparisons
-    
-    def _get_ticker_and_expiration(self, comp: StrategyComparison) -> tuple[str, str]:
-        """
-        Extrait le ticker et la date d'expiration d'une stratégie.
-        
-        Returns:
-            tuple: (ticker, expiration_date)
-        """
-        if not comp.all_options or len(comp.all_options) == 0:
-            return ("N/A", "N/A")
-        
-        # Prendre la première option pour le ticker
-        first_option = comp.all_options[0]
-        ticker = first_option.ticker if first_option.ticker else "N/A"
-        
-        # Construire la date d'expiration à partir de day/month/year
-        try:
-            from myproject.option.option_utils import get_expiration_key
-            exp_date = get_expiration_key(
-                first_option.day_of_expirition,
-                first_option.month_of_expiration,
-                first_option.year_of_expiration
-            )
-        except Exception:
-            exp_date = f"{first_option.day_of_expirition}/{first_option.month_of_expiration}/{first_option.year_of_expiration}"
-        
-        return (ticker, exp_date)
-    
-    def display_comparison(self, comparisons: List[StrategyComparison]):
-        """Affiche le tableau de comparaison avec les nouveaux critères de surfaces."""
-        if not comparisons:
-            print("Aucune stratégie à comparer")
-            return
-        
-        # Extraire ticker et expiration de la première stratégie
-        ticker, expiration = self._get_ticker_and_expiration(comparisons[0]) if comparisons else ("N/A", "N/A")
-        
-        print("\n" + "="*180)
-        print(f"COMPARAISON DES STRUCTURES - Prix cible: ${comparisons[0].target_price:.2f}")
-        print(f"Ticker: {ticker} | Expiration: {expiration}")
-        print("="*180)
-        print(f"{'Rank':<6} {'Structure':<40} {'Max Profit':<12} {'Max Loss':<12} "
-              f"{'R/R Ratio':<10} {'Zone ±':<10} {'P&L@Target':<12} {'Surf.Gauss':<12} {'P/L Ratio':<10} {'Score':<8}")
-        print("-"*180)
-        
-        for comp in comparisons:
-            max_loss_str = f"${abs(comp.max_loss):.2f}" if comp.max_loss != -999999.0 else "Illimité"
-            rr_str = f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else "∞"
-            zone_str = f"${comp.profit_zone_width:.2f}" if comp.profit_zone_width != float('inf') else "Illimité"
-            pl_ratio_str = f"{comp.surface_profit/comp.surface_loss:.2f}" if comp.surface_loss > 0 else "N/A"
-            
-            print(f"{comp.rank:<6} {comp.strategy_name:<40} "
-                  f"${comp.max_profit:<11.2f} {max_loss_str:<12} {rr_str:<10} {zone_str:<10} "
-                  f"${comp.profit_at_target:<11.2f} {comp.surface_gauss:<12.4f} {pl_ratio_str:<10} {comp.score:<8.3f}")
-        
-        print("="*180)
-        print("\nMÉTRIQUES DE SURFACES DÉTAILLÉES:")
-        print("-"*140)
-        print(f"{'Structure':<40} {'Ticker':<10} {'Expiration':<15} {'Surface Profit':<18} {'Surface Loss':<18} {'Surface Gauss':<18} {'Ratio P/L':<12}")
-        print("-"*140)
-        for comp in comparisons:
-            ticker, expiration = self._get_ticker_and_expiration(comp)
-            pl_ratio = comp.surface_profit/comp.surface_loss if comp.surface_loss > 0 else 0
-            print(f"{comp.strategy_name:<40} {ticker:<10} {expiration:<15} {comp.surface_profit:<18.2f} {comp.surface_loss:<18.2f} "
-                  f"{comp.surface_gauss:<18.4f} {pl_ratio:<12.2f}")
-        
-        print("\nPOINTS DE BREAKEVEN:")
-        print("-"*100)
-        for comp in comparisons:
-            if comp.breakeven_points:
-                be_str = ", ".join([f"${be:.2f}" for be in comp.breakeven_points])
-                print(f"{comp.strategy_name:<40} : {be_str}")
-        print("="*180 + "\n")

@@ -15,7 +15,6 @@ Ce module définit deux niveaux de responsabilités complémentaires:
     ajoutant les champs spécifiques, en implémentant max_loss() et breakeven_points() lorsque
     des formules sont fournies, et en préparant un BUILD_CONFIG pour la construction générique.
 """
-
 @dataclass
 class Option:
     """Brique de base: un leg d'option (call ou put).
@@ -27,13 +26,13 @@ class Option:
     premium: float  # Prime de l'option
 
     # ============ CHAMPS OBLIGATOIRES ============
-    day_of_expirition : str
-    month_of_expiration : Literal['F' , 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z' ]
-    year_of_expiration : int
+    expirition_day : Optional[str]= None
+    expiration_month : Literal['F' , 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z' ] = 'F'
+    expiration_year : int = 6
 
     
     # ============ STRUCTURE DE POSITION ============
-    quantity: int = 1  # Nombre de contrats
+    quantity: Optional[int] = 1  # Nombre de contrats
     position: Literal['long', 'short'] = 'short'  # Type de position
     
     # ============ IDENTIFICATION ============

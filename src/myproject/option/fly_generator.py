@@ -213,9 +213,10 @@ class FlyGenerator:
                         upper_opt = index.get((upper_strike, exp_date))
                         
                         # Vérifier que toutes les options existent
-                        if not all([lower_opt, middle_opt, upper_opt]):
+                        if not lower_opt or not middle_opt or not upper_opt:
                             continue
                         
+                        # À ce stade, on sait que lower_opt, middle_opt, upper_opt ne sont pas None
                         # Créer la stratégie directement
                         strategy = self._create_butterfly_strategy(
                             lower_strike, middle_strike, upper_strike,
@@ -286,13 +287,19 @@ class FlyGenerator:
             # Calcul des surfaces (centre = middle_strike du butterfly)
             center_strike = middle_strike
             surfaces = self._calculate_surfaces(all_options, center_strike)
-            
+
+
             # Date d'expiration
-            exp_info = get_expiration_info(all_options)
+            expiration_month = all_options[0].expiration_month
+            expiration_year = all_options[0].expiration_year
             
             return StrategyComparison(
                 strategy_name=f"{'Call' if option_type == 'call' else 'Put'}Fly {lower_strike}/{middle_strike}/{upper_strike}",
                 strategy=None,
+                expiration_day=None,
+                expiration_week=None,
+                expiration_month= expiration_month,
+                expiration_year=expiration_year,
                 target_price=target_price,
                 max_profit=max_profit,
                 max_loss=max_loss,
