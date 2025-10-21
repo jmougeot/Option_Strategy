@@ -149,8 +149,11 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', 
               '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
     
+    # Filtrer les stratégies valides (avec strategy != None)
+    valid_comparisons = [comp for comp in comparisons if comp.strategy is not None]
+    
     # Tracer chaque stratégie
-    for idx, comp in enumerate(comparisons):
+    for idx, comp in enumerate(valid_comparisons):
         color = colors[idx % len(colors)]
         
         # Calculer P&L (optimisé avec list comprehension)
@@ -195,23 +198,30 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
     return fig
 
 def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFrame:
-    """Crée un DataFrame pour l'affichage des comparaisons."""
+    """Crée un DataFrame pour l'affichage des comparaisons avec tous les critères."""
     
     data = []
     for idx, comp in enumerate(comparisons, 1):
         data.append({
             'Rang': idx,
             'Stratégie': comp.strategy_name,
+            'Score': f"{comp.score:.3f}",
+            # Critères financiers
             'Max Profit': format_currency(comp.max_profit),
             'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
             'R/R Ratio': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
             'Zone ±': format_currency(comp.profit_zone_width),
             'P&L@Target': format_currency(comp.profit_at_target),
+            # Nouveaux critères de surfaces
+            'Surf. Profit': f"{comp.surface_profit:.2f}",
+            'Surf. Loss': f"{comp.surface_loss:.2f}",
+            'Surf. Gauss': f"{comp.surface_gauss:.2f}",
+            'P/L Ratio': f"{(comp.surface_profit/comp.surface_loss):.2f}" if comp.surface_loss > 0 else '∞',
+            # Greeks
             'Delta': f"{comp.total_delta:.3f}",
             'Gamma': f"{comp.total_gamma:.3f}",
             'Vega': f"{comp.total_vega:.3f}",
-            'Theta': f"{comp.total_theta:.3f}",
-            'Score': f"{comp.score:.3f}"
+            'Theta': f"{comp.total_theta:.3f}"
         })
     
     return pd.DataFrame(data)
@@ -377,26 +387,36 @@ def main():
         st.subheader("⚖️ Pondération du Score")
         
         with st.expander("Personnaliser les poids", expanded=False):
-            weight_max_profit = st.slider("Max Profit", 0, 100, 30, 5) / 100
-            weight_rr = st.slider("Risque/Rendement", 0, 100, 30, 5) / 100
-            weight_zone = st.slider("Zone Profitable", 0, 100, 20, 5) / 100
-            weight_target = st.slider("Performance Cible", 0, 100, 20, 5) / 100
+            st.markdown("**Critères Classiques**")
+            weight_max_profit = st.slider("Max Profit", 0, 100, 15, 5) / 100
+            weight_rr = st.slider("Risque/Rendement", 0, 100, 15, 5) / 100
+            weight_zone = st.slider("Zone Profitable", 0, 100, 10, 5) / 100
+            weight_target = st.slider("Performance Cible", 0, 100, 10, 5) / 100
             
-            total_weight = weight_max_profit + weight_rr + weight_zone + weight_target
+            st.markdown("**Nouveaux Critères (Surfaces)**")
+            weight_surface_gauss = st.slider("Surface Gaussienne", 0, 100, 35, 5) / 100
+            weight_profit_loss_ratio = st.slider("Ratio Profit/Loss", 0, 100, 15, 5) / 100
+            
+            total_weight = (weight_max_profit + weight_rr + weight_zone + 
+                          weight_target + weight_surface_gauss + weight_profit_loss_ratio)
             if abs(total_weight - 1.0) > 0.01:
                 st.warning(f"⚠️ Total: {total_weight*100:.0f}% (devrait être 100%)")
+            else:
+                st.success(f"✅ Total: {total_weight*100:.0f}%")
         
         scoring_weights = {
             'max_profit': weight_max_profit,
             'risk_reward': weight_rr,
             'profit_zone': weight_zone,
-            'target_performance': weight_target
+            'target_performance': weight_target,
+            'surface_gauss': weight_surface_gauss,
+            'profit_loss_ratio': weight_profit_loss_ratio
         }
         
         st.markdown("---")
         
         # Bouton de comparaison
-        compare_button = st.button("🚀 COMPARER", type="primary", use_container_width=True)
+        compare_button = st.button("🚀 COMPARER", type="primary", width='stretch')
     
     # ========================================================================
     # ZONE PRINCIPALE
@@ -474,6 +494,26 @@ def main():
         st.info(f"🎯 **Meilleur prix cible identifié : ${best_target_price:.2f}**")
         
         # ====================================================================
+        # AFFICHAGE DES POIDS UTILISÉS
+        # ====================================================================
+        
+        with st.expander("📊 Poids de scoring utilisés", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("**Critères Classiques**")
+                st.write(f"• Max Profit: **{scoring_weights['max_profit']*100:.0f}%**")
+                st.write(f"• Risque/Rendement: **{scoring_weights['risk_reward']*100:.0f}%**")
+                st.write(f"• Zone Profitable: **{scoring_weights['profit_zone']*100:.0f}%**")
+                st.write(f"• Performance Cible: **{scoring_weights['target_performance']*100:.0f}%**")
+            with col2:
+                st.markdown("**Critères de Surfaces**")
+                st.write(f"• Surface Gaussienne: **{scoring_weights['surface_gauss']*100:.0f}%**")
+                st.write(f"• Ratio Profit/Loss: **{scoring_weights['profit_loss_ratio']*100:.0f}%**")
+                st.markdown("---")
+                total = sum(scoring_weights.values())
+                st.write(f"**Total: {total*100:.0f}%**")
+        
+        # ====================================================================
         # TABS POUR L'AFFICHAGE
         # ====================================================================
         
@@ -532,7 +572,7 @@ def main():
             
             st.dataframe(
                 df.style.apply(highlight_winner, axis=1),
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
             
@@ -555,7 +595,7 @@ def main():
             )
             fig.update_traces(texttemplate='%{text:.3f}', textposition='outside')
             fig.update_layout(height=400, showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # ----------------------------------------------------------------
         # TAB 2: DIAGRAMME P&L
@@ -564,7 +604,7 @@ def main():
             st.header("Diagramme de Profit/Perte à l'Expiration")
             
             fig_payoff = create_payoff_diagram(comparisons, best_target_price)
-            st.plotly_chart(fig_payoff, use_container_width=True)
+            st.plotly_chart(fig_payoff, width='stretch')
             
             # Tableau des breakevens
             st.subheader("Points de Breakeven")
@@ -578,7 +618,7 @@ def main():
                     'Zone': format_currency(comp.profit_zone_width)
                 })
             
-            st.dataframe(pd.DataFrame(be_data), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(be_data), width='stretch', hide_index=True)
         
 
 # ============================================================================

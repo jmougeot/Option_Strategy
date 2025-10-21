@@ -183,17 +183,17 @@ class OptionStrategyGenerator:
                 )
             )
         
-        # 3 legs strategies
-        if max_legs >= 3:
-            all_strategies.extend(self._generate_three_leg_strategies(
-                price_min, price_max, strike, target_price, expiration_date
-            ))
+        # 3 legs strategies (Butterflies - désactivé car géré par MultiStructureComparer)
+        # if max_legs >= 3:
+        #     all_strategies.extend(self._generate_three_leg_strategies(
+        #         price_min, price_max, strike, target_price, expiration_date
+        #     ))
         
-        # 4 legs strategies
-        if max_legs >= 4:
-            all_strategies.extend(self._generate_four_leg_strategies(
-                price_min, price_max, strike, target_price, expiration_date
-            ))
+        # 4 legs strategies (Condors - désactivé car géré par MultiStructureComparer)
+        # if max_legs >= 4:
+        #     all_strategies.extend(self._generate_four_leg_strategies(
+        #         price_min, price_max, strike, target_price, expiration_date
+        #     ))
         
         return all_strategies
     
@@ -341,7 +341,7 @@ class OptionStrategyGenerator:
             )
         except Exception as e:
             print(f"⚠️ Erreur création single leg {position} {option_type} {strike}: {e}")
-            return None
+            return StrategyComparison.empty()
     
     # ==================== 2 LEGS STRATEGIES ====================
     

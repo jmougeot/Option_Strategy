@@ -263,9 +263,8 @@ class CondorGenerator:
             surfaces = self._calculate_surfaces(all_options, center_strike)
             
             # Date d'expiration (extraire des options)
-
-            expiration_month=all_options[0].expiration_month
-            expiration_year=all_options[0].expiration_year
+            expiration_month = all_options[0].expiration_month
+            expiration_year = all_options[0].expiration_year
             
             return StrategyComparison(
                 strategy_name=f"IronCondor {s1}/{s2}/{s3}/{s4}",
@@ -273,7 +272,7 @@ class CondorGenerator:
                 expiration_day=None,
                 expiration_week=None,
                 expiration_month=expiration_month,
-                expiration_year=expiration_month,
+                expiration_year=expiration_year,
                 target_price=target_price,
                 max_profit=max_profit,
                 max_loss=max_loss,
