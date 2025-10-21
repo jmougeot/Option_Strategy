@@ -198,7 +198,7 @@ class CondorGenerator:
                             strategy = self._create_iron_condor_strategy(
                                 s1, s2, s3, s4, exp_date, target_price,
                                 put1, put2, call3, call4,
-                                lower_spread, upper_spread, body, center
+                                lower_spread, upper_spread
                             )
                             
                             if strategy:
