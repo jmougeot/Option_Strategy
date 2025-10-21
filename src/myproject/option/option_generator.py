@@ -42,7 +42,7 @@ class OptionStrategyGenerator:
         self.price_min = None
         self.price_max = None
     
-    def _index_options(self):
+    def _index_options(self) -> None:
         """Crée des index pour accès rapide par strike et expiration"""
         self.calls_by_strike_exp = {}
         self.puts_by_strike_exp = {}

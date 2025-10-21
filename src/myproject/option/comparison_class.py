@@ -61,3 +61,29 @@ class StrategyComparison:
     # Score et ranking
     score: float = 0.0
     rank: int = 0
+
+    @classmethod
+    def empty(cls) -> "StrategyComparison":
+        """
+        Crée une instance vide / neutre de StrategyComparison,
+        avec des valeurs par défaut pour initialiser une stratégie.
+        """
+        return cls(
+            strategy_name="EmptyStrategy",
+            strategy=None,
+            target_price=0.0,
+            expiration_day=None,
+            expiration_week=None,
+            expiration_month='F',
+            expiration_year=0,
+            max_profit=0.0,
+            max_loss=0.0,
+            breakeven_points=[],
+            profit_range=(0.0, 0.0),
+            profit_zone_width=0.0,
+            surface_profit=0.0,
+            surface_loss=0.0,
+            surface_gauss=0.0,
+            risk_reward_ratio=0.0,
+            all_options=[],
+        )

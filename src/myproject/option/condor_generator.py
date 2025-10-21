@@ -11,7 +11,8 @@ from myproject.option.option_utils import (
     calculate_greeks_by_type, 
     calculate_avg_implied_volatility,
     calculate_all_surfaces,
-    get_expiration_key
+    get_expiration_key,
+    get_expiration_info
 )
 from myproject.option.comparison_class import StrategyComparison
 
@@ -209,7 +210,7 @@ class CondorGenerator:
     def _create_iron_condor_strategy(self, s1: float, s2: float, s3: float, s4: float,
                                     exp_date: str, target_price: float,
                                     put1: Dict, put2: Dict, call3: Dict, call4: Dict,
-                                    lower_spread: float, upper_spread: float) -> Optional[StrategyComparison]:
+                                    lower_spread: float, upper_spread: float) -> StrategyComparison:
         """Crée un objet StrategyComparison pour un Iron Condor"""
         try:
             # Construire la liste d'options
@@ -228,7 +229,7 @@ class CondorGenerator:
             if opt4: all_options.append(opt4)
             
             if len(all_options) != 4:
-                return None
+                return StrategyComparison.empty()
             
             # Calculer crédit net
             net_credit = sum(
@@ -260,18 +261,19 @@ class CondorGenerator:
             # Calcul des surfaces (centre = milieu entre s2 et s3, le body du condor)
             center_strike = (s2 + s3) / 2
             surfaces = self._calculate_surfaces(all_options, center_strike)
-
-            expiration
             
-            # Date d'expiration
+            # Date d'expiration (extraire des options)
+
+            expiration_month=all_options[0].expiration_month
+            expiration_year=all_options[0].expiration_year
             
             return StrategyComparison(
                 strategy_name=f"IronCondor {s1}/{s2}/{s3}/{s4}",
                 strategy=None,
                 expiration_day=None,
                 expiration_week=None,
-                expiration_month= expiration_month,
-                expiration_year=expiration_year,
+                expiration_month=expiration_month,
+                expiration_year=expiration_month,
                 target_price=target_price,
                 max_profit=max_profit,
                 max_loss=max_loss,
@@ -303,7 +305,7 @@ class CondorGenerator:
             )
         except Exception as e:
             print(f"⚠️ Erreur création Iron Condor {s1}/{s2}/{s3}/{s4}: {e}")
-            return None
+            return StrategyComparison.empty()
     
     def _calculate_iron_condor_pnl(self, price: float, s1: float, s2: float, s3: float, s4: float, credit: float) -> float:
         """Calcule le P&L d'un Iron Condor à un prix donné"""
@@ -410,11 +412,11 @@ class CondorGenerator:
     def _create_single_type_condor_strategy(self, s1: float, s2: float, s3: float, s4: float,
                                            exp_date: str, target_price: float, option_type: str,
                                            opt1_dict: Dict, opt2_dict: Dict, opt3_dict: Dict, opt4_dict: Dict,
-                                           lower_wing: float, upper_wing: float, body: float) -> Optional[StrategyComparison]:
+                                           lower_wing: float, upper_wing: float, body: float) -> StrategyComparison:
         """Crée un StrategyComparison pour un Call/Put Condor"""
         try:
             # Construire la liste d'options (Long 1 + Short 2 + Long 1)
-            all_options = []
+            all_options:List[Option] = []
             
             opt1 = dict_to_option(opt1_dict, position='long', quantity=1)
             if opt1: all_options.append(opt1)
@@ -429,11 +431,11 @@ class CondorGenerator:
             if opt4: all_options.append(opt4)
             
             if len(all_options) != 4:
-                return None
+                return StrategyComparison.empty()
             
             # Calculer débit net
             net_debit = sum(
-                opt.premium * opt.quantity * (-1 if opt.position == 'long' else 1)
+                opt.premium* (-1 if opt.position == 'long' else 1)
                 for opt in all_options
             )
             debit = abs(net_debit)
@@ -460,7 +462,9 @@ class CondorGenerator:
             # Calcul des surfaces (centre = milieu du body entre s2 et s3)
             center_strike = (s2 + s3) / 2
             surfaces = self._calculate_surfaces(all_options, center_strike)
-            
+
+            expiration_month= all_options[0].expiration_month
+            expiration_year=all_options[0].expiration_year
             return StrategyComparison(
                 strategy_name=f"Long{'Call' if option_type == 'call' else 'Put'}Condor {s1}/{s2}/{s3}/{s4}",
                 strategy=None,
@@ -499,7 +503,7 @@ class CondorGenerator:
             )
         except Exception as e:
             print(f"⚠️ Erreur création {option_type} Condor {s1}/{s2}/{s3}/{s4}: {e}")
-            return None
+            return StrategyComparison.empty()
     
     def _calculate_single_condor_pnl(self, price: float, s1: float, s2: float, s3: float, s4: float, 
                                     debit: float, body: float) -> float:
