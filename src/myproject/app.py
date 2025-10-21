@@ -306,14 +306,6 @@ def main():
                 help="Target Price"
             )
         
-        strike_step = st.number_input(
-            "Pas des strikes:",
-            value=0.0625,
-            step=0.0001,
-            format="%.4f",
-            help="Incrément entre chaque strike"
-        )
-        
         # Section 2: Paramètres de marché
         st.subheader("💹 Paramètres de Marché")
         
@@ -370,10 +362,7 @@ def main():
             require_symmetric = st.checkbox("Uniquement structures symétriques", value=False)
             top_n_structures = st.number_input(
                 "Nombre de meilleures structures à afficher:",
-                min_value=5,
-                max_value=50,
                 value=10,
-                step=5
             )
                 
         # Section 4: Pondération du scoring
