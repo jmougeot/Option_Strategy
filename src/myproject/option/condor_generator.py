@@ -10,8 +10,6 @@ from myproject.option.option_utils import (
     dict_to_option, 
     calculate_greeks_by_type, 
     calculate_avg_implied_volatility,
-    get_expiration_info,
-    get_expiration_key,
     calculate_all_surfaces
 )
 from myproject.option.comparison_class import StrategyComparison
@@ -261,15 +259,18 @@ class CondorGenerator:
             # Calcul des surfaces (centre = milieu entre s2 et s3, le body du condor)
             center_strike = (s2 + s3) / 2
             surfaces = self._calculate_surfaces(all_options, center_strike)
+
+            expiration
             
             # Date d'expiration
-            exp_info = get_expiration_info(all_options)
             
             return StrategyComparison(
                 strategy_name=f"IronCondor {s1}/{s2}/{s3}/{s4}",
                 strategy=None,
-                month='', 
-                year=5, 
+                expiration_day=None,
+                expiration_week=None,
+                expiration_month= expiration_month,
+                expiration_year=expiration_year,
                 target_price=target_price,
                 max_profit=max_profit,
                 max_loss=max_loss,
@@ -462,6 +463,10 @@ class CondorGenerator:
             return StrategyComparison(
                 strategy_name=f"Long{'Call' if option_type == 'call' else 'Put'}Condor {s1}/{s2}/{s3}/{s4}",
                 strategy=None,
+                expiration_day=None,
+                expiration_week=None,
+                expiration_month= expiration_month,
+                expiration_year=expiration_year,
                 target_price=target_price,
                 max_profit=max_profit,
                 max_loss=max_loss,

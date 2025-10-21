@@ -19,10 +19,10 @@ python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo ERREUR: Python 3 n'est pas installe ou pas dans le PATH
     echo.
-    echo Ce script peut installer Python 3.11 automatiquement.
+    echo Ce script peut installer Python 3.1 automatiquement.
     echo.
     echo Options:
-    echo   1. Installer automatiquement Python 3.11 ^(RECOMMANDE^)
+    echo   1. Installer automatiquement Python 3.13 ^(RECOMMANDE^)
     echo   2. Ouvrir le site web de telechargement manuel
     echo   3. Annuler
     echo.
@@ -31,7 +31,7 @@ if %errorlevel% neq 0 (
     if "!choice!"=="1" (
         echo.
         echo ========================================================================
-        echo   Installation automatique de Python 3.11
+        echo   Installation automatique de Python 3.13
         echo ========================================================================
         echo.
         
@@ -44,7 +44,7 @@ if %errorlevel% neq 0 (
         
         set INSTALLER=%TEMP%\python_installer.exe
         
-        echo Telechargement de Python 3.11...
+        echo Telechargement de Python 3.13...
         echo URL: !PYTHON_URL!
         echo.
         
@@ -129,6 +129,7 @@ echo.
 REM Étape 3: Activer l'environnement virtuel
 echo Activation de l'environnement virtuel...
 call venv\Scripts\activate.bat
+call venv\Scripts\python.ps1
 echo OK: Environnement active
 echo.
 
@@ -145,36 +146,13 @@ echo   - plotly
 echo   - pandas
 pip install -r requirements.txt
 echo "blpapiioiiii"
-pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi
+pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi --quiet
 if %errorlevel% neq 0 (
     echo ERREUR: Echec de l'installation des dependances
     pause
     exit /b 1
 )
 echo OK: Dependances installees
-echo.
-
-REM Étape 6: Générer la base de données
-echo Generation de la base de donnees d'options...
-if exist "generate_full_database.py" (
-    python generate_full_database.py >nul 2>&1
-    echo OK: Base de donnees generee (calls_export.json)
-) else (
-    echo ATTENTION: generate_full_database.py non trouve, etape ignoree
-)
-echo.
-
-REM Étape 7: Créer le script de lancement
-echo Creation du script de lancement...
-(
-echo @echo off
-echo cd /d "%%~dp0"
-echo call venv\Scripts\activate.bat
-echo streamlit run src/app.py
-echo pause
-) > run.bat
-echo OK: Script run.bat cree
-echo.
 
 REM Résumé
 echo ========================================================================

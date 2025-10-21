@@ -15,7 +15,6 @@ from myproject.option.option_utils import (
     dict_to_option,
     calculate_greeks_by_type,
     calculate_avg_implied_volatility,
-    get_expiration_key,
     calculate_all_surfaces
 )
 from myproject.option.comparison_class import StrategyComparison
@@ -163,14 +162,25 @@ class OptionStrategyGenerator:
         
         # 1 leg strategies
         if max_legs >= 1:
-            all_strategies.extend(self._generate_single_leg_strategies( strike, target_price, expiration_date
-            ))
+            # Pass only target_price and optional expiration_date
+            all_strategies.extend(
+                self._generate_single_leg_strategies(
+                    target_price,
+                    expiration_date
+                )
+            )
         
         # 2 legs strategies
         if max_legs >= 2:
-            all_strategies.extend(self._generate_two_leg_strategies(
-                price_min, price_max, strike, target_price, expiration_date
-            ))
+            # This generator doesn't take a strike parameter
+            all_strategies.extend(
+                self._generate_two_leg_strategies(
+                    price_min,
+                    price_max,
+                    target_price,
+                    expiration_date
+                )
+            )
         
         # 3 legs strategies
         if max_legs >= 3:
@@ -298,6 +308,8 @@ class OptionStrategyGenerator:
                 target_price=target_price,
                 expiration_month='F',
                 expiration_year=6,
+                expiration_day= None,
+                expiration_week=None,
                 max_profit=max_profit if max_profit != float('inf') else 999999.0,
                 max_loss=max_loss if max_loss != float('-inf') else -999999.0,
                 breakeven_points=[breakeven],
@@ -425,7 +437,7 @@ class OptionStrategyGenerator:
                 return strategies
             
             all_options = [opt1, opt2]
-            net_cost = sum(opt.premium * opt.quantity * (-1 if opt.position == 'long' else 1) 
+            net_cost = sum(opt.premium * (-1 if opt.position == 'long' else 1) 
                           for opt in all_options)
             
             spread_width = s2 - s1
@@ -453,6 +465,8 @@ class OptionStrategyGenerator:
                 strategy=None,
                 expiration_month='F',
                 expiration_year=6,
+                expiration_day= None,
+                expiration_week=None,
                 target_price=target_price,
                 max_profit=max_profit,
                 max_loss=max_loss,
@@ -516,7 +530,7 @@ class OptionStrategyGenerator:
                 return strategies
             
             all_options = [opt1, opt2]
-            net_cost = sum(opt.premium * opt.quantity * (-1 if opt.position == 'long' else 1)
+            net_cost = sum(opt.premium * (-1 if opt.position == 'long' else 1)
                           for opt in all_options)
             
             spread_width = s2 - s1
@@ -544,6 +558,8 @@ class OptionStrategyGenerator:
                 strategy=None,
                 expiration_month='F',
                 expiration_year=6,
+                expiration_day= None,
+                expiration_week=None,
                 target_price=target_price,
                 max_profit=max_profit,
                 max_loss=max_loss,
@@ -581,7 +597,7 @@ class OptionStrategyGenerator:
         return strategies
     
     def _create_straddle(self, strike: float, exp_date: str, target_price: float,
-                        position: str) -> List[StrategyComparison]:
+                        position: Literal['long', 'short']) -> List[StrategyComparison]:
         """Crée un Straddle (Long ou Short)"""
         strategies = []
         
@@ -623,11 +639,15 @@ class OptionStrategyGenerator:
             center_strike = strike
             surfaces = self._calculate_surfaces(all_options, center_strike)
             
+            expiration_month=all_options[0].expiration_month
+            expiration_year= all_options[0].expiration_year
             strategy = StrategyComparison(
                 strategy_name=name,
                 strategy=None,
-                expiration_month='F',
-                expiration_year=6,
+                expiration_month=expiration_month,
+                expiration_year=expiration_year,
+                expiration_day= None,
+                expiration_week=None,
                 target_price=target_price,
                 max_profit=max_profit if max_profit != float('inf') else 999999.0,
                 max_loss=max_loss if max_loss != float('-inf') else -999999.0,
@@ -722,6 +742,8 @@ class OptionStrategyGenerator:
                 strategy=None,
                 expiration_month='F',
                 expiration_year=6,
+                expiration_day= None,
+                expiration_week=None,
                 target_price=target_price,
                 max_profit=max_profit if max_profit != float('inf') else 999999.0,
                 max_loss=max_loss if max_loss != float('-inf') else -999999.0,

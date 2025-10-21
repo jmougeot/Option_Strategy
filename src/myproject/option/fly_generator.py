@@ -11,8 +11,6 @@ from myproject.option.option_utils import (
     dict_to_option,
     calculate_greeks_by_type,
     calculate_avg_implied_volatility,
-    get_expiration_info,
-    get_expiration_key,
     calculate_all_surfaces
 )
 from myproject.option.comparison_class import StrategyComparison

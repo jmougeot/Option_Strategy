@@ -5,11 +5,10 @@ Fonctions communes pour convertir et manipuler les options.
 """
 
 from typing import Dict, List, Optional, Literal, Any, Tuple
-from datetime import datetime
 import math
 from myproject.option.option_class import Option
 
-def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long', quantity: int = 1) -> Optional[Option]:
+def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long', quantity: int = 1) -> Option:
     """
     Convertit un dictionnaire d'option (format Bloomberg) en objet Option.
     
@@ -34,10 +33,8 @@ def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long
             premium=float(option_dict.get('premium', 0.0)),
             expiration_month= expiration_month,
             expiration_year=expiration_year,
-            day_of_expirition=Optional[day]= None,
-            month_of_expiration=month,
-            year_of_expiration=year,
-            
+            expiration_day= None,
+
             # Position
             quantity=quantity,
             position=position,
@@ -75,7 +72,7 @@ def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long
         )
     except Exception as e:
         print(f"⚠️ Erreur conversion dict->Option: {e}")
-        return None
+        return Option.empyOption()
 
 
 def calculate_greeks_from_options(options: List[Option]) -> Dict[str, float]:
@@ -96,7 +93,7 @@ def calculate_greeks_from_options(options: List[Option]) -> Dict[str, float]:
     
     for opt in options:
         # Multiplicateur selon la position
-        multiplier = opt.quantity * (1 if opt.position == 'long' else -1)
+        multiplier =  (1 if opt.position == 'long' else -1)
         
         total_delta += (opt.delta or 0.0) * multiplier
         total_gamma += (opt.gamma or 0.0) * multiplier
@@ -150,7 +147,7 @@ def calculate_avg_implied_volatility(options: List[Option]) -> float:
     
     for opt in options:
         if opt.implied_volatility is not None and opt.premium > 0:
-            weight = abs(opt.premium * opt.quantity)
+            weight = abs(opt.premium)
             weighted_iv += opt.implied_volatility * weight
             total_premium += weight
     
@@ -177,7 +174,7 @@ def calculate_strategy_pnl(options: List[Option], price: float) -> float:
     
     for opt in options:
         # Coût initial (négatif si long, positif si short)
-        cost = opt.premium * opt.quantity * (-1 if opt.position == 'long' else 1)
+        cost = opt.premium * (-1 if opt.position == 'long' else 1)
         
         # Valeur intrinsèque à l'expiration
         if opt.option_type == 'call':
@@ -187,9 +184,9 @@ def calculate_strategy_pnl(options: List[Option], price: float) -> float:
         
         # P&L pour cette option (long: on reçoit la valeur, short: on la paye)
         if opt.position == 'long':
-            option_pnl = (intrinsic_value * opt.quantity) + cost
+            option_pnl = intrinsic_value + cost
         else:  # short
-            option_pnl = cost - (intrinsic_value * opt.quantity)
+            option_pnl = cost - intrinsic_value
         
         total_pnl += option_pnl
     
