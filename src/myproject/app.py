@@ -294,12 +294,25 @@ def main():
             help="Incrément entre chaque strike"
         )
         
+        # Nombre de strikes à générer
+        nb_strikes = st.number_input(
+            "Nombre de strikes:",
+            min_value=1,
+            max_value=50,
+            value=13,
+            step=1,
+            help="Nombre de strikes à générer à partir du strike minimum"
+        )
+        
         # Construire les paramètres
+        # Générer la liste de strikes basée sur le strike minimum
+        strikes_list = [round(strike + i * strike_step, 2) for i in range(nb_strikes)]
+        
         bloomberg_params = {
             'underlying': underlying,
             'months': [m.strip() for m in months_input.split(',')],
             'years': [int(y.strip()) for y in years_input.split(',')],
-            'strikes': strike
+            'strikes': strikes_list
         }
                 
         st.markdown("---")
