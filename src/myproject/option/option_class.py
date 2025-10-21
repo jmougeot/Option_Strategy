@@ -81,4 +81,18 @@ class Option:
     security_des: Optional[str] = None  # Description du titre
     timestamp: Optional[datetime] = None  # Timestamp des données
 
+    @classmethod
+    def empyOption(cls) -> "Option":
+        """
+        Crée une Option 'vide' avec des valeurs neutres pour les champs obligatoires.
+        - option_type: 'call' (par défaut)
+        - strike: 0.0
+        - premium: 0.0
+        Le reste utilise les valeurs par défaut de la dataclass.
+        """
+        return cls(
+            option_type="call",
+            strike=0.0,
+            premium=0.0,
+        )
     

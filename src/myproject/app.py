@@ -98,10 +98,14 @@ def load_options_from_bloomberg(params: Dict) -> Dict:
         return data
     except ImportError as e:
         st.error(f"❌ Erreur d'import du module Bloomberg: {e}")
+        # stop the Streamlit run but also return an empty dict to satisfy the type checker
         st.stop()
+        return {}
     except Exception as e:
         st.error(f"❌ Erreur lors de l'import Bloomberg: {e}")
+        # stop the Streamlit run but also return an empty dict to satisfy the type checker
         st.stop()
+        return {}
 
 def prepare_options_data(data: Dict) -> Dict[str, List]:
     """Separates calls and puts."""
@@ -454,16 +458,6 @@ def main():
         
         # Filtrer les comparaisons pour ce prix optimal
         comparisons = [c for c in all_comparisons if c.target_price == best_target_price]
-        
-        # Message de succès
-        structures_info = []
-        if include_flies:
-            structures_info.append("Butterflies")
-        if include_condors:
-            structures_info.append("Condors")
-        structures_text = ' + '.join(structures_info) if structures_info else "Aucune structure"
-        
-        st.success(f"✅ {len(all_comparisons)} combinaisons analysées - Structures: {structures_text}")
         st.info(f"🎯 **Meilleur prix cible identifié : ${best_target_price:.2f}**")
         
         # ====================================================================

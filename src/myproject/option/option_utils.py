@@ -8,6 +8,47 @@ from typing import Dict, List, Optional, Literal, Any, Tuple
 import math
 from myproject.option.option_class import Option
 
+def get_expiration_key(day: int, month: str, year: int) -> str:
+    """
+    Crée une clé unique pour identifier une date d'expiration.
+    
+    Args:
+        day: Jour d'expiration
+        month: Mois d'expiration (format lettre: F, G, H, etc.)
+        year: Année d'expiration
+    
+    Returns:
+        Clé au format 'YYYY-MONTH-DD'
+    """
+    return f"{year}-{month}-{day:02d}"
+
+
+def get_expiration_info(options: List[Option]) -> Dict[str, Any]:
+    """
+    Extrait les informations d'expiration communes d'une liste d'options.
+    
+    Args:
+        options: Liste d'options
+    
+    Returns:
+        Dict avec expiration_month, expiration_year, expiration_day, expiration_week
+    """
+    if not options:
+        return {
+            'expiration_month': 'F',
+            'expiration_year': 6,
+            'expiration_day': None,
+            'expiration_week': None
+        }
+    
+    first_option = options[0]
+    return {
+        'expiration_month': first_option.expiration_month,
+        'expiration_year': first_option.expiration_year,
+        'expiration_day': first_option.expiration_day,
+        'expiration_week': first_option.expiration_week
+    }
+
 def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long', quantity: int = 1) -> Option:
     """
     Convertit un dictionnaire d'option (format Bloomberg) en objet Option.
