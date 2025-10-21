@@ -334,7 +334,7 @@ def main():
             price_min = st.number_input(
                 "Prix Min ($)",
                 value=96.0,
-                step=0.001,
+                step=0.0001,
                 help="Borne inférieure de l'intervalle de prix"
             )
         
@@ -342,14 +342,14 @@ def main():
             price_max = st.number_input(
                 "Prix Max ($)",
                 value=98.0,
-                step=0.001,
+                step=0.0001,
                 help="Borne supérieure de l'intervalle de prix"
             )
         
         price_step = st.number_input(
             "Pas de Prix ($)",
             value=0.625,
-            step=0.001,
+            step=0.0001,
             help="Incrément entre chaque prix cible à tester"
         )
         
