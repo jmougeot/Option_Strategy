@@ -293,14 +293,14 @@ def main():
             strike = st.number_input(
                 "Strike :",
                 value=97.0,
-                step=0.625,
+                step=0.0625,
                 help="Target Price"
             )
         
         strike_step = st.number_input(
             "Pas des strikes:",
-            value=0.625,
-            step=0.001,
+            value=0.0625,
+            step=0.0001,
             help="Incrément entre chaque strike"
         )
         
@@ -348,7 +348,7 @@ def main():
         
         price_step = st.number_input(
             "Pas de Prix ($)",
-            value=0.625,
+            value=0.0625,
             step=0.0001,
             help="Incrément entre chaque prix cible à tester"
         )
