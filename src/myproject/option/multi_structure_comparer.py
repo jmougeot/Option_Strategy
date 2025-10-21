@@ -131,11 +131,11 @@ class MultiStructureComparer:
                     require_symmetric=require_symmetric
                 ))
                 # generate_call_condors et generate_put_condors passent à _generate_single_type_condors
-                # _generate_single_type_condors(price_min, price_max, strike_min, strike_max, target_price, option_type, ...)
+                # _generate_single_type_condors(price_min, price_max, strike, target_price, option_type, ...)
                 all_comparisons.extend(self.condor_generator.generate_call_condors(
                     price_min=price_min,
                     price_max=price_max,
-                    strike= strike,
+                    strike=strike,
                     target_price=target_price,
                     expiration_date=None,
                     require_symmetric=require_symmetric
@@ -143,7 +143,7 @@ class MultiStructureComparer:
                 all_comparisons.extend(self.condor_generator.generate_put_condors(
                     price_min=price_min,
                     price_max=price_max,
-                    strike_min=strike,
+                    strike=strike,
                     target_price=target_price,
                     expiration_date=None,
                     require_symmetric=require_symmetric
