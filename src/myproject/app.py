@@ -294,6 +294,7 @@ def main():
                 "Strike :",
                 value=97.0,
                 step=0.0625,
+                format="%.4f",
                 help="Target Price"
             )
         
@@ -301,6 +302,7 @@ def main():
             "Pas des strikes:",
             value=0.0625,
             step=0.0001,
+            format="%.4f",
             help="Incrément entre chaque strike"
         )
         
@@ -335,6 +337,7 @@ def main():
                 "Prix Min ($)",
                 value=96.0,
                 step=0.0001,
+                format="%.4f",
                 help="Borne inférieure de l'intervalle de prix"
             )
         
@@ -343,6 +346,7 @@ def main():
                 "Prix Max ($)",
                 value=98.0,
                 step=0.0001,
+                format="%.4f",
                 help="Borne supérieure de l'intervalle de prix"
             )
         
@@ -350,6 +354,7 @@ def main():
             "Pas de Prix ($)",
             value=0.0625,
             step=0.0001,
+            format="%.4f",
             help="Incrément entre chaque prix cible à tester"
         )
         
