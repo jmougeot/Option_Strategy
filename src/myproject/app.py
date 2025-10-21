@@ -306,9 +306,6 @@ def main():
                 help="Target Price"
             )
         
-        # Section 2: Paramètres de marché
-        st.subheader("💹 Paramètres de Marché")
-        
         # Intervalle de prix au lieu d'un prix unique
         col1, col2 = st.columns(2)
         with col1:
