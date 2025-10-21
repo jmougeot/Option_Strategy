@@ -341,7 +341,7 @@ def main():
         with col2:
             price_max = st.number_input(
                 "Prix Max ($)",
-                value=98,
+                value=98.0,
                 step=0.001,
                 help="Borne supérieure de l'intervalle de prix"
             )
