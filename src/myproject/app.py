@@ -305,7 +305,7 @@ def main():
         with col2:
             strike = st.number_input(
                 "Strike :",
-                value=97.0,
+                value=98.0,
                 format="%.4f",
                 help="Target Price"
             )
@@ -315,7 +315,7 @@ def main():
         with col1:
             price_min = st.number_input(
                 "Prix Min ($)",
-                value=96.0,
+                value=97.750,
                 step=0.0001,
                 format="%.4f",
                 help="Borne inférieure de l'intervalle de prix"
@@ -324,7 +324,7 @@ def main():
         with col2:
             price_max = st.number_input(
                 "Prix Max ($)",
-                value=98.0,
+                value=98.250,
                 step=0.0001,
                 format="%.4f",
                 help="Borne supérieure de l'intervalle de prix"
