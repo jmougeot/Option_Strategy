@@ -27,7 +27,6 @@ class StrategyComparison:
     profit_zone_width: float  # Largeur de la zone profitable
     surface_profit: float # surface of profit btw min price and max price 
     surface_loss:float # surface of loss btw min price and max price 
-    surface_gauss : float # surface of profit in commun with the surface of gauss center around the strike
     risk_reward_ratio: float  # Max loss / Max profit
 
 
@@ -83,7 +82,6 @@ class StrategyComparison:
             profit_zone_width=0.0,
             surface_profit=0.0,
             surface_loss=0.0,
-            surface_gauss=0.0,
             risk_reward_ratio=0.0,
             all_options=[],
         )

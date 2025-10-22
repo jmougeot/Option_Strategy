@@ -12,6 +12,9 @@ import json
 from typing import Dict, List
 from myproject.option.multi_structure_comparer import MultiStructureComparer
 from myproject.option.comparison_class import StrategyComparison
+from myproject.option.option_generator_v2 import OptionStrategyGeneratorV2
+from myproject.option.comparor_v2 import StrategyComparerV2
+from myproject.option.dic_to_option import bloomberg_data_to_options
 
 # ============================================================================
 # CONFIGURATION DE LA PAGE
@@ -215,7 +218,6 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
             # Nouveaux critères de surfaces
             'Surf. Profit': f"{comp.surface_profit:.2f}",
             'Surf. Loss': f"{comp.surface_loss:.2f}",
-            'Surf. Gauss': f"{comp.surface_gauss:.2f}",
             'P/L Ratio': f"{(comp.surface_profit/comp.surface_loss):.2f}" if comp.surface_loss > 0 else '∞',
             # Greeks
             'Delta': f"{comp.total_delta:.3f}",
@@ -278,11 +280,21 @@ def main():
         st.header("⚙️ Paramètres")
         
         # Paramètres d'import Bloomberg
-        underlying = st.text_input(
-            "Sous-jacent:",
-            value="ER",
-            help="Code Bloomberg (ex: ER pour EURIBOR)"
-        )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            underlying = st.text_input(
+                "Sous-jacent:",
+                value="ER",
+                help="Code Bloomberg (ex: ER pour EURIBOR)"
+            )
+        with col2:
+                years_input = st.text_input(
+                "Années:",
+                value="6",
+                help="Années sur 1 chiffre séparées par virgule (6=2026, 7=2027)"
+            )
+
         
         col1, col2 = st.columns(2)
         with col1:
@@ -291,17 +303,12 @@ def main():
                 value="F,G,H,K,M,N",
                 help="Codes séparés par virgule (F=Jan, G=Feb, H=Mar, K=Apr, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec)"
             )
-            years_input = st.text_input(
-                "Années:",
-                value="6",
-                help="Années sur 1 chiffre séparées par virgule (6=2026, 7=2027)"
-            )
+
         
         with col2:
             strike = st.number_input(
                 "Strike :",
                 value=97.0,
-                step=0.0625,
                 format="%.4f",
                 help="Target Price"
             )
@@ -354,12 +361,19 @@ def main():
         st.subheader("Options de Génération")
                 
         with st.expander("Paramètres de génération", expanded=True):
-            include_flies = st.checkbox("Inclure les Butterflies", value=True)
-            include_condors = st.checkbox("Inclure les Condors", value=True)
-            require_symmetric = st.checkbox("Uniquement structures symétriques", value=False)
+            max_legs = st.slider(
+                "Nombre maximum de legs par stratégie:",
+                min_value=1,
+                max_value=4,
+                value=4,
+                help="Nombre maximum d'options à combiner (1 à 4)"
+            )
+            
             top_n_structures = st.number_input(
                 "Nombre de meilleures structures à afficher:",
                 value=10,
+                min_value=1,
+                max_value=100
             )
                 
         # Section 4: Pondération du scoring
@@ -402,8 +416,10 @@ def main():
     # ========================================================================
     
     if compare_button:
-        # Chargement des données depuis Bloomberg
-        with st.spinner("� Import depuis Bloomberg en cours..."):
+        # ====================================================================
+        # ÉTAPE 1 : Chargement des données depuis Bloomberg
+        # ====================================================================
+        with st.spinner("📥 Import depuis Bloomberg en cours..."):
             data = load_options_from_bloomberg(bloomberg_params)
             
             # Optionnellement sauvegarder
@@ -415,16 +431,12 @@ def main():
                     json.dump(data, f, indent=2)
                 st.success(f"💾 Données sauvegardées dans {save_filename}")
             
-            options_data = prepare_options_data(data)
-            
-            nb_calls = len(options_data['calls'])
-            nb_puts = len(options_data['puts'])
-            
-            st.success(f"✅ {nb_calls + nb_puts} options chargées depuis Bloomberg ({nb_calls} calls, {nb_puts} puts)")
+            nb_options = len(data.get('options', []))
+            st.success(f"✅ {nb_options} options chargées depuis Bloomberg")
         
-        # Vérification des puts
-        if nb_puts == 0:
-            st.error("❌ Aucun put trouvé dans les données. Régénérez la base avec generate_full_database.py")
+        # Validation
+        if nb_options == 0:
+            st.error("❌ Aucune option trouvée dans les données Bloomberg")
             return
         
         # Validation de l'intervalle de prix
@@ -432,37 +444,71 @@ def main():
             st.error("❌ Le prix minimum doit être inférieur au prix maximum")
             return
         
-        # Calculer les prix cibles
-        target_prices = [round(price_min + i * price_step, 2) 
-                        for i in range(int((price_max - price_min) / price_step) + 1)]
+        # ====================================================================
+        # ÉTAPE 2 : Conversion Bloomberg → Options et Génération des Stratégies
+        # ====================================================================
         
-        # Comparaison avec auto-génération pour TOUS les prix cibles
-        with st.spinner(f"🔄 Auto-génération et comparaison pour {len(target_prices)} prix cibles..."):
-            multi_comparer = MultiStructureComparer(options_data)
-            
-            all_comparisons = []
-            
-            # Tester chaque prix cible
-            for target_price in target_prices:
-                comparisons = multi_comparer.compare_all_structures(
-                    target_price=target_price,
-                    strike=strike, 
-                    include_flies=include_flies,
-                    include_condors=include_condors,
-                    require_symmetric=require_symmetric,
-                    top_n=top_n_structures,
-                    weights=scoring_weights 
-                )
-                
-                if comparisons:
-                    all_comparisons.extend(comparisons)
+        # Calculer le prix cible médian pour commencer
+        target_price_median = (price_min + price_max) / 2
         
-        if not all_comparisons:
-            st.error("❌ Aucune stratégie n'a pu être construite avec les paramètres donnés")
-            return
+        with st.spinner(f"🔄 Conversion des options et génération des stratégies (max {max_legs} legs)..."):
+            # Convertir les données Bloomberg en objets Option
+            options = bloomberg_data_to_options(
+                bloomberg_data=data['options'],
+                default_position='long',
+                price_min=price_min,
+                price_max=price_max,
+                calculate_surfaces=False
+            )
+            
+            if not options:
+                st.error("❌ Aucune option valide après conversion")
+                return
+            
+            st.info(f"✅ {len(options)} options converties avec succès")
+            
+            # Générer toutes les combinaisons de stratégies
+            generator = OptionStrategyGeneratorV2(options)
+            
+            all_strategies = generator.generate_all_combinations(
+                target_price=target_price_median,
+                price_min=price_min,
+                price_max=price_max,
+                max_legs=max_legs,
+                include_long=True,
+                include_short=True
+            )
+            
+            if not all_strategies:
+                st.error("❌ Aucune stratégie générée")
+                return
+            
+            st.info(f"✅ {len(all_strategies)} stratégies générées")
+        
+        # ====================================================================
+        # ÉTAPE 3 : Comparaison et Ranking
+        # ====================================================================
+        with st.spinner(f"📊 Comparaison et ranking des stratégies (top {top_n_structures})..."):
+            comparer = StrategyComparerV2()
+            
+            best_strategies = comparer.compare_and_rank(
+                strategies=all_strategies,
+                top_n=top_n_structures,
+                weights=scoring_weights
+            )
+            
+            if not best_strategies:
+                st.error("❌ Aucune stratégie classée")
+                return
+            
+            st.success(f"✅ {len(best_strategies)} meilleures stratégies identifiées")
+        
+        # Utiliser best_strategies comme all_comparisons pour la compatibilité
+        all_comparisons = best_strategies
         
         # Trouver la meilleure combinaison globale
-        all_comparisons.sort(key=lambda x: x.score, reverse=True)
+        best_comparison = all_comparisons[0]
+        comparisons = all_comparisons
         
         # Pour l'affichage, on utilise la meilleure stratégie
         best_comparison = all_comparisons[0]

@@ -12,7 +12,6 @@ from myproject.option.option_utils import (
     calculate_avg_implied_volatility,
     calculate_all_surfaces,
     get_expiration_key,
-    get_expiration_info
 )
 from myproject.option.comparison_class import StrategyComparison
 
