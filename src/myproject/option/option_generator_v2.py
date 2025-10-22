@@ -45,25 +45,6 @@ class OptionStrategyGeneratorV2:
                            calculate_surfaces: bool = False) -> "OptionStrategyGeneratorV2":
         """
         Crée un générateur à partir de données Bloomberg brutes.
-        
-        Args:
-            bloomberg_data: Liste de dictionnaires avec données Bloomberg
-            default_position: Position par défaut pour toutes les options
-            default_quantity: Quantité par défaut
-            price_min: Prix minimum pour surfaces (optionnel, mais surfaces non calculées ici)
-            price_max: Prix maximum pour surfaces (optionnel, mais surfaces non calculées ici)
-            calculate_surfaces: Si True, pré-calcule les surfaces (pas recommandé, fait lors de generate_all_combinations)
-            
-        Returns:
-            Instance de OptionStrategyGeneratorV2
-            
-        Example:
-            >>> bloomberg_data = [
-            ...     {'option_type': 'call', 'strike': 100, 'premium': 5, 'delta': 0.6},
-            ...     {'option_type': 'put', 'strike': 95, 'premium': 3, 'delta': -0.4}
-            ... ]
-            >>> generator = OptionStrategyGeneratorV2.from_bloomberg_data(bloomberg_data)
-            >>> strategies = generator.generate_all_combinations(target_price=102, price_min=80, price_max=120)
         """
         # Convertir les données Bloomberg en objets Option
         # Note: On ne calcule PAS les surfaces ici car elles seront calculées
@@ -91,17 +72,6 @@ class OptionStrategyGeneratorV2:
                                   include_short: bool = True) -> List[StrategyComparison]:
         """
         Génère toutes les combinaisons possibles d'options (1 à max_legs).
-        
-        Args:
-            target_price: Prix cible du sous-jacent
-            price_min: Prix minimum pour le calcul des surfaces
-            price_max: Prix maximum pour le calcul des surfaces
-            max_legs: Nombre maximum d'options dans une combinaison (1-4)
-            include_long: Inclure les positions longues
-            include_short: Inclure les positions courtes
-            
-        Returns:
-            Liste de StrategyComparison pour toutes les combinaisons testées
         """
         self.price_min = price_min
         self.price_max = price_max
@@ -141,6 +111,7 @@ class OptionStrategyGeneratorV2:
         On vérifie simplement que la première et la dernière ont la même date.
         """
         n = len(options)
+        print("nombre d'option {n}")
         if n == 0:
             return []
         
@@ -148,8 +119,11 @@ class OptionStrategyGeneratorV2:
         # Comme les options sont triées, si première == dernière, toutes sont identiques
         if n > 1:
             first, last = options[0], options[-1]
-            if (first.expiration_month != last.expiration_month or 
-                first.expiration_year != last.expiration_year):
+            # Vérifier année, mois, semaine ET jour
+            if (first.expiration_year != last.expiration_year or 
+                first.expiration_month != last.expiration_month or
+                first.expiration_week != last.expiration_week or
+                first.expiration_day != last.expiration_day):
                 return []  # Dates d'échéance différentes
 
         n = len(options)

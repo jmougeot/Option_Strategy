@@ -58,6 +58,7 @@ def process_bloomberg_to_strategies(
         print(f"🔄 Génération des stratégies (max {max_legs} legs)...")
     
     generator = OptionStrategyGeneratorV2(options)
+    
     all_strategies = generator.generate_all_combinations(
         target_price=target_price,
         price_min=price_min,

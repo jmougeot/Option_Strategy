@@ -28,7 +28,7 @@ def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long
     """
     try:
         # Extraire la date d'expiration
-        day = option_dict.get('day_of_expiration', 1)
+        expiration_day = option_dict.get('day_of_expiration')
         expiration_month = option_dict.get('month_of_expiration', 1)
         expiration_year = option_dict.get('year_of_expiration', 2025)
 
@@ -40,7 +40,7 @@ def dict_to_option(option_dict: Dict, position: Literal['long', 'short'] = 'long
             premium=float(option_dict.get('premium', 0.0)),
             expiration_month= expiration_month,
             expiration_year=expiration_year,
-            expiration_day= None,
+            expiration_day= expiration_day,
 
             # Position
             quantity=quantity,
@@ -97,7 +97,7 @@ def dict_to_option_with_calcul(option_dict: Dict,
     """
     try:
         # Extraire la date d'expiration
-        day = option_dict.get('day_of_expiration', 1)
+        expiration_day = option_dict.get('day_of_expiration')
         expiration_month = option_dict.get('month_of_expiration', 1)
         expiration_year = option_dict.get('year_of_expiration', 2025)
 
@@ -109,7 +109,7 @@ def dict_to_option_with_calcul(option_dict: Dict,
             premium=float(option_dict.get('premium', 0.0)),
             expiration_month= expiration_month,
             expiration_year=expiration_year,
-            expiration_day= None,
+            expiration_day= expiration_day,
 
             # Position
             quantity=quantity,

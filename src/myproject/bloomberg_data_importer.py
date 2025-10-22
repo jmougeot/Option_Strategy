@@ -78,13 +78,47 @@ def build_ticker_info(
     return ticker, expiration_date, option_type_str
 
 
+def parse_expiration_components(expiration_date: str, month_code: str, year: int) -> Dict[str, Any]:
+    """
+    Parse une date d'expiration et retourne les composants.
+    
+    Args:
+        expiration_date: Date au format "YYYY-MM-DD"
+        month_code: Code du mois Bloomberg (F, G, H, etc.)
+        year: Année sur 1 chiffre
+        
+    Returns:
+        Dict avec 'month_of_expiration', 'year_of_expiration', 'day_of_expiration'
+    """
+    try:
+        # Parser la date
+        date_parts = expiration_date.split('-')
+        full_year = int(date_parts[0])
+        day = int(date_parts[2])
+        
+        return {
+            'month_of_expiration': month_code,
+            'year_of_expiration': year,
+            'day_of_expiration': day
+        }
+    except (ValueError, IndexError):
+        # Fallback si le parsing échoue
+        return {
+            'month_of_expiration': month_code,
+            'year_of_expiration': year,
+            'day_of_expiration': None
+        }
+
+
 def convert_to_option_dict(
     ticker: str,
     underlying: str,
     strike: float,
     expiration_date: str,
     option_type_str: str,
-    bloomberg_data: Dict[str, Any]
+    bloomberg_data: Dict[str, Any],
+    month_code: Optional[str] = None,
+    year: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Convertit les données Bloomberg brutes en format attendu par l'app.
@@ -96,11 +130,18 @@ def convert_to_option_dict(
         expiration_date: Date d'expiration
         option_type_str: "call" ou "put"
         bloomberg_data: Données extraites de Bloomberg
+        month_code: Code du mois Bloomberg (F, G, H, etc.) - optionnel
+        year: Année sur 1 chiffre - optionnel
         
     Returns:
         Dictionnaire formaté pour l'app
     """
-    return {
+    # Parser les composants d'expiration si disponibles
+    exp_components = {}
+    if month_code and year is not None:
+        exp_components = parse_expiration_components(expiration_date, month_code, year)
+    
+    result = {
         "symbol": underlying,
         "strike": float(strike),
         "option_type": option_type_str,
@@ -120,6 +161,12 @@ def convert_to_option_dict(
         "timestamp": datetime.now().isoformat(),
         "bloomberg_ticker": ticker
     }
+    
+    # Ajouter les composants d'expiration si disponibles
+    if exp_components:
+        result.update(exp_components)
+    
+    return result
 
 
 def import_euribor_options(
@@ -247,7 +294,9 @@ def import_euribor_options(
                             strike=meta['strike'],
                             expiration_date=meta['expiration_date'],
                             option_type_str=meta['option_type'],
-                            bloomberg_data=extracted
+                            bloomberg_data=extracted,
+                            month_code=meta['month'],
+                            year=meta['year']
                         )
                         
                         options.append(option_dict)
@@ -298,62 +347,3 @@ def save_to_json(data: Dict, filename: str = "bloomberg_options.json"):
     
     print(f"\n✅ Données sauvegardées dans: {filepath}")
     print(f"   {len(data.get('options', []))} options exportées")
-
-
-def main():
-    """
-    Fonction principale - exemple d'utilisation
-    """
-    print("\n")
-    print("╔" + "═" * 68 + "╗")
-    print("║" + " " * 15 + "BLOOMBERG DATA IMPORTER" + " " * 30 + "║")
-    print("╚" + "═" * 68 + "╝")
-    print("\n")
-    
-    # Configuration de l'import
-    print("📋 Configuration de l'import:")
-    print("   • Sous-jacent: EURIBOR (ER)")
-    print("   • Mois: Janvier à Juillet (F, G, H, K, M, N)")
-    print("   • Années: 2026, 2027")
-    print("   • Strikes: 96.0 à 99.0 par 0.25")
-    print("   • Types: Calls et Puts")
-    print()
-    
-    input("Appuyez sur Entrée pour démarrer l'import...")
-    print()
-    
-    # Importer les données
-    data = import_euribor_options(
-        underlying="ER",
-        months=["F", "G", "H", "K", "M", "N"],  # Jan à Jul
-        years=[6, 7],  # 2026, 2027
-        strikes=[round(96.0 + i * 0.25, 2) for i in range(13)],  # 96.0 à 99.0
-        include_calls=True,
-        include_puts=True
-    )
-    
-    # Sauvegarder
-    save_to_json(data, "bloomberg_euribor_options.json")
-    
-    # Statistiques
-    options = data.get('options', [])
-    if options:
-        calls = [o for o in options if o['option_type'] == 'call']
-        puts = [o for o in options if o['option_type'] == 'put']
-        
-        print("\n📊 STATISTIQUES:")
-        print(f"   • Total options: {len(options)}")
-        print(f"   • Calls: {len(calls)}")
-        print(f"   • Puts: {len(puts)}")
-        
-        if options:
-            avg_iv = sum(o.get('implied_volatility', 0) for o in options) / len(options)
-            print(f"   • Vol implicite moyenne: {avg_iv:.2%}")
-    
-    print("\n✅ Import terminé!")
-    print(f"   Utilisez 'bloomberg_euribor_options.json' dans app.py")
-    print()
-
-
-if __name__ == "__main__":
-    main()
