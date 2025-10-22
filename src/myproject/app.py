@@ -10,11 +10,8 @@ import plotly.express as px
 from datetime import datetime
 import json
 from typing import Dict, List
-from myproject.option.multi_structure_comparer import MultiStructureComparer
 from myproject.option.comparison_class import StrategyComparison
-from myproject.option.option_generator_v2 import OptionStrategyGeneratorV2
-from myproject.option.comparor_v2 import StrategyComparerV2
-from myproject.option.dic_to_option import bloomberg_data_to_options
+from myproject.option.main import process_bloomberg_to_strategies
 
 # ============================================================================
 # CONFIGURATION DE LA PAGE
@@ -445,70 +442,46 @@ def main():
             return
         
         # ====================================================================
-        # ÉTAPE 2 : Conversion Bloomberg → Options et Génération des Stratégies
+        # ÉTAPE 2-3 : Traitement complet via la fonction main
         # ====================================================================
         
-        # Calculer le prix cible médian pour commencer
+        # Calculer le prix cible médian
         target_price_median = (price_min + price_max) / 2
         
-        with st.spinner(f"🔄 Conversion des options et génération des stratégies (max {max_legs} legs)..."):
-            # Convertir les données Bloomberg en objets Option
-            options = bloomberg_data_to_options(
+        with st.spinner(f"🔄 Traitement complet : Conversion → Génération → Comparaison (max {max_legs} legs)..."):
+            # Appeler la fonction principale qui fait TOUT
+            best_strategies, stats = process_bloomberg_to_strategies(
                 bloomberg_data=data['options'],
-                default_position='long',
-                price_min=price_min,
-                price_max=price_max,
-                calculate_surfaces=False
-            )
-            
-            if not options:
-                st.error("❌ Aucune option valide après conversion")
-                return
-            
-            st.info(f"✅ {len(options)} options converties avec succès")
-            
-            # Générer toutes les combinaisons de stratégies
-            generator = OptionStrategyGeneratorV2(options)
-            
-            all_strategies = generator.generate_all_combinations(
                 target_price=target_price_median,
                 price_min=price_min,
                 price_max=price_max,
                 max_legs=max_legs,
-                include_long=True,
-                include_short=True
-            )
-            
-            if not all_strategies:
-                st.error("❌ Aucune stratégie générée")
-                return
-            
-            st.info(f"✅ {len(all_strategies)} stratégies générées")
-        
-        # ====================================================================
-        # ÉTAPE 3 : Comparaison et Ranking
-        # ====================================================================
-        with st.spinner(f"📊 Comparaison et ranking des stratégies (top {top_n_structures})..."):
-            comparer = StrategyComparerV2()
-            
-            best_strategies = comparer.compare_and_rank(
-                strategies=all_strategies,
                 top_n=top_n_structures,
-                weights=scoring_weights
+                scoring_weights=scoring_weights,
+                verbose=False
             )
             
+            # Vérifier les résultats
             if not best_strategies:
-                st.error("❌ Aucune stratégie classée")
+                st.error("❌ Aucune stratégie générée")
+                st.info(f"📊 Statistiques : {stats.get('nb_options', 0)} options converties")
                 return
             
-            st.success(f"✅ {len(best_strategies)} meilleures stratégies identifiées")
+            # Afficher les statistiques
+            st.success(f"""✅ Traitement terminé avec succès !
+            • {stats.get('nb_options', 0)} options converties
+            • {stats.get('nb_strategies_totales', 0)} stratégies générées
+            • {stats.get('nb_strategies_classees', 0)} meilleures stratégies identifiées
+            """)
         
-        # Utiliser best_strategies comme all_comparisons pour la compatibilité
+        # Utiliser best_strategies pour l'affichage
         all_comparisons = best_strategies
+        comparisons = best_strategies
+        best_comparison = best_strategies[0] if best_strategies else None
         
-        # Trouver la meilleure combinaison globale
-        best_comparison = all_comparisons[0]
-        comparisons = all_comparisons
+        if not best_comparison:
+            st.error("❌ Aucune stratégie disponible")
+            return
         
         # Pour l'affichage, on utilise la meilleure stratégie
         best_comparison = all_comparisons[0]

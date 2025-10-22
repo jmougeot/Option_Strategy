@@ -90,14 +90,7 @@ def dict_to_option_with_calcul(option_dict: Dict,
     """
     Convertit un dictionnaire d'option (format Bloomberg) en objet Option
     et calcule les métriques de surface (profit/loss surfaces).
-    
-    Args:
-        option_dict: Dictionnaire avec les données de l'option
-        position: 'long' ou 'short'
-        quantity: Quantité
-        price_min: Prix minimum pour le calcul des surfaces (optionnel)
-        price_max: Prix maximum pour le calcul des surfaces (optionnel)
-        num_points: Nombre de points pour l'intégration (défaut: 200)
+
     
     Returns:
         Objet Option avec les métriques de surface calculées
