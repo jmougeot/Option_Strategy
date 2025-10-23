@@ -12,6 +12,14 @@ import json
 from typing import Dict, List
 from myproject.option.comparison_class import StrategyComparison
 from myproject.option.main import process_bloomberg_to_strategies
+from myproject.app.styles import inject_css
+from myproject.app.widget import scoring_weights_block, sidebar_params
+from myproject.app.utils import (
+    create_payoff_diagram,
+    load_options_from_bloomberg,
+    format_currency,
+    create_comparison_table
+)
 
 # ============================================================================
 # CONFIGURATION DE LA PAGE
@@ -24,240 +32,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ============================================================================
-# STYLES CSS PERSONNALISÉS
-# ============================================================================
+inject_css()
 
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #1f77b4;
-        text-align: center;
-        padding: 1rem 0;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 5px solid #1f77b4;
-    }
-    .winner-card {
-        background-color: #d4edda;
-        padding: 1.5rem;
-        border-radius: 0.5rem;
-        border-left: 6px solid #28a745;
-        margin: 1rem 0;
-    }
-    .warning-card {
-        background-color: #fff3cd;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #ffc107;
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 24px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        padding: 0 24px;
-        background-color: #f0f2f6;
-        border-radius: 4px 4px 0 0;
-    }
-</style>
-""", unsafe_allow_html=True)
 
-# ============================================================================
-# FONCTIONS UTILITAIRES
-# ============================================================================
-
-@st.cache_data
-def load_options_from_bloomberg(params: Dict) -> Dict:
-    """
-    Charge les données d'options depuis Bloomberg
-    
-    Args:
-        params: Dictionnaire avec underlying, months, years, strikes
-        
-    Returns:
-        Dictionnaire au format {options: [...]}
-    """
-    try:
-        from src.myproject.bloomberg_data_importer import import_euribor_options
-        
-        data = import_euribor_options(
-            underlying=params['underlying'],
-            months=params['months'],
-            years=params['years'],
-            strikes=params['strikes'],
-            include_calls=True,
-            include_puts=True
-        )
-        
-        return data
-    except ImportError as e:
-        st.error(f"❌ Erreur d'import du module Bloomberg: {e}")
-        # stop the Streamlit run but also return an empty dict to satisfy the type checker
-        st.stop()
-        return {}
-    except Exception as e:
-        st.error(f"❌ Erreur lors de l'import Bloomberg: {e}")
-        # stop the Streamlit run but also return an empty dict to satisfy the type checker
-        st.stop()
-        return {}
-
-def prepare_options_data(data: Dict) -> Dict[str, List]:
-    """Separates calls and puts."""
-    calls = [opt for opt in data['options'] if opt['option_type'] == 'call']
-    puts = [opt for opt in data['options'] if opt['option_type'] == 'put']
-    
-    return {'calls': calls, 'puts': puts}
-
-def format_currency(value: float) -> str:
-    """Formats a value as currency."""
-    if value == float('inf'):
-        return "Unlimited"
-    return f"${value:.2f}"
-
-def format_percentage(value: float) -> str:
-    """Formats a percentage."""
-    return f"{value:.1f}%"
-
-def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: float):
-    """
-    Crée un diagramme P&L interactif pour toutes les stratégies
-    
-    Args:
-        comparisons: Liste des stratégies à afficher
-        target_price: Prix cible pour la référence verticale
-        
-    Returns:
-        Figure Plotly avec les courbes P&L
-    """
-    # Générer la plage de prix (±20% autour du prix cible)
-    price_range = [target_price * (1 + i/100) for i in range(-20, 21, 1)]
-    
-    fig = go.Figure()
-    
-    # Lignes de référence
-    fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-    fig.add_vline(x=target_price, line_dash="dot", line_color="red", 
-                  annotation_text="Target", opacity=0.7)
-    
-    # Palette de couleurs
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', 
-              '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-    
-    # Filtrer les stratégies valides (avec strategy != None)
-    valid_comparisons = [comp for comp in comparisons if comp.strategy is not None]
-    
-    # Tracer chaque stratégie
-    for idx, comp in enumerate(valid_comparisons):
-        color = colors[idx % len(colors)]
-        
-        # Calculer P&L (optimisé avec list comprehension)
-        pnl_values = [comp.strategy.profit_at_expiry(price) for price in price_range]
-        
-        # Courbe P&L
-        fig.add_trace(go.Scatter(
-            x=price_range,
-            y=pnl_values,
-            mode='lines',
-            name=comp.strategy_name,
-            line=dict(color=color, width=2.5),
-            hovertemplate='<b>%{fullData.name}</b><br>' +
-                         'Prix: $%{x:.2f}<br>' +
-                         'P&L: $%{y:.2f}<extra></extra>'
-        ))
-        
-        # Markers de breakeven
-        if comp.breakeven_points:
-            fig.add_trace(go.Scatter(
-                x=comp.breakeven_points,
-                y=[0] * len(comp.breakeven_points),
-                mode='markers',
-                marker=dict(size=10, color=color, symbol='circle-open', line=dict(width=2)),
-                showlegend=False,
-                hovertemplate='<b>Breakeven</b><br>Prix: $%{x:.2f}<extra></extra>'
-            ))
-    
-    # Configuration du layout
-    fig.update_layout(
-        title="Diagramme de P&L à l'Expiration",
-        xaxis_title="Prix du Sous-Jacent ($)",
-        yaxis_title="Profit / Perte ($)",
-        height=500,
-        hovermode='x unified',
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        plot_bgcolor='white',
-        xaxis=dict(gridcolor='lightgray'),
-        yaxis=dict(gridcolor='lightgray', zeroline=True, zerolinecolor='gray')
-    )
-    
-    return fig
-
-def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFrame:
-    """Crée un DataFrame pour l'affichage des comparaisons avec tous les critères."""
-    
-    data = []
-    for idx, comp in enumerate(comparisons, 1):
-        data.append({
-            'Rang': idx,
-            'Stratégie': comp.strategy_name,
-            'Score': f"{comp.score:.3f}",
-            # Critères financiers
-            'Max Profit': format_currency(comp.max_profit),
-            'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
-            'R/R Ratio': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
-            'Zone ±': format_currency(comp.profit_zone_width),
-            'P&L@Target': format_currency(comp.profit_at_target),
-            # Nouveaux critères de surfaces
-            'Surf. Profit': f"{comp.surface_profit:.2f}",
-            'Surf. Loss': f"{comp.surface_loss:.2f}",
-            'P/L Ratio': f"{(comp.surface_profit/comp.surface_loss):.2f}" if comp.surface_loss > 0 else '∞',
-            # Greeks
-            'Delta': f"{comp.total_delta:.3f}",
-            'Gamma': f"{comp.total_gamma:.3f}",
-            'Vega': f"{comp.total_vega:.3f}",
-            'Theta': f"{comp.total_theta:.3f}"
-        })
-    
-    return pd.DataFrame(data)
-
-def create_score_breakdown_chart(comparison: StrategyComparison):
-    """Crée un graphique de décomposition du score."""
-    
-    # Affichage simple du score global
-    fig = go.Figure(data=[
-        go.Bar(
-            x=[comparison.score],
-            y=['Score Global'],
-            orientation='h',
-            marker_color='#1f77b4',
-            text=[f"{comparison.score:.3f}"],
-            textposition='auto',
-        )
-    ])
-    
-    fig.update_layout(
-        title=f"Score Global - {comparison.strategy_name}",
-        xaxis_title="Score (0-1)",
-        yaxis_title="",
-        height=200,
-        showlegend=False,
-        xaxis=dict(range=[0, 1])
-    )
-    
-    return fig
-
-def strike_list(strike_min: float, strike_max : float, step:float)->List[str]:
-    strike_list = []
-    strike = strike_min
-    while strike<=strike_max:
-        strike_list.append(strike)
-        strike+=step
-    return strike_list
 
 # ============================================================================
 # INTERFACE PRINCIPALE
@@ -273,152 +50,32 @@ def main():
     # SIDEBAR - PARAMÈTRES
     # ========================================================================
     
-    with st.sidebar:
-        st.header("⚙️ Paramètres")
-        
-        # Paramètres d'import Bloomberg
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            underlying = st.text_input(
-                "Sous-jacent:",
-                value="ER",
-                help="Code Bloomberg (ex: ER pour EURIBOR)"
-            )
-        with col2:
-                years_input = st.text_input(
-                "Années:",
-                value="6",
-                help="Années sur 1 chiffre séparées par virgule (6=2026, 7=2027)"
-            )
 
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            months_input = st.text_input(
-                "Mois d'expiration:",
-                value="F,G,H,K,M,N",
-                help="Codes séparés par virgule (F=Jan, G=Feb, H=Mar, K=Apr, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec)"
-            )
+    with st.sidebar: 
+        params = sidebar_params()
+        scoring_weights = scoring_weights_block()
 
-        
-        with col2:
-            strike = st.number_input(
-                "Strike :",
-                value=98.0,
-                format="%.4f",
-                help="Target Price"
-            )
-        
-        # Intervalle de prix au lieu d'un prix unique
-        col1, col2 = st.columns(2)
-        with col1:
-            price_min = st.number_input(
-                "Prix Min ($)",
-                value=97.750,
-                step=0.0001,
-                format="%.4f",
-                help="Borne inférieure de l'intervalle de prix"
-            )
-        
-        with col2:
-            price_max = st.number_input(
-                "Prix Max ($)",
-                value=98.250,
-                step=0.0001,
-                format="%.4f",
-                help="Borne supérieure de l'intervalle de prix"
-            )
-        
-        price_step = st.number_input(
-            "Pas de Prix ($)",
-            value=0.0625,
-            step=0.0001,
-            format="%.4f",
-            help="Incrément entre chaque prix cible à tester"
-        )
-        
-        # Validation
-        if price_min >= price_max:
-            st.error("⚠️ Le prix minimum doit être inférieur au prix maximum")
-        else:
-            target_prices = [round(price_min + i * price_step, 2) 
-                           for i in range(int((price_max - price_min) / price_step) + 1)]
-        
-        strikes_list = strike_list(price_min, price_max, price_step)
-        
-        bloomberg_params = {
-            'underlying': underlying,
-            'months': [m.strip() for m in months_input.split(',')],
-            'years': [int(y.strip()) for y in years_input.split(',')],
-            'strikes': strikes_list
-        }
-                
-        # Section 3: Options d'auto-génération
-        st.subheader("Options de Génération")
-                
-        with st.expander("Paramètres de génération", expanded=True):
-            max_legs = st.slider(
-                "Nombre maximum de legs par stratégie:",
-                min_value=1,
-                max_value=4,
-                value=4,
-                help="Nombre maximum d'options à combiner (1 à 4)"
-            )
-            
-            top_n_structures = st.number_input(
-                "Nombre de meilleures structures à afficher:",
-                value=10,
-                min_value=1,
-                max_value=100
-            )
-                
-        # Section 4: Pondération du scoring
-        st.subheader("⚖️ Pondération du Score")
-        
-        with st.expander("Personnaliser les poids", expanded=False):
-            st.markdown("**Critères Classiques**")
-            weight_max_profit = st.slider("Max Profit", 0, 100, 15, 5) / 100
-            weight_rr = st.slider("Risque/Rendement", 0, 100, 15, 5) / 100
-            weight_zone = st.slider("Zone Profitable", 0, 100, 10, 5) / 100
-            weight_target = st.slider("Performance Cible", 0, 100, 10, 5) / 100
-            
-            st.markdown("**Nouveaux Critères (Surfaces)**")
-            weight_surface_gauss = st.slider("Surface Gaussienne", 0, 100, 35, 5) / 100
-            weight_profit_loss_ratio = st.slider("Ratio Profit/Loss", 0, 100, 15, 5) / 100
-            
-            total_weight = (weight_max_profit + weight_rr + weight_zone + 
-                          weight_target + weight_surface_gauss + weight_profit_loss_ratio)
-            if abs(total_weight - 1.0) > 0.01:
-                st.warning(f"⚠️ Total: {total_weight*100:.0f}% (devrait être 100%)")
-            else:
-                st.success(f"✅ Total: {total_weight*100:.0f}%")
-        
-        scoring_weights = {
-            'max_profit': weight_max_profit,
-            'risk_reward': weight_rr,
-            'profit_zone': weight_zone,
-            'target_performance': weight_target,
-            'surface_gauss': weight_surface_gauss,
-            'profit_loss_ratio': weight_profit_loss_ratio
-        }
-        
-        st.markdown("---")
-        
-        # Bouton de comparaison
-        compare_button = st.button("🚀 COMPARER", type="primary", width='stretch')
-    
     # ========================================================================
     # ZONE PRINCIPALE
     # ========================================================================
+    
+    compare_button = st.button("🚀 Lancer la Comparaison", type="primary", use_container_width=True)
     
     if compare_button:
         # ====================================================================
         # ÉTAPE 1 : Chargement des données depuis Bloomberg
         # ====================================================================
-        with st.spinner("📥 Import depuis Bloomberg en cours..."):
-            data = load_options_from_bloomberg(bloomberg_params)
-            
+        with st.spinner("📥 Import depuis Bloomberg..."):
+            # Convertir UIParams en dict pour load_options_from_bloomberg
+            params_dict = {
+                'underlying': params.underlying,
+                'months': params.months,
+                'years': params.years,
+                'strikes': params.strikes
+            }
+            data = load_options_from_bloomberg(params_dict)
+            st.success(f"✅ {len(data.get('options', []))} options chargées")
+                
             # Optionnellement sauvegarder
             save_data = st.checkbox("Sauvegarder les données importées en JSON", value=True)
             if save_data:
@@ -437,7 +94,7 @@ def main():
             return
         
         # Validation de l'intervalle de prix
-        if price_min >= price_max:
+        if params.price_min >= params.price_max:
             st.error("❌ Le prix minimum doit être inférieur au prix maximum")
             return
         
@@ -446,17 +103,17 @@ def main():
         # ====================================================================
         
         # Calculer le prix cible médian
-        target_price_median = (price_min + price_max) / 2
+        target_price_median = (params.price_min + params.price_max) / 2
         
-        with st.spinner(f"🔄 Traitement complet : Conversion → Génération → Comparaison (max {max_legs} legs)..."):
+        with st.spinner(f"🔄 Traitement complet : Conversion → Génération → Comparaison (max {params.max_legs} legs)..."):
             # Appeler la fonction principale qui fait TOUT
             best_strategies, stats = process_bloomberg_to_strategies(
                 bloomberg_data=data['options'],
                 target_price=target_price_median,
-                price_min=price_min,
-                price_max=price_max,
-                max_legs=max_legs,
-                top_n=top_n_structures,
+                price_min=params.price_min,
+                price_max=params.price_max,
+                max_legs=params.max_legs,
+                top_n=params.top_n,
                 scoring_weights=scoring_weights,
                 verbose=False
             )
@@ -492,21 +149,37 @@ def main():
         st.info(f"🎯 **Meilleur prix cible identifié : ${best_target_price:.2f}**")
         
         # ====================================================================
-        # AFFICHAGE DES POIDS UTILISÉS
+        # AFFICHAGE DES POIDS UTILISÉS - COMPLET
         # ====================================================================
         
-        with st.expander("📊 Poids de scoring utilisés", expanded=False):
-            col1, col2 = st.columns(2)
+        with st.expander("📊 Poids de scoring utilisés (TOUS LES ATTRIBUTS)", expanded=False):
+            col1, col2, col3, col4 = st.columns(4)
+            
             with col1:
-                st.markdown("**Critères Classiques**")
-                st.write(f"• Max Profit: **{scoring_weights['max_profit']*100:.0f}%**")
-                st.write(f"• Risque/Rendement: **{scoring_weights['risk_reward']*100:.0f}%**")
-                st.write(f"• Zone Profitable: **{scoring_weights['profit_zone']*100:.0f}%**")
-                st.write(f"• Performance Cible: **{scoring_weights['target_performance']*100:.0f}%**")
+                st.markdown("**💰 Métriques Financières**")
+                st.write(f"• Max Profit: **{scoring_weights.get('max_profit', 0)*100:.0f}%**")
+                st.write(f"• Risque/Rendement: **{scoring_weights.get('risk_reward', 0)*100:.0f}%**")
+                st.write(f"• Zone Profitable: **{scoring_weights.get('profit_zone', 0)*100:.0f}%**")
+                st.write(f"• Performance Cible: **{scoring_weights.get('target_performance', 0)*100:.0f}%**")
+            
             with col2:
-                st.markdown("**Critères de Surfaces**")
-                st.write(f"• Poximité avec le strike: **{scoring_weights['surface_gauss']*100:.0f}%**")
-                st.write(f"• Ratio Profit/Loss: **{scoring_weights['profit_loss_ratio']*100:.0f}%**")
+                st.markdown("**📐 Surfaces**")
+                st.write(f"• Surface Profit: **{scoring_weights.get('surface_profit', 0)*100:.0f}%**")
+                st.write(f"• Surface Loss: **{scoring_weights.get('surface_loss', 0)*100:.0f}%**")
+                st.write(f"• Ratio P/L: **{scoring_weights.get('profit_loss_ratio', 0)*100:.0f}%**")
+            
+            with col3:
+                st.markdown("**🔢 Greeks**")
+                st.write(f"• Delta Neutral: **{scoring_weights.get('delta_neutral', 0)*100:.0f}%**")
+                st.write(f"• Gamma: **{scoring_weights.get('gamma_exposure', 0)*100:.0f}%**")
+                st.write(f"• Vega: **{scoring_weights.get('vega_exposure', 0)*100:.0f}%**")
+                st.write(f"• Theta: **{scoring_weights.get('theta_positive', 0)*100:.0f}%**")
+            
+            with col4:
+                st.markdown("**📊 Autres**")
+                st.write(f"• Volatilité: **{scoring_weights.get('implied_vol', 0)*100:.0f}%**")
+                st.write(f"• BE Count: **{scoring_weights.get('breakeven_count', 0)*100:.0f}%**")
+                st.write(f"• BE Spread: **{scoring_weights.get('breakeven_spread', 0)*100:.0f}%**")
                 st.markdown("---")
                 total = sum(scoring_weights.values())
                 st.write(f"**Total: {total*100:.0f}%**")

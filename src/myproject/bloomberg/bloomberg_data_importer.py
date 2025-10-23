@@ -259,7 +259,6 @@ def import_euribor_options(
     
     print(f"✓ {len(all_tickers)} tickers construits")
     print(f"\n📡 Récupération des données Bloomberg en batch...")
-    print(f"   (UN SEUL appel pour TOUS les tickers - beaucoup plus rapide!)")
     
     # FETCH EN BATCH - UN SEUL APPEL BLOOMBERG POUR TOUS LES TICKERS
     try:

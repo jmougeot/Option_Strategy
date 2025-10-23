@@ -31,18 +31,36 @@ class StrategyComparerV2:
                         top_n: int = 10,
                         weights: Optional[Dict[str, float]] = None) -> List[StrategyComparison]:
         """
-        Compare et classe les stratégies selon un système de scoring multi-critères.
+        Compare et classe les stratégies selon un système de scoring multi-critères COMPLET.
+        Tous les attributs de StrategyComparison participent au scoring.
         
         Args:
             strategies: Liste de StrategyComparison à comparer
             top_n: Nombre de meilleures stratégies à retourner
             weights: Poids personnalisés pour le scoring (optionnel)
-                - 'max_profit': Poids pour le profit maximum (défaut: 0.15)
-                - 'risk_reward': Poids pour le ratio risque/récompense (défaut: 0.15)
-                - 'profit_zone': Poids pour la largeur de zone de profit (défaut: 0.10)
-                - 'target_performance': Poids pour la performance au prix cible (défaut: 0.10)
-                - 'surface_gauss': Poids pour le profit pondéré gaussien (défaut: 0.35)
-                - 'profit_loss_ratio': Poids pour le ratio surface profit/loss (défaut: 0.15)
+                MÉTRIQUES FINANCIÈRES:
+                - 'max_profit': Profit maximum (défaut: 0.10)
+                - 'risk_reward': Ratio risque/récompense (défaut: 0.10)
+                - 'profit_zone': Largeur de zone de profit (défaut: 0.08)
+                - 'target_performance': Performance au prix cible (défaut: 0.08)
+                
+                SURFACES:
+                - 'surface_profit': Surface de profit (défaut: 0.12)
+                - 'surface_loss': Surface de perte (inversé) (défaut: 0.08)
+                - 'profit_loss_ratio': Ratio surface profit/loss (défaut: 0.12)
+                
+                GREEKS:
+                - 'delta_neutral': Neutralité du delta (défaut: 0.06)
+                - 'gamma_exposure': Exposition gamma (défaut: 0.04)
+                - 'vega_exposure': Exposition vega (défaut: 0.04)
+                - 'theta_positive': Theta positif (défaut: 0.04)
+                
+                VOLATILITÉ:
+                - 'implied_vol': Volatilité implicite moyenne (défaut: 0.04)
+                
+                BREAKEVENS:
+                - 'breakeven_count': Nombre de points de breakeven (défaut: 0.05)
+                - 'breakeven_spread': Écart des breakevens (défaut: 0.05)
         
         Returns:
             Liste des top_n meilleures stratégies, triées par score décroissant,
@@ -59,15 +77,32 @@ class StrategyComparerV2:
             print("⚠️ Aucune stratégie à comparer")
             return []
         
-        # Poids par défaut (identiques à multi_structure_comparer.py)
+        # Poids par défaut - TOUS les attributs participent
         if weights is None:
             weights = {
-                'max_profit': 0.15,           # Profit max
-                'risk_reward': 0.15,          # Ratio risque/récompense
-                'profit_zone': 0.10,          # Largeur de zone de profit
-                'target_performance': 0.10,   # Performance au prix cible
-                'surface_gauss': 0.35,        # Profit pondéré par gaussienne (prioritaire)
-                'profit_loss_ratio': 0.15     # Ratio surface_profit/surface_loss
+                # Métriques financières (40%)
+                'max_profit': 0.10,
+                'risk_reward': 0.10,
+                'profit_zone': 0.08,
+                'target_performance': 0.08,
+                
+                # Surfaces (32%)
+                'surface_profit': 0.12,
+                'surface_loss': 0.08,
+                'profit_loss_ratio': 0.12,
+                
+                # Greeks (18%)
+                'delta_neutral': 0.06,
+                'gamma_exposure': 0.04,
+                'vega_exposure': 0.04,
+                'theta_positive': 0.04,
+                
+                # Volatilité (4%)
+                'implied_vol': 0.04,
+                
+                # Breakevens (6%)
+                'breakeven_count': 0.03,
+                'breakeven_spread': 0.03,
             }
         
         # Calculer les scores
@@ -90,31 +125,34 @@ class StrategyComparerV2:
                          weights: Dict[str, float]) -> List[StrategyComparison]:
         """
         Calcule les scores composites pour chaque stratégie.
-        Utilise la même logique que multi_structure_comparer.py.
+        TOUS les attributs de StrategyComparison participent au scoring.
         """
         if not strategies:
             return strategies
         
         # ============ NORMALISATION DES MÉTRIQUES ============
         
-        # 1. Profit maximum (filtrer les infinités)
+        # 1. MÉTRIQUES FINANCIÈRES
         finite_profits = [s.max_profit for s in strategies if s.max_profit != float('inf')]
         max_profit_val = max(finite_profits) if finite_profits else 1.0
         
-        # 2. Largeur zone de profit
         finite_zones = [s.profit_zone_width for s in strategies if s.profit_zone_width != float('inf')]
         max_zone_width = max(finite_zones) if finite_zones else 1.0
         
-        # 3. Performance au prix cible
         target_perfs = [abs(s.profit_at_target_pct) for s in strategies]
         max_target_perf = max(target_perfs) if target_perfs else 1.0
         
-        # 4. Risk/reward ratio (éviter les infinités)
         finite_rr = [s.risk_reward_ratio for s in strategies if s.risk_reward_ratio != float('inf')]
         min_rr = min(finite_rr) if finite_rr else 0.0
         max_rr = max(finite_rr) if finite_rr else 1.0
         
-        # 6. Ratio profit/loss surfaces
+        # 2. SURFACES
+        surface_profits = [s.surface_profit for s in strategies if s.surface_profit > 0]
+        max_surf_profit = max(surface_profits) if surface_profits else 1.0
+        
+        surface_losses = [abs(s.surface_loss) for s in strategies if s.surface_loss != 0]
+        max_surf_loss = max(surface_losses) if surface_losses else 1.0
+        
         profit_loss_ratios = []
         for s in strategies:
             if s.surface_loss > 0:
@@ -123,12 +161,44 @@ class StrategyComparerV2:
         min_pl_ratio = min(profit_loss_ratios) if profit_loss_ratios else 0.0
         max_pl_ratio = max(profit_loss_ratios) if profit_loss_ratios else 1.0
         
+        # 3. GREEKS
+        deltas = [abs(s.total_delta) for s in strategies]
+        max_delta = max(deltas) if deltas else 1.0
+        
+        gammas = [abs(s.total_gamma) for s in strategies]
+        max_gamma = max(gammas) if gammas else 1.0
+        
+        vegas = [abs(s.total_vega) for s in strategies]
+        max_vega = max(vegas) if vegas else 1.0
+        
+        thetas = [s.total_theta for s in strategies]
+        min_theta = min(thetas) if thetas else 0.0
+        max_theta = max(thetas) if thetas else 1.0
+        
+        # 4. VOLATILITÉ
+        impl_vols = [s.avg_implied_volatility for s in strategies if s.avg_implied_volatility > 0]
+        min_vol = min(impl_vols) if impl_vols else 0.0
+        max_vol = max(impl_vols) if impl_vols else 1.0
+        
+        # 5. BREAKEVENS
+        be_counts = [len(s.breakeven_points) for s in strategies]
+        max_be_count = max(be_counts) if be_counts else 1
+        
+        be_spreads = []
+        for s in strategies:
+            if len(s.breakeven_points) >= 2:
+                spread = max(s.breakeven_points) - min(s.breakeven_points)
+                be_spreads.append(spread)
+        max_be_spread = max(be_spreads) if be_spreads else 1.0
+        
         # ============ CALCUL DES SCORES ============
         
         for strat in strategies:
             score = 0.0
             
-            # 1. Max profit (normalisé 0-1)
+            # ========== MÉTRIQUES FINANCIÈRES ==========
+            
+            # 1. Max profit (normalisé, plus élevé = meilleur)
             if 'max_profit' in weights and max_profit_val > 0 and strat.max_profit != float('inf'):
                 score += (strat.max_profit / max_profit_val) * weights['max_profit']
             
@@ -144,12 +214,86 @@ class StrategyComparerV2:
             # 4. Target performance (plus élevé = meilleur)
             if 'target_performance' in weights and max_target_perf > 0:
                 score += (abs(strat.profit_at_target_pct) / max_target_perf) * weights['target_performance']
-
-            # 6. Profit/Loss ratio (plus élevé = meilleur)
+            
+            # ========== SURFACES ==========
+            
+            # 5. Surface profit (plus élevée = meilleur)
+            if 'surface_profit' in weights and max_surf_profit > 0:
+                score += (strat.surface_profit / max_surf_profit) * weights['surface_profit']
+            
+            # 6. Surface loss (inversé : plus petite = meilleur)
+            if 'surface_loss' in weights and max_surf_loss > 0 and strat.surface_loss != 0:
+                normalized_loss = abs(strat.surface_loss) / max_surf_loss
+                score += (1 - normalized_loss) * weights['surface_loss']
+            
+            # 7. Profit/Loss ratio (plus élevé = meilleur)
             if 'profit_loss_ratio' in weights and strat.surface_loss > 0 and max_pl_ratio > min_pl_ratio:
                 pl_ratio = strat.surface_profit / strat.surface_loss
                 pl_score = (pl_ratio - min_pl_ratio) / (max_pl_ratio - min_pl_ratio)
                 score += pl_score * weights['profit_loss_ratio']
+            
+            # ========== GREEKS ==========
+            
+            # 8. Delta neutralité (plus proche de 0 = meilleur)
+            if 'delta_neutral' in weights and max_delta > 0:
+                delta_score = 1 - (abs(strat.total_delta) / max_delta)
+                score += delta_score * weights['delta_neutral']
+            
+            # 9. Gamma exposure (exposition gamma modérée préférable)
+            if 'gamma_exposure' in weights and max_gamma > 0:
+                # Gamma modéré est préférable (ni trop élevé ni trop faible)
+                gamma_normalized = abs(strat.total_gamma) / max_gamma
+                # Score optimal à 0.5, pénalise les extrêmes
+                gamma_score = 1 - abs(gamma_normalized - 0.5) * 2
+                score += max(0, gamma_score) * weights['gamma_exposure']
+            
+            # 10. Vega exposure (exposition vega modérée)
+            if 'vega_exposure' in weights and max_vega > 0:
+                vega_normalized = abs(strat.total_vega) / max_vega
+                vega_score = 1 - abs(vega_normalized - 0.5) * 2
+                score += max(0, vega_score) * weights['vega_exposure']
+            
+            # 11. Theta positif (theta positif préférable)
+            if 'theta_positive' in weights and max_theta > min_theta:
+                if strat.total_theta >= 0:
+                    # Theta positif = bon
+                    theta_score = (strat.total_theta - min_theta) / (max_theta - min_theta) if max_theta > min_theta else 0
+                else:
+                    # Theta négatif = pénalité
+                    theta_score = 0
+                score += theta_score * weights['theta_positive']
+            
+            # ========== VOLATILITÉ ==========
+            
+            # 12. Volatilité implicite (volatilité modérée préférable)
+            if 'implied_vol' in weights and max_vol > min_vol and strat.avg_implied_volatility > 0:
+                vol_normalized = (strat.avg_implied_volatility - min_vol) / (max_vol - min_vol)
+                # Volatilité modérée (autour de 0.5) est préférable
+                vol_score = 1 - abs(vol_normalized - 0.5) * 2
+                score += max(0, vol_score) * weights['implied_vol']
+            
+            # ========== BREAKEVENS ==========
+            
+            # 13. Nombre de breakevens (2 breakevens = optimal pour stratégies)
+            if 'breakeven_count' in weights and max_be_count > 0:
+                be_count = len(strat.breakeven_points)
+                # 2 breakevens = score maximal
+                if be_count == 2:
+                    be_count_score = 1.0
+                elif be_count == 1:
+                    be_count_score = 0.5
+                elif be_count == 0:
+                    be_count_score = 0.0
+                else:
+                    # Plus de 2 = légère pénalité
+                    be_count_score = max(0, 1 - (be_count - 2) * 0.2)
+                score += be_count_score * weights['breakeven_count']
+            
+            # 14. Écart des breakevens (plus large = meilleur)
+            if 'breakeven_spread' in weights and len(strat.breakeven_points) >= 2 and max_be_spread > 0:
+                be_spread = max(strat.breakeven_points) - min(strat.breakeven_points)
+                spread_score = be_spread / max_be_spread
+                score += spread_score * weights['breakeven_spread']
             
             strat.score = score
         
@@ -157,7 +301,7 @@ class StrategyComparerV2:
     
     def print_summary(self, strategies: List[StrategyComparison], top_n: int = 5):
         """
-        Affiche un résumé des meilleures stratégies.
+        Affiche un résumé COMPLET des meilleures stratégies avec TOUS les attributs.
         
         Args:
             strategies: Liste de stratégies classées
@@ -167,24 +311,47 @@ class StrategyComparerV2:
             print("Aucune stratégie à afficher")
             return
         
-        print("\n" + "=" * 80)
-        print(f"TOP {min(top_n, len(strategies))} STRATÉGIES")
-        print("=" * 80)
+        print("\n" + "=" * 100)
+        print(f"TOP {min(top_n, len(strategies))} STRATÉGIES - SCORING COMPLET")
+        print("=" * 100)
         
         for strat in strategies[:top_n]:
-            print(f"\n#{strat.rank} - {strat.strategy_name}")
-            print(f"   Score: {strat.score:.4f}")
-            print(f"   Max Profit: ${strat.max_profit:.2f}" + 
-                  (f" ({strat.profit_at_target_pct:.1f}% au target)" if strat.profit_at_target_pct else ""))
-            print(f"   Max Loss: ${strat.max_loss:.2f}")
-            print(f"   Risk/Reward: {strat.risk_reward_ratio:.2f}")
+            print(f"\n{'='*100}")
+            print(f"#{strat.rank} - {strat.strategy_name}")
+            print(f"{'='*100}")
+            print(f"   📊 SCORE GLOBAL: {strat.score:.4f}")
+            
+            print(f"\n   💰 MÉTRIQUES FINANCIÈRES:")
+            print(f"      • Max Profit: ${strat.max_profit:.2f}")
+            print(f"      • Max Loss: ${strat.max_loss:.2f}")
+            print(f"      • Risk/Reward: {strat.risk_reward_ratio:.2f}")
             if strat.profit_zone_width != float('inf'):
-                print(f"   Profit Zone: ${strat.profit_zone_width:.2f}")
-
+                print(f"      • Profit Zone: ${strat.profit_zone_width:.2f}")
+            print(f"      • Profit @ Target: ${strat.profit_at_target:.2f} ({strat.profit_at_target_pct:.1f}%)")
+            
+            print(f"\n   📐 SURFACES:")
+            print(f"      • Surface Profit: {strat.surface_profit:.2f}")
+            print(f"      • Surface Loss: {strat.surface_loss:.2f}")
             if strat.surface_loss > 0:
                 pl_ratio = strat.surface_profit / strat.surface_loss
-                print(f"   Profit/Loss Ratio: {pl_ratio:.2f}")
-            print(f"   Delta Total: {strat.total_delta:.3f}")
+                print(f"      • Profit/Loss Ratio: {pl_ratio:.2f}")
+            
+            print(f"\n   🔢 GREEKS TOTAUX:")
+            print(f"      • Delta: {strat.total_delta:.3f} (Calls: {strat.total_delta_calls:.3f}, Puts: {strat.total_delta_puts:.3f})")
+            print(f"      • Gamma: {strat.total_gamma:.3f} (Calls: {strat.total_gamma_calls:.3f}, Puts: {strat.total_gamma_puts:.3f})")
+            print(f"      • Vega: {strat.total_vega:.3f} (Calls: {strat.total_vega_calls:.3f}, Puts: {strat.total_vega_puts:.3f})")
+            print(f"      • Theta: {strat.total_theta:.3f} (Calls: {strat.total_theta_calls:.3f}, Puts: {strat.total_theta_puts:.3f})")
+            
+            print(f"\n   📊 VOLATILITÉ & BREAKEVENS:")
+            print(f"      • Implied Vol Moyenne: {strat.avg_implied_volatility:.2%}")
+            print(f"      • Breakevens ({len(strat.breakeven_points)}): {', '.join([f'${be:.2f}' for be in strat.breakeven_points])}")
+            if len(strat.breakeven_points) >= 2:
+                be_spread = max(strat.breakeven_points) - min(strat.breakeven_points)
+                print(f"      • Écart Breakevens: ${be_spread:.2f}")
+            
+            print(f"\n   📅 EXPIRATION:")
+            print(f"      • Date: {strat.expiration_month}{strat.expiration_year} (Week: {strat.expiration_week}, Day: {strat.expiration_day})")
+            print(f"      • Nombre d'options: {len(strat.all_options)}")
         
-        print("\n" + "=" * 80)
+        print("\n" + "=" * 100)
 

@@ -90,10 +90,6 @@ def dict_to_option_with_calcul(option_dict: Dict,
     """
     Convertit un dictionnaire d'option (format Bloomberg) en objet Option
     et calcule les métriques de surface (profit/loss surfaces).
-
-    
-    Returns:
-        Objet Option avec les métriques de surface calculées
     """
     try:
         # Extraire la date d'expiration
@@ -173,26 +169,6 @@ def bloomberg_data_to_options(bloomberg_data: List[Dict],
     """
     Convertit une liste complète de données Bloomberg en liste d'objets Option.
     Utilise dict_to_option_with_calcul pour calculer automatiquement les surfaces.
-    
-    Args:
-        bloomberg_data: Liste de dictionnaires avec les données d'options Bloomberg
-        default_position: Position par défaut ('long' ou 'short') pour toutes les options
-        default_quantity: Quantité par défaut pour toutes les options
-        price_min: Prix minimum pour le calcul des surfaces (requis si calculate_surfaces=True)
-        price_max: Prix maximum pour le calcul des surfaces (requis si calculate_surfaces=True)
-        num_points: Nombre de points pour l'intégration (défaut: 200)
-        calculate_surfaces: Si True, calcule les surfaces profit/loss (défaut: True)
-    
-    Returns:
-        Liste d'objets Option avec surfaces calculées si demandé
-        
-    Example:
-        >>> data = [
-        ...     {'option_type': 'call', 'strike': 100, 'premium': 5, 'delta': 0.6},
-        ...     {'option_type': 'put', 'strike': 95, 'premium': 3, 'delta': -0.4}
-        ... ]
-        >>> options = bloomberg_data_to_options(data, price_min=80, price_max=120)
-        >>> print(f"Converted {len(options)} options")
     """
     if not bloomberg_data:
         print("⚠️ Aucune donnée Bloomberg fournie")
