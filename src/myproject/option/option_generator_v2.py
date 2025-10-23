@@ -13,7 +13,7 @@ from myproject.option.option_class import Option
 from myproject.option.comparison_class import StrategyComparison
 from myproject.option.calcul_linear_metrics import calculate_linear_metrics
 from myproject.option.option_filter import sort_options_by_expiration
-from myproject.option.option_utils import get_expiration_info
+from myproject.option.option_utils_v2 import get_expiration_info
 from myproject.option.dic_to_option import bloomberg_data_to_options
 
 
