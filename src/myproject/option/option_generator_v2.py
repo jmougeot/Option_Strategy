@@ -42,7 +42,7 @@ class OptionStrategyGeneratorV2:
                            default_quantity: int = 1,
                            price_min: Optional[float] = None,
                            price_max: Optional[float] = None,
-                           calculate_surfaces: bool = False) -> "OptionStrategyGeneratorV2":
+                           ) -> "OptionStrategyGeneratorV2":
         """
         Crée un générateur à partir de données Bloomberg brutes.
         """
@@ -53,9 +53,8 @@ class OptionStrategyGeneratorV2:
             bloomberg_data,
             default_position=default_position,
             default_quantity=default_quantity,
-            price_min=price_min if calculate_surfaces else None,
-            price_max=price_max if calculate_surfaces else None,
-            calculate_surfaces=calculate_surfaces
+            price_min=price_min,
+            price_max=price_max,
         )
         
         if not options:

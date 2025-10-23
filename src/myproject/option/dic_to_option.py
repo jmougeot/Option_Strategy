@@ -164,8 +164,7 @@ def bloomberg_data_to_options(bloomberg_data: List[Dict],
                               default_quantity: int = 1,
                               price_min: Optional[float] = None,
                               price_max: Optional[float] = None,
-                              num_points: int = 200,
-                              calculate_surfaces: bool = True) -> List[Option]:
+                              num_points: int = 200,) -> List[Option]:
     """
     Convertit une liste complète de données Bloomberg en liste d'objets Option.
     Utilise dict_to_option_with_calcul pour calculer automatiquement les surfaces.
@@ -173,12 +172,6 @@ def bloomberg_data_to_options(bloomberg_data: List[Dict],
     if not bloomberg_data:
         print("⚠️ Aucune donnée Bloomberg fournie")
         return []
-    
-    # Vérifier les paramètres si calcul de surfaces demandé
-    if calculate_surfaces and (price_min is None or price_max is None):
-        print("⚠️ price_min et price_max requis pour calculer les surfaces")
-        print("   → Conversion sans calcul de surfaces")
-        calculate_surfaces = False
     
     options = []
     errors = 0
@@ -188,24 +181,15 @@ def bloomberg_data_to_options(bloomberg_data: List[Dict],
             # Extraire position et quantity si présents dans les données
             position = option_dict.get('position', default_position)
             quantity = option_dict.get('quantity', default_quantity)
-            
-            if calculate_surfaces:
-                # Conversion avec calcul des surfaces
-                option = dict_to_option_with_calcul(
-                    option_dict,
-                    position=position,
-                    quantity=quantity,
-                    price_min=price_min,
-                    price_max=price_max,
-                    num_points=num_points
-                )
-            else:
-                # Conversion simple sans calcul
-                option = dict_to_option(
-                    option_dict,
-                    position=position,
-                    quantity=quantity
-                )
+            option = dict_to_option_with_calcul(
+            option_dict,
+            position=position,
+            quantity=quantity,
+            price_min=price_min,
+            price_max=price_max,
+            num_points=num_points
+            )
+
             
             # Ajouter uniquement les options valides (non-empty)
             if option.strike > 0 and option.premium > 0:
@@ -223,11 +207,9 @@ def bloomberg_data_to_options(bloomberg_data: List[Dict],
     if errors > 0:
         print(f"⚠️ {errors} erreurs de conversion")
     
-    if calculate_surfaces and options:
-        # Calculer les totaux pour information
-        total_profit = sum(opt.profit_surface or 0 for opt in options)
-        total_loss = sum(opt.loss_surface or 0 for opt in options)
-        print(f"📊 Surfaces totales: Profit={total_profit:,.2f}, Loss={total_loss:,.2f}")
+    total_profit = sum(opt.profit_surface or 0 for opt in options)
+    total_loss = sum(opt.loss_surface or 0 for opt in options)
+    print(f"📊 Surfaces totales: Profit={total_profit:,.2f}, Loss={total_loss:,.2f}")
     
     return options
        
