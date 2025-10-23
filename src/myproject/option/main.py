@@ -45,7 +45,8 @@ def process_bloomberg_to_strategies(
         default_position='long',
         price_min=price_min,
         price_max=price_max,
-        calculate_surfaces=False
+        calculate_surfaces=True,  # ✅ ACTIVER le calcul des surfaces !
+        num_points=200
     )
     
     stats['nb_options'] = len(options)

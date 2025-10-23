@@ -136,29 +136,42 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
     return fig
 
 def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFrame:
-    """Crée un DataFrame pour l'affichage des comparaisons avec tous les critères."""
+    """Crée un DataFrame pour l'affichage des comparaisons avec TOUS les critères de scoring."""
     
     data = []
     for idx, comp in enumerate(comparisons, 1):
+        # Calculs additionnels
+        be_count = len(comp.breakeven_points)
+        be_spread = (max(comp.breakeven_points) - min(comp.breakeven_points)) if len(comp.breakeven_points) >= 2 else 0
+        
         data.append({
             'Rang': idx,
             'Stratégie': comp.strategy_name,
             'Score': f"{comp.score:.3f}",
-            # Critères financiers
+            
+            # 💰 MÉTRIQUES FINANCIÈRES
             'Max Profit': format_currency(comp.max_profit),
             'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
-            'R/R Ratio': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
+            'R/R': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',
             'Zone ±': format_currency(comp.profit_zone_width),
             'P&L@Target': format_currency(comp.profit_at_target),
-            # Nouveaux critères de surfaces
+            'Target %': f"{comp.profit_at_target_pct:.1f}%",
+            
+            # 📐 SURFACES
             'Surf. Profit': f"{comp.surface_profit:.2f}",
             'Surf. Loss': f"{comp.surface_loss:.2f}",
             'P/L Ratio': f"{(comp.surface_profit/comp.surface_loss):.2f}" if comp.surface_loss > 0 else '∞',
-            # Greeks
+            
+            # 🔢 GREEKS
             'Delta': f"{comp.total_delta:.3f}",
             'Gamma': f"{comp.total_gamma:.3f}",
             'Vega': f"{comp.total_vega:.3f}",
-            'Theta': f"{comp.total_theta:.3f}"
+            'Theta': f"{comp.total_theta:.3f}",
+            
+            # 📊 VOLATILITÉ & BREAKEVENS
+            'IV': f"{comp.avg_implied_volatility:.2%}",
+            'BE Count': be_count,
+            'BE Spread': f"${be_spread:.2f}" if be_spread > 0 else '-',
         })
     
     return pd.DataFrame(data)

@@ -103,13 +103,12 @@ def main():
         # ====================================================================
         
         # Calculer le prix cible médian
-        target_price_median = (params.price_min + params.price_max) / 2
         
         with st.spinner(f"🔄 Traitement complet : Conversion → Génération → Comparaison (max {params.max_legs} legs)..."):
             # Appeler la fonction principale qui fait TOUT
             best_strategies, stats = process_bloomberg_to_strategies(
                 bloomberg_data=data['options'],
-                target_price=target_price_median,
+                target_price=params.strike,
                 price_min=params.price_min,
                 price_max=params.price_max,
                 max_legs=params.max_legs,
