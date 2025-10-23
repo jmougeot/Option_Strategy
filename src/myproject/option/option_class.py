@@ -134,17 +134,6 @@ class Option:
         """
         Produit élément-par-élément entre une gaussienne (normalisée) et un P&L déjà calculé
         sur la grille 'prices', puis intégrale trapézoïdale du résultat.
-
-        Args:
-            prices: np.ndarray des prix (shape [N])
-            pnl_array: np.ndarray du P&L sur la même grille (shape [N])
-            center_price: moyenne (mu) de la gaussienne
-            std_dev: écart-type (sigma) de la gaussienne (> 0)
-
-        Returns:
-            (weighted_array, weighted_area)
-              - weighted_array: pnl_array * gaussian (shape [N])
-              - weighted_area : float, intégrale de weighted_array sur 'prices'
         """
         if prices.shape != pnl_array.shape:
             raise ValueError("prices et pnl_array doivent avoir la même shape.")
