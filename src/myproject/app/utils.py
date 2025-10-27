@@ -11,45 +11,6 @@ from myproject.option.comparison_class import StrategyComparison
 from myproject.option.option_class import Option
 
 
-@st.cache_data
-def load_options_from_bloomberg(params: Dict) -> List[Option]:
-    """
-    Charge les données d'options depuis Bloomberg et retourne directement des objets Option.
-    
-    Args:
-        params: Dictionnaire avec underlying, months, years, strikes, price_min, price_max
-        
-    Returns:
-        Liste d'objets Option
-    """
-    try:
-        from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
-        
-        options = import_euribor_options(
-            underlying=params['underlying'],
-            months=params['months'],
-            years=params['years'],
-            strikes=params['strikes'],
-            include_calls=True,
-            include_puts=True,
-            default_position='long',
-            default_quantity=1,
-            price_min=params.get('price_min'),
-            price_max=params.get('price_max'),
-            num_points=200
-        )
-        
-        return options
-    except ImportError as e:
-        st.error(f"❌ Erreur d'import du module Bloomberg: {e}")
-        st.stop()
-        return []
-    except Exception as e:
-        st.error(f"❌ Erreur lors de l'import Bloomberg: {e}")
-        st.stop()
-        return []
-
-
 def prepare_options_data(options: List[Option]) -> Dict[str, List[Option]]:
     """Sépare les calls et puts."""
     calls = [opt for opt in options if opt.option_type == 'call']

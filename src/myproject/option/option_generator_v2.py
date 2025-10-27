@@ -14,7 +14,6 @@ from myproject.option.comparison_class import StrategyComparison
 from myproject.option.calcul_linear_metrics import calculate_linear_metrics
 from myproject.option.option_filter import sort_options_by_expiration
 from myproject.option.option_utils_v2 import get_expiration_info
-from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
 
 
 class OptionStrategyGeneratorV2:
@@ -149,6 +148,8 @@ class OptionStrategyGeneratorV2:
                 # Créer une copie de l'option avec la position modifiée
                 opt_copy = Option(
                     option_type=opt.option_type,
+                    loss_surface= opt.loss_surface,
+                    profit_surface=opt.profit_surface,
                     strike=opt.strike,
                     premium=opt.premium,
                     expiration_day=opt.expiration_day,

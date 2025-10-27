@@ -16,10 +16,10 @@ from myproject.app.styles import inject_css
 from myproject.app.widget import scoring_weights_block, sidebar_params
 from myproject.app.utils import (
     create_payoff_diagram,
-    load_options_from_bloomberg,
     format_currency,
     create_comparison_table
 )
+from myproject.option.option_class import Option
 
 # ============================================================================
 # CONFIGURATION DE LA PAGE
@@ -75,25 +75,7 @@ def main():
                 'price_min': params.price_min,
                 'price_max': params.price_max
             }
-            options = load_options_from_bloomberg(params_dict)
             
-            nb_options = len(options)
-            st.success(f"✅ {nb_options} options chargées depuis Bloomberg")
-            
-            # Optionnellement sauvegarder
-            save_data = st.checkbox("Sauvegarder les données importées en JSON", value=False)
-            if save_data and options:
-                from myproject.bloomberg.bloomberg_data_importer import save_to_json
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                save_filename = f"bloomberg_import_{timestamp}.json"
-                save_to_json(options, save_filename)
-                st.success(f"💾 Données sauvegardées dans {save_filename}")
-        
-        # Validation
-        if nb_options == 0:
-            st.error("❌ Aucune option trouvée dans les données Bloomberg")
-            return
-        
         # Validation de l'intervalle de prix
         if params.price_min >= params.price_max:
             st.error("❌ Le prix minimum doit être inférieur au prix maximum")

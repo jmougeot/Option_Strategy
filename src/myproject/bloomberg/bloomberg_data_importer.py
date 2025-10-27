@@ -256,7 +256,7 @@ def import_euribor_options(
                         # Extraire les meilleures valeurs
                         extracted = extract_best_values(raw_data)
                         
-                        # Créer l'option directement
+                        # Créer l'option directement (les surfaces sont calculées dans create_option_from_bloomberg)
                         option = create_option_from_bloomberg(
                             ticker=ticker,
                             underlying=meta['underlying'],
@@ -272,10 +272,6 @@ def import_euribor_options(
                             num_points=num_points,    
                         )
                         
-                        option.loss_surface = option.calcul_loss_surface(price_min , price_max, 100)
-                        option.profit_surface = option.calcul_profit_surface(price_min , price_max, 100)
-                        print(f"loss_surface = {option.loss_surface} ")
-
                         # Vérifier que l'option est valide
                         if option.strike > 0 and option.premium > 0:
                             option_objects.append(option)
