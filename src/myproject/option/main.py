@@ -63,7 +63,6 @@ def process_bloomberg_to_strategies(
         default_quantity=1,
         price_min=price_min,
         price_max=price_max,
-        calculate_surfaces=True,
         num_points=200
     )
     

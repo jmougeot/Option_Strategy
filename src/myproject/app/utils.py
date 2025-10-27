@@ -36,7 +36,6 @@ def load_options_from_bloomberg(params: Dict) -> List[Option]:
             default_quantity=1,
             price_min=params.get('price_min'),
             price_max=params.get('price_max'),
-            calculate_surfaces=True,
             num_points=200
         )
         
@@ -67,6 +66,29 @@ def format_currency(value: float) -> str:
 def format_percentage(value: float) -> str:
     """Formats a percentage."""
     return f"{value:.1f}%"
+
+def format_expiration_date(month: str, year: int) -> str:
+    """
+    Formate la date d'expiration à partir du mois Bloomberg et de l'année.
+    
+    Args:
+        month: Code du mois Bloomberg (F, G, H, K, M, N, Q, U, V, X, Z)
+        year: Année (6 = 2026)
+        
+    Returns:
+        Date formatée (ex: "Jun 2026")
+    """
+    month_names = {
+        'F': 'Jan', 'G': 'Feb', 'H': 'Mar', 'K': 'Apr',
+        'M': 'Jun', 'N': 'Jul', 'Q': 'Aug', 'U': 'Sep',
+        'V': 'Oct', 'X': 'Nov', 'Z': 'Dec'
+    }
+    
+    month_name = month_names.get(month, month)
+    full_year = 2020 + year
+    
+    return f"{month_name} {full_year}"
+
 
 def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: float):
     """
@@ -153,6 +175,7 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
         data.append({
             'Rang': idx,
             'Stratégie': comp.strategy_name,
+            'Expiration': format_expiration_date(comp.expiration_month, comp.expiration_year),
             'Score': f"{comp.score:.3f}",
             
             # 💰 MÉTRIQUES FINANCIÈRES

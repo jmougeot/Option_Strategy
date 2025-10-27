@@ -34,52 +34,7 @@ class OptionStrategyGeneratorV2:
         self.options = sort_options_by_expiration(options)
         self.price_min = None
         self.price_max = None
-    
-    @classmethod
-    def from_bloomberg_data(cls,
-                           underlying: str = "ER",
-                           months: List[str] = [],
-                           years: List[int] = [],
-                           strikes: List[float] = [],
-                           default_position: Literal['long', 'short'] = 'long',
-                           default_quantity: int = 1,
-                           price_min: Optional[float] = None,
-                           price_max: Optional[float] = None,
-                           calculate_surfaces: bool = True
-                           ) -> "OptionStrategyGeneratorV2":
-        """
-        Crée un générateur à partir de données Bloomberg.
-        
-        Args:
-            underlying: Symbole du sous-jacent (ex: "ER")
-            months: Liste des mois Bloomberg (ex: ['M', 'U'])
-            years: Liste des années (ex: [6, 7])
-            strikes: Liste des strikes
-            default_position: Position par défaut
-            default_quantity: Quantité par défaut
-            price_min: Prix min pour surfaces
-            price_max: Prix max pour surfaces
-            calculate_surfaces: Si True, calcule les surfaces
-        """
-        # Importer directement les options depuis Bloomberg
-        options = import_euribor_options(
-            underlying=underlying,
-            months=months,
-            years=years,
-            strikes=strikes,
-            default_position=default_position,
-            default_quantity=default_quantity,
-            price_min=price_min,
-            price_max=price_max,
-            calculate_surfaces=True,
-            num_points=200
-        )
-        
-        if not options:
-            print("⚠️ Aucune option valide après import Bloomberg")
-        
-        return cls(options)
-    
+
     def generate_all_combinations(self,
                                   target_price: float,
                                   price_min: float,

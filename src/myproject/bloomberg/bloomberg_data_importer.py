@@ -57,9 +57,8 @@ def create_option_from_bloomberg(
     bloomberg_data: dict,
     position: Literal['long', 'short'] = 'long',
     quantity: int = 1,
-    price_min: Optional[float] = None,
-    price_max: Optional[float] = None,
-    calculate_surfaces: bool = True,
+    price_min: float = 0,
+    price_max: float = 0,
     num_points: int = 200
 ) -> Option:
     """
@@ -130,10 +129,9 @@ def create_option_from_bloomberg(
             timestamp=datetime.now()
         )
         
-        # Calculer les surfaces si demandé
-        if calculate_surfaces and price_min is not None and price_max is not None:
-            option.profit_surface = option.calcul_profit_surface(price_min, price_max, num_points)
-            option.loss_surface = option.calcul_loss_surface(price_min, price_max, num_points)
+
+        option.profit_surface = option.calcul_profit_surface(price_min, price_max, num_points)
+        option.loss_surface = option.calcul_loss_surface(price_min, price_max, num_points)
         
         return option
         
@@ -144,17 +142,16 @@ def create_option_from_bloomberg(
 
 def import_euribor_options(
     underlying: str = "ER",
-    months: List[str] = [],
-    years: List[int] = [],
-    strikes: List[float] = [],
+    months: Optional[List[str]] = None,
+    years: Optional[List[int]] = None,
+    strikes: Optional[List[float]] = None,
     suffix: str = "Comdty",
     include_calls: bool = True,
     include_puts: bool = True,
     default_position: Literal['long', 'short'] = 'long',
     default_quantity: int = 1,
-    price_min: Optional[float] = None,
-    price_max: Optional[float] = None,
-    calculate_surfaces: bool = True,
+    price_min: float =0,
+    price_max: float = 0,
     num_points: int = 200
 ) -> List[Option]:
     """
@@ -186,9 +183,7 @@ def import_euribor_options(
     print(f"Années: {', '.join(map(str, years))}")
     print(f"Strikes: {len(strikes)} strikes de {min(strikes)} à {max(strikes)}")
     print(f"Types: {'Calls' if include_calls else ''}{' + ' if include_calls and include_puts else ''}{'Puts' if include_puts else ''}")
-    print(f"Calcul surfaces: {'Oui' if calculate_surfaces else 'Non'}")
-    if calculate_surfaces and price_min and price_max:
-        print(f"Range de prix: ${price_min} - ${price_max}")
+    print(f"Range de prix: ${price_min} - ${price_max}")
     print("=" * 70)
     print()
     
@@ -274,8 +269,7 @@ def import_euribor_options(
                             quantity=default_quantity,
                             price_min=price_min,
                             price_max=price_max,
-                            calculate_surfaces=calculate_surfaces,
-                            num_points=num_points
+                            num_points=num_points,
                         )
                         
                         # Vérifier que l'option est valide
