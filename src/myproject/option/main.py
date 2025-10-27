@@ -13,7 +13,7 @@ Utilise les fonctions optimisées des modules :
 """
 
 from typing import List, Dict, Optional, Tuple
-from myproject.option.option_generator_v2 import OptionStrategyGeneratorV2
+from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.comparor_v2 import StrategyComparerV2
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
@@ -87,9 +87,6 @@ def process_bloomberg_to_strategies(
     )
     
     stats['nb_strategies_totales'] = len(all_strategies)
-    
-    if not all_strategies:
-        return [], stats
     
     # ÉTAPE 3 : Comparaison et ranking
     if verbose:

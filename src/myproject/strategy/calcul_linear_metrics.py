@@ -9,8 +9,7 @@ Optimisé pour calculer toutes les métriques en une seule fonction.
 Utilise les méthodes de la classe Option pour assurer la cohérence des calculs.
 """
 
-from typing import List, Dict, Optional
-from dataclasses import dataclass, field
+from typing import List, Dict
 from myproject.option.option_class import Option
 import numpy as np
 
@@ -71,10 +70,7 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
         quantity = option.quantity if option.quantity is not None else 1
         leg_cost = option.premium * quantity * (-1 if option.position == 'long' else 1)
         premium += leg_cost
-        
-        # DEBUG: Afficher le calcul pour chaque leg
-        print(f"     → Leg: premium={option.premium:.4f} × qty={quantity} × sign={-1 if option.position == 'long' else 1} = {leg_cost:.4f} (cumul={premium:.4f})")
-        
+                
         # ============ GREEKS ============
         sign = 1 if option.position == 'long' else -1
         

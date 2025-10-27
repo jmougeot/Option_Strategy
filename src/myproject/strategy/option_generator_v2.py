@@ -11,7 +11,7 @@ from typing import List, Dict, Tuple, Optional, Literal
 from itertools import combinations
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
-from myproject.option.calcul_linear_metrics import calculate_linear_metrics
+from myproject.strategy.calcul_linear_metrics import calculate_linear_metrics
 from myproject.option.option_filter import sort_options_by_expiration
 from myproject.option.option_utils_v2 import get_expiration_info
 
@@ -85,7 +85,6 @@ class OptionStrategyGeneratorV2:
         if n == 0:
             return []
         
-        # ===== Vérification d'échéance (ultra-rapide) =====
         # Comme les options sont triées, si première == dernière, toutes sont identiques
         if n > 1:
             first, last = options[0], options[-1]
@@ -94,7 +93,7 @@ class OptionStrategyGeneratorV2:
                 first.expiration_month != last.expiration_month or
                 first.expiration_week != last.expiration_week or
                 first.expiration_day != last.expiration_day):
-                return []  # Dates d'échéance différentes
+                return [] 
 
         n = len(options)
         if n == 0:
@@ -114,9 +113,8 @@ class OptionStrategyGeneratorV2:
         strategies: List[StrategyComparison] = []
 
         # ===== Génération des stratégies =====
-        # Si tu veux conserver 'long'/'short', mappe le signe -> libellé à l’appel
         for signs in sign_space:
-            positions = ['long' if s == -1 else 'short' for s in signs]
+            positions: List[str] = ['long' if s == -1 else 'short' for s in signs]
             strat = self._create_strategy(options, positions, target_price)
             if strat:
                 strategies.append(strat)
@@ -172,28 +170,17 @@ class OptionStrategyGeneratorV2:
             
             # Générer le nom de la stratégie
             strategy_name = self._generate_strategy_name(option_legs)
-
-            # ============ CALCUL DE TOUTES LES MÉTRIQUES EN UNE FOIS ============
-            # calculate_linear_metrics calcule TOUT : linéaires + surfaces (si paramètres fournis)
             all_metrics = calculate_linear_metrics(option_legs)
-
-            # Calculer max_profit, max_loss, breakevens (métriques non-linéaires)
-            metrics = self._calculate_strategy_metrics(
-                option_legs,
-                target_price
-            )
-            
-            # Extraire les informations d'expiration
+            metrics = self._calculate_strategy_metrics(option_legs, target_price)
             exp_info = get_expiration_info(option_legs)
             
-            final_premium = all_metrics['premium']
 
             
             # Créer le StrategyComparison
             # Note: premium est négatif pour un débit (on paie), positif pour un crédit (on reçoit)
             # Le signe est déjà inversé dans calculate_linear_metrics
             strategy = StrategyComparison(                
-                premium=final_premium,  # Inverser le signe pour l'affichage (débit > 0, crédit < 0)
+                premium=all_metrics['premium'],  # Inverser le signe pour l'affichage (débit > 0, crédit < 0)
                 strategy_name=strategy_name,
                 strategy=None,  # Pas d'objet OptionStrategy, juste les métriques
                 target_price=target_price,
@@ -208,7 +195,7 @@ class OptionStrategyGeneratorV2:
                 profit_zone_width=metrics['profit_zone_width'],
                 surface_profit=all_metrics['profit_surface'],
                 surface_loss=all_metrics['loss_surface'],
-                risk_reward_ratio=metrics['max_profit'] / abs(metrics['max_loss']) if metrics['max_loss'] != 0 and metrics['max_loss'] != float('inf') else float('inf'),
+                risk_reward_ratio=metrics['max_profit'] / abs(metrics['max_loss']),
                 all_options=option_legs,
                 # Greeks (from all_metrics)
                 total_delta_calls=all_metrics['delta_calls'],
@@ -225,8 +212,7 @@ class OptionStrategyGeneratorV2:
                 total_theta=all_metrics['theta_total'],
                 avg_implied_volatility=all_metrics['avg_implied_volatility'],
                 profit_at_target=metrics['profit_at_target'],
-                profit_at_target_pct=(metrics['profit_at_target'] / metrics['max_profit'] * 100) 
-                                     if metrics['max_profit'] > 0 and metrics['max_profit'] != float('inf') else 0,
+                profit_at_target_pct=metrics['profit_at_target'] / metrics['max_profit'] * 100,
                 score=0.0,
                 rank=0
             )
