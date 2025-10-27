@@ -206,7 +206,7 @@ class OptionStrategyGeneratorV2:
                 profit_zone_width=metrics['profit_zone_width'],
                 surface_profit=all_metrics['profit_surface'],
                 surface_loss=all_metrics['loss_surface'],
-                risk_reward_ratio=abs(metrics['max_loss']) / metrics['max_profit'] if metrics['max_profit'] > 0 else 0,
+                risk_reward_ratio=metrics['max_profit'] / abs(metrics['max_loss']) if metrics['max_loss'] != 0 and metrics['max_loss'] != float('inf') else float('inf'),
                 all_options=option_legs,
                 # Greeks (from all_metrics)
                 total_delta_calls=all_metrics['delta_calls'],
