@@ -71,7 +71,7 @@ class OptionStrategyGeneratorV2:
             default_quantity=default_quantity,
             price_min=price_min,
             price_max=price_max,
-            calculate_surfaces=calculate_surfaces,
+            calculate_surfaces=True,
             num_points=200
         )
         
@@ -92,7 +92,6 @@ class OptionStrategyGeneratorV2:
         """
         self.price_min = price_min
         self.price_max = price_max
-        
         all_strategies = []
         
         # Générer les combinaisons pour chaque taille (1 à max_legs)
@@ -223,7 +222,7 @@ class OptionStrategyGeneratorV2:
                 option_legs,
                 price_min=self.price_min,
                 price_max=self.price_max,
-                num_points=1000,  # Activer le calcul des surfaces
+                num_points=200,  # Activer le calcul des surfaces
             )
             
             # Calculer max_profit, max_loss, breakevens (métriques non-linéaires)
@@ -236,7 +235,8 @@ class OptionStrategyGeneratorV2:
             exp_info = get_expiration_info(option_legs)
             
             # Créer le StrategyComparison
-            strategy = StrategyComparison(
+            strategy = StrategyComparison(                
+                premium=all_metrics['net_cost'],
                 strategy_name=strategy_name,
                 strategy=None,  # Pas d'objet OptionStrategy, juste les métriques
                 target_price=target_price,

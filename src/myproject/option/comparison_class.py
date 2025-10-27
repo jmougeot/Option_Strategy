@@ -10,6 +10,7 @@ class StrategyComparison:
     strategy_name: str
     strategy: Any  # OptionStrategy-like
     target_price: float
+    premium : float 
 
     # Epiration date
     expiration_day : Optional[str]
@@ -68,6 +69,7 @@ class StrategyComparison:
         avec des valeurs par défaut pour initialiser une stratégie.
         """
         return cls(
+            premium =1,
             strategy_name="EmptyStrategy",
             strategy=None,
             target_price=0.0,

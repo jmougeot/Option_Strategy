@@ -38,8 +38,6 @@ def calculate_linear_metrics(options: List[Option],
     """
     # Initialiser les accumulateurs
     net_cost = 0.0
-    total_premium_paid = 0.0
-    total_premium_received = 0.0
     total_loss_surface = 0.0
     total_profit_surface = 0.0
     total_gauss_pnl = 0.0
@@ -74,11 +72,6 @@ def calculate_linear_metrics(options: List[Option],
         # ============ COÛT NET ============
         leg_cost = option.premium * (-1 if option.position == 'long' else 1)
         net_cost += leg_cost
-        
-        if option.position == 'long':
-            total_premium_paid += option.premium
-        else:
-            total_premium_received += option.premium
         
         # ============ GREEKS ============
         sign = 1 if option.position == 'long' else -1
@@ -126,13 +119,12 @@ def calculate_linear_metrics(options: List[Option],
                if opt.implied_volatility is not None]
         avg_iv = sum(ivs) / len(ivs) if ivs else 0.0
     
+
+    
     # ============ PRÉPARER LE DICTIONNAIRE DE RÉSULTATS ============
     result = {
         # Coût
         'net_cost': net_cost,
-        'total_premium_paid': total_premium_paid,
-        'total_premium_received': total_premium_received,
-        
         # Greeks - Calls
         'delta_calls': delta_calls,
         'gamma_calls': gamma_calls,
