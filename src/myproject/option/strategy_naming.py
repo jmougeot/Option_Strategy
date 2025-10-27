@@ -91,13 +91,34 @@ def generate_strategy_name(options: List[Option]) -> str:
         # STRADDLE (même strike)
         elif len(calls) == 1 and len(puts) == 1:
             if len(strikes) == 1:
-                position_name = 'Long' if len(longs) == 2 else 'Short'
-                return f"{position_name}Straddle {strikes[0]:.2f}"
+                # Vérifier que les deux options ont la même position
+                if longs[0].position == longs[1].position if len(longs) == 2 else shorts[0].position == shorts[1].position:
+                    position_name = 'Long' if len(longs) == 2 else 'Short'
+                    return f"{position_name}Straddle {strikes[0]:.2f}"
             
             # STRANGLE (strikes différents)
             else:
-                position_name = 'Long' if len(longs) == 2 else 'Short'
-                return f"{position_name}Strangle {strikes_str}"
+                # Vérifier que les deux options ont la même position
+                if len(longs) == 2 or len(shorts) == 2:
+                    position_name = 'Long' if len(longs) == 2 else 'Short'
+                    return f"{position_name}Strangle {strikes_str}"
+        
+        # SYNTHETIC LONG/SHORT (Long Call + Short Put ou inverse)
+        elif len(calls) == 1 and len(puts) == 1:
+            call = calls[0]
+            put = puts[0]
+            # Synthetic Long : Long Call + Short Put (même strike)
+            if call.position == 'long' and put.position == 'short' and call.strike == put.strike:
+                return f"SyntheticLong {call.strike:.2f}"
+            # Synthetic Short : Short Call + Long Put (même strike)
+            elif call.position == 'short' and put.position == 'long' and call.strike == put.strike:
+                return f"SyntheticShort {call.strike:.2f}"
+            # Risk Reversal : Long Call + Short Put (strikes différents)
+            elif call.position == 'long' and put.position == 'short' and len(strikes) == 2:
+                return f"RiskReversal {strikes_str}"
+            # Reverse Risk Reversal : Short Call + Long Put (strikes différents)
+            elif call.position == 'short' and put.position == 'long' and len(strikes) == 2:
+                return f"ReverseRiskReversal {strikes_str}"
         
         # NOM GÉNÉRIQUE POUR 2 LEGS
         return f"2Leg_{len(calls)}C{len(puts)}P_{strikes_str}"
@@ -106,6 +127,38 @@ def generate_strategy_name(options: List[Option]) -> str:
     # STRATÉGIES À 3 LEGS
     # ============================================================================
     elif n_legs == 3:
+        # STRIP (2 Puts + 1 Call au même strike) - Bearish straddle
+        if len(puts) == 2 and len(calls) == 1 and len(strikes) == 1:
+            if len(longs) == 3 or len(shorts) == 3:
+                position_name = 'Long' if len(longs) == 3 else 'Short'
+                return f"{position_name}Strip {strikes[0]:.2f}"
+        
+        # STRAP (2 Calls + 1 Put au même strike) - Bullish straddle
+        elif len(calls) == 2 and len(puts) == 1 and len(strikes) == 1:
+            if len(longs) == 3 or len(shorts) == 3:
+                position_name = 'Long' if len(longs) == 3 else 'Short'
+                return f"{position_name}Strap {strikes[0]:.2f}"
+        
+        # RATIO CALL SPREAD (1 Long + 2 Short ou inverse)
+        elif len(calls) == 3 and len(strikes) == 2:
+            sorted_calls = sorted(calls, key=lambda o: o.strike)
+            # 1 Long (strike bas) + 2 Short (strike haut)
+            if sorted_calls[0].position == 'long' and sorted_calls[1].position == 'short' and sorted_calls[2].position == 'short':
+                return f"CallRatioSpread {strikes_str}"
+            # 2 Long (strike bas) + 1 Short (strike haut) - Backspread
+            elif sorted_calls[0].position == 'long' and sorted_calls[1].position == 'long' and sorted_calls[2].position == 'short':
+                return f"CallBackspread {strikes_str}"
+        
+        # RATIO PUT SPREAD (1 Long + 2 Short ou inverse)
+        elif len(puts) == 3 and len(strikes) == 2:
+            sorted_puts = sorted(puts, key=lambda o: o.strike)
+            # 2 Long (strike bas) + 1 Short (strike haut)
+            if sorted_puts[0].position == 'long' and sorted_puts[1].position == 'long' and sorted_puts[2].position == 'short':
+                return f"PutRatioSpread {strikes_str}"
+            # 1 Long (strike bas) + 2 Short (strike haut) - Backspread
+            elif sorted_puts[0].position == 'long' and sorted_puts[1].position == 'short' and sorted_puts[2].position == 'short':
+                return f"PutBackspread {strikes_str}"
+        
         if len(strikes) == 3:
             # CALL BUTTERFLY
             if len(calls) == 3:
@@ -125,6 +178,15 @@ def generate_strategy_name(options: List[Option]) -> str:
     # STRATÉGIES À 4 LEGS
     # ============================================================================
     elif n_legs == 4:
+        # IRON BUTTERFLY (spécial : 2 strikes centraux identiques, 3 strikes au total)
+        if len(calls) == 2 and len(puts) == 2 and len(strikes) == 3:
+            return f"IronButterfly {strikes_str}"
+        
+        # BOX SPREAD (arbitrage) : Bull Call + Bear Put (2 strikes)
+        if len(calls) == 2 and len(puts) == 2 and len(strikes) == 2:
+            if _is_box_spread_pattern(options):
+                return f"BoxSpread {strikes_str}"
+        
         if len(strikes) == 4:
             # CALL CONDOR
             if len(calls) == 4:
@@ -140,10 +202,6 @@ def generate_strategy_name(options: List[Option]) -> str:
             elif len(calls) == 2 and len(puts) == 2:
                 if _is_iron_condor_pattern(options):
                     return f"IronCondor {strikes_str}"
-            
-            # IRON BUTTERFLY (spécial : strikes centraux identiques)
-            elif len(calls) == 2 and len(puts) == 2 and len(strikes) == 3:
-                return f"IronButterfly {strikes_str}"
         
         # NOM GÉNÉRIQUE POUR 4 LEGS
         return f"4Leg_{len(calls)}C{len(puts)}P_{strikes_str}"
@@ -162,8 +220,11 @@ def _is_butterfly_pattern(options: List[Option]) -> bool:
     """
     Vérifie si les options forment un pattern butterfly valide.
     
-    Pattern attendu : 1 long (strike bas) - 2 short (strike milieu) - 1 long (strike haut)
-    ou l'inverse (short-long-short)
+    Pattern attendu : 
+    - 1 long (strike bas) - 2 short (strike milieu) - 1 long (strike haut)
+    - ou l'inverse : 1 short (strike bas) - 2 long (strike milieu) - 1 short (strike haut)
+    
+    Note: Le leg central doit avoir une quantité double (2 options au même strike)
     
     Args:
         options: Liste de 3 options avec 3 strikes différents
@@ -261,6 +322,46 @@ def _is_iron_condor_pattern(options: List[Option]) -> bool:
     
     # Vérifier que les strikes sont dans le bon ordre
     if not (puts[1].strike < calls[0].strike):
+        return False
+    
+    return True
+
+
+def _is_box_spread_pattern(options: List[Option]) -> bool:
+    """
+    Vérifie si les options forment un box spread valide (arbitrage).
+    
+    Pattern attendu :
+    - Bull Call Spread : Long call (strike bas) + Short call (strike haut)
+    - Bear Put Spread : Long put (strike haut) + Short put (strike bas)
+    
+    Les deux strikes doivent être identiques entre calls et puts.
+    
+    Args:
+        options: Liste de 4 options (2 calls + 2 puts) avec 2 strikes
+        
+    Returns:
+        True si c'est un box spread valide
+    """
+    if len(options) != 4:
+        return False
+    
+    calls = sorted([o for o in options if o.option_type == 'call'], key=lambda o: o.strike)
+    puts = sorted([o for o in options if o.option_type == 'put'], key=lambda o: o.strike)
+    
+    if len(calls) != 2 or len(puts) != 2:
+        return False
+    
+    # Vérifier que calls et puts ont les mêmes strikes
+    if calls[0].strike != puts[0].strike or calls[1].strike != puts[1].strike:
+        return False
+    
+    # Bull Call Spread : Long (strike bas) + Short (strike haut)
+    if not (calls[0].position == 'long' and calls[1].position == 'short'):
+        return False
+    
+    # Bear Put Spread : Short (strike bas) + Long (strike haut)
+    if not (puts[0].position == 'short' and puts[1].position == 'long'):
         return False
     
     return True
