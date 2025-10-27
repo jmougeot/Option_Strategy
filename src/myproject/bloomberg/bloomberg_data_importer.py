@@ -313,7 +313,7 @@ def import_euribor_options(
 
 def save_to_json(options: List[Option], filename: str = "bloomberg_options.json"):
     """
-    Sauvegarde une liste d'options au format JSON.
+    Sauvegarde une liste d'options au format JSON compatible avec la classe Option.
     
     Args:
         options: Liste d'objets Option
@@ -321,38 +321,197 @@ def save_to_json(options: List[Option], filename: str = "bloomberg_options.json"
     """
     filepath = Path(__file__).parent / filename
     
-    # Convertir les objets Option en dictionnaires
+    # Convertir les objets Option en dictionnaires compatibles avec la classe Option
     options_dicts = []
     for opt in options:
         opt_dict = {
-            "symbol": opt.underlying_symbol,
-            "strike": opt.strike,
+            # ============ CHAMPS OBLIGATOIRES ============
             "option_type": opt.option_type,
+            "strike": opt.strike,
             "premium": opt.premium,
-            "expiration_date": f"{2020 + opt.expiration_year}-{opt.expiration_month}-{opt.expiration_day or 15:02d}",
-            "underlying_price": opt.underlying_price,
+            
+            # ============ EXPIRATION ============
+            "expiration_day": opt.expiration_day,
+            "expiration_week": opt.expiration_week,
+            "expiration_month": opt.expiration_month,
+            "expiration_year": opt.expiration_year,
+            
+            # ============ STRUCTURE DE POSITION ============
+            "quantity": opt.quantity,
+            "position": opt.position,
+            
+            # ============ IDENTIFICATION ============
+            "ticker": opt.ticker,
+            "underlying_symbol": opt.underlying_symbol,
+            "exchange": opt.exchange,
+            "currency": opt.currency,
+            
+            # ============ PRIX ET COTATIONS ============
             "bid": opt.bid,
             "ask": opt.ask,
-            "volume": opt.volume or 0.0,
-            "open_interest": opt.open_interest,
-            "implied_volatility": opt.implied_volatility,
-            "delta": opt.delta ,
+            "last": opt.last,
+            "mid": opt.mid,
+            "settlement_price": opt.settlement_price,
+            
+            # ============ GREEKS ============
+            "delta": opt.delta,
             "gamma": opt.gamma,
-            "theta": opt.theta,
             "vega": opt.vega,
-            "rho": opt.rho or 0.0,
-            "timestamp": datetime.now().isoformat(),
-            "bloomberg_ticker": opt.bloomberg_ticker or opt.ticker,
-            "month_of_expiration": opt.expiration_month,
-            "year_of_expiration": opt.expiration_year,
-            "day_of_expiration": opt.expiration_day
+            "theta": opt.theta,
+            "rho": opt.rho,
+            
+            # ============ MÉTRIQUES (surfaces calculées) ============
+            "loss_surface": opt.loss_surface,
+            "profit_surface": opt.profit_surface,
+            "pnl_surface": opt.pnl_surface,
+            # Note: pnl_array n'est pas sérialisable en JSON (numpy array)
+            
+            # ============ VOLATILITÉ ============
+            "implied_volatility": opt.implied_volatility,
+            "historical_volatility": opt.historical_volatility,
+            
+            # ============ LIQUIDITÉ ============
+            "open_interest": opt.open_interest,
+            "volume": opt.volume,
+            "bid_size": opt.bid_size,
+            "ask_size": opt.ask_size,
+            
+            # ============ SOUS-JACENT ============
+            "underlying_price": opt.underlying_price,
+            "underlying_price_change": opt.underlying_price_change,
+            
+            # ============ CONTRAT ============
+            "contract_size": opt.contract_size,
+            "settlement_type": opt.settlement_type,
+            "exercise_style": opt.exercise_style,
+            
+            # ============ BLOOMBERG ============
+            "bloomberg_ticker": opt.bloomberg_ticker,
+            "security_des": opt.security_des,
+            "timestamp": opt.timestamp.isoformat() if opt.timestamp else None,
         }
         options_dicts.append(opt_dict)
     
-    data = {"options": options_dicts}
+    data = {
+        "metadata": {
+            "export_date": datetime.now().isoformat(),
+            "total_options": len(options),
+            "data_structure": "Option"
+        },
+        "options": options_dicts
+    }
     
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     
     print(f"\n✅ Données sauvegardées dans: {filepath}")
     print(f"   {len(options)} options exportées")
+    print(f"   Structure: Compatible avec la classe Option")
+
+
+def load_from_json(filename: str = "bloomberg_options.json") -> List[Option]:
+    """
+    Charge une liste d'options depuis un fichier JSON.
+    
+    Args:
+        filename: Nom du fichier JSON à charger
+        
+    Returns:
+        Liste d'objets Option
+    """
+    filepath = Path(__file__).parent / filename
+    
+    if not filepath.exists():
+        print(f"❌ Fichier non trouvé: {filepath}")
+        return []
+    
+    with open(filepath, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    options = []
+    options_data = data.get('options', [])
+    
+    for opt_dict in options_data:
+        # Convertir le timestamp ISO en datetime si présent
+        timestamp = None
+        if opt_dict.get('timestamp'):
+            try:
+                timestamp = datetime.fromisoformat(opt_dict['timestamp'])
+            except:
+                timestamp = None
+        
+        # Créer l'objet Option avec tous les champs
+        option = Option(
+            # Obligatoires
+            option_type=opt_dict['option_type'],
+            strike=opt_dict['strike'],
+            premium=opt_dict['premium'],
+            
+            # Expiration
+            expiration_day=opt_dict.get('expiration_day'),
+            expiration_week=opt_dict.get('expiration_week'),
+            expiration_month=opt_dict.get('expiration_month', 'F'),
+            expiration_year=opt_dict.get('expiration_year', 6),
+            
+            # Position
+            quantity=opt_dict.get('quantity', 1),
+            position=opt_dict.get('position', 'long'),
+            
+            # Identification
+            ticker=opt_dict.get('ticker'),
+            underlying_symbol=opt_dict.get('underlying_symbol'),
+            exchange=opt_dict.get('exchange'),
+            currency=opt_dict.get('currency'),
+            
+            # Prix
+            bid=opt_dict.get('bid'),
+            ask=opt_dict.get('ask'),
+            last=opt_dict.get('last'),
+            mid=opt_dict.get('mid'),
+            settlement_price=opt_dict.get('settlement_price'),
+            
+            # Greeks
+            delta=opt_dict.get('delta'),
+            gamma=opt_dict.get('gamma'),
+            vega=opt_dict.get('vega'),
+            theta=opt_dict.get('theta'),
+            rho=opt_dict.get('rho'),
+            
+            # Métriques
+            loss_surface=opt_dict.get('loss_surface', 0),
+            profit_surface=opt_dict.get('profit_surface', 0),
+            pnl_surface=opt_dict.get('pnl_surface'),
+            
+            # Volatilité
+            implied_volatility=opt_dict.get('implied_volatility'),
+            historical_volatility=opt_dict.get('historical_volatility'),
+            
+            # Liquidité
+            open_interest=opt_dict.get('open_interest'),
+            volume=opt_dict.get('volume'),
+            bid_size=opt_dict.get('bid_size'),
+            ask_size=opt_dict.get('ask_size'),
+            
+            # Sous-jacent
+            underlying_price=opt_dict.get('underlying_price'),
+            underlying_price_change=opt_dict.get('underlying_price_change'),
+            
+            # Contrat
+            contract_size=opt_dict.get('contract_size', 100),
+            settlement_type=opt_dict.get('settlement_type'),
+            exercise_style=opt_dict.get('exercise_style'),
+            
+            # Bloomberg
+            bloomberg_ticker=opt_dict.get('bloomberg_ticker'),
+            security_des=opt_dict.get('security_des'),
+            timestamp=timestamp,
+        )
+        
+        options.append(option)
+    
+    print(f"\n✅ {len(options)} options chargées depuis: {filepath}")
+    if 'metadata' in data:
+        print(f"   Date d'export: {data['metadata'].get('export_date', 'N/A')}")
+    
+    return options
+

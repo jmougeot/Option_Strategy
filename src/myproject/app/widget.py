@@ -52,7 +52,90 @@ def sidebar_params() -> UIParams:
 def scoring_weights_block() -> dict:
     st.subheader("⚖️ Pondération du Score - COMPLET")
     
-    with st.expander("📊 Personnaliser TOUS les poids de scoring", expanded=False):
+    # STRATÉGIES PRÉDÉFINIES
+    preset_strategies = {
+        "Balanced (Équilibré)": {
+            'max_profit': 0.10, 'risk_reward': 0.10, 'profit_zone': 0.08, 'target_performance': 0.08,
+            'surface_profit': 0.12, 'surface_loss': 0.08, 'profit_loss_ratio': 0.12,
+            'delta_neutral': 0.06, 'gamma_exposure': 0.04, 'vega_exposure': 0.04, 'theta_positive': 0.04,
+            'implied_vol': 0.04, 'breakeven_count': 0.03, 'breakeven_spread': 0.03
+        },
+        "Short Vol (Vente de Volatilité)": {
+            'max_profit': 0.05, 'risk_reward': 0.10, 'profit_zone': 0.15, 'target_performance': 0.10,
+            'surface_profit': 0.10, 'surface_loss': 0.15, 'profit_loss_ratio': 0.10,
+            'delta_neutral': 0.10, 'gamma_exposure': 0.05, 'vega_exposure': 0.05, 'theta_positive': 0.15,
+            'implied_vol': 0.00, 'breakeven_count': 0.00, 'breakeven_spread': 0.00
+        },
+        "Directional (Directionnel)": {
+            'max_profit': 0.20, 'risk_reward': 0.15, 'profit_zone': 0.05, 'target_performance': 0.15,
+            'surface_profit': 0.15, 'surface_loss': 0.05, 'profit_loss_ratio': 0.10,
+            'delta_neutral': 0.02, 'gamma_exposure': 0.03, 'vega_exposure': 0.02, 'theta_positive': 0.02,
+            'implied_vol': 0.02, 'breakeven_count': 0.02, 'breakeven_spread': 0.02
+        },
+        "Income (Génération de Revenus)": {
+            'max_profit': 0.12, 'risk_reward': 0.08, 'profit_zone': 0.12, 'target_performance': 0.12,
+            'surface_profit': 0.08, 'surface_loss': 0.10, 'profit_loss_ratio': 0.08,
+            'delta_neutral': 0.08, 'gamma_exposure': 0.04, 'vega_exposure': 0.04, 'theta_positive': 0.18,
+            'implied_vol': 0.03, 'breakeven_count': 0.03, 'breakeven_spread': 0.05
+        },
+        "Delta Neutral (Market Neutral)": {
+            'max_profit': 0.08, 'risk_reward': 0.12, 'profit_zone': 0.10, 'target_performance': 0.08,
+            'surface_profit': 0.10, 'surface_loss': 0.10, 'profit_loss_ratio': 0.10,
+            'delta_neutral': 0.20, 'gamma_exposure': 0.06, 'vega_exposure': 0.08, 'theta_positive': 0.06,
+            'implied_vol': 0.04, 'breakeven_count': 0.04, 'breakeven_spread': 0.04
+        },
+        "Manuel (Personnalisé)": None  # Sera configuré manuellement
+    }
+    
+    # SÉLECTION DE LA STRATÉGIE
+    st.markdown("### 🎯 Stratégies Prédéfinies")
+    
+
+    strategy_choice = st.selectbox(
+        "Choisir une stratégie:",
+        list(preset_strategies.keys()),
+        index=0,
+        help="Sélectionnez une stratégie prédéfinie ou 'Manuel' pour personnaliser"
+    )
+    
+    # Initialiser les poids avec la stratégie sélectionnée
+    if strategy_choice != "Manuel (Personnalisé)":
+        weights = preset_strategies[strategy_choice].copy()
+        
+        # Afficher les poids de la stratégie sélectionnée
+        if 'force_manual' not in st.session_state or not st.session_state['force_manual']:
+            with st.expander("📊 Voir les poids de cette stratégie", expanded=False):
+                cols = st.columns(4)
+                with cols[0]:
+                    st.markdown("**💰 Financier**")
+                    st.write(f"Max Profit: {weights['max_profit']*100:.0f}%")
+                    st.write(f"R/R: {weights['risk_reward']*100:.0f}%")
+                    st.write(f"Zone: {weights['profit_zone']*100:.0f}%")
+                    st.write(f"Target: {weights['target_performance']*100:.0f}%")
+                with cols[1]:
+                    st.markdown("**📐 Surfaces**")
+                    st.write(f"Profit: {weights['surface_profit']*100:.0f}%")
+                    st.write(f"Loss: {weights['surface_loss']*100:.0f}%")
+                    st.write(f"P/L: {weights['profit_loss_ratio']*100:.0f}%")
+                with cols[2]:
+                    st.markdown("**🔢 Greeks**")
+                    st.write(f"Delta: {weights['delta_neutral']*100:.0f}%")
+                    st.write(f"Gamma: {weights['gamma_exposure']*100:.0f}%")
+                    st.write(f"Vega: {weights['vega_exposure']*100:.0f}%")
+                    st.write(f"Theta: {weights['theta_positive']*100:.0f}%")
+                with cols[3]:
+                    st.markdown("**📊 Autres**")
+                    st.write(f"IV: {weights['implied_vol']*100:.0f}%")
+                    st.write(f"BE Count: {weights['breakeven_count']*100:.0f}%")
+                    st.write(f"BE Spread: {weights['breakeven_spread']*100:.0f}%")
+            
+            return weights
+    
+    # Mode MANUEL - Afficher tous les sliders
+    if 'force_manual' in st.session_state:
+        del st.session_state['force_manual']
+    
+    with st.expander("📊 Personnaliser TOUS les poids de scoring", expanded=True):
         st.markdown("**Tous les attributs participent au scoring. Total doit être ~100%**")
         
         # MÉTRIQUES FINANCIÈRES

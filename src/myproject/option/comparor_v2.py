@@ -271,29 +271,7 @@ class StrategyComparerV2:
                 # Volatilité modérée (autour de 0.5) est préférable
                 vol_score = 1 - abs(vol_normalized - 0.5) * 2
                 score += max(0, vol_score) * weights['implied_vol']
-            
-            # ========== BREAKEVENS ==========
-            
-            # 13. Nombre de breakevens (2 breakevens = optimal pour stratégies)
-            if 'breakeven_count' in weights and max_be_count > 0:
-                be_count = len(strat.breakeven_points)
-                # 2 breakevens = score maximal
-                if be_count == 2:
-                    be_count_score = 1.0
-                elif be_count == 1:
-                    be_count_score = 0.5
-                elif be_count == 0:
-                    be_count_score = 0.0
-                else:
-                    # Plus de 2 = légère pénalité
-                    be_count_score = max(0, 1 - (be_count - 2) * 0.2)
-                score += be_count_score * weights['breakeven_count']
-            
-            # 14. Écart des breakevens (plus large = meilleur)
-            if 'breakeven_spread' in weights and len(strat.breakeven_points) >= 2 and max_be_spread > 0:
-                be_spread = max(strat.breakeven_points) - min(strat.breakeven_points)
-                spread_score = be_spread / max_be_spread
-                score += spread_score * weights['breakeven_spread']
+
             
             strat.score = score
         
@@ -344,11 +322,6 @@ class StrategyComparerV2:
             
             print(f"\n   📊 VOLATILITÉ & BREAKEVENS:")
             print(f"      • Implied Vol Moyenne: {strat.avg_implied_volatility:.2%}")
-            print(f"      • Breakevens ({len(strat.breakeven_points)}): {', '.join([f'${be:.2f}' for be in strat.breakeven_points])}")
-            if len(strat.breakeven_points) >= 2:
-                be_spread = max(strat.breakeven_points) - min(strat.breakeven_points)
-                print(f"      • Écart Breakevens: ${be_spread:.2f}")
-            
             print(f"\n   📅 EXPIRATION:")
             print(f"      • Date: {strat.expiration_month}{strat.expiration_year} (Week: {strat.expiration_week}, Day: {strat.expiration_day})")
             print(f"      • Nombre d'options: {len(strat.all_options)}")
