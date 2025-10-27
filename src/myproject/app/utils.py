@@ -137,6 +137,7 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
             'Rang': idx,
             'Stratégie': comp.strategy_name,
             'Expiration': format_expiration_date(comp.expiration_month, comp.expiration_year),
+            'Premium': format_currency(comp.premium),
             'Score': f"{comp.score:.3f}",
             
             # 💰 MÉTRIQUES FINANCIÈRES
