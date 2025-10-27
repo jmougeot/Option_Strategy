@@ -72,6 +72,9 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
         leg_cost = option.premium * quantity * (-1 if option.position == 'long' else 1)
         premium += leg_cost
         
+        # DEBUG: Afficher le calcul pour chaque leg
+        print(f"     → Leg: premium={option.premium:.4f} × qty={quantity} × sign={-1 if option.position == 'long' else 1} = {leg_cost:.4f} (cumul={premium:.4f})")
+        
         # ============ GREEKS ============
         sign = 1 if option.position == 'long' else -1
         
