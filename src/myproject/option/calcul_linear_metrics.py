@@ -15,10 +15,7 @@ from myproject.option.option_class import Option
 import numpy as np
 
 
-def calculate_linear_metrics(options: List[Option],
-                           price_min: Optional[float] = None,
-                           price_max: Optional[float] = None,
-                           num_points: int = 1000) -> Dict:
+def calculate_linear_metrics(options: List[Option],) -> Dict:
     """
     Calcule TOUTES les métriques d'une stratégie d'options en une fois.
     

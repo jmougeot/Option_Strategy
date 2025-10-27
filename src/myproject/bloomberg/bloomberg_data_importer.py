@@ -269,8 +269,14 @@ def import_euribor_options(
                             quantity=default_quantity,
                             price_min=price_min,
                             price_max=price_max,
-                            num_points=num_points,
+                            num_points=num_points,    
                         )
+
+                        loss_surface = option.calcul_loss_surface(price_min , price_max, 100)
+                        profit_surface =option.calcul_profit_surface(price_min , price_max, 100)
+                        
+                        option.loss_surface = loss_surface
+                        option.profit_surface = profit_surface
                         
                         # Vérifier que l'option est valide
                         if option.strike > 0 and option.premium > 0:

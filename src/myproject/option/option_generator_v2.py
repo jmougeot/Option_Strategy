@@ -35,6 +35,7 @@ class OptionStrategyGeneratorV2:
         self.price_min = None
         self.price_max = None
 
+
     def generate_all_combinations(self,
                                   target_price: float,
                                   price_min: float,
@@ -173,12 +174,7 @@ class OptionStrategyGeneratorV2:
             
             # ============ CALCUL DE TOUTES LES MÉTRIQUES EN UNE FOIS ============
             # calculate_linear_metrics calcule TOUT : linéaires + surfaces (si paramètres fournis)
-            all_metrics = calculate_linear_metrics(
-                option_legs,
-                price_min=self.price_min,
-                price_max=self.price_max,
-                num_points=200,  # Activer le calcul des surfaces
-            )
+            all_metrics = calculate_linear_metrics(option_legs)
             
             # Calculer max_profit, max_loss, breakevens (métriques non-linéaires)
             metrics = self._calculate_strategy_metrics(
