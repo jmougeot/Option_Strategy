@@ -10,6 +10,7 @@ import plotly.express as px
 from datetime import datetime
 import json
 from typing import Dict, List
+from pathlib import Path
 from myproject.option.comparison_class import StrategyComparison
 from myproject.option.main import process_bloomberg_to_strategies
 from myproject.app.styles import inject_css
@@ -20,6 +21,11 @@ from myproject.app.utils import (
     create_comparison_table
 )
 from myproject.option.option_class import Option
+from myproject.option.strategy_persistence import (
+    save_strategies_to_json,
+    load_strategies_from_json,
+    list_saved_strategies
+)
 
 # ============================================================================
 # CONFIGURATION DE LA PAGE
@@ -54,14 +60,72 @@ def main():
     with st.sidebar: 
         params = sidebar_params()
         scoring_weights = scoring_weights_block()
+        
+        # Section pour charger des stratégies sauvegardées
+        st.markdown("---")
+        st.markdown("### 💾 Gestion des Stratégies")
+        
+        saved_files = list_saved_strategies()
+        
+        if saved_files:
+            st.markdown("**Charger des stratégies :**")
+            
+            # Créer un selectbox avec les fichiers disponibles
+            file_options = {f"{f['filename']} ({f['saved_at'][:10]})": f for f in saved_files}
+            selected_file = st.selectbox(
+                "Fichiers sauvegardés",
+                options=list(file_options.keys()),
+                key="load_strategies_select"
+            )
+            
+            if st.button("📂 Charger", use_container_width=True, key="load_btn"):
+                selected_info = file_options[selected_file]
+                try:
+                    strategies, metadata = load_strategies_from_json(selected_info['filepath'])
+                    st.session_state['loaded_strategies'] = strategies
+                    st.session_state['loaded_metadata'] = metadata
+                    st.success(f"✅ {len(strategies)} stratégies chargées !")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erreur lors du chargement : {str(e)}")
+        else:
+            st.info("Aucune stratégie sauvegardée trouvée")
 
     # ========================================================================
     # ZONE PRINCIPALE
     # ========================================================================
     
+    # Vérifier s'il y a des stratégies chargées
+    if 'loaded_strategies' in st.session_state:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.info(f"📂 Stratégies chargées : {len(st.session_state['loaded_strategies'])} stratégies")
+        with col2:
+            if st.button("🔄 Nouvelle Analyse", use_container_width=True):
+                del st.session_state['loaded_strategies']
+                if 'loaded_metadata' in st.session_state:
+                    del st.session_state['loaded_metadata']
+                st.rerun()
+    
     compare_button = st.button("🚀 Lancer la Comparaison", type="primary", use_container_width=True)
     
-    if compare_button:
+    # Utiliser les stratégies chargées si disponibles
+    if 'loaded_strategies' in st.session_state:
+        all_comparisons = st.session_state['loaded_strategies']
+        comparisons = all_comparisons
+        best_comparison = all_comparisons[0] if all_comparisons else None
+        
+        if best_comparison:
+            best_target_price = best_comparison.target_price
+            metadata = st.session_state.get('loaded_metadata', {})
+            
+            st.success(f"""✅ Stratégies chargées depuis le fichier
+            • {len(all_comparisons)} stratégies
+            • Sauvegardé le : {metadata.get('saved_at', 'Unknown')[:19]}
+            • Underlying : {metadata.get('underlying', 'Unknown')}
+            """)
+    
+    elif compare_button:
         # ====================================================================
         # ÉTAPE 1 : Chargement des données depuis Bloomberg
         # ====================================================================
@@ -130,6 +194,59 @@ def main():
         # Filtrer les comparaisons pour ce prix optimal
         comparisons = [c for c in all_comparisons if c.target_price == best_target_price]
         st.info(f"🎯 **Meilleur prix cible identifié : ${best_target_price:.2f}**")
+        
+        # Sauvegarder les stratégies dans session_state pour pouvoir les exporter
+        st.session_state['current_strategies'] = all_comparisons
+        st.session_state['current_params'] = {
+            'underlying': params.underlying,
+            'target_price': best_target_price,
+            'months': params.months,
+            'years': params.years,
+            'strikes': params.strikes,
+            'max_legs': params.max_legs,
+            'price_min': params.price_min,
+            'price_max': params.price_max
+        }
+    
+    # Si on arrive ici sans stratégies, ne rien afficher
+    else:
+        st.info("👆 Cliquez sur 'Lancer la Comparaison' pour générer des stratégies ou chargez des stratégies sauvegardées")
+        return
+        
+        # ====================================================================
+        # BOUTON DE SAUVEGARDE
+        # ====================================================================
+        
+        st.markdown("---")
+        col1, col2, col3 = st.columns([2, 2, 1])
+        
+        with col1:
+            save_filename = st.text_input(
+                "Nom du fichier (sans .json)",
+                value=f"strategies_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                key="save_filename"
+            )
+        
+        with col2:
+            if st.button("💾 Sauvegarder les Stratégies", use_container_width=True, key="save_btn"):
+                try:
+                    # Créer le dossier saved_strategies s'il n'existe pas
+                    save_dir = Path("saved_strategies")
+                    save_dir.mkdir(exist_ok=True)
+                    
+                    # Créer le chemin complet
+                    filepath = save_dir / f"{save_filename}.json"
+                    
+                    # Préparer les métadonnées
+                    metadata = st.session_state.get('current_params', {})
+                    metadata['saved_at'] = datetime.now().isoformat()
+                    
+                    # Sauvegarder
+                    save_strategies_to_json(all_comparisons, str(filepath), metadata)
+                    
+                    st.success(f"✅ {len(all_comparisons)} stratégies sauvegardées dans {filepath}")
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de la sauvegarde : {str(e)}")
         
         # ====================================================================
         # AFFICHAGE DES POIDS UTILISÉS - COMPLET

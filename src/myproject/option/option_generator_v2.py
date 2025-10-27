@@ -416,6 +416,8 @@ class OptionStrategyGeneratorV2:
             else:  # short
                 pnl = (opt.premium - intrinsic_value) * quantity
             
+            print(f"  💰 P&L @ {price}: {opt.option_type} {opt.strike} {opt.position} x{quantity}: intrinsic={intrinsic_value:.4f}, premium={opt.premium:.4f}, pnl={pnl:.4f}")
+            
             total_pnl += pnl
         
         return total_pnl
