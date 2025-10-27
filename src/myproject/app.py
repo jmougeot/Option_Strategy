@@ -71,22 +71,23 @@ def main():
                 'underlying': params.underlying,
                 'months': params.months,
                 'years': params.years,
-                'strikes': params.strikes
+                'strikes': params.strikes,
+                'price_min': params.price_min,
+                'price_max': params.price_max
             }
-            data = load_options_from_bloomberg(params_dict)
-            st.success(f"✅ {len(data.get('options', []))} options chargées")
-                
+            options = load_options_from_bloomberg(params_dict)
+            
+            nb_options = len(options)
+            st.success(f"✅ {nb_options} options chargées depuis Bloomberg")
+            
             # Optionnellement sauvegarder
-            save_data = st.checkbox("Sauvegarder les données importées en JSON", value=True)
-            if save_data:
+            save_data = st.checkbox("Sauvegarder les données importées en JSON", value=False)
+            if save_data and options:
+                from myproject.bloomberg.bloomberg_data_importer import save_to_json
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 save_filename = f"bloomberg_import_{timestamp}.json"
-                with open(save_filename, 'w') as f:
-                    json.dump(data, f, indent=2)
+                save_to_json(options, save_filename)
                 st.success(f"💾 Données sauvegardées dans {save_filename}")
-            
-            nb_options = len(data.get('options', []))
-            st.success(f"✅ {nb_options} options chargées depuis Bloomberg")
         
         # Validation
         if nb_options == 0:
@@ -102,12 +103,13 @@ def main():
         # ÉTAPE 2-3 : Traitement complet via la fonction main
         # ====================================================================
         
-        # Calculer le prix cible médian
-        
-        with st.spinner(f"🔄 Traitement complet : Conversion → Génération → Comparaison (max {params.max_legs} legs)..."):
+        with st.spinner(f"🔄 Génération et comparaison des stratégies (max {params.max_legs} legs)..."):
             # Appeler la fonction principale qui fait TOUT
             best_strategies, stats = process_bloomberg_to_strategies(
-                bloomberg_data=data['options'],
+                underlying=params.underlying,
+                months=params.months,
+                years=params.years,
+                strikes=params.strikes,
                 target_price=params.strike,
                 price_min=params.price_min,
                 price_max=params.price_max,

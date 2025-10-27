@@ -14,7 +14,7 @@ from myproject.option.comparison_class import StrategyComparison
 from myproject.option.calcul_linear_metrics import calculate_linear_metrics
 from myproject.option.option_filter import sort_options_by_expiration
 from myproject.option.option_utils_v2 import get_expiration_info
-from myproject.option.dic_to_option import bloomberg_data_to_options
+from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
 
 
 class OptionStrategyGeneratorV2:
@@ -37,28 +37,46 @@ class OptionStrategyGeneratorV2:
     
     @classmethod
     def from_bloomberg_data(cls,
-                           bloomberg_data: List[Dict],
+                           underlying: str = "ER",
+                           months: List[str] = [],
+                           years: List[int] = [],
+                           strikes: List[float] = [],
                            default_position: Literal['long', 'short'] = 'long',
                            default_quantity: int = 1,
                            price_min: Optional[float] = None,
                            price_max: Optional[float] = None,
+                           calculate_surfaces: bool = True
                            ) -> "OptionStrategyGeneratorV2":
         """
-        Crée un générateur à partir de données Bloomberg brutes.
+        Crée un générateur à partir de données Bloomberg.
+        
+        Args:
+            underlying: Symbole du sous-jacent (ex: "ER")
+            months: Liste des mois Bloomberg (ex: ['M', 'U'])
+            years: Liste des années (ex: [6, 7])
+            strikes: Liste des strikes
+            default_position: Position par défaut
+            default_quantity: Quantité par défaut
+            price_min: Prix min pour surfaces
+            price_max: Prix max pour surfaces
+            calculate_surfaces: Si True, calcule les surfaces
         """
-        # Convertir les données Bloomberg en objets Option
-        # Note: On ne calcule PAS les surfaces ici car elles seront calculées
-        # dans generate_all_combinations avec les bons paramètres
-        options = bloomberg_data_to_options(
-            bloomberg_data,
+        # Importer directement les options depuis Bloomberg
+        options = import_euribor_options(
+            underlying=underlying,
+            months=months,
+            years=years,
+            strikes=strikes,
             default_position=default_position,
             default_quantity=default_quantity,
             price_min=price_min,
             price_max=price_max,
+            calculate_surfaces=calculate_surfaces,
+            num_points=200
         )
         
         if not options:
-            print("⚠️ Aucune option valide après conversion Bloomberg")
+            print("⚠️ Aucune option valide après import Bloomberg")
         
         return cls(options)
     
@@ -204,8 +222,8 @@ class OptionStrategyGeneratorV2:
             # calculate_linear_metrics calcule TOUT : linéaires + surfaces (si paramètres fournis)
             all_metrics = calculate_linear_metrics(
                 option_legs,
-                price_min=self.price_min or 0.0,
-                price_max=self.price_max or 200.0,
+                price_min=self.price_min,
+                price_max=self.price_max,
                 num_points=1000,  # Activer le calcul des surfaces
             )
             

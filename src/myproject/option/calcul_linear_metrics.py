@@ -87,8 +87,8 @@ def calculate_linear_metrics(options: List[Option],
         gamma = (option.gamma or 0.0) * sign
         vega = (option.vega or 0.0) * sign
         theta = (option.theta or 0.0) * sign
-        loss_surface = (option.loss_surface or 0.0) * sign
-        profit_surface = (option.profit_surface or 0.0)* sign
+        loss_surface = (option.loss_surface) * sign
+        profit_surface = (option.profit_surface)* sign
 
         
         # Accumuler par type

@@ -1,16 +1,17 @@
 """
 Bloomberg Data Importer for Options Strategy App
 =================================================
-Importe les données d'options depuis Bloomberg et les convertit au format
-JSON attendu par app.py
+Importe les données d'options depuis Bloomberg et les convertit directement
+en objets Option avec calcul optionnel des surfaces.
 """
 
 from pathlib import Path
-from typing import List, Dict, Any, Literal, Optional, cast
+from typing import List, Literal, Optional, cast
 from datetime import datetime
 import json
 from myproject.bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
 from myproject.bloomberg.ticker_builder import build_option_ticker
+from myproject.option.option_class import Option
 
 # Type pour les mois valides
 MonthCode = Literal['F', 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z']
@@ -31,179 +32,152 @@ MONTH_EXPIRY_DAY = {
 }
 
 
-def get_expiration_date(month: str, year: int) -> str:
+def get_expiration_components(month: str, year: int) -> tuple[MonthCode, int, str]:
     """
-    Calcule la date d'expiration (3ème mercredi du mois)
+    Calcule les composants d'expiration pour une option.
     
     Args:
-        month: Code du mois (F, G, H, etc.)
+        month: Code du mois Bloomberg (F, G, H, etc.)
         year: Année sur 1 chiffre (6 = 2026)
         
     Returns:
-        Date au format ISO "YYYY-MM-DD"
+        (month_code, year, day_str)
     """
-    # Convertir l'année
-    full_year = 2020 + year
-    
-    # Obtenir le numéro du mois
-    month_number = list(MONTH_NAMES.keys()).index(month) + 1
-    if month_number > 12:
-        month_number = month_number - 12
-        full_year += 1
-    
-    # Approximation du 3ème mercredi (jour 15-21 généralement)
     day = MONTH_EXPIRY_DAY.get(month, 18)
-    
-    return f"{full_year:04d}-{month_number:02d}-{day:02d}"
+    return cast(MonthCode, month), year, str(day)
 
 
-def build_ticker_info(
-    underlying: str,
-    month: MonthCode,
-    year: int,
-    option_type: Literal['C', 'P'],
-    strike: float,
-    suffix: str = "Comdty"
-) -> tuple[str, str, str]:
-    """
-    Construit le ticker et les métadonnées.
-    
-    Returns:
-        (ticker, expiration_date, option_type_str)
-    """
-    ticker = build_option_ticker(underlying, month, year, option_type, strike, suffix)
-    expiration_date = get_expiration_date(month, year)
-    option_type_str = "call" if option_type == 'C' else "put"
-    
-    return ticker, expiration_date, option_type_str
-
-
-def parse_expiration_components(expiration_date: str, month_code: str, year: int) -> Dict[str, Any]:
-    """
-    Parse une date d'expiration et retourne les composants.
-    
-    Args:
-        expiration_date: Date au format "YYYY-MM-DD"
-        month_code: Code du mois Bloomberg (F, G, H, etc.)
-        year: Année sur 1 chiffre
-        
-    Returns:
-        Dict avec 'month_of_expiration', 'year_of_expiration', 'day_of_expiration'
-    """
-    try:
-        # Parser la date
-        date_parts = expiration_date.split('-')
-        full_year = int(date_parts[0])
-        day = int(date_parts[2])
-        
-        return {
-            'month_of_expiration': month_code,
-            'year_of_expiration': year,
-            'day_of_expiration': day
-        }
-    except (ValueError, IndexError):
-        # Fallback si le parsing échoue
-        return {
-            'month_of_expiration': month_code,
-            'year_of_expiration': year,
-            'day_of_expiration': None
-        }
-
-
-def convert_to_option_dict(
+def create_option_from_bloomberg(
     ticker: str,
     underlying: str,
     strike: float,
-    expiration_date: str,
+    month: str,
+    year: int,
     option_type_str: str,
-    bloomberg_data: Dict[str, Any],
-    month_code: Optional[str] = None,
-    year: Optional[int] = None
-) -> Dict[str, Any]:
+    bloomberg_data: dict,
+    position: Literal['long', 'short'] = 'long',
+    quantity: int = 1,
+    price_min: Optional[float] = None,
+    price_max: Optional[float] = None,
+    calculate_surfaces: bool = True,
+    num_points: int = 200
+) -> Option:
     """
-    Convertit les données Bloomberg brutes en format attendu par l'app.
+    Crée un objet Option directement depuis les données Bloomberg.
     
     Args:
         ticker: Ticker Bloomberg
         underlying: Symbole du sous-jacent
         strike: Prix d'exercice
-        expiration_date: Date d'expiration
+        month: Code du mois d'expiration
+        year: Année d'expiration (1 chiffre)
         option_type_str: "call" ou "put"
-        bloomberg_data: Données extraites de Bloomberg
-        month_code: Code du mois Bloomberg (F, G, H, etc.) - optionnel
-        year: Année sur 1 chiffre - optionnel
+        bloomberg_data: Données brutes Bloomberg
+        position: 'long' ou 'short'
+        quantity: Quantité
+        price_min: Prix min pour surfaces
+        price_max: Prix max pour surfaces
+        calculate_surfaces: Si True, calcule les surfaces
+        num_points: Nombre de points pour les surfaces
         
     Returns:
-        Dictionnaire formaté pour l'app
+        Objet Option
     """
-    # Parser les composants d'expiration si disponibles
-    exp_components = {}
-    if month_code and year is not None:
-        exp_components = parse_expiration_components(expiration_date, month_code, year)
-    
-    result = {
-        "symbol": underlying,
-        "strike": float(strike),
-        "option_type": option_type_str,
-        "premium": float(bloomberg_data['premium']),
-        "expiration_date": expiration_date,
-        "underlying_price": float(bloomberg_data['underlying_price']),
-        "bid": float(bloomberg_data['bid']),
-        "ask": float(bloomberg_data['ask']),
-        "volume": int(bloomberg_data['volume']),
-        "open_interest": int(bloomberg_data['open_interest']),
-        "implied_volatility": float(bloomberg_data['implied_volatility']),
-        "delta": float(bloomberg_data['delta']),
-        "gamma": float(bloomberg_data['gamma']),
-        "theta": float(bloomberg_data['theta']),
-        "vega": float(bloomberg_data['vega']),
-        "rho": float(bloomberg_data['rho']),
-        "timestamp": datetime.now().isoformat(),
-        "bloomberg_ticker": ticker
-    }
-    
-    # Ajouter les composants d'expiration si disponibles
-    if exp_components:
-        result.update(exp_components)
-    
-    return result
+    try:
+        month_code, exp_year, exp_day = get_expiration_components(month, year)
+        
+        # Créer l'option directement
+        option = Option(
+            # Obligatoires
+            option_type=option_type_str,
+            strike=float(strike),
+            premium=float(bloomberg_data['premium']),
+            expiration_month=month_code,
+            expiration_year=exp_year,
+            expiration_day=exp_day,
+            
+            # Position
+            quantity=quantity,
+            position=position,
+            
+            # Identification
+            ticker=ticker,
+            underlying_symbol=underlying,
+            bloomberg_ticker=ticker,
+            
+            # Prix
+            bid=float(bloomberg_data['bid']),
+            ask=float(bloomberg_data['ask']),
+            
+            # Greeks
+            delta=float(bloomberg_data['delta']),
+            gamma=float(bloomberg_data['gamma']),
+            vega=float(bloomberg_data['vega']),
+            theta=float(bloomberg_data['theta']),
+            rho=float(bloomberg_data['rho']),
+            
+            # Volatilité
+            implied_volatility=float(bloomberg_data['implied_volatility']),
+            
+            # Liquidité
+            open_interest=int(bloomberg_data['open_interest']),
+            volume=int(bloomberg_data['volume']),
+            
+            # Sous-jacent
+            underlying_price=float(bloomberg_data['underlying_price']),
+            
+            # Timestamp
+            timestamp=datetime.now()
+        )
+        
+        # Calculer les surfaces si demandé
+        if calculate_surfaces and price_min is not None and price_max is not None:
+            option.profit_surface = option.calcul_profit_surface(price_min, price_max, num_points)
+            option.loss_surface = option.calcul_loss_surface(price_min, price_max, num_points)
+        
+        return option
+        
+    except Exception as e:
+        print(f"⚠️ Erreur création Option: {e}")
+        return Option.empyOption()
 
 
 def import_euribor_options(
     underlying: str = "ER",
-    months: Optional[List[str]] = None,
-    years: Optional[List[int]] = None,
-    strikes: Optional[List[float]] = None,
+    months: List[str] = [],
+    years: List[int] = [],
+    strikes: List[float] = [],
     suffix: str = "Comdty",
     include_calls: bool = True,
-    include_puts: bool = True
-) -> Dict[str, List[Dict[str, Any]]]:
+    include_puts: bool = True,
+    default_position: Literal['long', 'short'] = 'long',
+    default_quantity: int = 1,
+    price_min: Optional[float] = None,
+    price_max: Optional[float] = None,
+    calculate_surfaces: bool = True,
+    num_points: int = 200
+) -> List[Option]:
     """
-    Importe un ensemble d'options EURIBOR depuis Bloomberg
+    Importe un ensemble d'options depuis Bloomberg et retourne directement des objets Option.
     
     Args:
-        underlying: Code du sous-jacent (défaut: "ER")
-        months: Liste des mois (défaut: ["F", "G", "H"] - Jan, Feb, Mar)
-        years: Liste des années (défaut: [6, 7] - 2026, 2027)
-        strikes: Liste des strikes (défaut: range de 96.0 à 99.0 par 0.5)
-        suffix: Suffixe Bloomberg (défaut: "Comdty")
-        include_calls: Importer les calls (défaut: True)
-        include_puts: Importer les puts (défaut: True)
-        
+        underlying: Symbole du sous-jacent (ex: "ER" pour Euribor)
+        months: Liste des mois Bloomberg (ex: ['M', 'U', 'Z'])
+        years: Liste des années (ex: [6, 7] pour 2026, 2027)
+        strikes: Liste des strikes à importer
+        suffix: Suffixe Bloomberg (ex: "Comdty")
+        include_calls: Inclure les calls
+        include_puts: Inclure les puts
+        default_position: Position par défaut ('long' ou 'short')
+        default_quantity: Quantité par défaut
+        price_min: Prix minimum pour le calcul des surfaces
+        price_max: Prix maximum pour le calcul des surfaces
+        calculate_surfaces: Si True, calcule profit_surface et loss_surface
+        num_points: Nombre de points pour le calcul des surfaces
+
     Returns:
-        Dictionnaire avec clé "options" contenant la liste des options
-    """
-    # Valeurs par défaut
-    if months is None:
-        months = ["F", "G", "H", "K", "M", "N"]  # Jan à Jul
-    
-    if years is None:
-        years = [6, 7]  # 2026, 2027
-    
-    if strikes is None:
-        # Strikes de 96.0 à 99.0 par pas de 0.25
-        strikes = [round(96.0 + i * 0.25, 2) for i in range(13)]  # 96.0 à 99.0
-    
+        Liste d'objets Option directement utilisables
+    """ 
     print("=" * 70)
     print("IMPORT DES OPTIONS DEPUIS BLOOMBERG")
     print("=" * 70)
@@ -212,16 +186,19 @@ def import_euribor_options(
     print(f"Années: {', '.join(map(str, years))}")
     print(f"Strikes: {len(strikes)} strikes de {min(strikes)} à {max(strikes)}")
     print(f"Types: {'Calls' if include_calls else ''}{' + ' if include_calls and include_puts else ''}{'Puts' if include_puts else ''}")
+    print(f"Calcul surfaces: {'Oui' if calculate_surfaces else 'Non'}")
+    if calculate_surfaces and price_min and price_max:
+        print(f"Range de prix: ${price_min} - ${price_max}")
     print("=" * 70)
     print()
     
-    options = []
+    option_objects: List[Option] = []
     total_attempts = 0
     total_success = 0
     
-    # OPTIMISATION: Construire tous les tickers d'abord, puis fetch en batch
+    # Construire tous les tickers et métadonnées
     all_tickers = []
-    ticker_metadata = {}  # Stocke les métadonnées pour chaque ticker
+    ticker_metadata = {}
     
     print("\n🔨 Construction des tickers...")
     for year in years:
@@ -231,13 +208,12 @@ def import_euribor_options(
             for strike in strikes:
                 # Calls
                 if include_calls:
-                    ticker, exp_date, opt_type = build_ticker_info(underlying, month_code, year, 'C', strike, suffix)
+                    ticker = build_option_ticker(underlying, month_code, year, 'C', strike, suffix)
                     all_tickers.append(ticker)
                     ticker_metadata[ticker] = {
                         'underlying': underlying,
                         'strike': strike,
-                        'expiration_date': exp_date,
-                        'option_type': opt_type,
+                        'option_type': 'call',
                         'month': month,
                         'year': year
                     }
@@ -245,13 +221,12 @@ def import_euribor_options(
                 
                 # Puts
                 if include_puts:
-                    ticker, exp_date, opt_type = build_ticker_info(underlying, month_code, year, 'P', strike, suffix)
+                    ticker = build_option_ticker(underlying, month_code, year, 'P', strike, suffix)
                     all_tickers.append(ticker)
                     ticker_metadata[ticker] = {
                         'underlying': underlying,
                         'strike': strike,
-                        'expiration_date': exp_date,
-                        'option_type': opt_type,
+                        'option_type': 'put',
                         'month': month,
                         'year': year
                     }
@@ -260,14 +235,14 @@ def import_euribor_options(
     print(f"✓ {len(all_tickers)} tickers construits")
     print(f"\n📡 Récupération des données Bloomberg en batch...")
     
-    # FETCH EN BATCH - UN SEUL APPEL BLOOMBERG POUR TOUS LES TICKERS
+    # FETCH EN BATCH
     try:
         batch_data = fetch_options_batch(all_tickers, use_overrides=True)
         
-        # Traiter les résultats par mois pour l'affichage
+        # Traiter les résultats par mois
         for year in years:
             for month in months:
-                month_options = []
+                month_options_count = 0
                 
                 print(f"\n📅 {MONTH_NAMES[month]} 20{20+year}")
                 print("-" * 70)
@@ -275,7 +250,7 @@ def import_euribor_options(
                 for ticker in all_tickers:
                     meta = ticker_metadata[ticker]
                     
-                    # Filtrer par mois/année courant
+                    # Filtrer par mois/année
                     if meta['month'] != month or meta['year'] != year:
                         continue
                     
@@ -286,31 +261,43 @@ def import_euribor_options(
                         # Extraire les meilleures valeurs
                         extracted = extract_best_values(raw_data)
                         
-                        # Convertir au format attendu
-                        option_dict = convert_to_option_dict(
+                        # Créer l'option directement
+                        option = create_option_from_bloomberg(
                             ticker=ticker,
                             underlying=meta['underlying'],
                             strike=meta['strike'],
-                            expiration_date=meta['expiration_date'],
+                            month=meta['month'],
+                            year=meta['year'],
                             option_type_str=meta['option_type'],
                             bloomberg_data=extracted,
-                            month_code=meta['month'],
-                            year=meta['year']
+                            position=default_position,
+                            quantity=default_quantity,
+                            price_min=price_min,
+                            price_max=price_max,
+                            calculate_surfaces=calculate_surfaces,
+                            num_points=num_points
                         )
                         
-                        options.append(option_dict)
-                        month_options.append(option_dict)
-                        total_success += 1
-                        
-                        # Afficher un résumé
-                        opt_symbol = "C" if option_dict['option_type'] == "call" else "P"
-                        print(f"✓ {opt_symbol} {option_dict['strike']:6.2f}: "
-                              f"Premium={option_dict['premium']:.4f}, "
-                              f"Delta={option_dict['delta']:+.4f}, "
-                              f"IV={option_dict['implied_volatility']:.2%}")
+                        # Vérifier que l'option est valide
+                        if option.strike > 0 and option.premium > 0:
+                            option_objects.append(option)
+                            month_options_count += 1
+                            total_success += 1
+                            
+                            # Afficher un résumé
+                            opt_symbol = "C" if option.option_type == "call" else "P"
+                            surfaces_info = ""
+                            if calculate_surfaces and option.profit_surface is not None:
+                                surfaces_info = f", Surf.P={option.profit_surface:.2f}, Surf.L={option.loss_surface:.2f}"
+                            
+                            print(f"✓ {opt_symbol} {option.strike:6.2f}: "
+                                  f"Premium={option.premium:.4f}, "
+                                  f"Delta={option.delta:+.4f}, "
+                                  f"IV={option.implied_volatility:.2%}"
+                                  f"{surfaces_info}")
                 
-                if month_options:
-                    print(f"\n   ✓ {len(month_options)} options récupérées pour ce mois")
+                if month_options_count > 0:
+                    print(f"\n   ✓ {month_options_count} options récupérées pour ce mois")
                 else:
                     print(f"\n   ⚠️  Aucune option récupérée pour ce mois")
     
@@ -319,30 +306,73 @@ def import_euribor_options(
         import traceback
         traceback.print_exc()
     
+    # Calcul des statistiques
+    total_profit_surface = 0.0
+    total_loss_surface = 0.0
+    options_with_surfaces = 0
+    
+    if calculate_surfaces:
+        total_profit_surface = sum(opt.profit_surface or 0 for opt in option_objects)
+        total_loss_surface = sum(opt.loss_surface or 0 for opt in option_objects)
+        options_with_surfaces = sum(1 for opt in option_objects if opt.profit_surface is not None)
+    
     print("\n" + "=" * 70)
     print("RÉSUMÉ DE L'IMPORT")
     print("=" * 70)
     print(f"Total tentatives: {total_attempts}")
-    print(f"Succès: {total_success} ({total_success/total_attempts*100:.1f}%)")
+    print(f"Succès: {total_success} ({total_success/total_attempts*100:.1f}%)" if total_attempts > 0 else "Succès: 0")
     print(f"Échecs: {total_attempts - total_success}")
-    print(f"Options importées: {len(options)}")
+    print(f"Options importées: {len(option_objects)}")
+    if calculate_surfaces:
+        print(f"Options avec surfaces: {options_with_surfaces}")
+        print(f"Surfaces totales: Profit={total_profit_surface:,.2f}, Loss={total_loss_surface:,.2f}")
     print("=" * 70)
     
-    return {"options": options}
+    return option_objects
 
 
-def save_to_json(data: Dict, filename: str = "bloomberg_options.json"):
+def save_to_json(options: List[Option], filename: str = "bloomberg_options.json"):
     """
-    Sauvegarde les données au format JSON
+    Sauvegarde une liste d'options au format JSON.
     
     Args:
-        data: Dictionnaire avec les données
+        options: Liste d'objets Option
         filename: Nom du fichier de sortie
     """
     filepath = Path(__file__).parent / filename
+    
+    # Convertir les objets Option en dictionnaires
+    options_dicts = []
+    for opt in options:
+        opt_dict = {
+            "symbol": opt.underlying_symbol,
+            "strike": opt.strike,
+            "option_type": opt.option_type,
+            "premium": opt.premium,
+            "expiration_date": f"{2020 + opt.expiration_year}-{opt.expiration_month}-{opt.expiration_day or 15:02d}",
+            "underlying_price": opt.underlying_price,
+            "bid": opt.bid,
+            "ask": opt.ask,
+            "volume": opt.volume or 0,
+            "open_interest": opt.open_interest or 0,
+            "implied_volatility": opt.implied_volatility or 0.0,
+            "delta": opt.delta or 0.0,
+            "gamma": opt.gamma or 0.0,
+            "theta": opt.theta or 0.0,
+            "vega": opt.vega or 0.0,
+            "rho": opt.rho or 0.0,
+            "timestamp": datetime.now().isoformat(),
+            "bloomberg_ticker": opt.bloomberg_ticker or opt.ticker,
+            "month_of_expiration": opt.expiration_month,
+            "year_of_expiration": opt.expiration_year,
+            "day_of_expiration": opt.expiration_day
+        }
+        options_dicts.append(opt_dict)
+    
+    data = {"options": options_dicts}
     
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     
     print(f"\n✅ Données sauvegardées dans: {filepath}")
-    print(f"   {len(data.get('options', []))} options exportées")
+    print(f"   {len(options)} options exportées")

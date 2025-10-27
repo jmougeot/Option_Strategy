@@ -41,8 +41,8 @@ class Option:
     rho: Optional[float] = None
 
     # ============ METRIQUES (stockage éventuel) ============
-    loss_surface: Optional[float] = None
-    profit_surface: Optional[float] = None
+    loss_surface: float = 0
+    profit_surface: float = 0
     pnl_surface: Optional[float] = None
     pnl_array:Optional[np.ndarray]= None
     

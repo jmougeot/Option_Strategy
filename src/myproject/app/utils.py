@@ -8,47 +8,53 @@ import plotly.graph_objects as go
 
 from typing import Dict, List
 from myproject.option.comparison_class import StrategyComparison
+from myproject.option.option_class import Option
 
 
 @st.cache_data
-def load_options_from_bloomberg(params: Dict) -> Dict:
+def load_options_from_bloomberg(params: Dict) -> List[Option]:
     """
-    Charge les données d'options depuis Bloomberg
+    Charge les données d'options depuis Bloomberg et retourne directement des objets Option.
     
     Args:
-        params: Dictionnaire avec underlying, months, years, strikes
+        params: Dictionnaire avec underlying, months, years, strikes, price_min, price_max
         
     Returns:
-        Dictionnaire au format {options: [...]}
+        Liste d'objets Option
     """
     try:
         from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
         
-        data = import_euribor_options(
+        options = import_euribor_options(
             underlying=params['underlying'],
             months=params['months'],
             years=params['years'],
             strikes=params['strikes'],
             include_calls=True,
-            include_puts=True
+            include_puts=True,
+            default_position='long',
+            default_quantity=1,
+            price_min=params.get('price_min'),
+            price_max=params.get('price_max'),
+            calculate_surfaces=True,
+            num_points=200
         )
         
-        return data
+        return options
     except ImportError as e:
         st.error(f"❌ Erreur d'import du module Bloomberg: {e}")
-        # stop the Streamlit run but also return an empty dict to satisfy the type checker
         st.stop()
-        return {}
+        return []
     except Exception as e:
         st.error(f"❌ Erreur lors de l'import Bloomberg: {e}")
-        # stop the Streamlit run but also return an empty dict to satisfy the type checker
         st.stop()
-        return {}
+        return []
 
-def prepare_options_data(data: Dict) -> Dict[str, List]:
-    """Separates calls and puts."""
-    calls = [opt for opt in data['options'] if opt['option_type'] == 'call']
-    puts = [opt for opt in data['options'] if opt['option_type'] == 'put']
+
+def prepare_options_data(options: List[Option]) -> Dict[str, List[Option]]:
+    """Sépare les calls et puts."""
+    calls = [opt for opt in options if opt.option_type == 'call']
+    puts = [opt for opt in options if opt.option_type == 'put']
     
     return {'calls': calls, 'puts': puts}
 

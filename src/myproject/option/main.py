@@ -8,23 +8,24 @@ Ce module implémente le workflow complet :
 4. Comparaison et ranking des stratégies
 
 Utilise les fonctions optimisées des modules :
-- dic_to_option.bloomberg_data_to_options()
 - option_generator_v2.OptionStrategyGeneratorV2
 - comparor_v2.StrategyComparerV2
 """
 
 from typing import List, Dict, Optional, Tuple
-from myproject.option.dic_to_option import bloomberg_data_to_options
 from myproject.option.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.option.comparor_v2 import StrategyComparerV2
 from myproject.option.comparison_class import StrategyComparison
-
+from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
 
 def process_bloomberg_to_strategies(
-    bloomberg_data: List[Dict],
-    target_price: float,
-    price_min: float,
-    price_max: float,
+    underlying: str = "ER",
+    months: List[str] = [],
+    years: List[int] = [],
+    strikes: List[float] = [],
+    target_price: float = 0.0,
+    price_min: float = 0.0,
+    price_max: float = 100.0,
     max_legs: int = 4,
     top_n: int = 10,
     scoring_weights: Optional[Dict[str, float]] = None,
@@ -32,19 +33,37 @@ def process_bloomberg_to_strategies(
 ) -> Tuple[List[StrategyComparison], Dict]:
     """
     Fonction principale simplifiée pour Streamlit.
-    Prend les données Bloomberg et retourne les meilleures stratégies + stats.
+    Importe les options depuis Bloomberg et retourne les meilleures stratégies + stats.
+    
+    Args:
+        underlying: Symbole du sous-jacent (ex: "ER")
+        months: Liste des mois Bloomberg (ex: ['M', 'U'])
+        years: Liste des années (ex: [6, 7])
+        strikes: Liste des strikes
+        target_price: Prix cible
+        price_min: Prix minimum
+        price_max: Prix maximum
+        max_legs: Nombre max de legs par stratégie
+        top_n: Nombre de meilleures stratégies à retourner
+        scoring_weights: Poids personnalisés pour le scoring
+        verbose: Affichage détaillé
     """
     stats = {}
     
-    # ÉTAPE 1 : Conversion Bloomberg → Options
+    # ÉTAPE 1 : Import Bloomberg → Options
     if verbose:
-        print("📥 Conversion des données Bloomberg...")
+        print("📥 Import des options depuis Bloomberg...")
     
-    options = bloomberg_data_to_options(
-        bloomberg_data=bloomberg_data,
+    options = import_euribor_options(
+        underlying=underlying,
+        months=months,
+        years=years,
+        strikes=strikes,
         default_position='long',
+        default_quantity=1,
         price_min=price_min,
         price_max=price_max,
+        calculate_surfaces=True,
         num_points=200
     )
     
