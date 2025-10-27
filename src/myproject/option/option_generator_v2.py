@@ -128,7 +128,6 @@ class OptionStrategyGeneratorV2:
         On vérifie simplement que la première et la dernière ont la même date.
         """
         n = len(options)
-        print("nombre d'option {n}")
         if n == 0:
             return []
         

@@ -306,16 +306,7 @@ def import_euribor_options(
         import traceback
         traceback.print_exc()
     
-    # Calcul des statistiques
-    total_profit_surface = 0.0
-    total_loss_surface = 0.0
-    options_with_surfaces = 0
-    
-    if calculate_surfaces:
-        total_profit_surface = sum(opt.profit_surface or 0 for opt in option_objects)
-        total_loss_surface = sum(opt.loss_surface or 0 for opt in option_objects)
-        options_with_surfaces = sum(1 for opt in option_objects if opt.profit_surface is not None)
-    
+
     print("\n" + "=" * 70)
     print("RÉSUMÉ DE L'IMPORT")
     print("=" * 70)
@@ -323,9 +314,6 @@ def import_euribor_options(
     print(f"Succès: {total_success} ({total_success/total_attempts*100:.1f}%)" if total_attempts > 0 else "Succès: 0")
     print(f"Échecs: {total_attempts - total_success}")
     print(f"Options importées: {len(option_objects)}")
-    if calculate_surfaces:
-        print(f"Options avec surfaces: {options_with_surfaces}")
-        print(f"Surfaces totales: Profit={total_profit_surface:,.2f}, Loss={total_loss_surface:,.2f}")
     print("=" * 70)
     
     return option_objects
@@ -353,13 +341,13 @@ def save_to_json(options: List[Option], filename: str = "bloomberg_options.json"
             "underlying_price": opt.underlying_price,
             "bid": opt.bid,
             "ask": opt.ask,
-            "volume": opt.volume or 0,
-            "open_interest": opt.open_interest or 0,
-            "implied_volatility": opt.implied_volatility or 0.0,
-            "delta": opt.delta or 0.0,
-            "gamma": opt.gamma or 0.0,
-            "theta": opt.theta or 0.0,
-            "vega": opt.vega or 0.0,
+            "volume": opt.volume or 0.0,
+            "open_interest": opt.open_interest,
+            "implied_volatility": opt.implied_volatility,
+            "delta": opt.delta ,
+            "gamma": opt.gamma,
+            "theta": opt.theta,
+            "vega": opt.vega,
             "rho": opt.rho or 0.0,
             "timestamp": datetime.now().isoformat(),
             "bloomberg_ticker": opt.bloomberg_ticker or opt.ticker,
