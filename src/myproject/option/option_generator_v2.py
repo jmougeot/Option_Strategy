@@ -64,7 +64,7 @@ class OptionStrategyGeneratorV2:
                 )
                 all_strategies.extend(strategies)
         
-        print(f"✅ {len(all_strategies)} stratégies générées au total")
+        print(f"{len(all_strategies)} stratégies générées au total")
         return all_strategies
     
     def _generate_position_variants(

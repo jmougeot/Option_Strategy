@@ -34,7 +34,7 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
         Dict avec toutes les métriques (linéaires + surfaces si demandé)
     """
     # Initialiser les accumulateurs
-    net_cost = 0.0
+    premium = 0.0
     total_loss_surface = 0.0
     total_profit_surface = 0.0
     total_gauss_pnl = 0.0
@@ -67,26 +67,30 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
             n_short += 1
         
         # ============ COÛT NET ============
-        leg_cost = option.premium * (-1 if option.position == 'long' else 1)
-        net_cost += leg_cost
+        # Multiplier par la quantité pour tenir compte des multiples contrats
+        quantity = option.quantity if option.quantity is not None else 1
+        leg_cost = option.premium * quantity * (-1 if option.position == 'long' else 1)
+        premium += leg_cost
         
         # ============ GREEKS ============
         sign = 1 if option.position == 'long' else -1
         
-        delta = (option.delta or 0.0) * sign
-        gamma = (option.gamma or 0.0) * sign
-        vega = (option.vega or 0.0) * sign
-        theta = (option.theta or 0.0) * sign
+        # Multiplier par la quantité (déjà calculée pour le premium)
+        delta = (option.delta or 0.0) * sign * quantity
+        gamma = (option.gamma or 0.0) * sign * quantity
+        vega = (option.vega or 0.0) * sign * quantity
+        theta = (option.theta or 0.0) * sign * quantity
         
         # ============ SURFACES ============
         # Pour LONG : profit_surface ajoute au profit, loss_surface ajoute à la perte
         # Pour SHORT : profit_surface ajoute à la PERTE, loss_surface ajoute au PROFIT (inversé)
+        # Multiplier par la quantité pour tenir compte des multiples contrats
         if option.position == 'long':
-            total_profit_surface += option.profit_surface or 0.0
-            total_loss_surface += option.loss_surface or 0.0
+            total_profit_surface += (option.profit_surface or 0.0) * quantity
+            total_loss_surface += (option.loss_surface or 0.0) * quantity
         else:  # short
-            total_profit_surface += option.loss_surface or 0.0  # Inversé pour short
-            total_loss_surface += option.profit_surface or 0.0  # Inversé pour short
+            total_profit_surface += (option.loss_surface or 0.0) * quantity  # Inversé pour short
+            total_loss_surface += (option.profit_surface or 0.0) * quantity  # Inversé pour short
         
         # Accumuler par type
         if option.option_type == 'call':
@@ -108,7 +112,8 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
         
         # ============ VOLATILITÉ IMPLICITE ============
         if option.implied_volatility is not None and option.premium > 0:
-            weight = abs(option.premium)
+            # Pondérer par le premium total (premium * quantity)
+            weight = abs(option.premium * quantity)
             weighted_iv_sum += option.implied_volatility * weight
             total_weight += weight
     
@@ -126,7 +131,7 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
     # ============ PRÉPARER LE DICTIONNAIRE DE RÉSULTATS ============
     result = {
         # Coût
-        'net_cost': net_cost,
+        'premium': premium,
         # Greeks - Calls
         'delta_calls': delta_calls,
         'gamma_calls': gamma_calls,
