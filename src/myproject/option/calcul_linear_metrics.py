@@ -77,9 +77,16 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
         gamma = (option.gamma or 0.0) * sign
         vega = (option.vega or 0.0) * sign
         theta = (option.theta or 0.0) * sign
-        loss_surface = (option.loss_surface) * sign
-        profit_surface = (option.profit_surface)* sign
-
+        
+        # ============ SURFACES ============
+        # Pour LONG : profit_surface ajoute au profit, loss_surface ajoute à la perte
+        # Pour SHORT : profit_surface ajoute à la PERTE, loss_surface ajoute au PROFIT (inversé)
+        if option.position == 'long':
+            total_profit_surface += option.profit_surface or 0.0
+            total_loss_surface += option.loss_surface or 0.0
+        else:  # short
+            total_profit_surface += option.loss_surface or 0.0  # Inversé pour short
+            total_loss_surface += option.profit_surface or 0.0  # Inversé pour short
         
         # Accumuler par type
         if option.option_type == 'call':
@@ -98,8 +105,6 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
         gamma_total += gamma
         vega_total += vega
         theta_total += theta
-        total_loss_surface += loss_surface
-        total_profit_surface += profit_surface 
         
         # ============ VOLATILITÉ IMPLICITE ============
         if option.implied_volatility is not None and option.premium > 0:

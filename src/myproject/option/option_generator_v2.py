@@ -187,8 +187,11 @@ class OptionStrategyGeneratorV2:
             exp_info = get_expiration_info(option_legs)
             
             # Créer le StrategyComparison
+            # Note: net_cost est négatif pour un débit, on inverse le signe pour l'affichage
+            # Débit (on paie) : net_cost < 0 → premium > 0
+            # Crédit (on reçoit) : net_cost > 0 → premium < 0
             strategy = StrategyComparison(                
-                premium=all_metrics['net_cost'],
+                premium=-all_metrics['net_cost'],  # Inverser le signe pour l'affichage
                 strategy_name=strategy_name,
                 strategy=None,  # Pas d'objet OptionStrategy, juste les métriques
                 target_price=target_price,
