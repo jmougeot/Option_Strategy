@@ -10,7 +10,7 @@ from itertools import product
 from typing import List, Dict, Tuple, Optional, Literal
 from itertools import combinations
 from myproject.option.option_class import Option
-from myproject.option.comparison_class import StrategyComparison
+from myproject.strategy.comparison_class import StrategyComparison
 from myproject.option.calcul_linear_metrics import calculate_linear_metrics
 from myproject.option.option_filter import sort_options_by_expiration
 from myproject.option.option_utils_v2 import get_expiration_info
@@ -172,25 +172,11 @@ class OptionStrategyGeneratorV2:
             
             # Générer le nom de la stratégie
             strategy_name = self._generate_strategy_name(option_legs)
-            
-            # ============ DEBUG PREMIUM - ÉTAPE 1 : OPTIONS INDIVIDUELLES ============
-            print(f"\n{'='*80}")
-            print(f"🔍 DEBUG PREMIUM - Stratégie: {strategy_name}")
-            print(f"{'='*80}")
-            for i, opt in enumerate(option_legs, 1):
-                qty = opt.quantity if opt.quantity is not None else 1
-                print(f"  Leg {i}: {opt.option_type.upper()} {opt.strike:.2f} "
-                      f"{opt.position.upper()} x{qty} @ premium={opt.premium:.4f}")
-            
+
             # ============ CALCUL DE TOUTES LES MÉTRIQUES EN UNE FOIS ============
             # calculate_linear_metrics calcule TOUT : linéaires + surfaces (si paramètres fournis)
             all_metrics = calculate_linear_metrics(option_legs)
-            
-            # ============ DEBUG PREMIUM - ÉTAPE 2 : CALCUL LINEAR METRICS ============
-            print(f"\n  📊 Résultat calculate_linear_metrics:")
-            print(f"     premium brut (net_cost) = {all_metrics['premium']:.4f}")
-            print(f"     premium affiché = {-all_metrics['premium']:.4f}")
-            
+
             # Calculer max_profit, max_loss, breakevens (métriques non-linéaires)
             metrics = self._calculate_strategy_metrics(
                 option_legs,
@@ -200,12 +186,8 @@ class OptionStrategyGeneratorV2:
             # Extraire les informations d'expiration
             exp_info = get_expiration_info(option_legs)
             
-            # ============ DEBUG PREMIUM - ÉTAPE 3 : AVANT CRÉATION STRATEGYCOMPARISON ============
-            final_premium = -all_metrics['premium']
-            print(f"\n  💰 Premium final pour StrategyComparison:")
-            print(f"     all_metrics['premium'] = {all_metrics['premium']:.4f}")
-            print(f"     -all_metrics['premium'] = {final_premium:.4f}")
-            print(f"     Interprétation: {'DÉBIT (on paie)' if final_premium > 0 else 'CRÉDIT (on reçoit)'}")
+            final_premium = all_metrics['premium']
+
             
             # Créer le StrategyComparison
             # Note: premium est négatif pour un débit (on paie), positif pour un crédit (on reçoit)
@@ -248,13 +230,6 @@ class OptionStrategyGeneratorV2:
                 score=0.0,
                 rank=0
             )
-            
-            # ============ DEBUG PREMIUM - ÉTAPE 4 : STRATÉGIE CRÉÉE ============
-            print(f"\n  ✅ StrategyComparison créé:")
-            print(f"     strategy.premium = {strategy.premium:.4f}")
-            print(f"     strategy.max_profit = {strategy.max_profit:.4f}")
-            print(f"     strategy.max_loss = {strategy.max_loss:.4f}")
-            print(f"{'='*80}\n")
             
             return strategy
             
@@ -415,9 +390,7 @@ class OptionStrategyGeneratorV2:
                 pnl = (intrinsic_value - opt.premium) * quantity
             else:  # short
                 pnl = (opt.premium - intrinsic_value) * quantity
-            
-            print(f"  💰 P&L @ {price}: {opt.option_type} {opt.strike} {opt.position} x{quantity}: intrinsic={intrinsic_value:.4f}, premium={opt.premium:.4f}, pnl={pnl:.4f}")
-            
+                        
             total_pnl += pnl
         
         return total_pnl

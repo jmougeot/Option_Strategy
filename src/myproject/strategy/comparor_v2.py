@@ -6,7 +6,7 @@ Utilise le même système de scoring que multi_structure_comparer.py.
 """
 
 from typing import List, Dict, Optional
-from myproject.option.comparison_class import StrategyComparison
+from myproject.strategy.comparison_class import StrategyComparison
 
 
 class StrategyComparerV2:
@@ -277,54 +277,3 @@ class StrategyComparerV2:
         
         return strategies
     
-    def print_summary(self, strategies: List[StrategyComparison], top_n: int = 5):
-        """
-        Affiche un résumé COMPLET des meilleures stratégies avec TOUS les attributs.
-        
-        Args:
-            strategies: Liste de stratégies classées
-            top_n: Nombre de stratégies à afficher
-        """
-        if not strategies:
-            print("Aucune stratégie à afficher")
-            return
-        
-        print("\n" + "=" * 100)
-        print(f"TOP {min(top_n, len(strategies))} STRATÉGIES - SCORING COMPLET")
-        print("=" * 100)
-        
-        for strat in strategies[:top_n]:
-            print(f"\n{'='*100}")
-            print(f"#{strat.rank} - {strat.strategy_name}")
-            print(f"{'='*100}")
-            print(f"   📊 SCORE GLOBAL: {strat.score:.4f}")
-            
-            print(f"\n   💰 MÉTRIQUES FINANCIÈRES:")
-            print(f"      • Max Profit: ${strat.max_profit:.2f}")
-            print(f"      • Max Loss: ${strat.max_loss:.2f}")
-            print(f"      • Risk/Reward: {strat.risk_reward_ratio:.2f}")
-            if strat.profit_zone_width != float('inf'):
-                print(f"      • Profit Zone: ${strat.profit_zone_width:.2f}")
-            print(f"      • Profit @ Target: ${strat.profit_at_target:.2f} ({strat.profit_at_target_pct:.1f}%)")
-            
-            print(f"\n   📐 SURFACES:")
-            print(f"      • Surface Profit: {strat.surface_profit:.2f}")
-            print(f"      • Surface Loss: {strat.surface_loss:.2f}")
-            if strat.surface_loss > 0:
-                pl_ratio = strat.surface_profit / strat.surface_loss
-                print(f"      • Profit/Loss Ratio: {pl_ratio:.2f}")
-            
-            print(f"\n   🔢 GREEKS TOTAUX:")
-            print(f"      • Delta: {strat.total_delta:.3f} (Calls: {strat.total_delta_calls:.3f}, Puts: {strat.total_delta_puts:.3f})")
-            print(f"      • Gamma: {strat.total_gamma:.3f} (Calls: {strat.total_gamma_calls:.3f}, Puts: {strat.total_gamma_puts:.3f})")
-            print(f"      • Vega: {strat.total_vega:.3f} (Calls: {strat.total_vega_calls:.3f}, Puts: {strat.total_vega_puts:.3f})")
-            print(f"      • Theta: {strat.total_theta:.3f} (Calls: {strat.total_theta_calls:.3f}, Puts: {strat.total_theta_puts:.3f})")
-            
-            print(f"\n   📊 VOLATILITÉ & BREAKEVENS:")
-            print(f"      • Implied Vol Moyenne: {strat.avg_implied_volatility:.2%}")
-            print(f"\n   📅 EXPIRATION:")
-            print(f"      • Date: {strat.expiration_month}{strat.expiration_year} (Week: {strat.expiration_week}, Day: {strat.expiration_day})")
-            print(f"      • Nombre d'options: {len(strat.all_options)}")
-        
-        print("\n" + "=" * 100)
-

@@ -11,7 +11,7 @@ from datetime import datetime
 import json
 from typing import Dict, List
 from pathlib import Path
-from myproject.option.comparison_class import StrategyComparison
+from myproject.strategy.comparison_class import StrategyComparison
 from myproject.option.main import process_bloomberg_to_strategies
 from myproject.app.styles import inject_css
 from myproject.app.widget import scoring_weights_block, sidebar_params
@@ -21,7 +21,7 @@ from myproject.app.utils import (
     create_comparison_table
 )
 from myproject.option.option_class import Option
-from myproject.option.strategy_persistence import (
+from myproject.strategy.strategy_persistence import (
     save_strategies_to_json,
     load_strategies_from_json,
     list_saved_strategies
