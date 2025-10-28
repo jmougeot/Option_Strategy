@@ -14,6 +14,7 @@ from myproject.strategy.comparison_class import StrategyComparison
 from myproject.strategy.calcul_linear_metrics import calculate_linear_metrics
 from myproject.option.option_filter import sort_options_by_expiration
 from myproject.option.option_utils_v2 import get_expiration_info
+from myproject.strategy.strategy_naming_v2 import generate_strategy_name
 
 
 class OptionStrategyGeneratorV2:
@@ -169,7 +170,7 @@ class OptionStrategyGeneratorV2:
                 option_legs.append(opt_copy)
             
             # Générer le nom de la stratégie
-            strategy_name = self._generate_strategy_name(option_legs)
+            strategy_name = generate_strategy_name(option_legs)
             all_metrics = calculate_linear_metrics(option_legs)
             metrics = self._calculate_strategy_metrics(option_legs, target_price)
             exp_info = get_expiration_info(option_legs)
@@ -222,68 +223,7 @@ class OptionStrategyGeneratorV2:
         except Exception as e:
             print(f"⚠️ Erreur création stratégie: {e}")
             return None  
-    
-    def _generate_strategy_name(self, options: List[Option]) -> str:
-        """
-        Génère un nom descriptif pour la stratégie.
-        
-        Args:
-            options: Liste d'options
-            
-        Returns:
-            Nom de la stratégie
-        """
-        n_legs = len(options)
-        
-        # Compter les calls et puts, long et short
-        calls = [o for o in options if o.option_type == 'call']
-        puts = [o for o in options if o.option_type == 'put']
-        longs = [o for o in options if o.position == 'long']
-        shorts = [o for o in options if o.position == 'short']
-        
-        # Récupérer les strikes uniques
-        strikes = sorted(set(o.strike for o in options))
-        strikes_str = '/'.join([f"{s:.2f}" for s in strikes])
-        
-        # Stratégies connues (reconnaissance de patterns)
-        if n_legs == 1:
-            opt = options[0]
-            return f"{'Long' if opt.position == 'long' else 'Short'} {opt.option_type.capitalize()} {opt.strike:.2f}"
-        
-        elif n_legs == 2:
-            # Spread, Straddle, Strangle
-            if len(calls) == 2 and len(strikes) == 2:
-                if len(longs) == 1 and len(shorts) == 1:
-                    return f"CallSpread {strikes_str}"
-            elif len(puts) == 2 and len(strikes) == 2:
-                if len(longs) == 1 and len(shorts) == 1:
-                    return f"PutSpread {strikes_str}"
-            elif len(calls) == 1 and len(puts) == 1:
-                if len(strikes) == 1:
-                    return f"{'Long' if len(longs) == 2 else 'Short'}Straddle {strikes[0]:.2f}"
-                else:
-                    return f"{'Long' if len(longs) == 2 else 'Short'}Strangle {strikes_str}"
-        
-        elif n_legs == 3:
-            # Butterfly
-            if len(strikes) == 3:
-                if len(calls) == 3:
-                    return f"CallButterfly {strikes_str}"
-                elif len(puts) == 3:
-                    return f"PutButterfly {strikes_str}"
-        
-        elif n_legs == 4:
-            # Condor, Iron Condor
-            if len(strikes) == 4:
-                if len(calls) == 4:
-                    return f"CallCondor {strikes_str}"
-                elif len(puts) == 4:
-                    return f"PutCondor {strikes_str}"
-                elif len(calls) == 2 and len(puts) == 2:
-                    return f"IronCondor {strikes_str}"
-        
-        # Nom générique si non reconnu
-        return f"{n_legs}Leg_{len(calls)}C{len(puts)}P_{strikes_str}"
+
     
     def _calculate_strategy_metrics(self,
                                     options: List[Option],

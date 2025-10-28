@@ -44,6 +44,7 @@ class Option:
     loss_surface: float = 0
     profit_surface: float = 0
     pnl_surface: Optional[float] = None
+    pnl_loss : Optional [np.ndarray] = None
     pnl_array:Optional[np.ndarray]= None
     
     # ============ VOLATILITÉ ============
