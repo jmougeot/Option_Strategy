@@ -12,6 +12,7 @@ import json
 from myproject.bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
 from myproject.bloomberg.ticker_builder import build_option_ticker
 from myproject.option.option_class import Option
+import numpy as np
 
 # Type pour les mois valides
 MonthCode = Literal['F', 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z']
@@ -57,6 +58,7 @@ def create_option_from_bloomberg(
     bloomberg_data: dict,
     position: Literal['long', 'short'] = 'long',
     quantity: int = 1,
+    mixture: Optional[np.ndarray] = None,
     price_min: float = 0,
     price_max: float = 0,
     num_points: int = 200
@@ -129,12 +131,30 @@ def create_option_from_bloomberg(
             timestamp=datetime.now()
         )
         
-        option.profit_surface, option.loss_surface = option._calcul_surface()
-
+        # Initialiser la mixture et calculer les surfaces si les paramètres sont fournis
+        if mixture is not None and price_min > 0 and price_max > 0:
+            # 1. Stocker la mixture
+            option.mixture = mixture
+            
+            # 2. Calculer le pnl_array sur la grille de prix
+            option._calculate_pnl_array(price_min, price_max, num_points)
+            
+            # 3. Calculer la pondération du P&L par la mixture
+            if hasattr(option, 'x') and option.x is not None:
+                option._pnl_ponderation_array(option.x)
+            
+            # 4. Calculer l'espérance du P&L
+            option._average_pnl()
+            
+            # 5. Calculer l'écart-type du P&L
+            option._sigma_pnl()
+            
+            # 6. Calculer les surfaces de profit et de perte
+            option._calcul_surface()
         
         return option
         
-    except Exception as e:
+    except Exception as e:r
         print(f"⚠️ Erreur création Option: {e}")
         return Option.empyOption()
 

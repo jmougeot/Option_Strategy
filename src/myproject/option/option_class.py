@@ -150,7 +150,6 @@ class Option:
         self.pnl_ponderation = self.mixture * self.pnl_array * dx
         return self.pnl_ponderation
 
-
     def _average_pnl(self):
         """
         Espérance du PnL: E[PnL] = ∫ p(x) * pnl(x) dx ≈ sum(mixture * pnl * dx).
@@ -223,5 +222,7 @@ class Option:
                 loss += xi
             else:
                 win += xi
+        self.loss_surface = -loss
+        self.profit_surface = win
         # loss is negative (sum of negative contributions), return positive loss
         return -loss, win     
