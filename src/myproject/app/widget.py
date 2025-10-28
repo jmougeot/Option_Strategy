@@ -212,3 +212,178 @@ def scoring_weights_block() -> dict:
         "breakeven_count": w_be_count,
         "breakeven_spread": w_be_spread,
     }
+
+@dataclass
+class ScenarioData:
+    centers: list[float]
+    std_devs: list[float]
+    weights: list[float]
+
+def scenario_params() -> ScenarioData:
+    """
+    Interface pour définir les scénarios de marché (mixture gaussienne).
+    L'utilisateur peut ajouter autant de scénarios qu'il souhaite.
+    Chaque scénario = (prix cible, incertitude/volatilité, probabilité)
+    """
+    st.subheader("📊 Scénarios de Marché (Mixture Gaussienne)")
+    
+    st.markdown("""
+    Définissez différents scénarios de prix futurs avec leur probabilité.
+    - **Prix Cible** : Prix attendu pour ce scénario
+    - **Incertitude (σ)** : Écart-type, mesure la dispersion autour du prix cible
+    - **Probabilité** : Poids du scénario (sera normalisé automatiquement)
+    """)
+    
+    # Initialiser le state pour les scénarios
+    if 'scenarios' not in st.session_state:
+        st.session_state.scenarios = [
+            {'price': 98.0, 'std': 0.10, 'weight': 50.0},  # Scénario neutre par défaut
+        ]
+    
+    # Afficher les scénarios existants
+    st.markdown("### Scénarios actuels")
+    
+    scenarios_to_delete = []
+    
+    for i, scenario in enumerate(st.session_state.scenarios):
+        with st.container():
+            col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
+            
+            with col1:
+                st.markdown(f"**Scénario {i+1}**")
+            
+            with col2:
+                price = st.number_input(
+                    "Prix Cible",
+                    value=float(scenario['price']),
+                    step=0.01,
+                    format="%.4f",
+                    key=f"price_{i}",
+                    help="Prix attendu pour ce scénario"
+                )
+                st.session_state.scenarios[i]['price'] = price
+            
+            with col3:
+                std = st.number_input(
+                    "Incertitude (σ)",
+                    value=float(scenario['std']),
+                    min_value=0.001,
+                    step=0.01,
+                    format="%.4f",
+                    key=f"std_{i}",
+                    help="Écart-type : plus c'est grand, plus le scénario est incertain"
+                )
+                st.session_state.scenarios[i]['std'] = std
+            
+            with col4:
+                weight = st.number_input(
+                    "Probabilité (%)",
+                    value=float(scenario['weight']),
+                    min_value=0.1,
+                    max_value=100.0,
+                    step=1.0,
+                    format="%.1f",
+                    key=f"weight_{i}",
+                    help="Poids du scénario (sera normalisé)"
+                )
+                st.session_state.scenarios[i]['weight'] = weight
+            
+            with col5:
+                if len(st.session_state.scenarios) > 1:
+                    if st.button("🗑️", key=f"delete_{i}", help="Supprimer ce scénario"):
+                        scenarios_to_delete.append(i)
+            
+            st.divider()
+    
+    # Supprimer les scénarios marqués
+    for idx in sorted(scenarios_to_delete, reverse=True):
+        st.session_state.scenarios.pop(idx)
+        st.rerun()
+    
+    # Boutons d'action
+    col1, col2, col3 = st.columns([2, 2, 2])
+    
+    with col1:
+        if st.button("➕ Ajouter un scénario", use_container_width=True):
+            # Ajouter un nouveau scénario avec des valeurs par défaut
+            last_price = st.session_state.scenarios[-1]['price'] if st.session_state.scenarios else 98.0
+            st.session_state.scenarios.append({
+                'price': last_price + 0.10,
+                'std': 0.10,
+                'weight': 25.0
+            })
+            st.rerun()
+    
+    with col2:
+        if st.button("🎯 Scénarios Prédéfinis", use_container_width=True):
+            preset = st.selectbox(
+                "Choisir un modèle",
+                ["Neutre", "Haussier", "Baissier", "Tri-modal", "Bi-modal symétrique"],
+                key="preset_choice"
+            )
+            
+            if preset == "Neutre":
+                st.session_state.scenarios = [
+                    {'price': 98.0, 'std': 0.05, 'weight': 100.0}
+                ]
+            elif preset == "Haussier":
+                st.session_state.scenarios = [
+                    {'price': 98.0, 'std': 0.05, 'weight': 30.0},
+                    {'price': 98.15, 'std': 0.06, 'weight': 70.0}
+                ]
+            elif preset == "Baissier":
+                st.session_state.scenarios = [
+                    {'price': 97.85, 'std': 0.06, 'weight': 70.0},
+                    {'price': 98.0, 'std': 0.05, 'weight': 30.0}
+                ]
+            elif preset == "Tri-modal":
+                st.session_state.scenarios = [
+                    {'price': 97.875, 'std': 0.04, 'weight': 25.0},
+                    {'price': 98.0, 'std': 0.03, 'weight': 50.0},
+                    {'price': 98.125, 'std': 0.04, 'weight': 25.0}
+                ]
+            elif preset == "Bi-modal symétrique":
+                st.session_state.scenarios = [
+                    {'price': 97.90, 'std': 0.05, 'weight': 50.0},
+                    {'price': 98.10, 'std': 0.05, 'weight': 50.0}
+                ]
+            st.rerun()
+    
+    with col3:
+        if st.button("🔄 Réinitialiser", use_container_width=True):
+            st.session_state.scenarios = [
+                {'price': 98.0, 'std': 0.10, 'weight': 50.0}
+            ]
+            st.rerun()
+    
+    # Statistiques et validation
+    st.markdown("### 📈 Statistiques")
+    
+    total_weight = sum(s['weight'] for s in st.session_state.scenarios)
+    normalized_weights = [s['weight'] / total_weight for s in st.session_state.scenarios]
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Nombre de scénarios", len(st.session_state.scenarios))
+    
+    with col2:
+        avg_price = sum(s['price'] * w for s, w in zip(st.session_state.scenarios, normalized_weights))
+        st.metric("Prix moyen pondéré", f"{avg_price:.4f}")
+    
+    with col3:
+        avg_uncertainty = sum(s['std'] * w for s, w in zip(st.session_state.scenarios, normalized_weights))
+        st.metric("Incertitude moyenne", f"{avg_uncertainty:.4f}")
+    
+    # Afficher la répartition des probabilités
+    with st.expander("📊 Répartition des probabilités (normalisées)", expanded=False):
+        for i, (scenario, norm_weight) in enumerate(zip(st.session_state.scenarios, normalized_weights)):
+            st.write(f"**Scénario {i+1}** : Prix={scenario['price']:.4f}, σ={scenario['std']:.4f} → **{norm_weight*100:.1f}%**")
+    
+    # Préparer les données pour le retour
+    centers = [s['price'] for s in st.session_state.scenarios]
+    std_devs = [s['std'] for s in st.session_state.scenarios]
+    weights = normalized_weights
+    
+    return ScenarioData(centers=centers, std_devs=std_devs, weights=weights)
+    

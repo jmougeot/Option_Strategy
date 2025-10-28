@@ -29,10 +29,12 @@ all_strategies = generator.generate_all_combinations(
     include_long=True,
     include_short=True
 )
-for stra in all_strategies :
-    for leg in stra.all_options : 
-        print (leg.option_type, leg.position, leg.premium)
-    print (stra.strategy_name, stra.premium)
-    print ("-------------------------------------------------------------------------")
-
+for stra in all_strategies:
+    premium = 0.0
+    for leg in stra.all_options:
+        # signe : + pour short (on encaisse), - pour long (on paie)
+        premium += leg.premium * (1 if leg.position == 'short' else -1)
+        print(leg.option_type, leg.position, leg.premium)
+    print(stra.strategy_name, stra.premium, premium)
+    print("-------------------------------------------------------------------------")
 

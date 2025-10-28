@@ -7,11 +7,10 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from datetime import datetime
 from myproject.strategy.comparison_class import StrategyComparison
-from myproject.option.main import process_bloomberg_to_strategies
+from myproject.app.main import process_bloomberg_to_strategies
 from myproject.app.styles import inject_css
-from myproject.app.widget import scoring_weights_block, sidebar_params
+from myproject.app.widget import scoring_weights_block, sidebar_params, scenario_params
 from myproject.app.utils import (
     create_payoff_diagram,
     format_currency,
@@ -20,7 +19,6 @@ from myproject.app.utils import (
 from myproject.app.strategy_manager import (
     render_load_strategies_sidebar,
     render_save_strategies_section,
-    display_loaded_strategies_banner
 )
 
 # ============================================================================
@@ -54,19 +52,19 @@ def main():
     
     with st.sidebar: 
         params = sidebar_params()
-        scoring_weights = scoring_weights_block()
         
-        # Section pour charger des stratégies sauvegardées
+        # Widget de scénarios de marché
+        st.markdown("---")
+        st.markdown("### 🎯 Scénarios de Marché")
+        scenarios = scenario_params()
+        
+        st.markdown("---")
+        scoring_weights = scoring_weights_block()
         loaded_data = render_load_strategies_sidebar()
 
     # ========================================================================
     # ZONE PRINCIPALE
     # ========================================================================
-    
-    # Vérifier s'il y a des stratégies chargées
-    if loaded_data:
-        loaded_strategies, loaded_metadata = loaded_data
-        display_loaded_strategies_banner(loaded_strategies, loaded_metadata)
     
     compare_button = st.button("🚀 Lancer la Comparaison", type="primary", use_container_width=True)
     
@@ -90,26 +88,7 @@ def main():
     
     elif compare_button:
         # ====================================================================
-        # ÉTAPE 1 : Chargement des données depuis Bloomberg
-        # ====================================================================
-        with st.spinner("📥 Import depuis Bloomberg..."):
-            # Convertir UIParams en dict pour load_options_from_bloomberg
-            params_dict = {
-                'underlying': params.underlying,
-                'months': params.months,
-                'years': params.years,
-                'strikes': params.strikes,
-                'price_min': params.price_min,
-                'price_max': params.price_max
-            }
-            
-        # Validation de l'intervalle de prix
-        if params.price_min >= params.price_max:
-            st.error("❌ Le prix minimum doit être inférieur au prix maximum")
-            return
-        
-        # ====================================================================
-        # ÉTAPE 2-3 : Traitement complet via la fonction main
+        # ÉTAPE 1 : Traitement complet via la fonction main
         # ====================================================================
         
         with st.spinner(f"🔄 Génération et comparaison des stratégies (max {params.max_legs} legs)..."):
@@ -177,41 +156,6 @@ def main():
     
     render_save_strategies_section(all_comparisons)
     
-    # ====================================================================
-    # AFFICHAGE DES POIDS UTILISÉS - COMPLET
-    # ====================================================================
-    
-    with st.expander("📊 Poids de scoring utilisés (TOUS LES ATTRIBUTS)", expanded=False):
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown("**💰 Métriques Financières**")
-            st.write(f"• Max Profit: **{scoring_weights.get('max_profit', 0)*100:.0f}%**")
-            st.write(f"• Risque/Rendement: **{scoring_weights.get('risk_reward', 0)*100:.0f}%**")
-            st.write(f"• Zone Profitable: **{scoring_weights.get('profit_zone', 0)*100:.0f}%**")
-            st.write(f"• Performance Cible: **{scoring_weights.get('target_performance', 0)*100:.0f}%**")
-        
-        with col2:
-            st.markdown("**📐 Surfaces**")
-            st.write(f"• Surface Profit: **{scoring_weights.get('surface_profit', 0)*100:.0f}%**")
-            st.write(f"• Surface Loss: **{scoring_weights.get('surface_loss', 0)*100:.0f}%**")
-            st.write(f"• Ratio P/L: **{scoring_weights.get('profit_loss_ratio', 0)*100:.0f}%**")
-        
-        with col3:
-            st.markdown("**🔢 Greeks**")
-            st.write(f"• Delta Neutral: **{scoring_weights.get('delta_neutral', 0)*100:.0f}%**")
-            st.write(f"• Gamma: **{scoring_weights.get('gamma_exposure', 0)*100:.0f}%**")
-            st.write(f"• Vega: **{scoring_weights.get('vega_exposure', 0)*100:.0f}%**")
-            st.write(f"• Theta: **{scoring_weights.get('theta_positive', 0)*100:.0f}%**")
-        
-        with col4:
-            st.markdown("**📊 Autres**")
-            st.write(f"• Volatilité: **{scoring_weights.get('implied_vol', 0)*100:.0f}%**")
-            st.write(f"• BE Count: **{scoring_weights.get('breakeven_count', 0)*100:.0f}%**")
-            st.write(f"• BE Spread: **{scoring_weights.get('breakeven_spread', 0)*100:.0f}%**")
-            st.markdown("---")
-            total = sum(scoring_weights.values())
-            st.write(f"**Total: {total*100:.0f}%**")
     
     # ====================================================================
     # TABS POUR L'AFFICHAGE

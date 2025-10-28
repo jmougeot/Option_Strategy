@@ -1,50 +1,62 @@
 """
 Calcul Complet des Métriques de Stratégie d'Options
-===================================================
-Fournit une fonction générale pour calculer TOUTES les métriques d'une stratégie :
-- Métriques linéaires (coût, Greeks, IV) - calculées par simple addition
-- Métriques de surface (profit/loss surfaces) - calculées en sommant les surfaces de chaque leg
-
-Optimisé pour calculer toutes les métriques en une seule fonction.
-Utilise les méthodes de la classe Option pour assurer la cohérence des calculs.
 """
 
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 from myproject.option.option_class import Option
 import numpy as np
 
 
-def calculate_linear_metrics(options: List[Option],) -> Dict:
+def calculate_linear_metrics(
+    options: List[Option],
+    mixture: Optional[np.ndarray] = None,
+    prices: Optional[np.ndarray] = None,
+) -> Dict:
     """
     Calcule TOUTES les métriques d'une stratégie d'options en une fois.
     
     Cette fonction est optimisée pour calculer :
     1. Métriques linéaires (coût, Greeks, IV) - en une passe sur les options
     2. Métriques de surface (profit/loss) - par calcul vectorisé si demandé
+    3. Métriques pondérées par mixture gaussienne (si fournie)
     
     Args:
         options: Liste d'options constituant la stratégie
-        price_min: Prix minimum pour le calcul des surfaces (optionnel)
-        price_max: Prix maximum pour le calcul des surfaces (optionnel)
-        num_points: Nombre de points pour l'intégration des surfaces
-        calculate_surfaces: Si True, calcule aussi les surfaces (plus lent)
+        mixture: Distribution de probabilité gaussienne (optionnel)
+                 Si fournie, calcule les métriques pondérées
+        prices: Grille de prix correspondant à la mixture (optionnel)
+                Requis si mixture est fourni
+        min_price: Prix minimum pour les calculs (optionnel)
+        max_price: Prix maximum pour les calculs (optionnel)
         
     Returns:
-        Dict avec toutes les métriques (linéaires + surfaces si demandé)
+        Dict avec toutes les métriques (linéaires + pondérées par mixture si applicable)
+        
+    Examples:
+        # Sans mixture (calculs classiques)
+        metrics = calculate_linear_metrics([call, put])
+        
+        # Avec mixture gaussienne
+        prices = np.linspace(80, 120, 500)
+        mixture = create_gaussian_mixture(prices, centers=[100], std_devs=[5])
+        metrics = calculate_linear_metrics([call, put], mixture=mixture, prices=prices)
     """
     # Initialiser les accumulateurs
     premium = 0.0
     total_loss_surface = 0.0
     total_profit_surface = 0.0
     total_gauss_pnl = 0.0
+    
+    # Accumulateurs pour les métriques basées sur la mixture
+    total_average_pnl = 0.0
+    total_sigma_pnl = 0.0
+    has_mixture_data = False
+
 
     
-    # Greeks par type
     delta_calls = gamma_calls = vega_calls = theta_calls = 0.0
     delta_puts = gamma_puts = vega_puts = theta_puts = 0.0
     delta_total = gamma_total = vega_total = theta_total = 0.0
-    
-    # Volatilité implicite
     weighted_iv_sum = 0.0
     total_weight = 0.0
     
@@ -81,16 +93,50 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
         theta = (option.theta or 0.0) * sign * quantity
         
         # ============ SURFACES ============
-        # Pour LONG : profit_surface ajoute au profit, loss_surface ajoute à la perte
-        # Pour SHORT : profit_surface ajoute à la PERTE, loss_surface ajoute au PROFIT (inversé)
-        # Multiplier par la quantité pour tenir compte des multiples contrats
         if option.position == 'long':
-            total_profit_surface += (option.profit_surface or 0.0) * quantity
-            total_loss_surface += (option.loss_surface or 0.0) * quantity
+            total_profit_surface += (option.profit_surface) * quantity
+            total_loss_surface += (option.loss_surface) * quantity
         else:  # short
-            total_profit_surface += (option.loss_surface or 0.0) * quantity  # Inversé pour short
-            total_loss_surface += (option.profit_surface or 0.0) * quantity  # Inversé pour short
+            total_profit_surface += (option.loss_surface) * quantity  # Inversé pour short
+            total_loss_surface += (option.profit_surface) * quantity  # Inversé pour short
         
+        # ============ CALCULS BASÉS SUR LA MIXTURE GAUSSIENNE ============
+        # Seulement si mixture et prices sont fournis
+        if mixture is not None and prices is not None:
+            option.mixture = mixture
+            # Calculer le P&L à l'expiration pour chaque prix
+            option.pnl_array = option._pnl_at_expiry_array(prices)
+            option.x = prices
+            
+            # Calculer les métriques pondérées
+            option._pnl_ponderation_array(prices)
+            avg_pnl = option._average_pnl()
+            sigma_pnl = option._sigma_pnl()
+            
+            # Récupérer les surfaces calculées avec la mixture
+            mixture_loss, mixture_profit = option.calcul_surface()
+            
+            # Accumuler selon la position
+            if option.position == 'long':
+                total_profit_surface += mixture_profit * quantity
+                total_loss_surface += mixture_loss * quantity
+                if avg_pnl is not None:
+                    total_average_pnl += avg_pnl * quantity
+                if sigma_pnl is not None:
+                    # Pour l'écart-type, on cumule les variances puis on prendra la racine
+                    total_sigma_pnl += (sigma_pnl ** 2) * (quantity ** 2)
+            else:  # short
+                # Inverser pour les positions short
+                total_profit_surface += mixture_loss * quantity
+                total_loss_surface += mixture_profit * quantity
+                if avg_pnl is not None:
+                    total_average_pnl -= avg_pnl * quantity  # Inverser le signe
+                if sigma_pnl is not None:
+                    # La variance est toujours positive, même pour short
+                    total_sigma_pnl += (sigma_pnl ** 2) * (quantity ** 2)
+            
+            has_mixture_data = True
+                
         # Accumuler par type
         if option.option_type == 'call':
             delta_calls += delta
@@ -126,6 +172,11 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
         avg_iv = sum(ivs) / len(ivs) if ivs else 0.0
     
 
+    # Calculer l'écart-type total (racine de la somme des variances)
+    if has_mixture_data and total_sigma_pnl > 0:
+        total_sigma_pnl = np.sqrt(total_sigma_pnl)
+    else:
+        total_sigma_pnl = 0.0
     
     # ============ PRÉPARER LE DICTIONNAIRE DE RÉSULTATS ============
     result = {
@@ -137,11 +188,15 @@ def calculate_linear_metrics(options: List[Option],) -> Dict:
         'vega_calls': vega_calls,
         'theta_calls': theta_calls,
 
-        #METRIQUE
-
+        # MÉTRIQUES DE SURFACE
         'loss_surface' : total_loss_surface,
         'profit_surface' : total_profit_surface,
         'gauss_x_pnl': total_gauss_pnl,
+        
+        # MÉTRIQUES BASÉES SUR LA MIXTURE GAUSSIENNE
+        'average_pnl': total_average_pnl if has_mixture_data else None,
+        'sigma_pnl': total_sigma_pnl if has_mixture_data else None,
+        'has_mixture': has_mixture_data,
         
         # Greeks - Puts
         'delta_puts': delta_puts,

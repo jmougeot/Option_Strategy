@@ -13,10 +13,74 @@ Utilise les fonctions optimisées des modules :
 """
 
 from typing import List, Dict, Optional, Tuple
+import numpy as np
 from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.comparor_v2 import StrategyComparerV2
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
+from myproject.app.widget import ScenarioData
+from myproject.mixture.mixture_gaussienne import mixture
+from myproject.mixture.gauss import gaussian
+
+
+def create_mixture_from_scenarios(
+    scenarios: ScenarioData,
+    price_min: float,
+    price_max: float,
+    num_points: int = 500
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Crée une mixture gaussienne à partir des scénarios définis par l'utilisateur.
+    
+    Utilise les fonctions du module mixture_gaussienne pour créer une distribution
+    de probabilité à partir de plusieurs gaussiennes pondérées.
+    
+    Args:
+        scenarios: ScenarioData avec centers, std_devs, weights
+        price_min: Prix minimum de la grille
+        price_max: Prix maximum de la grille
+        num_points: Nombre de points dans la grille
+        
+    Returns:
+        (prices, mixture_normalized): Grille de prix et mixture gaussienne normalisée
+    """
+    if not scenarios or not scenarios.centers:
+        # Retourner une mixture uniforme par défaut
+        prices = np.linspace(price_min, price_max, num_points)
+        uniform_mixture = np.ones_like(prices) / num_points
+        return prices, uniform_mixture
+    
+    # Extraire les paramètres des scénarios
+    centers = scenarios.centers
+    std_devs = scenarios.std_devs
+    weights = scenarios.weights
+    
+    # Normaliser les poids pour qu'ils somment à 1
+    total_weight = sum(weights)
+    if total_weight > 0:
+        proba = [w / total_weight for w in weights]
+    else:
+        # Poids égaux si tous sont à 0
+        proba = [1.0 / len(weights)] * len(weights)
+    
+    # Utiliser la fonction mixture du module mixture_gaussienne
+    prices, mix = mixture(
+        price_min=price_min,
+        price_max=price_max,
+        num_points=num_points,
+        proba=proba,
+        mus=centers,
+        sigmas=std_devs,
+        f=gaussian  # Fonction gaussienne du module gauss
+    )
+    
+    # Normaliser la mixture pour que l'intégrale soit 1
+    norm = float(np.trapz(mix, prices))
+    if norm > 0:
+        mix = mix / norm
+    
+    return prices, mix
+
 
 def process_bloomberg_to_strategies(
     underlying: str = "ER",
@@ -65,6 +129,7 @@ def process_bloomberg_to_strategies(
         price_max=price_max,
         num_points=200
     )
+    
     
     stats['nb_options'] = len(options)
     

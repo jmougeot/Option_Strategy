@@ -172,33 +172,44 @@ class OptionStrategyGeneratorV2:
             # Générer le nom de la stratégie
             strategy_name = generate_strategy_name(option_legs)
             all_metrics = calculate_linear_metrics(option_legs)
-            metrics = self._calculate_strategy_metrics(option_legs, target_price)
             exp_info = get_expiration_info(option_legs)
             
-
+            # Calculer max_profit et max_loss à partir du P&L
+            # (ces métriques ne sont plus dans calculate_linear_metrics)
+            max_profit = 0.0
+            max_loss = 0.0
+            profit_at_target = 0.0
+            breakeven_points = []
             
-            # Créer le StrategyComparison
-            # Note: premium est négatif pour un débit (on paie), positif pour un crédit (on reçoit)
-            # Le signe est déjà inversé dans calculate_linear_metrics
+            # Si on a la mixture, utiliser average_pnl, sinon calculer simplement
+            if all_metrics.get('has_mixture'):
+                profit_at_target = all_metrics.get('average_pnl', 0.0)
+                # Approximation pour max_profit/loss avec mixture
+                max_profit = all_metrics['profit_surface']
+                max_loss = -all_metrics['loss_surface']
+            else:
+                # Valeurs par défaut ou calcul simple
+                max_profit = all_metrics['profit_surface']
+                max_loss = -all_metrics['loss_surface']
+
             strategy = StrategyComparison(                
-                premium=all_metrics['premium'],  # Inverser le signe pour l'affichage (débit > 0, crédit < 0)
+                premium=all_metrics['premium'],
                 strategy_name=strategy_name,
-                strategy=None,  # Pas d'objet OptionStrategy, juste les métriques
+                strategy=None,
                 target_price=target_price,
                 expiration_day=exp_info.get('expiration_day'),
                 expiration_week=exp_info.get('expiration_week'),
                 expiration_month=exp_info.get('expiration_month', 'F'),
                 expiration_year=exp_info.get('expiration_year', 6),
-                max_profit=metrics['max_profit'],
-                max_loss=metrics['max_loss'],
-                breakeven_points=metrics['breakeven_points'],
-                profit_range=metrics['profit_range'],
-                profit_zone_width=metrics['profit_zone_width'],
+                max_profit=max_profit,
+                max_loss=max_loss,
+                breakeven_points=breakeven_points,
+                profit_range=(0.0, 0.0),  # À calculer si nécessaire
+                profit_zone_width=0.0,  # À calculer si nécessaire
                 surface_profit=all_metrics['profit_surface'],
                 surface_loss=all_metrics['loss_surface'],
-                risk_reward_ratio=metrics['max_profit'] / abs(metrics['max_loss']),
+                risk_reward_ratio=max_profit / abs(max_loss) if max_loss != 0 else 0.0,
                 all_options=option_legs,
-                # Greeks (from all_metrics)
                 total_delta_calls=all_metrics['delta_calls'],
                 total_gamma_calls=all_metrics['gamma_calls'],
                 total_vega_calls=all_metrics['vega_calls'],
@@ -212,8 +223,8 @@ class OptionStrategyGeneratorV2:
                 total_vega=all_metrics['vega_total'],
                 total_theta=all_metrics['theta_total'],
                 avg_implied_volatility=all_metrics['avg_implied_volatility'],
-                profit_at_target=metrics['profit_at_target'],
-                profit_at_target_pct=metrics['profit_at_target'] / metrics['max_profit'] * 100,
+                profit_at_target=profit_at_target,
+                profit_at_target_pct=0.0,  # À calculer si nécessaire
                 score=0.0,
                 rank=0
             )
@@ -224,140 +235,4 @@ class OptionStrategyGeneratorV2:
             print(f"⚠️ Erreur création stratégie: {e}")
             return None  
 
-    
-    def _calculate_strategy_metrics(self,
-                                    options: List[Option],
-                                    target_price: float) -> Dict:
-        """
-        Calcule les métriques financières de la stratégie (max_profit, max_loss, breakevens).
-        
-        Args:
-            options: Liste d'options
-            net_cost: Coût net de la stratégie (négatif = crédit)
-            target_price: Prix cible
-            
-        Returns:
-            Dictionnaire avec les métriques
-        """
-        # Calculer le P&L pour une plage de prix
-        strikes = sorted(set(opt.strike for opt in options))
-        min_strike = min(strikes)
-        max_strike = max(strikes)
-        
-        # Plage de prix pour calculer max_profit/max_loss
-        price_range = [min_strike - 10, min_strike, *strikes, max_strike, max_strike + 10]
-        
-        pnl_values = []
-        for price in price_range:
-            pnl = self._calculate_pnl_at_price(options, price)
-            pnl_values.append((price, pnl))
-        
-        # Trouver max_profit et max_loss
-        max_profit = max(pnl for _, pnl in pnl_values)
-        max_loss = min(pnl for _, pnl in pnl_values)
-        
-        # Limiter les valeurs infinies
-        if max_profit == float('inf') or max_profit > 100000:
-            max_profit = 999999.0
-        if max_loss == float('-inf') or max_loss < -100000:
-            max_loss = -999999.0
-        
-        # Calculer les breakevens (prix où P&L = 0)
-        breakeven_points = self._find_breakevens(options, strikes)
-        
-        # Calculer profit_range et profit_zone_width
-        if len(breakeven_points) >= 2:
-            profit_range = (breakeven_points[0], breakeven_points[-1])
-            profit_zone_width = breakeven_points[-1] - breakeven_points[0]
-        elif len(breakeven_points) == 1:
-            profit_range = (breakeven_points[0], max_strike + 10)
-            profit_zone_width = max_strike + 10 - breakeven_points[0]
-        else:
-            profit_range = (min_strike, max_strike)
-            profit_zone_width = max_strike - min_strike
-        
-        # Calculer profit_at_target
-        profit_at_target = self._calculate_pnl_at_price(options, target_price)
-        
-        return {
-            'max_profit': max_profit,
-            'max_loss': max_loss,
-            'breakeven_points': breakeven_points,
-            'profit_range': profit_range,
-            'profit_zone_width': profit_zone_width,
-            'profit_at_target': profit_at_target
-        }
-    
-    def _calculate_pnl_at_price(self, options: List[Option], price: float) -> float:
-        """
-        Calcule le P&L de la stratégie à un prix donné à l'expiration.
-        
-        Args:
-            options: Liste d'options
-            price: Prix du sous-jacent
-            
-        Returns:
-            P&L total
-        """
-        total_pnl = 0.0
-        
-        for opt in options:
-            # Quantité (par défaut 1 si None)
-            quantity = opt.quantity if opt.quantity is not None else 1
-            
-            # Valeur intrinsèque à l'expiration
-            if opt.option_type == 'call':
-                intrinsic_value = max(0, price - opt.strike)
-            else:  # put
-                intrinsic_value = max(0, opt.strike - price)
-            
-            # P&L pour cette option (multiplier par la quantité)
-            if opt.position == 'long':
-                pnl = (intrinsic_value - opt.premium) * quantity
-            else:  # short
-                pnl = (opt.premium - intrinsic_value) * quantity
-                        
-            total_pnl += pnl
-        
-        return total_pnl
-    
-    def _find_breakevens(self, options: List[Option], strikes: List[float]) -> List[float]:
-        """
-        Trouve les points de breakeven (où P&L = 0).
-        
-        Args:
-            options: Liste d'options
-            strikes: Liste des strikes
-            
-        Returns:
-            Liste des prix de breakeven
-        """
-        breakevens = []
-        
-        # Créer une plage de prix plus dense
-        min_strike = min(strikes)
-        max_strike = max(strikes)
-        step = 0.1
-        
-        # Tester les prix de min_strike-10 à max_strike+10
-        prices = []
-        current = min_strike - 10
-        while current <= max_strike + 10:
-            prices.append(current)
-            current += step
-        
-        # Calculer P&L pour chaque prix
-        pnl_values = [(p, self._calculate_pnl_at_price(options, p)) for p in prices]
-        
-        # Trouver les points où P&L change de signe
-        for i in range(len(pnl_values) - 1):
-            price1, pnl1 = pnl_values[i]
-            price2, pnl2 = pnl_values[i + 1]
-            
-            # Si changement de signe, il y a un breakeven entre price1 et price2
-            if pnl1 * pnl2 < 0:
-                # Interpolation linéaire pour trouver le breakeven exact
-                breakeven = price1 - pnl1 * (price2 - price1) / (pnl2 - pnl1)
-                breakevens.append(round(breakeven, 2))
-        
-        return sorted(breakevens)
+
