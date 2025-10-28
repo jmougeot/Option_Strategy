@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import  Callable, Literal, Optional, Tuple
+from typing import Literal, Optional, Tuple
 import numpy as np
 
 @dataclass
@@ -43,8 +43,6 @@ class Option:
     # ============ METRIQUES (stockage éventuel) ============
     loss_surface: float = 0
     profit_surface: float = 0
-    pnl_surface: Optional[float] = None
-    pnl_loss : Optional [np.ndarray] = None
     pnl_array : Optional[np.ndarray]= None
     mixture : Optional[np.ndarray]= None
     pnl_ponderation: Optional[np.ndarray] = None 
@@ -104,7 +102,7 @@ class Option:
         pnl = sign * (self.premium - intrinsic) * qty * float(self.contract_size or 1)
         return pnl
     
-    def calculate_pnl_array(self, price_min: float, price_max: float, num_points: int = 500) -> np.ndarray:
+    def _calculate_pnl_array(self, price_min: float, price_max: float, num_points: int = 500) -> np.ndarray:
         """
         Calcule le P&L array sur une grille de prix entre price_min et price_max.
         Stocke le résultat dans self.pnl_array.
@@ -210,7 +208,7 @@ class Option:
         self.sigma_pnl = sigma
         return sigma
 
-    def calcul_surface(self) -> Tuple[float, float]:
+    def _calcul_surface(self) -> Tuple[float, float]:
         """
         Aire de la partie négative de P&L (perte) entre min_price et max_price.
         On retourne une valeur positive (= intégrale de max(-P&L, 0)).

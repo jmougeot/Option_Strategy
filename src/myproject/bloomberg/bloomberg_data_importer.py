@@ -129,9 +129,8 @@ def create_option_from_bloomberg(
             timestamp=datetime.now()
         )
         
+        option.profit_surface, option.loss_surface = option._calcul_surface()
 
-        option.profit_surface = option.calcul_profit_surface(price_min, price_max, num_points)
-        option.loss_surface = option.calcul_loss_surface(price_min, price_max, num_points)
         
         return option
         
