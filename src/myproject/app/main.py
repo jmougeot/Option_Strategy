@@ -53,15 +53,7 @@ def create_mixture_from_scenarios(
     # Extraire les paramètres des scénarios
     centers = scenarios.centers
     std_devs = scenarios.std_devs
-    weights = scenarios.weights
-    
-    # Normaliser les poids pour qu'ils somment à 1
-    total_weight = sum(weights)
-    if total_weight > 0:
-        proba = [w / total_weight for w in weights]
-    else:
-        # Poids égaux si tous sont à 0
-        proba = [1.0 / len(weights)] * len(weights)
+    proba = scenarios.weights
     
     # Utiliser la fonction mixture du module mixture_gaussienne
     prices, mix = mixture(
@@ -73,12 +65,6 @@ def create_mixture_from_scenarios(
         sigmas=std_devs,
         f=gaussian  # Fonction gaussienne du module gauss
     )
-    
-    # Normaliser la mixture pour que l'intégrale soit 1
-    norm = float(np.trapz(mix, prices))
-    if norm > 0:
-        mix = mix / norm
-    
     return prices, mix
 
 
