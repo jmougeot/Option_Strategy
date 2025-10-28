@@ -154,7 +154,7 @@ def create_option_from_bloomberg(
         
         return option
         
-    except Exception as e:r
+    except Exception as e:
         print(f"⚠️ Erreur création Option: {e}")
         return Option.empyOption()
 
