@@ -101,23 +101,3 @@ def render_save_strategies_section(all_comparisons: List[StrategyComparison]) ->
     with col3:
         st.write("")  # Espacement
 
-
-def display_loaded_strategies_banner(strategies: List[StrategyComparison], metadata: dict) -> None:
-    """
-    Affiche une bannière indiquant que des stratégies sont chargées
-    
-    Args:
-        strategies: Liste des stratégies chargées
-        metadata: Métadonnées du fichier
-    """
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.info(f"📂 **Stratégies chargées** : {len(strategies)} stratégies | "
-                f"Sauvegardé le : {metadata.get('saved_at', 'Unknown')[:19]} | "
-                f"Underlying : {metadata.get('underlying', 'Unknown')}")
-    with col2:
-        if st.button("🔄 Nouvelle Analyse", use_container_width=True):
-            del st.session_state['loaded_strategies']
-            if 'loaded_metadata' in st.session_state:
-                del st.session_state['loaded_metadata']
-            st.rerun()

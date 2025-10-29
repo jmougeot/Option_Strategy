@@ -25,7 +25,7 @@ class StrategyComparison:
 
     # Métriques de risque
     profit_range: Tuple[float, float]  # Range de prix profitable
-    profit_zone_width: float  # Largeur de la zone profitable
+    profit_zone_width: float  # Largeur de la zone profitable+
     surface_profit: float # surface of profit btw min price and max price 
     surface_loss:float # surface of loss btw min price and max price 
     risk_reward_ratio: float  # Max loss / Max profit

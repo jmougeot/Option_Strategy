@@ -40,9 +40,9 @@ def sidebar_params() -> UIParams:
     price_step = st.number_input("Pas de Prix ($)", value=0.0625, step=0.0001, format="%.4f")
     strikes = strike_list(price_min, price_max, price_step)
 
-    with st.expander("Paramètres de génération", expanded=True):
-        max_legs = st.slider("Nombre maximum de legs par stratégie:", 1, 4, 4)
-        top_n = st.number_input("Nombre de meilleures structures à afficher:", value=10, min_value=1, max_value=100)
+
+    max_legs = st.slider("Nombre maximum de legs par stratégie:", 1, 4, 4)
+    top_n = st.number_input("Nombre de meilleures structures à afficher:", value=10, min_value=1, max_value=100)
 
     years = [int(y.strip()) for y in years_input.split(",") if y.strip()]
     months = [m.strip() for m in months_input.split(",") if m.strip()]

@@ -227,6 +227,7 @@ class StrategyComparerV2:
                 - 'surface_loss': 0.08 - Surface de perte (inversé)
                 - 'profit_loss_ratio': 0.12 - Ratio surface profit/loss
                 
+                
                 GREEKS (18%):
                 - 'delta_neutral': 0.06 - Neutralité du delta
                 - 'gamma_exposure': 0.04 - Exposition gamma (modéré préféré)

@@ -121,6 +121,39 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
     return fig
 
 
+def calculate_strategy_pnl(strategy: StrategyComparison, price: float) -> float:
+    """
+    Calcule le P&L d'une stratégie à un prix donné.
+    
+    Args:
+        strategy: Stratégie dont on veut calculer le P&L
+        price: Prix du sous-jacent
+        
+    Returns:
+        P&L total à ce prix
+    """
+    total_pnl = -strategy.premium  # Coût initial (négatif si débit, positif si crédit)
+    
+    for option in strategy.all_options:
+        # Calculer la valeur intrinsèque à l'expiration
+        if option.option_type == 'call':
+            intrinsic_value = max(0, price - option.strike)
+        else:  # put
+            intrinsic_value = max(0, option.strike - price)
+        
+        # Appliquer la position (long = acheté, short = vendu)
+        if option.position == 'long':
+            option_pnl = intrinsic_value - option.premium
+        else:  # short
+            option_pnl = option.premium - intrinsic_value
+        
+        # Multiplier par la quantité
+        quantity = option.quantity if option.quantity is not None else 1
+        total_pnl += option_pnl * quantity
+    
+    return total_pnl
+
+
 def create_single_strategy_payoff(strategy: StrategyComparison, target_price: float) -> go.Figure:
     """
     Crée un diagramme P&L pour une seule stratégie.
@@ -142,43 +175,42 @@ def create_single_strategy_payoff(strategy: StrategyComparison, target_price: fl
     fig.add_vline(x=target_price, line_dash="dot", line_color="red", 
                   annotation_text="Target", opacity=0.7)
     
-    # Calculer P&L
-    if strategy.strategy is not None:
-        pnl_values = [strategy.strategy.profit_at_expiry(price) for price in price_range]
-        
-        # Courbe P&L
+    # Calculer P&L pour toute la plage de prix
+    pnl_values = [calculate_strategy_pnl(strategy, price) for price in price_range]
+    
+    # Courbe P&L
+    fig.add_trace(go.Scatter(
+        x=price_range,
+        y=pnl_values,
+        mode='lines',
+        name=strategy.strategy_name,
+        line=dict(color='#1f77b4', width=3),
+        fill='tozeroy',
+        fillcolor='rgba(31, 119, 180, 0.1)',
+        hovertemplate='Prix: $%{x:.2f}<br>P&L: $%{y:.2f}<extra></extra>'
+    ))
+    
+    # Markers de breakeven (si disponibles)
+    if strategy.breakeven_points:
         fig.add_trace(go.Scatter(
-            x=price_range,
-            y=pnl_values,
-            mode='lines',
-            name=strategy.strategy_name,
-            line=dict(color='#1f77b4', width=3),
-            fill='tozeroy',
-            fillcolor='rgba(31, 119, 180, 0.1)',
-            hovertemplate='Prix: $%{x:.2f}<br>P&L: $%{y:.2f}<extra></extra>'
-        ))
-        
-        # Markers de breakeven
-        if strategy.breakeven_points:
-            fig.add_trace(go.Scatter(
-                x=strategy.breakeven_points,
-                y=[0] * len(strategy.breakeven_points),
-                mode='markers',
-                marker=dict(size=12, color='red', symbol='circle-open', line=dict(width=3)),
-                name='Breakeven',
-                hovertemplate='Breakeven: $%{x:.2f}<extra></extra>'
-            ))
-        
-        # Marker au prix cible
-        profit_at_target = strategy.strategy.profit_at_expiry(target_price)
-        fig.add_trace(go.Scatter(
-            x=[target_price],
-            y=[profit_at_target],
+            x=strategy.breakeven_points,
+            y=[0] * len(strategy.breakeven_points),
             mode='markers',
-            marker=dict(size=15, color='green', symbol='star'),
-            name='Prix Cible',
-            hovertemplate=f'Target: ${target_price:.2f}<br>P&L: ${profit_at_target:.2f}<extra></extra>'
+            marker=dict(size=12, color='red', symbol='circle-open', line=dict(width=3)),
+            name='Breakeven',
+            hovertemplate='Breakeven: $%{x:.2f}<extra></extra>'
         ))
+    
+    # Marker au prix cible
+    profit_at_target = calculate_strategy_pnl(strategy, target_price)
+    fig.add_trace(go.Scatter(
+        x=[target_price],
+        y=[profit_at_target],
+        mode='markers',
+        marker=dict(size=15, color='green', symbol='star'),
+        name='Prix Cible',
+        hovertemplate=f'Target: ${target_price:.2f}<br>P&L: ${profit_at_target:.2f}<extra></extra>'
+    ))
     
     # Configuration du layout
     fig.update_layout(
