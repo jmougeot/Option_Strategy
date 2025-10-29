@@ -12,6 +12,7 @@ from itertools import combinations
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.strategy.calcul_linear_metrics import calculate_linear_metrics
+from myproject.strategy.calcul_nonlinear_metrics import update_metrics_with_nonlinear
 from myproject.option.option_filter import sort_options_by_expiration
 from myproject.option.option_utils_v2 import get_expiration_info
 from myproject.strategy.strategy_naming_v2 import generate_strategy_name
@@ -201,26 +202,14 @@ class OptionStrategyGeneratorV2:
             
             # Générer le nom de la stratégie
             strategy_name = generate_strategy_name(option_legs)
+            
+            # Calculer métriques linéaires (Greeks, surfaces, etc.)
             all_metrics = calculate_linear_metrics(option_legs)
+            
+            # Calculer métriques non-linéaires (max_profit, max_loss, breakeven, etc.)
+            all_metrics = update_metrics_with_nonlinear(all_metrics, target_price)
+            
             exp_info = get_expiration_info(option_legs)
-            
-            # Calculer max_profit et max_loss à partir du P&L
-            # (ces métriques ne sont plus dans calculate_linear_metrics)
-            max_profit = 0.0
-            max_loss = 0.0
-            profit_at_target = 0.0
-            breakeven_points = []
-            
-            # Si on a la mixture, utiliser average_pnl, sinon calculer simplement
-            if all_metrics.get('has_mixture'):
-                profit_at_target = all_metrics.get('average_pnl', 0.0)
-                # Approximation pour max_profit/loss avec mixture
-                max_profit = all_metrics['profit_surface']
-                max_loss = -all_metrics['loss_surface']
-            else:
-                # Valeurs par défaut ou calcul simple
-                max_profit = all_metrics['profit_surface']
-                max_loss = -all_metrics['loss_surface']
 
             strategy = StrategyComparison(                
                 premium=all_metrics['premium'],
@@ -231,44 +220,41 @@ class OptionStrategyGeneratorV2:
                 expiration_week=exp_info.get('expiration_week'),
                 expiration_month=exp_info.get('expiration_month', 'F'),
                 expiration_year=exp_info.get('expiration_year', 6),
-                max_profit=max_profit,
-                max_loss=max_loss,
-                breakeven_points=breakeven_points,
-                profit_range=(0.0, 0.0),  # À calculer si nécessaire
-                profit_zone_width=0.0,  # À calculer si nécessaire
+                
+                # Métriques non-linéaires (calculées depuis pnl_array)
+                max_profit=all_metrics.get('max_profit', 0.0),
+                max_loss=all_metrics.get('max_loss', 0.0),
+                breakeven_points=all_metrics.get('breakeven_points', []),
+                profit_range=all_metrics.get('profit_range', (0.0, 0.0)),
+                profit_zone_width=all_metrics.get('profit_zone_width', 0.0),
+                risk_reward_ratio=all_metrics.get('risk_reward_ratio', 0.0),
+                
+                # Surfaces
                 surface_profit=all_metrics['profit_surface'],
                 surface_loss=all_metrics['loss_surface'],
-                risk_reward_ratio=max_profit / abs(max_loss) if max_loss != 0 else 0.0,
-                all_options=option_legs,
                 
-                # Greeks - Calls
+                all_options=option_legs,
                 total_delta_calls=all_metrics['delta_calls'],
                 total_gamma_calls=all_metrics['gamma_calls'],
                 total_vega_calls=all_metrics['vega_calls'],
                 total_theta_calls=all_metrics['theta_calls'],
-                
-                # Greeks - Puts
                 total_delta_puts=all_metrics['delta_puts'],
                 total_gamma_puts=all_metrics['gamma_puts'],
                 total_vega_puts=all_metrics['vega_puts'],
                 total_theta_puts=all_metrics['theta_puts'],
-                
-                # Greeks - Total
                 total_delta=all_metrics['delta_total'],
                 total_gamma=all_metrics['gamma_total'],
                 total_vega=all_metrics['vega_total'],
                 total_theta=all_metrics['theta_total'],
-                
-                # Volatilité
                 avg_implied_volatility=all_metrics['avg_implied_volatility'],
                 
                 # Métriques pondérées par mixture (si disponibles)
                 average_pnl=all_metrics.get('average_pnl'),
                 sigma_pnl=all_metrics.get('sigma_pnl'),
                 
-                # Performance
-                profit_at_target=profit_at_target,
-                profit_at_target_pct=0.0,  # À calculer si nécessaire
+                # Performance au prix cible
+                profit_at_target=all_metrics.get('profit_at_target', 0.0),
+                profit_at_target_pct=all_metrics.get('profit_at_target_pct', 0.0),
                 
                 # Score et ranking
                 score=0.0,

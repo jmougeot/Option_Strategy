@@ -48,6 +48,10 @@ def calculate_linear_metrics(
     total_average_pnl = 0.0
     total_sigma_pnl = 0.0
     has_mixture = False  # Indicateur si au moins une option a une mixture
+    
+    # Accumulateur pour le P&L array (stratégie complète)
+    pnl_array = None
+    prices = None
 
     delta_calls = gamma_calls = vega_calls = theta_calls = 0.0
     delta_puts = gamma_puts = vega_puts = theta_puts = 0.0
@@ -130,6 +134,16 @@ def calculate_linear_metrics(
         if hasattr(option, 'sigma_pnl') and option.sigma_pnl is not None:
             # Pour l'écart-type, on accumule les variances puis on prend la racine
             total_sigma_pnl += (option.sigma_pnl ** 2)
+        
+        # ============ ACCUMULER LE P&L ARRAY ============
+        # Construire le P&L total de la stratégie
+        if hasattr(option, 'pnl_array') and option.pnl_array is not None:
+            if pnl_array is None:
+                pnl_array = option.pnl_array.copy()
+                if hasattr(option, 'prices') and option.prices is not None:
+                    prices = option.prices.copy()
+            else:
+                pnl_array += option.pnl_array
     
     # Calculer l'écart-type total (racine de la somme des variances)
     if has_mixture and total_sigma_pnl > 0:
@@ -187,7 +201,11 @@ def calculate_linear_metrics(
         'n_calls': n_calls,
         'n_puts': n_puts,
         'n_long': n_long,
-        'n_short': n_short
+        'n_short': n_short,
+        
+        # Arrays pour calculs non-linéaires
+        'pnl_array': pnl_array,
+        'prices': prices
     }
 
     return result
