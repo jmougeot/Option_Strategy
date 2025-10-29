@@ -34,7 +34,7 @@ def process_bloomberg_to_strategies(
     scoring_weights: Optional[Dict[str, float]] = None,
     verbose: bool = False,
     scenarios: Optional[ScenarioData] = None ,
-    num_points : int = 50
+    num_points : int = 100
 
 ) -> Tuple[List[StrategyComparison], Dict]:
     """
@@ -56,7 +56,7 @@ def process_bloomberg_to_strategies(
     """
     stats = {}
 
-    
+    print (scenarios)
     mixture= create_mixture_from_scenarios(scenarios, price_min, price_max, num_points, target_price)
     print (mixture)
 

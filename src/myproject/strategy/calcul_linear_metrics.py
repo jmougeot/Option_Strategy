@@ -43,11 +43,11 @@ def calculate_linear_metrics(
     premium = 0.0
     total_loss_surface = 0.0
     total_profit_surface = 0.0
-    total_gauss_pnl = 0.0
     
     # Accumulateurs pour les métriques basées sur la mixture
     total_average_pnl = 0.0
     total_sigma_pnl = 0.0
+    has_mixture = False  # Indicateur si au moins une option a une mixture
 
     delta_calls = gamma_calls = vega_calls = theta_calls = 0.0
     delta_puts = gamma_puts = vega_puts = theta_puts = 0.0
@@ -112,6 +112,28 @@ def calculate_linear_metrics(
             weight = abs(option.premium * quantity)
             weighted_iv_sum += option.implied_volatility * weight
             total_weight += weight
+        
+        # ============ SURFACES (stockées dans chaque option) ============
+        # Accumuler les surfaces de profit et de perte
+        if hasattr(option, 'profit_surface') and option.profit_surface > 0:
+            total_profit_surface += option.profit_surface
+        
+        if hasattr(option, 'loss_surface') and option.loss_surface > 0:
+            total_loss_surface += option.loss_surface
+        
+        # ============ MÉTRIQUES PONDÉRÉES PAR MIXTURE ============
+        # Si l'option a des métriques calculées avec la mixture
+        if hasattr(option, 'average_pnl') and option.average_pnl is not None:
+            total_average_pnl += option.average_pnl
+            has_mixture = True
+        
+        if hasattr(option, 'sigma_pnl') and option.sigma_pnl is not None:
+            # Pour l'écart-type, on accumule les variances puis on prend la racine
+            total_sigma_pnl += (option.sigma_pnl ** 2)
+    
+    # Calculer l'écart-type total (racine de la somme des variances)
+    if has_mixture and total_sigma_pnl > 0:
+        total_sigma_pnl = np.sqrt(total_sigma_pnl)
     
     # Calculer IV moyenne
     if total_weight > 0:
@@ -129,21 +151,25 @@ def calculate_linear_metrics(
     result = {
         # Coût
         'premium': premium,
+        
         # Greeks - Calls
         'delta_calls': delta_calls,
         'gamma_calls': gamma_calls,
         'vega_calls': vega_calls,
         'theta_calls': theta_calls,
 
-        # MÉTRIQUES DE SURFACE
-        'loss_surface' : total_loss_surface,
-        'profit_surface' : total_profit_surface,
-        'gauss_x_pnl': total_gauss_pnl,
+        # MÉTRIQUES DE SURFACE (accumulées depuis les options)
+        'loss_surface': total_loss_surface,
+        'profit_surface': total_profit_surface,
+        
+        # MÉTRIQUES PONDÉRÉES PAR MIXTURE (si disponibles)
+        'average_pnl': total_average_pnl if has_mixture else None,
+        'sigma_pnl': total_sigma_pnl if has_mixture else None,
+        'has_mixture': has_mixture,
         
         # Greeks - Puts
         'delta_puts': delta_puts,
         'gamma_puts': gamma_puts,
-
         'vega_puts': vega_puts,
         'theta_puts': theta_puts,
         

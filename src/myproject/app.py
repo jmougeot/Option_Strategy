@@ -18,7 +18,6 @@ from myproject.app.utils import (
 )
 from myproject.app.strategy_manager import (
     render_load_strategies_sidebar,
-    render_save_strategies_section,
 )
 
 # ============================================================================
@@ -104,7 +103,8 @@ def main():
                 max_legs=params.max_legs,
                 top_n=params.top_n,
                 scoring_weights=scoring_weights,
-                verbose=False
+                verbose=False,
+                scenarios = scenarios
             )
             
             # Vérifier les résultats

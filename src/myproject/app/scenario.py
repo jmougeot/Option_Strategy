@@ -9,7 +9,7 @@ def create_mixture_from_scenarios(
     scenarios: Optional[ScenarioData],
     price_min: float,
     price_max: float,
-    num_points: int = 500,
+    num_points: int = 50,
     target_price : float = 100,
     f = gaussian 
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -32,7 +32,8 @@ def create_mixture_from_scenarios(
         # Retourner une mixture uniforme par défaut
         sigma = (price_min-price_max)/4
         prices = np.linspace(price_min, price_max, num_points)
-        uniform_mixture = f(prices, target_price, sigma)
+        step = len (prices)/num_points 
+        uniform_mixture = f(prices, target_price, sigma)*step
         return prices, uniform_mixture
     
     # Extraire les paramètres des scénarios

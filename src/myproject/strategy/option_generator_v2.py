@@ -146,27 +146,57 @@ class OptionStrategyGeneratorV2:
                 
                 # Créer une copie de l'option avec la position modifiée
                 opt_copy = Option(
+                    # Obligatoires
                     option_type=opt.option_type,
-                    loss_surface= opt.loss_surface,
-                    profit_surface=opt.profit_surface,
                     strike=opt.strike,
                     premium=opt.premium,
+                    
+                    # Expiration
                     expiration_day=opt.expiration_day,
                     expiration_week=opt.expiration_week,
                     expiration_month=opt.expiration_month,
                     expiration_year=opt.expiration_year,
+                    
+                    # Position
                     quantity=opt.quantity,
-                    position=position_type,  # Utiliser la variable typée
+                    position=position_type,
+                    
+                    # Identification
                     ticker=opt.ticker,
                     underlying_symbol=opt.underlying_symbol,
+                    
+                    # Prix
                     bid=opt.bid,
                     ask=opt.ask,
+                    
+                    # Greeks
                     delta=opt.delta,
                     gamma=opt.gamma,
                     vega=opt.vega,
                     theta=opt.theta,
-                    implied_volatility=opt.implied_volatility
+                    
+                    # Volatilité
+                    implied_volatility=opt.implied_volatility,
+                    
+                    # Surfaces calculées (copiées depuis l'option originale)
+                    loss_surface=opt.loss_surface,
+                    profit_surface=opt.profit_surface,
+                    
+                    # Arrays et mixture (si disponibles)
+                    prices=opt.prices,
+                    mixture=opt.mixture,
+                    pnl_array=opt.pnl_array,
+                    pnl_ponderation=opt.pnl_ponderation,
+                    
+                    # Métriques calculées avec la mixture
+                    average_pnl=opt.average_pnl,
+                    sigma_pnl=opt.sigma_pnl,
                 )
+                
+                # Copier l'attribut dynamique _dx si présent
+                if hasattr(opt, '_dx'):
+                    opt_copy._dx = opt._dx
+                
                 option_legs.append(opt_copy)
             
             # Générer le nom de la stratégie
@@ -210,21 +240,37 @@ class OptionStrategyGeneratorV2:
                 surface_loss=all_metrics['loss_surface'],
                 risk_reward_ratio=max_profit / abs(max_loss) if max_loss != 0 else 0.0,
                 all_options=option_legs,
+                
+                # Greeks - Calls
                 total_delta_calls=all_metrics['delta_calls'],
                 total_gamma_calls=all_metrics['gamma_calls'],
                 total_vega_calls=all_metrics['vega_calls'],
                 total_theta_calls=all_metrics['theta_calls'],
+                
+                # Greeks - Puts
                 total_delta_puts=all_metrics['delta_puts'],
                 total_gamma_puts=all_metrics['gamma_puts'],
                 total_vega_puts=all_metrics['vega_puts'],
                 total_theta_puts=all_metrics['theta_puts'],
+                
+                # Greeks - Total
                 total_delta=all_metrics['delta_total'],
                 total_gamma=all_metrics['gamma_total'],
                 total_vega=all_metrics['vega_total'],
                 total_theta=all_metrics['theta_total'],
+                
+                # Volatilité
                 avg_implied_volatility=all_metrics['avg_implied_volatility'],
+                
+                # Métriques pondérées par mixture (si disponibles)
+                average_pnl=all_metrics.get('average_pnl'),
+                sigma_pnl=all_metrics.get('sigma_pnl'),
+                
+                # Performance
                 profit_at_target=profit_at_target,
                 profit_at_target_pct=0.0,  # À calculer si nécessaire
+                
+                # Score et ranking
                 score=0.0,
                 rank=0
             )

@@ -14,9 +14,9 @@ def mixture(
 ) -> Tuple[np.ndarray, np.ndarray]:
     
     x = np.linspace(price_min, price_max, num_points)
+    step = (price_max-price_min)/num_points
 
     w = np.asarray(proba, dtype=float)
 
-    mix = sum((wi * f(x, mu, sigma) for wi, mu, sigma in zip(w, mus, sigmas)), np.zeros_like(x, dtype=float))
+    mix = sum((wi * f(x, mu, sigma) * step  for wi, mu, sigma in zip(w, mus, sigmas)), np.zeros_like(x, dtype=float))
     return (x, mix)
-

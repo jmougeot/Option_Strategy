@@ -41,12 +41,16 @@ class Option:
     rho: Optional[float] = None
 
     # ============ METRIQUES (stockage éventuel) ============
-    prices :  Optional[np.ndarray]= None
+    prices: Optional[np.ndarray] = None
     loss_surface: float = 0
     profit_surface: float = 0
-    pnl_array : Optional[np.ndarray]= None
-    mixture : Optional[np.ndarray]= None
-    pnl_ponderation: Optional[np.ndarray] = None 
+    pnl_array: Optional[np.ndarray] = None
+    mixture: Optional[np.ndarray] = None
+    pnl_ponderation: Optional[np.ndarray] = None
+    
+    # Métriques calculées avec la mixture
+    average_pnl: Optional[float] = None
+    sigma_pnl: Optional[float] = None 
 
     # ============ VOLATILITÉ ============
     implied_volatility: Optional[float] = None

@@ -54,6 +54,10 @@ class StrategyComparison:
     # Volatilité implicite
     avg_implied_volatility: float = 0.0  # Volatilité implicite moyenne des options
 
+    # Métriques pondérées par mixture gaussienne
+    average_pnl: Optional[float] = None  # Espérance du P&L avec mixture
+    sigma_pnl: Optional[float] = None    # Écart-type du P&L avec mixture
+
     # Performance au prix cible
     profit_at_target: float = 0.0
     profit_at_target_pct: float = 0.0  # % du max profit

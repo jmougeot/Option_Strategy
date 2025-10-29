@@ -5,7 +5,7 @@ Comparateur simplifié pour les stratégies générées par option_generator_v2.
 Utilise le même système de scoring que multi_structure_comparer.py.
 """
 
-from typing import List, Dict, Optional, Callable, Tuple, Any
+from typing import List, Dict, Optional, Callable, Tuple
 from dataclasses import dataclass
 from myproject.strategy.comparison_class import StrategyComparison
 
@@ -134,6 +134,22 @@ class StrategyComparerV2:
                 normalizer=self._normalize_min_max,
                 scorer=self._score_moderate_better
             ),
+            
+            # ========== MÉTRIQUES GAUSSIENNES (MIXTURE) ==========
+            MetricConfig(
+                name='average_pnl',
+                weight=0.06,
+                extractor=lambda s: s.average_pnl if s.average_pnl is not None else 0.0,
+                normalizer=self._normalize_min_max,
+                scorer=self._score_higher_better
+            ),
+            MetricConfig(
+                name='sigma_pnl',
+                weight=0.04,
+                extractor=lambda s: s.sigma_pnl if s.sigma_pnl is not None else 0.0,
+                normalizer=self._normalize_max,
+                scorer=self._score_lower_better  # Plus faible écart-type = meilleur
+            ),
         ]
     
     # ========== NORMALISATEURS ==========
@@ -220,9 +236,9 @@ class StrategyComparerV2:
                 VOLATILITÉ (4%):
                 - 'implied_vol': 0.04 - Volatilité implicite (modéré préféré)
                 
-                BREAKEVENS (6%):
-                - 'breakeven_count': 0.03 - Nombre de points de breakeven
-                - 'breakeven_spread': 0.03 - Écart des breakevens
+                MÉTRIQUES GAUSSIENNES - MIXTURE (10%):
+                - 'average_pnl': 0.06 - Espérance du P&L avec mixture
+                - 'sigma_pnl': 0.04 - Écart-type du P&L (inversé, plus faible = meilleur)
         
         Returns:
             Liste des top_n meilleures stratégies, triées par score décroissant,
