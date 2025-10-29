@@ -150,20 +150,14 @@ def main():
     # Filtrer les comparaisons pour le meilleur prix cible
     comparisons: list[StrategyComparison] = [c for c in all_comparisons if c.target_price == best_target_price]
     
-    # ====================================================================
-    # BOUTON DE SAUVEGARDE
-    # ====================================================================
-    
-    render_save_strategies_section(all_comparisons)
-    
     
     # ====================================================================
     # TABS POUR L'AFFICHAGE
     # ====================================================================
     
     tab1, tab2 = st.tabs([
-        "🏆 Vue d'Ensemble", 
-        "📈 Diagramme P&L", 
+        "Vue d'Ensemble", 
+        "Diagramme P&L", 
     ])
     
     # ----------------------------------------------------------------
