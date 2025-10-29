@@ -19,9 +19,7 @@ from myproject.app.utils import (
 from myproject.app.payoff_diagram import display_interactive_strategy_table
 
 from myproject.app.mixture_diagram import create_mixture_diagram
-from myproject.app.strategy_manager import (
-    render_load_strategies_sidebar,
-)
+
 
 # ============================================================================
 # CONFIGURATION DE LA PAGE
@@ -59,7 +57,6 @@ def main():
         st.markdown("---")
         scenarios = scenario_params()
         scoring_weights = scoring_weights_block()
-        loaded_data = render_load_strategies_sidebar()
 
     # ========================================================================
     # ZONE PRINCIPALE
@@ -73,13 +70,8 @@ def main():
     mixture = None  # Initialiser mixture
     
     # Utiliser les stratégies chargées si disponibles
-    if loaded_data:
-        loaded_strategies, loaded_metadata = loaded_data
-        all_comparisons = loaded_strategies
-        if all_comparisons:
-            best_target_price = all_comparisons[0].target_price
         
-    elif compare_button:
+    if compare_button:
         # ====================================================================
         # ÉTAPE 1 : Traitement complet via la fonction main
         # ====================================================================

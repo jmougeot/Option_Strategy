@@ -210,41 +210,6 @@ class StrategyComparerV2:
         """
         Compare et classe les stratégies selon un système de scoring multi-critères.
         
-        Args:
-            strategies: Liste de StrategyComparison à comparer
-            top_n: Nombre de meilleures stratégies à retourner
-            weights: Poids personnalisés pour le scoring (optionnel)
-                Toutes les métriques disponibles et leurs poids par défaut:
-                
-                MÉTRIQUES FINANCIÈRES (36%):
-                - 'max_profit': 0.10 - Profit maximum
-                - 'risk_reward': 0.10 - Ratio risque/récompense (inversé)
-                - 'profit_zone': 0.08 - Largeur de zone de profit
-                - 'target_performance': 0.08 - Performance au prix cible
-                
-                SURFACES (32%):
-                - 'surface_profit': 0.12 - Surface de profit
-                - 'surface_loss': 0.08 - Surface de perte (inversé)
-                - 'profit_loss_ratio': 0.12 - Ratio surface profit/loss
-                
-                
-                GREEKS (18%):
-                - 'delta_neutral': 0.06 - Neutralité du delta
-                - 'gamma_exposure': 0.04 - Exposition gamma (modéré préféré)
-                - 'vega_exposure': 0.04 - Exposition vega (modéré préféré)
-                - 'theta_positive': 0.04 - Theta positif
-                
-                VOLATILITÉ (4%):
-                - 'implied_vol': 0.04 - Volatilité implicite (modéré préféré)
-                
-                MÉTRIQUES GAUSSIENNES - MIXTURE (10%):
-                - 'average_pnl': 0.06 - Espérance du P&L avec mixture
-                - 'sigma_pnl': 0.04 - Écart-type du P&L (inversé, plus faible = meilleur)
-        
-        Returns:
-            Liste des top_n meilleures stratégies, triées par score décroissant,
-            avec score et rank assignés.
-            
         Example:
             >>> comparer = StrategyComparerV2()
             >>> best = comparer.compare_and_rank(strategies, top_n=5)
