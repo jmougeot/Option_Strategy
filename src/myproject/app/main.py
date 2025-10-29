@@ -58,6 +58,7 @@ def process_bloomberg_to_strategies(
 
     
     mixture= create_mixture_from_scenarios(scenarios, price_min, price_max, num_points, target_price)
+    print (mixture)
 
     # ÉTAPE 1 : Import Bloomberg → Options
     if verbose:
@@ -72,7 +73,6 @@ def process_bloomberg_to_strategies(
         default_quantity=1,
         price_min=price_min,
         price_max=price_max,
-        num_points=50,
         mixture = mixture
     )
     

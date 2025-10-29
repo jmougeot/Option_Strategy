@@ -120,9 +120,12 @@ def create_option_from_bloomberg(
         
         # Initialiser la mixture et calculer les surfaces si les paramètres sont fournis
         if mixture is not None:
-            # 1. Stocker la mixture
-            option.mixture, option.prices= mixture
-            option._calcul_all_surface
+            # 1. Stocker la mixture et la grille de prix
+            option.prices, option.mixture = mixture
+            
+            # 2. Calculer toutes les surfaces et métriques
+            option._calcul_all_surface()
+        
         return option
         
     except Exception as e:

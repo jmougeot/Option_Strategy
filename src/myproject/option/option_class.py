@@ -85,12 +85,12 @@ class Option:
           - long  -> P&L = intrinsic - premium
           - short -> P&L = premium - intrinsic
         
-        Args:
-            prices: Array numpy des prix du sous-jacent
-            
         Returns:
             Array numpy du P&L pour chaque prix
         """
+        if self.prices is None:
+            raise ValueError("prices doit être défini avant d'appeler _pnl_at_expiry_array")
+        
         if self.option_type.lower() == "call":
             intrinsic = np.maximum(self.prices - self.strike, 0.0)
         else:  # put
@@ -108,22 +108,20 @@ class Option:
         Calcule le P&L array sur une grille de prix entre price_min et price_max.
         Stocke le résultat dans self.pnl_array.
         
-        Args:
-            price_min: Prix minimum de la grille
-            price_max: Prix maximum de la grille
-            num_points: Nombre de points dans la grille (défaut: 500)
-            
         Returns:
             Array numpy du P&L pour chaque prix de la grille
             
         Example:
             >>> option = Option(option_type='call', strike=100, premium=5, position='long')
-            >>> pnl = option.calculate_pnl_array(80, 120, num_points=200)
+            >>> option.prices = np.linspace(80, 120, 200)
+            >>> pnl = option._calculate_pnl_array()
             >>> # pnl contient le P&L pour 200 points entre 80 et 120
         """
+        if self.prices is None:
+            raise ValueError("prices doit être défini avant d'appeler _calculate_pnl_array")
 
         # Calculer le P&L pour chaque prix
-        pnl_array = self._pnl_at_expiry_array(self.prices)
+        pnl_array = self._pnl_at_expiry_array()
         
         # Stocker dans l'attribut de l'instance
         self.pnl_array = pnl_array
@@ -131,7 +129,11 @@ class Option:
         return pnl_array
     
     def _pnl_ponderation_array(self):
-        if self.mixture is None or self.pnl_array is None:
+        """
+        Calcule la pondération du P&L par la mixture.
+        Retourne: p(x) × PnL(x) × dx
+        """
+        if self.mixture is None or self.pnl_array is None or self.prices is None:
             return None
 
         # pas moyen (dx) sur la grille
@@ -153,8 +155,8 @@ class Option:
         dx = getattr(self, "_dx", None)
         if dx is None:
             # Valeur de repli si _pnl_ponderation_array n'a pas été appelée
-            if hasattr(self, "x") and self.x is not None and len(self.x) > 1:
-                dx = float(np.mean(np.diff(self.x)))
+            if self.prices is not None and len(self.prices) > 1:
+                dx = float(np.mean(np.diff(self.prices)))
             else:
                 return None
 
@@ -184,8 +186,8 @@ class Option:
 
         dx = getattr(self, "_dx", None)
         if dx is None:
-            if hasattr(self, "x") and self.x is not None and len(self.x) > 1:
-                dx = float(np.mean(np.diff(self.x)))
+            if self.prices is not None and len(self.prices) > 1:
+                dx = float(np.mean(np.diff(self.prices)))
             else:
                 return None
 
@@ -219,10 +221,32 @@ class Option:
         # loss is negative (sum of negative contributions), return positive loss
         return -loss, win
     
-    def _calcul_all_surface( self):
-        return (self._pnl_at_expiry_array, 
-                self._calculate_pnl_array, 
-                self._pnl_ponderation_array, 
-                self._average_pnl,
-                self._calcul_surface)
+    def _calcul_all_surface(self):
+        """
+        Calcule toutes les surfaces et métriques associées à la mixture.
+        
+        Ordre d'exécution:
+        1. Calcul du P&L array
+        2. Calcul de la pondération (mixture × P&L × dx)
+        3. Calcul de l'espérance du P&L
+        4. Calcul de l'écart-type du P&L
+        5. Calcul des surfaces de profit et perte
+        
+        Returns:
+            Tuple[float, float]: (loss_surface, profit_surface)
+        """
+        # 1. Calculer le P&L array (utilise self.prices)
+        self._calculate_pnl_array()
+        
+        # 2. Calculer la pondération (mixture × P&L × dx)
+        self._pnl_ponderation_array()
+        
+        # 3. Calculer l'espérance du P&L
+        self._average_pnl()
+        
+        # 4. Calculer l'écart-type du P&L
+        self._sigma_pnl()
+        
+        # 5. Calculer les surfaces de profit et perte
+        return self._calcul_surface()
 

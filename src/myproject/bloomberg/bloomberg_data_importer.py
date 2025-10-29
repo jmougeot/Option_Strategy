@@ -46,7 +46,6 @@ def import_euribor_options(
     default_quantity: int = 1,
     price_min: float =0,
     price_max: float = 0,
-    num_points: int = 200,
     mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None ,
 ) -> List[Option]:
     """
