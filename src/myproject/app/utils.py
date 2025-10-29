@@ -138,7 +138,6 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
             'Stratégie': comp.strategy_name,
             'Expiration': format_expiration_date(comp.expiration_month, comp.expiration_year),
             'Premium': format_currency(comp.premium),
-            'Score': f"{comp.score:.3f}",
             'Max Profit': format_currency(comp.max_profit),
             'Max Loss': format_currency(comp.max_loss) if comp.max_loss != float('inf') else 'Illimité',
             'R/R': f"{comp.risk_reward_ratio:.2f}" if comp.risk_reward_ratio != float('inf') else '∞',

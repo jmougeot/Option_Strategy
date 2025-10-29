@@ -16,6 +16,7 @@ from myproject.app.utils import (
     format_currency,
     create_comparison_table
 )
+from myproject.app.mixture_diagram import create_mixture_diagram
 from myproject.app.strategy_manager import (
     render_load_strategies_sidebar,
 )
@@ -92,7 +93,7 @@ def main():
         
         with st.spinner(f"🔄 Génération et comparaison des stratégies (max {params.max_legs} legs)..."):
             # Appeler la fonction principale qui fait TOUT
-            best_strategies, stats = process_bloomberg_to_strategies(
+            best_strategies, stats, mixture = process_bloomberg_to_strategies(
                 underlying=params.underlying,
                 months=params.months,
                 years=params.years,
@@ -155,7 +156,7 @@ def main():
     # TABS POUR L'AFFICHAGE
     # ====================================================================
     
-    tab1, tab2 = st.tabs([
+    tab1, tab2, tab3 = st.tabs([
         "Vue d'Ensemble", 
         "Diagramme P&L", 
     ])
@@ -258,7 +259,10 @@ def main():
         
         st.dataframe(pd.DataFrame(be_data), width='stretch', hide_index=True)
         
-
+    with tab3: 
+        st.header ("Mixture Gaussienne")
+        fig = create_mixture_diagram(mixture, target_price=97.5)
+        st.plotly_chart(fig)
 # ============================================================================
 # POINT D'ENTRÉE
 # ============================================================================

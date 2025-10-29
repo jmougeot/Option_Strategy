@@ -19,6 +19,7 @@ from myproject.strategy.comparison_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
 from myproject.app.scenario import create_mixture_from_scenarios
 from myproject.app.widget import ScenarioData
+import numpy as np
 
 
 def process_bloomberg_to_strategies(
@@ -36,7 +37,7 @@ def process_bloomberg_to_strategies(
     scenarios: Optional[ScenarioData] = None ,
     num_points : int = 100
 
-) -> Tuple[List[StrategyComparison], Dict]:
+) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray]]:
     """
     Fonction principale simplifiée pour Streamlit.
     Importe les options depuis Bloomberg et retourne les meilleures stratégies + stats.
@@ -80,7 +81,7 @@ def process_bloomberg_to_strategies(
     stats['nb_options'] = len(options)
     
     if not options:
-        return [], stats
+        return [], stats, mixture
     
     # ÉTAPE 2 : Génération des stratégies
     if verbose:
@@ -115,4 +116,4 @@ def process_bloomberg_to_strategies(
     if verbose:
         print(f"✅ Terminé : {stats['nb_options']} options → {stats['nb_strategies_totales']} stratégies → Top {stats['nb_strategies_classees']}")
     
-    return best_strategies, stats
+    return best_strategies, stats, mixture
