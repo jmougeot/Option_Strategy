@@ -6,7 +6,7 @@ en objets Option avec calcul optionnel des surfaces.
 """
 
 from pathlib import Path
-from typing import List, Literal, Optional, cast
+from typing import List, Literal, Optional, cast, Tuple 
 from datetime import datetime
 import json
 from myproject.bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
@@ -46,7 +46,8 @@ def import_euribor_options(
     default_quantity: int = 1,
     price_min: float =0,
     price_max: float = 0,
-    num_points: int = 200
+    num_points: int = 200,
+    mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None ,
 ) -> List[Option]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne directement des objets Option.
@@ -121,7 +122,6 @@ def import_euribor_options(
                     }
                     total_attempts += 1
     
-    print(f"✓ {len(all_tickers)} tickers construits")
     print(f"\n📡 Récupération des données Bloomberg en batch...")
     
     # FETCH EN BATCH
@@ -163,7 +163,8 @@ def import_euribor_options(
                             quantity=default_quantity,
                             price_min=price_min,
                             price_max=price_max,
-                            num_points=num_points,    
+                            num_points=num_points,
+                            mixture = mixture,    
                         )
                         
                         # Vérifier que l'option est valide

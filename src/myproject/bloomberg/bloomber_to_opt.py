@@ -1,4 +1,4 @@
-from typing import Literal, Optional, cast
+from typing import Literal, Optional, cast, Tuple
 from datetime import datetime
 
 from myproject.option.option_class import Option
@@ -48,7 +48,7 @@ def create_option_from_bloomberg(
     bloomberg_data: dict,
     position: Literal['long', 'short'] = 'long',
     quantity: int = 1,
-    mixture: Optional[np.ndarray] = None,
+    mixture: Optional[Tuple[np.ndarray,np.ndarray]] = None ,
     price_min: float = 0,
     price_max: float = 0,
     num_points: int = 200
@@ -124,10 +124,10 @@ def create_option_from_bloomberg(
         # Initialiser la mixture et calculer les surfaces si les paramètres sont fournis
         if mixture is not None and price_min > 0 and price_max > 0:
             # 1. Stocker la mixture
-            option.mixture = mixture
+            option.mixture = mixture[0]
             
             # 2. Calculer le pnl_array sur la grille de prix
-            option._calculate_pnl_array(price_min, price_max, num_points)
+            option._calculate_pnl_array(mixture[0])
             
             # 3. Calculer la pondération du P&L par la mixture
             if hasattr(option, 'x') and option.x is not None:

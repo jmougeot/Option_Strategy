@@ -102,7 +102,7 @@ class Option:
         pnl = sign * (self.premium - intrinsic) * qty * float(self.contract_size or 1)
         return pnl
     
-    def _calculate_pnl_array(self, price_min: float, price_max: float, num_points: int = 500) -> np.ndarray:
+    def _calculate_pnl_array(self , prices : np.ndarray) -> np.ndarray:
         """
         Calcule le P&L array sur une grille de prix entre price_min et price_max.
         Stocke le résultat dans self.pnl_array.
@@ -120,14 +120,7 @@ class Option:
             >>> pnl = option.calculate_pnl_array(80, 120, num_points=200)
             >>> # pnl contient le P&L pour 200 points entre 80 et 120
         """
-        if not np.isfinite(price_min) or not np.isfinite(price_max) or price_min >= price_max:
-            raise ValueError("price_min doit être inférieur à price_max et tous deux finis")
-        
-        num_points = max(2, int(num_points))
-        
-        # Créer la grille de prix
-        prices = np.linspace(price_min, price_max, num_points, dtype=float)
-        
+
         # Calculer le P&L pour chaque prix
         pnl_array = self._pnl_at_expiry_array(prices)
         
