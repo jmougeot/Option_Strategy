@@ -158,7 +158,8 @@ def main():
     
     tab1, tab2, tab3 = st.tabs([
         "Vue d'Ensemble", 
-        "Diagramme P&L", 
+        "Diagramme P&L",
+        "Mixture gaussienne",
     ])
     
     # ----------------------------------------------------------------
