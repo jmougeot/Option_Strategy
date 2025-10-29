@@ -94,7 +94,6 @@ def import_euribor_options(
     for year in years:
         for month in months:
             month_code = cast(MonthCode, month)
-            
             for strike in strikes:
                 # Calls
                 if include_calls:
@@ -161,9 +160,6 @@ def import_euribor_options(
                             bloomberg_data=extracted,
                             position=default_position,
                             quantity=default_quantity,
-                            price_min=price_min,
-                            price_max=price_max,
-                            num_points=num_points,
                             mixture = mixture,    
                         )
                         

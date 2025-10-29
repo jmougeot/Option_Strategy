@@ -9,8 +9,6 @@ import numpy as np
 
 def calculate_linear_metrics(
     options: List[Option],
-    mixture: Optional[np.ndarray] = None,
-    prices: Optional[np.ndarray] = None,
 ) -> Dict:
     """
     Calcule TOUTES les métriques d'une stratégie d'options en une fois.
@@ -50,10 +48,7 @@ def calculate_linear_metrics(
     # Accumulateurs pour les métriques basées sur la mixture
     total_average_pnl = 0.0
     total_sigma_pnl = 0.0
-    has_mixture_data = False
 
-
-    
     delta_calls = gamma_calls = vega_calls = theta_calls = 0.0
     delta_puts = gamma_puts = vega_puts = theta_puts = 0.0
     delta_total = gamma_total = vega_total = theta_total = 0.0
@@ -92,50 +87,6 @@ def calculate_linear_metrics(
         vega = (option.vega or 0.0) * sign * quantity
         theta = (option.theta or 0.0) * sign * quantity
         
-        # ============ SURFACES ============
-        if option.position == 'long':
-            total_profit_surface += (option.profit_surface) * quantity
-            total_loss_surface += (option.loss_surface) * quantity
-        else:  # short
-            total_profit_surface += (option.loss_surface) * quantity  # Inversé pour short
-            total_loss_surface += (option.profit_surface) * quantity  # Inversé pour short
-        
-        # ============ CALCULS BASÉS SUR LA MIXTURE GAUSSIENNE ============
-        # Seulement si mixture et prices sont fournis
-        if mixture is not None and prices is not None:
-            option.mixture = mixture
-            # Calculer le P&L à l'expiration pour chaque prix
-            option.pnl_array = option._pnl_at_expiry_array(prices)
-            option.x = prices
-            
-            # Calculer les métriques pondérées
-            option._pnl_ponderation_array(prices)
-            avg_pnl = option._average_pnl()
-            sigma_pnl = option._sigma_pnl()
-            
-            # Récupérer les surfaces calculées avec la mixture
-            mixture_loss, mixture_profit = option.calcul_surface()
-            
-            # Accumuler selon la position
-            if option.position == 'long':
-                total_profit_surface += mixture_profit * quantity
-                total_loss_surface += mixture_loss * quantity
-                if avg_pnl is not None:
-                    total_average_pnl += avg_pnl * quantity
-                if sigma_pnl is not None:
-                    # Pour l'écart-type, on cumule les variances puis on prendra la racine
-                    total_sigma_pnl += (sigma_pnl ** 2) * (quantity ** 2)
-            else:  # short
-                # Inverser pour les positions short
-                total_profit_surface += mixture_loss * quantity
-                total_loss_surface += mixture_profit * quantity
-                if avg_pnl is not None:
-                    total_average_pnl -= avg_pnl * quantity  # Inverser le signe
-                if sigma_pnl is not None:
-                    # La variance est toujours positive, même pour short
-                    total_sigma_pnl += (sigma_pnl ** 2) * (quantity ** 2)
-            
-            has_mixture_data = True
                 
         # Accumuler par type
         if option.option_type == 'call':
@@ -172,11 +123,7 @@ def calculate_linear_metrics(
         avg_iv = sum(ivs) / len(ivs) if ivs else 0.0
     
 
-    # Calculer l'écart-type total (racine de la somme des variances)
-    if has_mixture_data and total_sigma_pnl > 0:
-        total_sigma_pnl = np.sqrt(total_sigma_pnl)
-    else:
-        total_sigma_pnl = 0.0
+
     
     # ============ PRÉPARER LE DICTIONNAIRE DE RÉSULTATS ============
     result = {
@@ -192,11 +139,6 @@ def calculate_linear_metrics(
         'loss_surface' : total_loss_surface,
         'profit_surface' : total_profit_surface,
         'gauss_x_pnl': total_gauss_pnl,
-        
-        # MÉTRIQUES BASÉES SUR LA MIXTURE GAUSSIENNE
-        'average_pnl': total_average_pnl if has_mixture_data else None,
-        'sigma_pnl': total_sigma_pnl if has_mixture_data else None,
-        'has_mixture': has_mixture_data,
         
         # Greeks - Puts
         'delta_puts': delta_puts,

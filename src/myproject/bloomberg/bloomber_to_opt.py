@@ -49,9 +49,6 @@ def create_option_from_bloomberg(
     position: Literal['long', 'short'] = 'long',
     quantity: int = 1,
     mixture: Optional[Tuple[np.ndarray,np.ndarray]] = None ,
-    price_min: float = 0,
-    price_max: float = 0,
-    num_points: int = 200
 ) -> Option:
     """
     Crée un objet Option directement depuis les données Bloomberg.
@@ -122,26 +119,10 @@ def create_option_from_bloomberg(
         )
         
         # Initialiser la mixture et calculer les surfaces si les paramètres sont fournis
-        if mixture is not None and price_min > 0 and price_max > 0:
+        if mixture is not None:
             # 1. Stocker la mixture
-            option.mixture = mixture[0]
-            
-            # 2. Calculer le pnl_array sur la grille de prix
-            option._calculate_pnl_array(mixture[0])
-            
-            # 3. Calculer la pondération du P&L par la mixture
-            if hasattr(option, 'x') and option.x is not None:
-                option._pnl_ponderation_array(option.x)
-            
-            # 4. Calculer l'espérance du P&L
-            option._average_pnl()
-            
-            # 5. Calculer l'écart-type du P&L
-            option._sigma_pnl()
-            
-            # 6. Calculer les surfaces de profit et de perte
-            option._calcul_surface()
-        
+            option.mixture, option.prices= mixture
+            option._calcul_all_surface
         return option
         
     except Exception as e:

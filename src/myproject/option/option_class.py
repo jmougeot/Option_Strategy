@@ -41,6 +41,7 @@ class Option:
     rho: Optional[float] = None
 
     # ============ METRIQUES (stockage éventuel) ============
+    prices :  Optional[np.ndarray]= None
     loss_surface: float = 0
     profit_surface: float = 0
     pnl_array : Optional[np.ndarray]= None
@@ -76,7 +77,7 @@ class Option:
     def empyOption(cls) -> "Option":
         return cls(option_type="call", strike=0.0, premium=0.0)
     
-    def _pnl_at_expiry_array(self, prices: np.ndarray) -> np.ndarray:
+    def _pnl_at_expiry_array(self) -> np.ndarray:
         """
         Calcule le P&L à l'expiration pour un array de prix du sous-jacent.
         
@@ -91,9 +92,9 @@ class Option:
             Array numpy du P&L pour chaque prix
         """
         if self.option_type.lower() == "call":
-            intrinsic = np.maximum(prices - self.strike, 0.0)
+            intrinsic = np.maximum(self.prices - self.strike, 0.0)
         else:  # put
-            intrinsic = np.maximum(self.strike - prices, 0.0)
+            intrinsic = np.maximum(self.strike - self.prices, 0.0)
 
         sign = -1.0 if self.position == "long" else 1.0
         qty = float(self.quantity or 1)
@@ -102,7 +103,7 @@ class Option:
         pnl = sign * (self.premium - intrinsic) * qty * float(self.contract_size or 1)
         return pnl
     
-    def _calculate_pnl_array(self , prices : np.ndarray) -> np.ndarray:
+    def _calculate_pnl_array(self) -> np.ndarray:
         """
         Calcule le P&L array sur une grille de prix entre price_min et price_max.
         Stocke le résultat dans self.pnl_array.
@@ -122,21 +123,19 @@ class Option:
         """
 
         # Calculer le P&L pour chaque prix
-        pnl_array = self._pnl_at_expiry_array(prices)
+        pnl_array = self._pnl_at_expiry_array(self.prices)
         
         # Stocker dans l'attribut de l'instance
-        self.x = prices
         self.pnl_array = pnl_array
         
         return pnl_array
     
-    def _pnl_ponderation_array(self, x: np.ndarray):
+    def _pnl_ponderation_array(self):
         if self.mixture is None or self.pnl_array is None:
             return None
 
         # pas moyen (dx) sur la grille
-        dx = float(np.diff(x).mean())
-        self.x = x
+        dx = float(np.diff(self.prices).mean())
         self._dx = dx
 
         # intégrande discrétisé : p(x) * PnL(x) * dx
@@ -218,4 +217,12 @@ class Option:
         self.loss_surface = -loss
         self.profit_surface = win
         # loss is negative (sum of negative contributions), return positive loss
-        return -loss, win     
+        return -loss, win
+    
+    def _calcul_all_surface( self):
+        return (self._pnl_at_expiry_array, 
+                self._calculate_pnl_array, 
+                self._pnl_ponderation_array, 
+                self._average_pnl,
+                self._calcul_surface)
+
