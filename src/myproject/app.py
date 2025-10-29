@@ -16,6 +16,8 @@ from myproject.app.utils import (
     format_currency,
     create_comparison_table
 )
+from myproject.app.payoff_diagram import display_interactive_strategy_table
+
 from myproject.app.mixture_diagram import create_mixture_diagram
 from myproject.app.strategy_manager import (
     render_load_strategies_sidebar,
@@ -71,6 +73,7 @@ def main():
     # Déterminer quelle source de stratégies utiliser
     all_comparisons = None
     best_target_price = None
+    mixture = None  # Initialiser mixture
     
     # Utiliser les stratégies chargées si disponibles
     if loaded_data:
@@ -156,10 +159,11 @@ def main():
     # TABS POUR L'AFFICHAGE
     # ====================================================================
     
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3 , tab4= st.tabs([
         "Vue d'Ensemble", 
         "Diagramme P&L",
         "Mixture gaussienne",
+        "test de tableau"
     ])
     
     # ----------------------------------------------------------------
@@ -245,25 +249,23 @@ def main():
         
         fig_payoff = create_payoff_diagram(comparisons, best_target_price or 0.0)
         st.plotly_chart(fig_payoff, width='stretch')
-        
-        # Tableau des breakevens
-        st.subheader("Points de Breakeven")
-        
-        be_data = []
-        for comp in comparisons:
-            breakevens = ', '.join([f"${be:.2f}" for be in comp.breakeven_points])
-            be_data.append({
-                'Stratégie': comp.strategy_name,
-                'Breakevens': breakevens,
-                'Zone': format_currency(comp.profit_zone_width)
-            })
-        
-        st.dataframe(pd.DataFrame(be_data), width='stretch', hide_index=True)
+    
         
     with tab3: 
-        st.header ("Mixture Gaussienne")
-        fig = create_mixture_diagram(mixture, target_price=97.5)
-        st.plotly_chart(fig)
+        st.header("Mixture Gaussienne")
+        if mixture is not None:
+            fig = create_mixture_diagram(mixture, target_price=best_target_price or 97.5)
+            st.plotly_chart(fig)
+        else:
+            st.warning("⚠️ Aucune mixture gaussienne disponible. Lancez une comparaison pour générer la mixture.")
+    
+    with tab4: 
+        st.header("Tableau Interactif des Stratégies")
+        display_interactive_strategy_table(
+            strategies=comparisons,
+            target_price=best_target_price or 97.5,
+            key_prefix="main"
+        )
 # ============================================================================
 # POINT D'ENTRÉE
 # ============================================================================

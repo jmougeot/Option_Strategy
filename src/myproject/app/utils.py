@@ -129,10 +129,6 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
     
     data = []
     for idx, comp in enumerate(comparisons, 1):
-        # Calculs additionnels
-        be_count = len(comp.breakeven_points)
-        be_spread = (max(comp.breakeven_points) - min(comp.breakeven_points)) if len(comp.breakeven_points) >= 2 else 0
-        
         data.append({
             'Rang': idx,
             'Stratégie': comp.strategy_name,
@@ -158,31 +154,6 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
     
     return pd.DataFrame(data)
 
-def create_score_breakdown_chart(comparison: StrategyComparison):
-    """Crée un graphique de décomposition du score."""
-    
-    # Affichage simple du score global
-    fig = go.Figure(data=[
-        go.Bar(
-            x=[comparison.score],
-            y=['Score Global'],
-            orientation='h',
-            marker_color='#1f77b4',
-            text=[f"{comparison.score:.3f}"],
-            textposition='auto',
-        )
-    ])
-    
-    fig.update_layout(
-        title=f"Score Global - {comparison.strategy_name}",
-        xaxis_title="Score (0-1)",
-        yaxis_title="",
-        height=200,
-        showlegend=False,
-        xaxis=dict(range=[0, 1])
-    )
-    
-    return fig
 
 def strike_list(strike_min: float, strike_max : float, step:float)->List[float]:
     strike_list = []
