@@ -40,7 +40,7 @@ def calculate_linear_metrics(
         metrics = calculate_linear_metrics([call, put], mixture=mixture, prices=prices)
     """
     # Initialiser les accumulateurs
-    premium = 0.0
+    total_premium = 0.0
     total_loss_surface = 0.0
     total_profit_surface = 0.0
     total_average_pnl = 0.0
@@ -49,15 +49,12 @@ def calculate_linear_metrics(
     # Accumulateurs pour les métriques basées sur la mixture
     total_average_pnl = 0.0
     total_sigma_pnl = 0.0
-    has_mixture = False  # Indicateur si au moins une option a une mixture
     
     # Accumulateur pour le P&L array (stratégie complète)
-
-    delta_calls = gamma_calls = vega_calls = theta_calls = 0.0
-    delta_puts = gamma_puts = vega_puts = theta_puts = 0.0
-    delta_total = gamma_total = vega_total = theta_total = 0.0
-    weighted_iv_sum = 0.0
-    total_weight = 0.0
+    total_delta = 0.0
+    total_gamma = 0.0
+    total_vega = 0.0
+    total_theta = 0.0
     total_ivs =0.0
     
     # Parcourir toutes les options UNE SEULE FOIS
@@ -66,7 +63,7 @@ def calculate_linear_metrics(
         # Multiplier par la quantité pour tenir compte des multiples contrats
         quantity = option.quantity if option.quantity is not None else 1
         leg_cost: float = option.premium * quantity * (-1 if option.position == 'long' else 1)
-        premium += leg_cost
+        total_premium += leg_cost
                 
         # ============ GREEKS ============
         sign = 1 if option.position == 'long' else -1
@@ -77,32 +74,6 @@ def calculate_linear_metrics(
         vega = (option.vega or 0.0) * sign * quantity
         theta = (option.theta or 0.0) * sign * quantity
         
-                
-        # Accumuler par type
-        if option.option_type == 'call':
-            delta_calls += delta
-            gamma_calls += gamma
-            vega_calls += vega
-            theta_calls += theta
-
-        else:  # put
-            delta_puts += delta
-            gamma_puts += gamma
-            vega_puts += vega
-            theta_puts += theta
-        
-        # Accumuler total
-        delta_total += delta
-        gamma_total += gamma
-        vega_total += vega
-        theta_total += theta
-        
-        # ============ VOLATILITÉ IMPLICITE ============
-        if option.implied_volatility is not None and option.premium > 0:
-            # Pondérer par le premium total (premium * quantity)
-            weight = abs(option.premium * quantity)
-            weighted_iv_sum += option.implied_volatility * weight
-            total_weight += weight
         
         # ============ SURFACES (stockées dans chaque option) ============
         # Accumuler les surfaces de profit et de perte
@@ -111,6 +82,12 @@ def calculate_linear_metrics(
             total_loss_surface += option.loss_surface
             total_average_pnl += option.average_pnl
             total_ivs += option.implied_volatility
+            
+            #Greeks
+            total_delta += delta
+            total_gamma += gamma
+            total_vega += vega
+            total_theta += theta
             
             # Initialiser ou additionner le pnl_array (vérifier que ce n'est pas None)
             if option.pnl_array is not None:
@@ -127,6 +104,12 @@ def calculate_linear_metrics(
             total_average_pnl -= option.average_pnl
             total_ivs -= option.implied_volatility
 
+            #Greeks
+            total_delta -= delta
+            total_gamma -= gamma
+            total_vega -= vega
+            total_theta -= theta
+
             
             # Initialiser ou soustraire le pnl_array (vérifier que ce n'est pas None)
             if option.pnl_array is not None:
@@ -138,9 +121,8 @@ def calculate_linear_metrics(
             total_sigma_pnl += (option.sigma_pnl ** 2)
     
     total_sigma_pnl = np.sqrt(total_sigma_pnl)
-    prices = options[0].prices if options else np.array([])
+    prices = options[0].prices
     
-    # S'assurer que total_pnl_array n'est pas None
     if total_pnl_array is None:
         total_pnl_array = np.zeros_like(prices)
 
@@ -149,13 +131,7 @@ def calculate_linear_metrics(
     # ============ PRÉPARER LE DICTIONNAIRE DE RÉSULTATS ============
     result = {
         # Coût
-        'premium': premium,
-        
-        # Greeks - Calls
-        'delta_calls': delta_calls,
-        'gamma_calls': gamma_calls,
-        'vega_calls': vega_calls,
-        'theta_calls': theta_calls,
+        'premium': total_premium,
 
         # MÉTRIQUES DE SURFACE (accumulées depuis les options)
         'loss_surface': total_loss_surface,
@@ -164,19 +140,12 @@ def calculate_linear_metrics(
         # MÉTRIQUES PONDÉRÉES PAR MIXTURE (si disponibles)
         'average_pnl': total_average_pnl,
         'sigma_pnl': total_sigma_pnl,
-        'has_mixture': has_mixture,
-        
-        # Greeks - Puts
-        'delta_puts': delta_puts,
-        'gamma_puts': gamma_puts,
-        'vega_puts': vega_puts,
-        'theta_puts': theta_puts,
-        
+
         # Greeks - Total
-        'delta_total': delta_total,
-        'gamma_total': gamma_total,
-        'vega_total': vega_total,
-        'theta_total': theta_total,
+        'delta_total': total_delta ,
+        'gamma_total': total_gamma,
+        'vega_total': total_vega,
+        'theta_total': total_vega,
         
         # Volatilité
         'avg_implied_volatility': total_ivs,
