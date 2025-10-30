@@ -43,6 +43,8 @@ def calculate_linear_metrics(
     premium = 0.0
     total_loss_surface = 0.0
     total_profit_surface = 0.0
+    total_average_pnl = 0.0
+    total_pnl_array: np.ndarray = np.array([])
     
     # Accumulateurs pour les métriques basées sur la mixture
     total_average_pnl = 0.0
@@ -50,8 +52,6 @@ def calculate_linear_metrics(
     has_mixture = False  # Indicateur si au moins une option a une mixture
     
     # Accumulateur pour le P&L array (stratégie complète)
-    pnl_array = None
-    prices = None
 
     delta_calls = gamma_calls = vega_calls = theta_calls = 0.0
     delta_puts = gamma_puts = vega_puts = theta_puts = 0.0
@@ -61,25 +61,13 @@ def calculate_linear_metrics(
     
     # Compteurs
     n_legs = len(options)
-    n_calls = n_puts = n_long = n_short = 0
     
     # Parcourir toutes les options UNE SEULE FOIS
     for option in options:
-        # ============ COMPTEURS ============
-        if option.option_type == 'call':
-            n_calls += 1
-        else:
-            n_puts += 1
-        
-        if option.position == 'long':
-            n_long += 1
-        else:
-            n_short += 1
-        
         # ============ COÛT NET ============
         # Multiplier par la quantité pour tenir compte des multiples contrats
         quantity = option.quantity if option.quantity is not None else 1
-        leg_cost = option.premium * quantity * (-1 if option.position == 'long' else 1)
+        leg_cost: float = option.premium * quantity * (-1 if option.position == 'long' else 1)
         premium += leg_cost
                 
         # ============ GREEKS ============
@@ -98,6 +86,7 @@ def calculate_linear_metrics(
             gamma_calls += gamma
             vega_calls += vega
             theta_calls += theta
+
         else:  # put
             delta_puts += delta
             gamma_puts += gamma
@@ -119,44 +108,25 @@ def calculate_linear_metrics(
         
         # ============ SURFACES (stockées dans chaque option) ============
         # Accumuler les surfaces de profit et de perte
-        if hasattr(option, 'profit_surface') and option.profit_surface > 0:
+        if option.position == 'long':
             total_profit_surface += option.profit_surface
-        
-        if hasattr(option, 'loss_surface') and option.loss_surface > 0:
             total_loss_surface += option.loss_surface
-        
-        # ============ MÉTRIQUES PONDÉRÉES PAR MIXTURE ============
-        # Si l'option a des métriques calculées avec la mixture
-        if hasattr(option, 'average_pnl') and option.average_pnl is not None:
-            total_average_pnl += option.average_pnl
-            has_mixture = True
-        
-        if hasattr(option, 'sigma_pnl') and option.sigma_pnl is not None:
-            # Pour l'écart-type, on accumule les variances puis on prend la racine
+            total_average_pnl +=option.average_pnl
+            total_pnl_array += option.pnl_array
             total_sigma_pnl += (option.sigma_pnl ** 2)
-        
-        # ============ ACCUMULER LE P&L ARRAY ============
-        # Construire le P&L total de la stratégie
-        if hasattr(option, 'pnl_array') and option.pnl_array is not None:
-            if pnl_array is None:
-                pnl_array = option.pnl_array.copy()
-                if hasattr(option, 'prices') and option.prices is not None:
-                    prices = option.prices.copy()
-            else:
-                pnl_array += option.pnl_array
+
+
+        if option.position == 'short':
+            total_profit_surface -= option.loss_surface
+            total_loss_surface -= option.profit_surface
+            total_average_pnl -=option.average_pnl
+            total_pnl_array -= option.pnl_array
+            total_sigma_pnl += (option.sigma_pnl ** 2)
+
     
-    # Calculer l'écart-type total (racine de la somme des variances)
-    if has_mixture and total_sigma_pnl > 0:
-        total_sigma_pnl = np.sqrt(total_sigma_pnl)
-    
-    # Calculer IV moyenne
-    if total_weight > 0:
-        avg_iv = weighted_iv_sum / total_weight
-    else:
-        # Fallback : moyenne simple
-        ivs = [opt.implied_volatility for opt in options 
-               if opt.implied_volatility is not None]
-        avg_iv = sum(ivs) / len(ivs) if ivs else 0.0
+    total_sigma_pnl = np.sqrt(total_sigma_pnl)
+    prices = options[0].prices
+    ivs = [opt.implied_volatility for opt in options ]
     
 
 
@@ -177,8 +147,8 @@ def calculate_linear_metrics(
         'profit_surface': total_profit_surface,
         
         # MÉTRIQUES PONDÉRÉES PAR MIXTURE (si disponibles)
-        'average_pnl': total_average_pnl if has_mixture else None,
-        'sigma_pnl': total_sigma_pnl if has_mixture else None,
+        'average_pnl': total_average_pnl,
+        'sigma_pnl': total_sigma_pnl,
         'has_mixture': has_mixture,
         
         # Greeks - Puts
@@ -194,17 +164,8 @@ def calculate_linear_metrics(
         'theta_total': theta_total,
         
         # Volatilité
-        'avg_implied_volatility': avg_iv,
-        
-        # Compteurs
-        'n_legs': n_legs,
-        'n_calls': n_calls,
-        'n_puts': n_puts,
-        'n_long': n_long,
-        'n_short': n_short,
-        
-        # Arrays pour calculs non-linéaires
-        'pnl_array': pnl_array,
+        'avg_implied_volatility': ivs,
+        'pnl_array': total_pnl_array,
         'prices': prices
     }
 

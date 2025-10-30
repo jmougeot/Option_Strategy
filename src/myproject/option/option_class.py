@@ -49,7 +49,7 @@ class Option:
     pnl_ponderation: Optional[np.ndarray] = None
     
     # Métriques calculées avec la mixture
-    average_pnl: Optional[float] = None
+    average_pnl: float = 0.0
     sigma_pnl: Optional[float] = None 
 
     # ============ VOLATILITÉ ============
@@ -81,7 +81,7 @@ class Option:
     @classmethod
     def empyOption(cls) -> "Option":
         return cls(option_type="call", strike=0.0, premium=0.0)
-    
+        
     def _pnl_at_expiry_array(self) -> np.ndarray:
         """
         Calcule le P&L à l'expiration pour un array de prix du sous-jacent.
@@ -97,15 +97,9 @@ class Option:
             raise ValueError("prices doit être défini avant d'appeler _pnl_at_expiry_array")
         
         if self.option_type.lower() == "call":
-            intrinsic = np.maximum(self.prices - self.strike, 0.0)
+            pnl = np.maximum(self.prices - self.strike, 0.0) - self.premium
         else:  # put
-            intrinsic = np.maximum(self.strike - self.prices, 0.0)
-
-        sign = -1.0 if self.position == "long" else 1.0
-        qty = float(self.quantity or 1)
-        
-        # P&L = sign * (premium - intrinsic) * quantity * contract_size
-        pnl = sign * (self.premium - intrinsic) * qty * float(self.contract_size or 1)
+            pnl = np.maximum(self.strike - self.prices, 0.0) - self.premium
         return pnl
     
     def _calculate_pnl_array(self) -> np.ndarray:

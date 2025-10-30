@@ -259,8 +259,7 @@ class StrategyComparerV2:
         
         return strategies
     
-    def _calculate_scores(self, 
-                         strategies: List[StrategyComparison]) -> List[StrategyComparison]:
+    def _calculate_scores(self, strategies: List[StrategyComparison]) -> List[StrategyComparison]:
         """
         Calcule les scores composites pour chaque stratégie en UN SEUL PARCOURS.            
         
