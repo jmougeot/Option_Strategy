@@ -44,7 +44,7 @@ def calculate_linear_metrics(
     total_loss_surface = 0.0
     total_profit_surface = 0.0
     total_average_pnl = 0.0
-    total_pnl_array: np.ndarray = np.array([])
+    total_pnl_array: Optional[np.ndarray] = None  # Initialisé à None, sera créé au premier usage
     
     # Accumulateurs pour les métriques basées sur la mixture
     total_average_pnl = 0.0
@@ -58,9 +58,7 @@ def calculate_linear_metrics(
     delta_total = gamma_total = vega_total = theta_total = 0.0
     weighted_iv_sum = 0.0
     total_weight = 0.0
-    
-    # Compteurs
-    n_legs = len(options)
+    total_ivs =0.0
     
     # Parcourir toutes les options UNE SEULE FOIS
     for option in options:
@@ -111,23 +109,40 @@ def calculate_linear_metrics(
         if option.position == 'long':
             total_profit_surface += option.profit_surface
             total_loss_surface += option.loss_surface
-            total_average_pnl +=option.average_pnl
-            total_pnl_array += option.pnl_array
+            total_average_pnl += option.average_pnl
+            total_ivs += option.implied_volatility
+            
+            # Initialiser ou additionner le pnl_array (vérifier que ce n'est pas None)
+            if option.pnl_array is not None:
+                if total_pnl_array is None:
+                    total_pnl_array = option.pnl_array.copy()
+                else:
+                    total_pnl_array += option.pnl_array
+            
             total_sigma_pnl += (option.sigma_pnl ** 2)
-
 
         if option.position == 'short':
             total_profit_surface -= option.loss_surface
             total_loss_surface -= option.profit_surface
-            total_average_pnl -=option.average_pnl
-            total_pnl_array -= option.pnl_array
-            total_sigma_pnl += (option.sigma_pnl ** 2)
+            total_average_pnl -= option.average_pnl
+            total_ivs -= option.implied_volatility
 
+            
+            # Initialiser ou soustraire le pnl_array (vérifier que ce n'est pas None)
+            if option.pnl_array is not None:
+                if total_pnl_array is None:
+                    total_pnl_array = -option.pnl_array.copy()
+                else:
+                    total_pnl_array -= option.pnl_array
+            
+            total_sigma_pnl += (option.sigma_pnl ** 2)
     
     total_sigma_pnl = np.sqrt(total_sigma_pnl)
-    prices = options[0].prices
-    ivs = [opt.implied_volatility for opt in options ]
+    prices = options[0].prices if options else np.array([])
     
+    # S'assurer que total_pnl_array n'est pas None
+    if total_pnl_array is None:
+        total_pnl_array = np.zeros_like(prices)
 
 
     
@@ -164,7 +179,7 @@ def calculate_linear_metrics(
         'theta_total': theta_total,
         
         # Volatilité
-        'avg_implied_volatility': ivs,
+        'avg_implied_volatility': total_ivs,
         'pnl_array': total_pnl_array,
         'prices': prices
     }

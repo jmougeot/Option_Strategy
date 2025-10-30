@@ -50,10 +50,10 @@ class Option:
     
     # Métriques calculées avec la mixture
     average_pnl: float = 0.0
-    sigma_pnl: Optional[float] = None 
+    sigma_pnl: float = 0.0 
 
     # ============ VOLATILITÉ ============
-    implied_volatility: Optional[float] = None
+    implied_volatility: float = 0.0
     historical_volatility: Optional[float] = None
     
     # ============ LIQUIDITÉ ============
