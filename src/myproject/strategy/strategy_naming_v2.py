@@ -68,32 +68,38 @@ def generate_strategy_name(options: List[Option]) -> str:
         
         # Types mixtes (call + put)
         else:
-            call_opt = o1 if o1.is_call() else o2
-            put_opt = o1 if o1.is_put() else o2
+            # Straddle : même strike, même position
+            if o1.strike == o2.strike:
+                # Long Straddle : long call + long put
+                if o1.is_long() and o2.is_long():
+                    return f"Long Straddle {o1.strike}"
+                # Short Straddle : short call + short put
+                elif o1.is_short() and o2.is_short():
+                    return f"Short Straddle {o1.strike}"
             
-            same_strike = (call_opt.strike == put_opt.strike)
-            same_position = (call_opt.position == put_opt.position)
+            # Strangle : strikes différents, même position
+            elif o1.strike != o2.strike:
+                if o1.is_long() and o2.is_long():
+                    return f"Long Strangle {o1.strike}/{o2.strike}"
+                elif o1.is_short() and o2.is_short():
+                    return f"Short Strangle {o1.strike}/{o2.strike}"
             
-            # Straddle : même strike et même position
-            if same_strike and same_position:
-                pos = "Long" if call_opt.is_long() else "Short"
-                return f"{pos} Straddle {call_opt.strike}"
-            
-            # Strangle : strikes différents et même position
-            elif not same_strike and same_position:
-                pos = "Long" if call_opt.is_long() else "Short"
-                return f"{pos} Strangle {put_opt.strike}/{call_opt.strike}"
+            # Risk Reversal : positions mixtes
+            # Identifier quel est le call et quel est le put
+            call = o1 if o1.is_call() else o2
+            put = o1 if o1.is_put() else o2
             
             # Risk Reversal : long call + short put
-            elif call_opt.is_long_call() and put_opt.is_short_put():
-                return f"Risk Reversal {put_opt.strike}/{call_opt.strike}"
-            
+            if call.is_long() and put.is_short():
+                return f"Risk Reversal {put.strike}/{call.strike}"
             # Reverse Risk Reversal : short call + long put
-            elif call_opt.is_short_call() and put_opt.is_long_put():
-                return f"Reverse Risk Reversal {put_opt.strike}/{call_opt.strike}"
+            elif call.is_short() and put.is_long():
+                return f"Reverse Risk Reversal {put.strike}/{call.strike}"
             
-            else:
-                return f"Custom 2-Leg {o1.position_name()} {o1.strike} / {o2.position_name()} {o2.strike}"
+            # Fallback pour types mixtes non reconnus
+            pos1 = "L" if o1.is_long() else "S"
+            pos2 = "L" if o2.is_long() else "S"
+            return f"Custom Mixed 2-Leg {pos1}{o1.strike}/{pos2}{o2.strike}"
 
     # ======================================================================
     # 3 LEGS
@@ -101,37 +107,129 @@ def generate_strategy_name(options: List[Option]) -> str:
     if n_legs == 3:
         o1, o2, o3 = options[0], options[1], options[2]
         
-        # Butterfly : 1-2-1 pattern, même type
+        # ================== CALLS UNIQUEMENT ==================
         if o1.is_call() and o2.is_call() and o3.is_call():
-            # Long Butterfly : long-short-short-long avec ratio 1-2-1
+            # Long Call Butterfly : long-short-long (1-2-1 pattern)
             if o1.is_long_call() and o2.is_short_call() and o3.is_long_call():
                 return f"Long Call Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+            
+            # Short Call Butterfly : short-long-short
             elif o1.is_short_call() and o2.is_long_call() and o3.is_short_call():
                 return f"Short Call Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+            
+            # Bull Call Ladder (Long Call Ladder) : long-long-short
+            elif o1.is_long_call() and o2.is_long_call() and o3.is_short_call():
+                return f"Bull Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+            
+            # Bear Call Ladder (Short Call Ladder) : short-short-long
+            elif o1.is_short_call() and o2.is_short_call() and o3.is_long_call():
+                return f"Bear Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+            
+            # Long Call Ladder inversé : long-short-short
+            elif o1.is_long_call() and o2.is_short_call() and o3.is_short_call():
+                return f"Modified Bull Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+            
+            # Short Call Ladder inversé : short-long-long
+            elif o1.is_short_call() and o2.is_long_call() and o3.is_long_call():
+                return f"Modified Bear Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+            
             else:
-                return f"Call Strip 3-Leg {o1.strike}/{o2.strike}/{o3.strike}"
+                pos1 = "L" if o1.is_long() else "S"
+                pos2 = "L" if o2.is_long() else "S"
+                pos3 = "L" if o3.is_long() else "S"
+                return f"Call Strip 3-Leg {pos1}{o1.strike}/{pos2}{o2.strike}/{pos3}{o3.strike}"
         
+        # ================== PUTS UNIQUEMENT ==================
         elif o1.is_put() and o2.is_put() and o3.is_put():
+            # Long Put Butterfly : long-short-long
             if o1.is_long_put() and o2.is_short_put() and o3.is_long_put():
                 return f"Long Put Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+            
+            # Short Put Butterfly : short-long-short
             elif o1.is_short_put() and o2.is_long_put() and o3.is_short_put():
                 return f"Short Put Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+            
+            # Bear Put Ladder (Long Put Ladder) : long-long-short
+            elif o1.is_long_put() and o2.is_long_put() and o3.is_short_put():
+                return f"Bear Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+            
+            # Bull Put Ladder (Short Put Ladder) : short-short-long
+            elif o1.is_short_put() and o2.is_short_put() and o3.is_long_put():
+                return f"Bull Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+            
+            # Long Put Ladder inversé : long-short-short
+            elif o1.is_long_put() and o2.is_short_put() and o3.is_short_put():
+                return f"Modified Bear Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+            
+            # Short Put Ladder inversé : short-long-long
+            elif o1.is_short_put() and o2.is_long_put() and o3.is_long_put():
+                return f"Modified Bull Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+            
             else:
-                return f"Put Strip 3-Leg {o1.strike}/{o2.strike}/{o3.strike}"
+                pos1 = "L" if o1.is_long() else "S"
+                pos2 = "L" if o2.is_long() else "S"
+                pos3 = "L" if o3.is_long() else "S"
+                return f"Put Strip 3-Leg {pos1}{o1.strike}/{pos2}{o2.strike}/{pos3}{o3.strike}"
         
-        # Types mixtes
+        # ================== TYPES MIXTES (CALL + PUT) ==================
         else:
             # Compter calls et puts
             n_calls = sum(1 for o in options if o.is_call())
             n_puts = sum(1 for o in options if o.is_put())
             
-            # Collar (call + 2 puts ou put + 2 calls)
-            if n_calls == 2 and n_puts == 1:
-                return f"Custom Call Collar {o1.strike}/{o2.strike}/{o3.strike}"
-            elif n_calls == 1 and n_puts == 2:
-                return f"Custom Put Collar {o1.strike}/{o2.strike}/{o3.strike}"
+            # Collar : 1 call + 2 puts OU 1 put + 2 calls (généralement pour protéger une position)
+            if n_calls == 1 and n_puts == 2:
+                call = [o for o in options if o.is_call()][0]
+                puts = sorted([o for o in options if o.is_put()], key=lambda o: o.strike)
+                
+                # Collar classique : long stock, long put, short call
+                # Ici on simule : long put bas + long put haut + short call
+                if puts[0].is_long_put() and puts[1].is_long_put() and call.is_short_call():
+                    return f"Collar {puts[0].strike}/{puts[1].strike}/{call.strike}"
+                else:
+                    pos1 = "L" if o1.is_long() else "S"
+                    pos2 = "L" if o2.is_long() else "S"
+                    pos3 = "L" if o3.is_long() else "S"
+                    return f"Custom Put Collar {pos1}{o1.strike}/{pos2}{o2.strike}/{pos3}{o3.strike}"
+            
+            elif n_calls == 2 and n_puts == 1:
+                calls = sorted([o for o in options if o.is_call()], key=lambda o: o.strike)
+                put = [o for o in options if o.is_put()][0]
+                
+                # Collar inversé ou protection call
+                if calls[0].is_long_call() and calls[1].is_long_call() and put.is_short_put():
+                    return f"Reverse Collar {put.strike}/{calls[0].strike}/{calls[1].strike}"
+                else:
+                    pos1 = "L" if o1.is_long() else "S"
+                    pos2 = "L" if o2.is_long() else "S"
+                    pos3 = "L" if o3.is_long() else "S"
+                    return f"Custom Call Collar {pos1}{o1.strike}/{pos2}{o2.strike}/{pos3}{o3.strike}"
+            
+            # Covered Short Straddle : short call + short put (même strike) + position sous-jacente
+            # Ici détection : 1 call + 1 put + 1 autre option
+            # Approximation : si on a 2 shorts du même strike + 1 long
             else:
-                strikes = "/".join(str(o.strike) for o in options)
+                # Covered Short Straddle/Strangle : détecter si même strike
+                calls = [o for o in options if o.is_call()]
+                puts = [o for o in options if o.is_put()]
+                
+                if len(calls) == 1 and len(puts) == 1:
+                    call = calls[0]
+                    put = puts[0]
+                    third = [o for o in options if o != call and o != put][0]
+                    
+                    # Covered Short Straddle : short call + short put + long third
+                    if call.is_short() and put.is_short() and third.is_long():
+                        if call.strike == put.strike:
+                            return f"Covered Short Straddle {call.strike}/{third.strike}"
+                        else:
+                            return f"Covered Short Strangle {put.strike}/{call.strike}/{third.strike}"
+                    
+                    # Autres patterns
+                    elif call.is_long() and put.is_long() and third.is_short():
+                        return f"Protected Long Strangle {o1.strike}/{o2.strike}/{o3.strike}"
+                
+                strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
                 return f"Custom 3-Leg {strikes}"
 
     # ======================================================================
@@ -166,7 +264,7 @@ def generate_strategy_name(options: List[Option]) -> str:
                 return f"Reverse Iron Condor {puts[0].strike}/{puts[1].strike}/{calls[0].strike}/{calls[1].strike}"
             
             else:
-                strikes = "/".join(str(o.strike) for o in options)
+                strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
                 return f"Custom Mixed 4-Leg {strikes}"
         
         # Tous calls
@@ -179,7 +277,7 @@ def generate_strategy_name(options: List[Option]) -> str:
                   o3.is_long_call() and o4.is_short_call()):
                 return f"Short Call Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
             else:
-                strikes = "/".join(str(o.strike) for o in options)
+                strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
                 return f"Call Strip 4-Leg {strikes}"
         
         # Tous puts
@@ -191,16 +289,16 @@ def generate_strategy_name(options: List[Option]) -> str:
                   o3.is_long_put() and o4.is_short_put()):
                 return f"Short Put Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
             else:
-                strikes = "/".join(str(o.strike) for o in options)
+                strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
                 return f"Put Strip 4-Leg {strikes}"
         
         # Autres combinaisons
         else:
-            strikes = "/".join(str(o.strike) for o in options)
+            strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
             return f"Custom 4-Leg {strikes}"
 
     # ======================================================================
     # 5+ LEGS (fallback)
     # ======================================================================
-    strikes = "/".join(str(o.strike) for o in options)
+    strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
     return f"Custom {n_legs}-Leg {strikes}"
