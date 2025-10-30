@@ -27,15 +27,16 @@ class StrategyComparison:
     profit_range: Tuple[float, float]  # Range de prix profitable
     profit_zone_width: float  # Largeur de la zone profitable+
     surface_profit: float # surface of profit btw min price and max price
-    surface_loss:float # surface of loss btw min price and max price 
+    surface_loss: float # surface of loss btw min price and max price 
+    
+    # Arrays - DOIVENT être avant les champs avec valeurs par défaut
+    prices: np.ndarray 
+    pnl_array: np.ndarray 
 
-    surface_loss_ponderate : float = 0.0
-    surface_profit_ponderate : float = 0.0
-
-    risk_reward_ratio: float =0.0  # Max loss / Max profit
-    prices : np.ndarray 
-    pnl_array : np.ndarray 
-
+    # Champs avec valeurs par défaut (doivent venir après les champs sans défaut)
+    surface_loss_ponderate: float = 0.0
+    surface_profit_ponderate: float = 0.0
+    risk_reward_ratio: float = 0.0  # Max loss / Max profit
     all_options: List[Option] = field(default_factory=list)  # Toutes les options
 
     # Greeks exposure - Calls
@@ -71,4 +72,3 @@ class StrategyComparison:
     score: float = 0.0
     rank: int = 0
 
-    
