@@ -11,18 +11,6 @@ from typing import List
 from myproject.option.option_class import Option
 
 
-def _sorted_strikes_str(options: List[Option]) -> str:
-    strikes = sorted(float(o.strike) for o in options)
-    return "/".join(f"{s:.2f}" for s in strikes)
-
-
-def _both_same_position(a: Option, b: Option) -> bool:
-    return a.position == b.position
-
-
-def _position_name(is_long: bool) -> str:
-    return "Long" if is_long else "Short"
-
 
 def generate_strategy_name(options: List[Option]) -> str:
     """
@@ -40,208 +28,179 @@ def generate_strategy_name(options: List[Option]) -> str:
 
     n_legs = len(options)
 
-    calls = [o for o in options if o.option_type == "call"]
-    puts  = [o for o in options if o.option_type == "put"]
-    longs = [o for o in options if o.position == "long"]
-    shorts= [o for o in options if o.position == "short"]
-
-    strikes_sorted = sorted(set(float(o.strike) for o in options))
-    strikes_str = "/".join(f"{s:.2f}" for s in strikes_sorted)
+    options.sort(key=lambda o: float(o.strike))
 
     # ======================================================================
     # 1 LEG
     # ======================================================================
     if n_legs == 1:
         o = options[0]
-        return f"{_position_name(o.position=='long')} {o.option_type.capitalize()} {o.strike:.2f}"
+        return f"{o.position} {o.option_type.lower()} {o.strike} "
 
     # ======================================================================
     # 2 LEGS
     # ======================================================================
     if n_legs == 2:
-        # 2 CALLS -> CALL SPREAD
-        if len(calls) == 2 and len(puts) == 0 and len(strikes_sorted) == 2:
-            c_low, c_high = sorted(calls, key=lambda x: x.strike)
-            # Bull Call Spread : Long(lower) + Short(higher)
-            if c_low.position == "long" and c_high.position == "short":
-                return f"BullCallSpread {c_low.strike:.2f}/{c_high.strike:.2f}"
-            # Bear Call Spread : Short(lower) + Long(higher)
-            if c_low.position == "short" and c_high.position == "long":
-                return f"BearCallSpread {c_low.strike:.2f}/{c_high.strike:.2f}"
-            # Sinon combo générique
-            return f"CallSpread {c_low.strike:.2f}/{c_high.strike:.2f}"
-
-        # 2 PUTS -> PUT SPREAD
-        if len(puts) == 2 and len(calls) == 0 and len(strikes_sorted) == 2:
-            p_low, p_high = sorted(puts, key=lambda x: x.strike)
-            # Bull Put Spread : Short(higher) + Long(lower)
-            if p_low.position == "long" and p_high.position == "short":
-                return f"BullPutSpread {p_low.strike:.2f}/{p_high.strike:.2f}"
-            # Bear Put Spread : Long(higher) + Short(lower)
-            if p_low.position == "short" and p_high.position == "long":
-                return f"BearPutSpread {p_low.strike:.2f}/{p_high.strike:.2f}"
-            # Sinon combo générique
-            return f"PutSpread {p_low.strike:.2f}/{p_high.strike:.2f}"
-
-        # 1 CALL + 1 PUT
-        if len(calls) == 1 and len(puts) == 1:
-            c, p = calls[0], puts[0]
-
-            # STRADDLE (même strike + même position)
-            if c.strike == p.strike and _both_same_position(c, p):
-                return f"{_position_name(c.position=='long')}Straddle {c.strike:.2f}"
-
-            # STRANGLE (strikes différents + même position)
-            if c.strike != p.strike and _both_same_position(c, p):
-                # convention d’affichage: strikes triés
-                k1, k2 = sorted([float(p.strike), float(c.strike)])
-                return f"{_position_name(c.position=='long')}Strangle {k1:.2f}/{k2:.2f}"
-
-            # SYNTHÈTIQUES au même strike
-            if c.strike == p.strike:
-                if c.position == "long" and p.position == "short":
-                    return f"SyntheticLong {c.strike:.2f}"
-                if c.position == "short" and p.position == "long":
-                    return f"SyntheticShort {c.strike:.2f}"
-
-            # RISK REVERSALS (positions mixtes, strikes possiblement différents)
-            if c.position == "long" and p.position == "short":
-                k1, k2 = sorted([float(p.strike), float(c.strike)])
-                return f"RiskReversal {k1:.2f}/{k2:.2f}"
-            if c.position == "short" and p.position == "long":
-                k1, k2 = sorted([float(p.strike), float(c.strike)])
-                return f"ReverseRiskReversal {k1:.2f}/{k2:.2f}"
-
-            # Sinon générique
-            return f"2Leg_{len(calls)}C{len(puts)}P_{strikes_str}"
-
-        # Générique 2 legs (si autre cas exotique)
-        return f"2Leg_{len(calls)}C{len(puts)}P_{strikes_str}"
+        o1, o2 = options[0], options[1]
+        
+        # Même type d'option (call-call ou put-put)
+        if o1.is_call() and o2.is_call():
+            # Spreads verticaux sur calls
+            if o1.is_long_call() and o2.is_short_call():
+                return f"Bull Call Spread {o1.strike}/{o2.strike}"
+            elif o1.is_short_call() and o2.is_long_call():
+                return f"Bear Call Spread {o1.strike}/{o2.strike}"
+            elif o1.is_long_call() and o2.is_long_call():
+                return f"Long Call Strip {o1.strike}/{o2.strike}"
+            else:  # short/short
+                return f"Short Call Strip {o1.strike}/{o2.strike}"
+        
+        elif o1.is_put() and o2.is_put():
+            # Spreads verticaux sur puts
+            if o1.is_long_put() and o2.is_short_put():
+                return f"Bear Put Spread {o1.strike}/{o2.strike}"
+            elif o1.is_short_put() and o2.is_long_put():
+                return f"Bull Put Spread {o1.strike}/{o2.strike}"
+            elif o1.is_long_put() and o2.is_long_put():
+                return f"Long Put Strip {o1.strike}/{o2.strike}"
+            else:  # short/short
+                return f"Short Put Strip {o1.strike}/{o2.strike}"
+        
+        # Types mixtes (call + put)
+        else:
+            call_opt = o1 if o1.is_call() else o2
+            put_opt = o1 if o1.is_put() else o2
+            
+            same_strike = (call_opt.strike == put_opt.strike)
+            same_position = (call_opt.position == put_opt.position)
+            
+            # Straddle : même strike et même position
+            if same_strike and same_position:
+                pos = "Long" if call_opt.is_long() else "Short"
+                return f"{pos} Straddle {call_opt.strike}"
+            
+            # Strangle : strikes différents et même position
+            elif not same_strike and same_position:
+                pos = "Long" if call_opt.is_long() else "Short"
+                return f"{pos} Strangle {put_opt.strike}/{call_opt.strike}"
+            
+            # Risk Reversal : long call + short put
+            elif call_opt.is_long_call() and put_opt.is_short_put():
+                return f"Risk Reversal {put_opt.strike}/{call_opt.strike}"
+            
+            # Reverse Risk Reversal : short call + long put
+            elif call_opt.is_short_call() and put_opt.is_long_put():
+                return f"Reverse Risk Reversal {put_opt.strike}/{call_opt.strike}"
+            
+            else:
+                return f"Custom 2-Leg {o1.position_name()} {o1.strike} / {o2.position_name()} {o2.strike}"
 
     # ======================================================================
-    # 3 LEGS (inchangé sauf renommages mineurs)
+    # 3 LEGS
     # ======================================================================
     if n_legs == 3:
-        # STRIP : 2P + 1C au même strike et même position
-        if len(puts) == 2 and len(calls) == 1 and len(set(o.strike for o in options)) == 1:
-            if len(longs) == 3 or len(shorts) == 3:
-                pos = _position_name(len(longs) == 3)
-                return f"{pos}Strip {options[0].strike:.2f}"
-
-        # STRAP : 2C + 1P au même strike et même position
-        if len(calls) == 2 and len(puts) == 1 and len(set(o.strike for o in options)) == 1:
-            if len(longs) == 3 or len(shorts) == 3:
-                pos = _position_name(len(longs) == 3)
-                return f"{pos}Strap {options[0].strike:.2f}"
-
-        # RATIO CALL SPREADS (3 calls, 2 strikes)
-        if len(calls) == 3 and len(set(o.strike for o in calls)) == 2:
-            sc = sorted(calls, key=lambda o: o.strike)
-            if sc[0].position == "long" and sc[1].position == "short" and sc[2].position == "short":
-                return f"CallRatioSpread {_sorted_strikes_str(calls)}"
-            if sc[0].position == "long" and sc[1].position == "long" and sc[2].position == "short":
-                return f"CallBackspread {_sorted_strikes_str(calls)}"
-
-        # RATIO PUT SPREADS (3 puts, 2 strikes)
-        if len(puts) == 3 and len(set(o.strike for o in puts)) == 2:
-            sp = sorted(puts, key=lambda o: o.strike)
-            if sp[0].position == "long" and sp[1].position == "long" and sp[2].position == "short":
-                return f"PutRatioSpread {_sorted_strikes_str(puts)}"
-            if sp[0].position == "long" and sp[1].position == "short" and sp[2].position == "short":
-                return f"PutBackspread {_sorted_strikes_str(puts)}"
-
-        # BUTTERFLY (3 strikes)
-        if len(set(o.strike for o in options)) == 3:
-            # 3 CALLS
-            if len(calls) == 3 and _is_butterfly_pattern(options):
-                return f"CallButterfly {strikes_str}"
-            # 3 PUTS
-            if len(puts) == 3 and _is_butterfly_pattern(options):
-                return f"PutButterfly {strikes_str}"
-
-        return f"3Leg_{len(calls)}C{len(puts)}P_{strikes_str}"
+        o1, o2, o3 = options[0], options[1], options[2]
+        
+        # Butterfly : 1-2-1 pattern, même type
+        if o1.is_call() and o2.is_call() and o3.is_call():
+            # Long Butterfly : long-short-short-long avec ratio 1-2-1
+            if o1.is_long_call() and o2.is_short_call() and o3.is_long_call():
+                return f"Long Call Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+            elif o1.is_short_call() and o2.is_long_call() and o3.is_short_call():
+                return f"Short Call Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+            else:
+                return f"Call Strip 3-Leg {o1.strike}/{o2.strike}/{o3.strike}"
+        
+        elif o1.is_put() and o2.is_put() and o3.is_put():
+            if o1.is_long_put() and o2.is_short_put() and o3.is_long_put():
+                return f"Long Put Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+            elif o1.is_short_put() and o2.is_long_put() and o3.is_short_put():
+                return f"Short Put Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+            else:
+                return f"Put Strip 3-Leg {o1.strike}/{o2.strike}/{o3.strike}"
+        
+        # Types mixtes
+        else:
+            # Compter calls et puts
+            n_calls = sum(1 for o in options if o.is_call())
+            n_puts = sum(1 for o in options if o.is_put())
+            
+            # Collar (call + 2 puts ou put + 2 calls)
+            if n_calls == 2 and n_puts == 1:
+                return f"Custom Call Collar {o1.strike}/{o2.strike}/{o3.strike}"
+            elif n_calls == 1 and n_puts == 2:
+                return f"Custom Put Collar {o1.strike}/{o2.strike}/{o3.strike}"
+            else:
+                strikes = "/".join(str(o.strike) for o in options)
+                return f"Custom 3-Leg {strikes}"
 
     # ======================================================================
-    # 4 LEGS (identique à ta logique, avec vérifs)
+    # 4 LEGS
     # ======================================================================
     if n_legs == 4:
-        uniq_strikes = sorted(set(float(o.strike) for o in options))
-        if len(calls) == 2 and len(puts) == 2 and len(uniq_strikes) == 3:
-            return f"IronButterfly {strikes_str}"
-
-        if len(calls) == 2 and len(puts) == 2 and len(uniq_strikes) == 2:
-            if _is_box_spread_pattern(options):
-                return f"BoxSpread {strikes_str}"
-
-        if len(uniq_strikes) == 4:
-            if len(calls) == 4 and _is_condor_pattern(options):
-                return f"CallCondor {strikes_str}"
-            if len(puts) == 4 and _is_condor_pattern(options):
-                return f"PutCondor {strikes_str}"
-            if len(calls) == 2 and len(puts) == 2 and _is_iron_condor_pattern(options):
-                return f"IronCondor {strikes_str}"
-
-        return f"4Leg_{len(calls)}C{len(puts)}P_{strikes_str}"
+        o1, o2, o3, o4 = options[0], options[1], options[2], options[3]
+        
+        # Iron Condor : 4 options, 2 calls + 2 puts
+        n_calls = sum(1 for o in options if o.is_call())
+        n_puts = sum(1 for o in options if o.is_put())
+        
+        if n_calls == 2 and n_puts == 2:
+            # Séparer calls et puts
+            calls = [o for o in options if o.is_call()]
+            puts = [o for o in options if o.is_put()]
+            
+            # Trier par strike
+            calls.sort(key=lambda o: o.strike)
+            puts.sort(key=lambda o: o.strike)
+            
+            # Iron Condor : short middle, long wings
+            # Put spread: long low put + short high put
+            # Call spread: short low call + long high call
+            if (puts[0].is_long_put() and puts[1].is_short_put() and
+                calls[0].is_short_call() and calls[1].is_long_call()):
+                return f"Iron Condor {puts[0].strike}/{puts[1].strike}/{calls[0].strike}/{calls[1].strike}"
+            
+            # Reverse Iron Condor
+            elif (puts[0].is_short_put() and puts[1].is_long_put() and
+                  calls[0].is_long_call() and calls[1].is_short_call()):
+                return f"Reverse Iron Condor {puts[0].strike}/{puts[1].strike}/{calls[0].strike}/{calls[1].strike}"
+            
+            else:
+                strikes = "/".join(str(o.strike) for o in options)
+                return f"Custom Mixed 4-Leg {strikes}"
+        
+        # Tous calls
+        elif n_calls == 4:
+            # Condor : 1-1-1-1 avec positions alternées
+            if (o1.is_long_call() and o2.is_short_call() and 
+                o3.is_short_call() and o4.is_long_call()):
+                return f"Long Call Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
+            elif (o1.is_short_call() and o2.is_long_call() and 
+                  o3.is_long_call() and o4.is_short_call()):
+                return f"Short Call Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
+            else:
+                strikes = "/".join(str(o.strike) for o in options)
+                return f"Call Strip 4-Leg {strikes}"
+        
+        # Tous puts
+        elif n_puts == 4:
+            if (o1.is_long_put() and o2.is_short_put() and 
+                o3.is_short_put() and o4.is_long_put()):
+                return f"Long Put Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
+            elif (o1.is_short_put() and o2.is_long_put() and 
+                  o3.is_long_put() and o4.is_short_put()):
+                return f"Short Put Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
+            else:
+                strikes = "/".join(str(o.strike) for o in options)
+                return f"Put Strip 4-Leg {strikes}"
+        
+        # Autres combinaisons
+        else:
+            strikes = "/".join(str(o.strike) for o in options)
+            return f"Custom 4-Leg {strikes}"
 
     # ======================================================================
-    # FALLBACK > 4 LEGS
+    # 5+ LEGS (fallback)
     # ======================================================================
-    return f"{n_legs}Leg_{len(calls)}C{len(puts)}P_{strikes_str}"
-
-
-# ======================= AUXILIARY PATTERN CHECKS =========================
-
-def _is_butterfly_pattern(options: List[Option]) -> bool:
-    if len(options) != 3:
-        return False
-    so = sorted(options, key=lambda o: o.strike)
-    # Long-Short-Long OR Short-Long-Short
-    pat1 = (so[0].position == 'long'  and so[1].position == 'short' and so[2].position == 'long')
-    pat2 = (so[0].position == 'short' and so[1].position == 'long'  and so[2].position == 'short')
-    return pat1 or pat2
-
-
-def _is_condor_pattern(options: List[Option]) -> bool:
-    if len(options) != 4:
-        return False
-    so = sorted(options, key=lambda o: o.strike)
-    pat1 = (so[0].position == 'long'  and so[1].position == 'short' and
-            so[2].position == 'short' and so[3].position == 'long')
-    pat2 = (so[0].position == 'short' and so[1].position == 'long'  and
-            so[2].position == 'long'  and so[3].position == 'short')
-    return pat1 or pat2
-
-
-def _is_iron_condor_pattern(options: List[Option]) -> bool:
-    if len(options) != 4:
-        return False
-    calls = sorted([o for o in options if o.option_type == 'call'], key=lambda o: o.strike)
-    puts  = sorted([o for o in options if o.option_type == 'put'],  key=lambda o: o.strike)
-    if len(calls) != 2 or len(puts) != 2:
-        return False
-    # Puts : Long (bas) + Short (haut)
-    if not (puts[0].position == 'long' and puts[1].position == 'short'):
-        return False
-    # Calls : Short (bas) + Long (haut)
-    if not (calls[0].position == 'short' and calls[1].position == 'long'):
-        return False
-    # Ordre cohérent entre ailes put/call
-    return puts[1].strike < calls[0].strike
-
-
-def _is_box_spread_pattern(options: List[Option]) -> bool:
-    if len(options) != 4:
-        return False
-    calls = sorted([o for o in options if o.option_type == 'call'], key=lambda o: o.strike)
-    puts  = sorted([o for o in options if o.option_type == 'put'],  key=lambda o: o.strike)
-    if len(calls) != 2 or len(puts) != 2:
-        return False
-    if calls[0].strike != puts[0].strike or calls[1].strike != puts[1].strike:
-        return False
-    # Bull Call : Long(lower) + Short(higher)
-    if not (calls[0].position == 'long' and calls[1].position == 'short'):
-        return False
-    # Bear Put : Short(lower) + Long(higher)
-    if not (puts[0].position == 'short' and puts[1].position == 'long'):
-        return False
-    return True
+    strikes = "/".join(str(o.strike) for o in options)
+    return f"Custom {n_legs}-Leg {strikes}"

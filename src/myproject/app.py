@@ -229,7 +229,7 @@ def main():
     with tab2:
         st.header("Diagramme de Profit/Perte à l'Expiration")
         
-        fig_payoff = create_payoff_diagram(comparisons, best_target_price or 0.0)
+        fig_payoff = create_payoff_diagram(comparisons)
         st.plotly_chart(fig_payoff, width='stretch')
     
         

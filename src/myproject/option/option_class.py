@@ -77,6 +77,7 @@ class Option:
     timestamp: Optional[datetime] = None
 
 
+
     @classmethod
     def empyOption(cls) -> "Option":
         return cls(option_type="call", strike=0.0, premium=0.0)
@@ -253,4 +254,60 @@ class Option:
         
         # 5. Calculer les surfaces de profit et perte
         return self._calcul_surface()
+    
+    # ============================================================================
+    # POSITION HELPERS - Méthodes utilitaires pour faciliter les checks de position
+    # ============================================================================
+    
+    def is_long_call(self) -> bool:
+        """Retourne True si c'est un long call."""
+        return self.position == 'long' and self.option_type.lower() == 'call'
+    
+    def is_short_call(self) -> bool:
+        """Retourne True si c'est un short call."""
+        return self.position == 'short' and self.option_type.lower() == 'call'
+    
+    def is_long_put(self) -> bool:
+        """Retourne True si c'est un long put."""
+        return self.position == 'long' and self.option_type.lower() == 'put'
+    
+    def is_short_put(self) -> bool:
+        """Retourne True si c'est un short put."""
+        return self.position == 'short' and self.option_type.lower() == 'put'
+    
+    def is_long(self) -> bool:
+        """Retourne True si la position est long (call ou put)."""
+        return self.position == 'long'
+    
+    def is_short(self) -> bool:
+        """Retourne True si la position est short (call ou put)."""
+        return self.position == 'short'
+    
+    def is_call(self) -> bool:
+        """Retourne True si c'est un call (long ou short)."""
+        return self.option_type.lower() == 'call'
+    
+    def is_put(self) -> bool:
+        """Retourne True si c'est un put (long ou short)."""
+        return self.option_type.lower() == 'put'
+    
+    def position_name(self) -> str:
+        """
+        Retourne une chaîne décrivant la position.
+        
+        Returns:
+            str: Format "Long Call", "Short Put", etc.
+        """
+        pos = "Long" if self.position == 'long' else "Short"
+        typ = "Call" if self.option_type.lower() == 'call' else "Put"
+        return f"{pos} {typ}"
+    
+    def position_sign(self) -> int:
+        """
+        Retourne le signe de la position pour les calculs.
+        
+        Returns:
+            int: +1 pour long, -1 pour short
+        """
+        return 1 if self.position == 'long' else -1
 

@@ -180,7 +180,7 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     result = {}
     
     # Prix (priorité: LAST > MID > moyenne BID/ASK)
-    result['premium'] = data.get('PX_LAST') or data.get('PX_MID')
+    result['premium'] = data.get('PX_MID')
     if not result['premium'] and data.get('PX_BID') and data.get('PX_ASK'):
         result['premium'] = (data['PX_BID'] + data['PX_ASK']) / 2
     result['premium'] = result['premium'] or 0.0

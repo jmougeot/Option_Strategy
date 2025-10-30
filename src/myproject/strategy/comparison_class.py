@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
+import numpy as np
 from typing import List, Tuple, Literal, Optional
-from datetime import datetime
 from typing import Any
 from myproject.option.option_class import Option
 
@@ -29,7 +29,8 @@ class StrategyComparison:
     surface_profit: float # surface of profit btw min price and max price 
     surface_loss:float # surface of loss btw min price and max price 
     risk_reward_ratio: float  # Max loss / Max profit
-
+    prices : np.ndarray
+    pnl_array : np.ndarray
 
     all_options: List[Option] = field(default_factory=list)  # Toutes les options
 
@@ -65,29 +66,3 @@ class StrategyComparison:
     # Score et ranking
     score: float = 0.0
     rank: int = 0
-
-    @classmethod
-    def empty(cls) -> "StrategyComparison":
-        """
-        Crée une instance vide / neutre de StrategyComparison,
-        avec des valeurs par défaut pour initialiser une stratégie.
-        """
-        return cls(
-            premium =1,
-            strategy_name="EmptyStrategy",
-            strategy=None,
-            target_price=0.0,
-            expiration_day=None,
-            expiration_week=None,
-            expiration_month='F',
-            expiration_year=0,
-            max_profit=0.0,
-            max_loss=0.0,
-            breakeven_points=[],
-            profit_range=(0.0, 0.0),
-            profit_zone_width=0.0,
-            surface_profit=0.0,
-            surface_loss=0.0,
-            risk_reward_ratio=0.0,
-            all_options=[],
-        )

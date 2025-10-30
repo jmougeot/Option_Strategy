@@ -232,7 +232,8 @@ class OptionStrategyGeneratorV2:
                 # Surfaces
                 surface_profit=all_metrics['profit_surface'],
                 surface_loss=all_metrics['loss_surface'],
-                
+                pnl_array=all_metrics['pnl_array'],
+                prices=all_metrics['prices'],
                 all_options=option_legs,
                 total_delta_calls=all_metrics['delta_calls'],
                 total_gamma_calls=all_metrics['gamma_calls'],
