@@ -294,8 +294,23 @@ def generate_strategy_name(options: List[Option]) -> str:
         
         # Autres combinaisons
         else:
-            strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
-            return f"Custom 4-Leg {strikes}"
+            # Génération des noms avec préfixes détaillés : LC, LP, SC, SP
+            parts = []
+            for o in options:
+                if o.is_long_call():
+                    prefix = "LC"
+                elif o.is_short_call():
+                    prefix = "SC"
+                elif o.is_long_put():
+                    prefix = "LP"
+                elif o.is_short_put():
+                    prefix = "SP"
+                else:
+                    prefix = "?"
+                parts.append(f"{prefix}{o.strike}")
+            
+            strikes = "/".join(parts)
+            return f"{strikes}"
 
     # ======================================================================
     # 5+ LEGS (fallback)
