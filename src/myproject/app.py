@@ -87,7 +87,7 @@ def main():
                 price_min=params.price_min,
                 price_max=params.price_max,
                 max_legs=params.max_legs,
-                top_n=params.top_n,
+                top_n=200,
                 scoring_weights=scoring_weights,
                 verbose=False,
                 scenarios = scenarios

@@ -13,7 +13,6 @@ class UIParams:
     price_max: float
     price_step: float
     max_legs: int
-    top_n: int
     strikes: list[float]
 
 def sidebar_params() -> UIParams:
@@ -48,7 +47,7 @@ def sidebar_params() -> UIParams:
     years = [int(y.strip()) for y in years_input.split(",") if y.strip()]
     months = [m.strip() for m in months_input.split(",") if m.strip()]
 
-    return UIParams(underlying, months, years, strike, price_min, price_max, price_step, max_legs, top_n, strikes)
+    return UIParams(underlying, months, years, strike, price_min, price_max, price_step, max_legs, strikes)
 
 def scoring_weights_block() -> dict:
     st.subheader("⚖️ Pondération du Score - COMPLET")

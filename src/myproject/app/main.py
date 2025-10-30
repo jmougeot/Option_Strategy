@@ -35,7 +35,7 @@ def process_bloomberg_to_strategies(
     scoring_weights: Optional[Dict[str, float]] = None,
     verbose: bool = False,
     scenarios: Optional[ScenarioData] = None ,
-    num_points : int = 100
+    num_points : int = 200
 
 ) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray]]:
     """

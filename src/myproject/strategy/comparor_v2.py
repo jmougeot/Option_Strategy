@@ -86,11 +86,28 @@ class StrategyComparerV2:
                 weight=0.08,
                 extractor=lambda s: abs(s.surface_loss) if s.surface_loss != 0 else 0.0,
                 normalizer=self._normalize_max,
-                scorer=self._score_lower_better
+                scorer=self._score_higher_better
             ),
+
+            MetricConfig(
+                name='surface_loss_ponderate',
+                weight=0.08,
+                extractor=lambda s: abs(s.surface_loss_ponderate) if s.surface_loss != 0 else 0.0,
+                normalizer=self._normalize_max,
+                scorer=self._score_higher_better
+            ),
+
+            MetricConfig(
+                name='surface_profit_ponderate',
+                weight=0.08,
+                extractor=lambda s: abs(s.surface_loss_ponderate) if s.surface_loss != 0 else 0.0,
+                normalizer=self._normalize_max,
+                scorer=self._score_higher_better
+            ),
+
             MetricConfig(
                 name='profit_loss_ratio',
-                weight=0.12,
+                weight=0.10,
                 extractor=lambda s: s.surface_profit / s.surface_loss if s.surface_loss > 0 else 0.0,
                 normalizer=self._normalize_min_max,
                 scorer=self._score_higher_better
@@ -99,28 +116,28 @@ class StrategyComparerV2:
             # ========== GREEKS ==========
             MetricConfig(
                 name='delta_neutral',
-                weight=0.06,
+                weight=0.00,
                 extractor=lambda s: abs(s.total_delta),
                 normalizer=self._normalize_max,
                 scorer=self._score_lower_better
             ),
             MetricConfig(
                 name='gamma_exposure',
-                weight=0.04,
+                weight=0.00,
                 extractor=lambda s: abs(s.total_gamma),
                 normalizer=self._normalize_max,
                 scorer=self._score_moderate_better
             ),
             MetricConfig(
                 name='vega_exposure',
-                weight=0.04,
+                weight=0.00,
                 extractor=lambda s: abs(s.total_vega),
                 normalizer=self._normalize_max,
                 scorer=self._score_moderate_better
             ),
             MetricConfig(
                 name='theta_positive',
-                weight=0.04,
+                weight=0.05,
                 extractor=lambda s: s.total_theta,
                 normalizer=self._normalize_min_max,
                 scorer=self._score_positive_better
@@ -129,7 +146,7 @@ class StrategyComparerV2:
             # ========== VOLATILITÉ ==========
             MetricConfig(
                 name='implied_vol',
-                weight=0.04,
+                weight=0.00,
                 extractor=lambda s: s.avg_implied_volatility if s.avg_implied_volatility > 0 else 0.0,
                 normalizer=self._normalize_min_max,
                 scorer=self._score_moderate_better
@@ -138,18 +155,19 @@ class StrategyComparerV2:
             # ========== MÉTRIQUES GAUSSIENNES (MIXTURE) ==========
             MetricConfig(
                 name='average_pnl',
-                weight=0.06,
+                weight=0.70,
                 extractor=lambda s: s.average_pnl if s.average_pnl is not None else 0.0,
                 normalizer=self._normalize_min_max,
                 scorer=self._score_higher_better
             ),
             MetricConfig(
                 name='sigma_pnl',
-                weight=0.04,
+                weight=0.05,
                 extractor=lambda s: s.sigma_pnl if s.sigma_pnl is not None else 0.0,
                 normalizer=self._normalize_max,
                 scorer=self._score_lower_better  # Plus faible écart-type = meilleur
             ),
+            
         ]
     
     # ========== NORMALISATEURS ==========
