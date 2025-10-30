@@ -56,14 +56,12 @@ def calculate_linear_metrics(
     total_vega = 0.0
     total_theta = 0.0
     total_ivs =0.0
+
+    quantity = 1
     
     # Parcourir toutes les options UNE SEULE FOIS
     for option in options:
-        # ============ COÛT NET ============
-        # Multiplier par la quantité pour tenir compte des multiples contrats
-        quantity = option.quantity if option.quantity is not None else 1
-        leg_cost: float = option.premium * quantity * (-1 if option.position == 'long' else 1)
-        total_premium += leg_cost
+
                 
         # ============ GREEKS ============
         sign = 1 if option.position == 'long' else -1
@@ -88,6 +86,8 @@ def calculate_linear_metrics(
             total_gamma += gamma
             total_vega += vega
             total_theta += theta
+
+            total_premium += option.premium 
             
             # Initialiser ou additionner le pnl_array (vérifier que ce n'est pas None)
             if option.pnl_array is not None:
@@ -99,6 +99,8 @@ def calculate_linear_metrics(
             total_sigma_pnl += (option.sigma_pnl ** 2)
 
         if option.position == 'short':
+
+            #Surface
             total_profit_surface -= option.loss_surface
             total_loss_surface -= option.profit_surface
             total_average_pnl -= option.average_pnl
@@ -109,6 +111,9 @@ def calculate_linear_metrics(
             total_gamma -= gamma
             total_vega -= vega
             total_theta -= theta
+
+            #Premium
+            total_premium -= option.premium
 
             
             # Initialiser ou soustraire le pnl_array (vérifier que ce n'est pas None)

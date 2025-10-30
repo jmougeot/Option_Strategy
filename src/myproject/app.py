@@ -10,7 +10,8 @@ import plotly.express as px
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.app.main import process_bloomberg_to_strategies
 from myproject.app.styles import inject_css
-from myproject.app.widget import scoring_weights_block, sidebar_params, scenario_params
+from myproject.app.widget import sidebar_params, scenario_params
+from myproject.app.scoring_block import scoring_weights_block
 from myproject.app.utils import (
     create_payoff_diagram,
     format_currency,
