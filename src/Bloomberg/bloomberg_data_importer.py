@@ -177,7 +177,6 @@ def import_euribor_options(
                                   f"Delta={option.delta:+.4f}, "
                                   f"IV={option.implied_volatility:.2%}"
                                   f"{surfaces_info}")
-                            print(f"{option}")
                 
                 if month_options_count > 0:
                     print(f"\n   ✓ {month_options_count} options récupérées pour ce mois")

@@ -30,7 +30,7 @@ def create_mixture_from_scenarios(
     """
     if not scenarios or not scenarios.centers:
         # Retourner une mixture uniforme par défaut
-        sigma = (price_max-price_min)/3
+        sigma = (price_max-price_min)/5
         prices = np.linspace(price_min, price_max, num_points)
         step = len (prices)/num_points 
         uniform_mixture = f(prices, target_price, sigma)*step

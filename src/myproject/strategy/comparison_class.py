@@ -32,30 +32,19 @@ class StrategyComparison:
     # Arrays - DOIVENT être avant les champs avec valeurs par défaut
     prices: np.ndarray 
     pnl_array: np.ndarray 
-
+    is_closed : Optional[bool] = False 
+    
     # Champs avec valeurs par défaut (doivent venir après les champs sans défaut)
     surface_loss_ponderate: float = 0.0
-    surface_profit_ponderate: float = 0.0
+    surface_profit_ponderate: float = 0.0 #Probabilité de gain
     risk_reward_ratio: float = 0.0  # Max loss / Max profit
     all_options: List[Option] = field(default_factory=list)  # Toutes les options
 
-    # Greeks exposure - Calls
-    total_delta_calls: float = 0.0   # Delta total des calls
-    total_gamma_calls: float = 0.0   # Gamma total des calls
-    total_vega_calls: float = 0.0    # Vega total des calls
-    total_theta_calls: float = 0.0   # Theta total des calls
-    
-    # Greeks exposure - Puts
-    total_delta_puts: float = 0.0    # Delta total des puts
-    total_gamma_puts: float = 0.0    # Gamma total des puts
-    total_vega_puts: float = 0.0     # Vega total des puts
-    total_theta_puts: float = 0.0    # Theta total des puts
-    
-    # Greeks exposure - Total stratégie
-    total_delta: float = 0.0         # Delta total de la stratégie
-    total_gamma: float = 0.0         # Gamma total de la stratégie
-    total_vega: float = 0.0          # Vega total de la stratégie
-    total_theta: float = 0.0         # Theta total de la stratégie
+    # Greeks exposure 
+    total_delta: float = 0.0         # Delta de la stratégie
+    total_gamma: float = 0.0         # Gamma de la stratégie
+    total_vega: float = 0.0          # Vega de la stratégie
+    total_theta: float = 0.0         # Theta de la stratégie
     
     # Volatilité implicite
     avg_implied_volatility: float = 0.0  # Volatilité implicite moyenne des options
