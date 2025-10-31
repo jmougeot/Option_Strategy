@@ -12,7 +12,7 @@ class Option:
 
     # ============ CHAMPS OBLIGATOIRES ============
     expiration_day : Optional[str]= None
-    expiration_week : Optional[str]= None 
+    expiration_week : Optional[str]= None
     expiration_month : Literal['F','G','H','K','M','N','Q','U','V','X','Z'] = 'F'
     expiration_year : int = 6
 
@@ -31,7 +31,6 @@ class Option:
     ask: Optional[float] = None
     last: Optional[float] = None
     mid: Optional[float] = None
-    settlement_price: Optional[float] = None
     
     # ============ GREEKS ============
     delta: float = 0.0
@@ -40,17 +39,16 @@ class Option:
     theta: float = 0.0
     rho: float = 0.0
 
-    # ============ METRIQUES (stockage éventuel) ============
+    # ============ METRIQUES ============
     prices: Optional[np.ndarray] = None
-    loss_surface: float = 0
-    profit_surface: float = 0
+    loss_surface_ponderated: float = 0     # La surface est calculée pour être positive
+    profit_surface_ponderated: float = 0
     pnl_array: Optional[np.ndarray] = None
     mixture: Optional[np.ndarray] = None
     pnl_ponderation: Optional[np.ndarray] = None
-    
-    # Métriques calculées avec la mixture
     average_pnl: float = 0.0
     sigma_pnl: float = 0.0 
+    dx : Optional[float] = None
 
     # ============ VOLATILITÉ ============
     implied_volatility: float = 0.0
@@ -64,18 +62,6 @@ class Option:
     
     # ============ SOUS-JACENT ============
     underlying_price: Optional[float] = None
-    underlying_price_change: Optional[float] = None
-    
-    # ============ CONTRAT ============
-    contract_size: int = 100
-    settlement_type: Optional[str] = None
-    exercise_style: Optional[str] = None
-    
-    # ============ BLOOMBERG ============
-    bloomberg_ticker: Optional[str] = None
-    security_des: Optional[str] = None
-    timestamp: Optional[datetime] = None
-
 
 
     @classmethod
@@ -146,24 +132,22 @@ class Option:
     def _average_pnl(self):
         """
         Espérance du PnL: E[PnL] = ∫ p(x) * pnl(x) dx ≈ sum(mixture * pnl * dx).
-        Normalise si la densité n'intègre pas exactement à 1.
         """
         if self.mixture is None or self.pnl_array is None:
             return None
 
-        dx = getattr(self, "_dx", None)
-        if dx is None:
+        if self.dx is None:
             # Valeur de repli si _pnl_ponderation_array n'a pas été appelée
             if self.prices is not None and len(self.prices) > 1:
-                dx = float(np.mean(np.diff(self.prices)))
+                self.dx = float(np.mean(np.diff(self.prices)))
             else:
                 return None
 
-        mass = float(np.sum(self.mixture) * dx)  # ∫ p(x) dx
+        mass = float(np.sum(self.mixture) * self.dx)  # ∫ p(x) dx
         if mass <= 0:
             return None
 
-        mu = float(np.sum(self.mixture * self.pnl_array * dx) / mass)
+        mu = float(np.sum(self.mixture * self.pnl_array * self.dx) / mass)
         self.average_pnl = mu
         return mu
 
@@ -200,7 +184,7 @@ class Option:
         self.sigma_pnl = sigma
         return sigma
 
-    def _calcul_surface(self) -> Tuple[float, float]:
+    def _calcul_surface_ponderated(self) -> Tuple[float, float]:
         """
         Aire de la partie négative de P&L (perte) entre min_price et max_price.
         On retourne une valeur positive (= intégrale de max(-P&L, 0)).
@@ -215,8 +199,8 @@ class Option:
                 loss += xi
             else:
                 win += xi
-        self.loss_surface = -loss
-        self.profit_surface = win
+        self.loss_surface_ponderated = -loss
+        self.profit_surface_ponderated = win
         # loss is negative (sum of negative contributions), return positive loss
         return -loss, win
     
@@ -247,7 +231,7 @@ class Option:
         self._sigma_pnl()
         
         # 5. Calculer les surfaces de profit et perte
-        return self._calcul_surface()
+        return self._calcul_surface_ponderated()
     
     # ============================================================================
     # POSITION HELPERS - Méthodes utilitaires pour faciliter les checks de position
@@ -305,3 +289,4 @@ class Option:
         """
         return 1 if self.position == 'long' else -1
 
+    

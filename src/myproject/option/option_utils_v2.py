@@ -2,20 +2,6 @@ import numpy as np
 from myproject.option.option_class import Option 
 from typing import List, Any, Dict
 
-# ------- Helpers vectorisés -------
-
-def _pack_legs(options: List[Option]):
-    """Prépare des vecteurs numpy pour vectoriser le P&L."""
-    if not options:
-        # Placeholders vides
-        return (np.array([]),)*6
-    strikes  = np.array([o.strike for o in options], dtype=float)
-    premiums = np.array([o.premium for o in options], dtype=float)
-    qty      = np.array([float(o.quantity or 1) for o in options], dtype=float)
-    signs    = np.array([-1.0 if o.position == "long" else 1.0 for o in options], dtype=float)
-    is_call  = np.array([1.0 if o.option_type.lower() == "call" else 0.0 for o in options], dtype=float)
-    csize    = np.array([float(o.contract_size or 1) for o in options], dtype=float)
-    return strikes, premiums, qty, signs, is_call, csize
 
 def get_expiration_info(options: List[Option]) -> Dict[str, Any]:
     """

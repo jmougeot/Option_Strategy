@@ -180,8 +180,8 @@ class OptionStrategyGeneratorV2:
                     implied_volatility=opt.implied_volatility,
                     
                     # Surfaces calculées (copiées depuis l'option originale)
-                    loss_surface=opt.loss_surface,
-                    profit_surface=opt.profit_surface,
+                    loss_surface_ponderated=opt.loss_surface_ponderated,
+                    profit_surface_ponderated=opt.profit_surface_ponderated,
                     
                     # Arrays et mixture (si disponibles)
                     prices=opt.prices,
@@ -216,6 +216,9 @@ class OptionStrategyGeneratorV2:
                 strategy_name=strategy_name,
                 strategy=None,
                 target_price=target_price,
+                all_options=option_legs,
+                
+                # Expiration date
                 expiration_day=exp_info.get('expiration_day'),
                 expiration_week=exp_info.get('expiration_week'),
                 expiration_month=exp_info.get('expiration_month', 'F'),
@@ -227,23 +230,31 @@ class OptionStrategyGeneratorV2:
                 breakeven_points=all_metrics.get('breakeven_points', []),
                 profit_range=all_metrics.get('profit_range', (0.0, 0.0)),
                 profit_zone_width=all_metrics.get('profit_zone_width', 0.0),
-                risk_reward_ratio=all_metrics.get('risk_reward_ratio', 0.0),
                 
-                # Surfaces
-                surface_profit=all_metrics['profit_surface'],
-                surface_loss=all_metrics['loss_surface'],
+                # Surfaces (non pondérées - calculées depuis linear_metrics)
+                surface_profit=all_metrics.get('profit_surface'),
+                surface_loss=all_metrics.get('loss_surface'),
+                
+                # Métriques pondérées par mixture gaussienne
+                average_pnl=all_metrics.get('average_pnl'),
+                sigma_pnl=all_metrics.get('sigma_pnl'),
+                surface_loss_ponderated=all_metrics.get('surface_loss_ponderate', 0.0),
+                surface_profit_ponderated=all_metrics.get('surface_profit_ponderate', 0.0),
+                
+                # Arrays
                 pnl_array=all_metrics['pnl_array'],
                 prices=all_metrics['prices'],
-                all_options=option_legs,
+                
+                # Risk/Reward Ratios
+                risk_reward_ratio=all_metrics.get('risk_reward_ratio', 0.0),
+                risk_reward_ratio_ponderated=0.0,  # Calculé après si nécessaire
+                
+                # Greeks totaux
                 total_delta=all_metrics['delta_total'],
                 total_gamma=all_metrics['gamma_total'],
                 total_vega=all_metrics['vega_total'],
                 total_theta=all_metrics['theta_total'],
                 avg_implied_volatility=all_metrics['avg_implied_volatility'],
-                
-                # Métriques pondérées par mixture (si disponibles)
-                average_pnl=all_metrics.get('average_pnl'),
-                sigma_pnl=all_metrics.get('sigma_pnl'),
                 
                 # Performance au prix cible
                 profit_at_target=all_metrics.get('profit_at_target', 0.0),

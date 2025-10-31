@@ -41,8 +41,8 @@ def calculate_linear_metrics(
     """
     # Initialiser les accumulateurs
     total_premium = 0.0
-    total_loss_surface = 0.0
-    total_profit_surface = 0.0
+    total_loss_surface_ponderated = 0.0
+    total_profit_surface_ponderated = 0.0
     total_average_pnl = 0.0
     total_pnl_array: Optional[np.ndarray] = None  # Initialisé à None, sera créé au premier usage
     
@@ -66,8 +66,8 @@ def calculate_linear_metrics(
         # ============ SURFACES (stockées dans chaque option) ============
         # Accumuler les surfaces de profit et de perte
         if option.position == 'long':
-            total_profit_surface += option.profit_surface
-            total_loss_surface += option.loss_surface
+            total_profit_surface_ponderated += option.profit_surface_ponderated
+            total_loss_surface_ponderated += option.loss_surface_ponderated
             total_average_pnl += option.average_pnl
             total_ivs += option.implied_volatility
             
@@ -91,8 +91,8 @@ def calculate_linear_metrics(
         if option.position == 'short':
 
             #Surface
-            total_profit_surface -= option.loss_surface
-            total_loss_surface -= option.profit_surface
+            total_profit_surface_ponderated -= option.loss_surface_ponderated
+            total_loss_surface_ponderated -= option.profit_surface_ponderated
             total_average_pnl -= option.average_pnl
             total_ivs -= option.implied_volatility
 
@@ -129,8 +129,8 @@ def calculate_linear_metrics(
         'premium': total_premium,
 
         # MÉTRIQUES DE SURFACE (accumulées depuis les options)
-        'loss_surface': total_loss_surface,
-        'profit_surface': total_profit_surface,
+        'loss_surface_ponderated': total_loss_surface_ponderated,
+        'profit_surface': total_profit_surface_ponderated,
         
         # MÉTRIQUES PONDÉRÉES PAR MIXTURE (si disponibles)
         'average_pnl': total_average_pnl,

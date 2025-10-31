@@ -10,35 +10,40 @@ class StrategyComparison:
     strategy_name: str
     strategy: Any  # OptionStrategy-like
     target_price: float
-    premium : float 
+    premium : float
+    all_options: List[Option]  # Toutes les options
 
-    # Epiration date
+
+    # ================= Epiration date ======================
     expiration_day : Optional[str]
     expiration_week : Optional[str]
     expiration_month : Literal['F' , 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z' ]
     expiration_year : int
 
-    # Métriques financières
+    # ================== Métriques financières ===================
     max_profit: float
     max_loss: float
     breakeven_points: List[float]
 
-    # Métriques de risque
+    # =================== Métriques de risque ====================
     profit_range: Tuple[float, float]  # Range de prix profitable
     profit_zone_width: float  # Largeur de la zone profitable+
-    surface_profit: float # surface of profit btw min price and max price
-    surface_loss: float # surface of loss btw min price and max price 
-    
+    surface_profit: Optional[float] # surface of profit btw min price and max price
+    surface_loss: Optional[float] # surface of loss btw min price and max price
+    average_pnl: Optional[float]   # Espérance du P&L avec mixture
+    sigma_pnl: Optional[float]     # Écart-type du P&L avec mixture
+    surface_loss_ponderated: float
+    surface_profit_ponderated: float #Probabilité de gain
+
     # Arrays - DOIVENT être avant les champs avec valeurs par défaut
     prices: np.ndarray 
     pnl_array: np.ndarray 
-    is_closed : Optional[bool] = False 
+
     
-    # Champs avec valeurs par défaut (doivent venir après les champs sans défaut)
-    surface_loss_ponderate: float = 0.0
-    surface_profit_ponderate: float = 0.0 #Probabilité de gain
-    risk_reward_ratio: float = 0.0  # Max loss / Max profit
-    all_options: List[Option] = field(default_factory=list)  # Toutes les options
+    # =================== Ratio =================================
+    risk_reward_ratio: float   # Max loss / Max profit
+    risk_reward_ratio_ponderated: float
+
 
     # Greeks exposure 
     total_delta: float = 0.0         # Delta de la stratégie
@@ -50,8 +55,7 @@ class StrategyComparison:
     avg_implied_volatility: float = 0.0  # Volatilité implicite moyenne des options
 
     # Métriques pondérées par mixture gaussienne
-    average_pnl: Optional[float] = None  # Espérance du P&L avec mixture
-    sigma_pnl: Optional[float] = None    # Écart-type du P&L avec mixture
+
 
     # Performance au prix cible
     profit_at_target: float = 0.0
@@ -60,4 +64,14 @@ class StrategyComparison:
     # Score et ranking
     score: float = 0.0
     rank: int = 0
+
+
+    def _risk_reward_ratio(self):
+        self.risk_reward_ratio = self.max_profit/self.max_loss
+    
+    def _risk_reward_ratio_ponderated(self):
+        self.risk_reward_ratio_ponderated = self.surface_profit_ponderated/self.surface_loss_ponderated
+
+    
+
 
