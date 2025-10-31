@@ -172,13 +172,11 @@ def import_euribor_options(
                             opt_symbol = "C" if option.option_type == "call" else "P"
                             surfaces_info = f", Surf.P={option.profit_surface:.2f}, Surf.L={option.loss_surface:.2f}"
                             
-                            print(f"✓ {opt_symbol} {option.strike:6.2f}: "
-                                  f"Premium={option.premium:.4f}, "
-                                  f"Delta={option.delta:+.4f}, "
-                                  f"IV={option.implied_volatility:.2%}"
-                                  f"{surfaces_info}")
-                            print(f"{option}")
-                
+                            print(f"✓ {opt_symbol} {option.strike}: "
+                                  f"Premium={option.premium}, "
+                                  f"Delta={option.delta}, "
+                                  f"IV={option.implied_volatility}"
+                                  f"{surfaces_info}")                
                 if month_options_count > 0:
                     print(f"\n   ✓ {month_options_count} options récupérées pour ce mois")
                 else:

@@ -61,16 +61,6 @@ def calculate_linear_metrics(
     
     # Parcourir toutes les options UNE SEULE FOIS
     for option in options:
-
-                
-        # ============ GREEKS ============
-        sign = 1 if option.position == 'long' else -1
-        
-        # Multiplier par la quantité (déjà calculée pour le premium)
-        delta = (option.delta or 0.0) * sign * quantity
-        gamma = (option.gamma or 0.0) * sign * quantity
-        vega = (option.vega or 0.0) * sign * quantity
-        theta = (option.theta or 0.0) * sign * quantity
         
         
         # ============ SURFACES (stockées dans chaque option) ============
@@ -82,10 +72,10 @@ def calculate_linear_metrics(
             total_ivs += option.implied_volatility
             
             #Greeks
-            total_delta += delta
-            total_gamma += gamma
-            total_vega += vega
-            total_theta += theta
+            total_delta += option.delta
+            total_gamma += option.gamma
+            total_vega += option.vega
+            total_theta += option.theta
 
             total_premium += option.premium 
             
@@ -107,10 +97,10 @@ def calculate_linear_metrics(
             total_ivs -= option.implied_volatility
 
             #Greeks
-            total_delta -= delta
-            total_gamma -= gamma
-            total_vega -= vega
-            total_theta -= theta
+            total_delta -= option.delta
+            total_gamma -= option.gamma
+            total_vega -= option.vega
+            total_theta -= option.theta
 
             #Premium
             total_premium -= option.premium

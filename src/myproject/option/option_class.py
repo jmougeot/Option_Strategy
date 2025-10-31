@@ -34,11 +34,11 @@ class Option:
     settlement_price: Optional[float] = None
     
     # ============ GREEKS ============
-    delta: Optional[float] = None
-    gamma: Optional[float] = None
-    vega: Optional[float] = None
-    theta: Optional[float] = None
-    rho: Optional[float] = None
+    delta: float = 0.0
+    gamma: float = 0.0
+    vega: float = 0.0
+    theta: float = 0.0
+    rho: float = 0.0
 
     # ============ METRIQUES (stockage éventuel) ============
     prices: Optional[np.ndarray] = None
