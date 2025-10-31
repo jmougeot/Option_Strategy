@@ -17,10 +17,12 @@ Optimisé avec numpy pour des calculs vectorisés rapides.
 8. Greeks modérés: gamma/vega utilisent _score_lower_better (faible expo = meilleur)
 9. Target performance: max(value, 0) pour récompenser uniquement les profits
 10. Premium: scorer=_score_lower_better (crédit = meilleur)
+11. ✅ ISOLATION DES POIDS: deepcopy() pour éviter mutations entre appels
 """
 
 from typing import List, Dict, Optional, Callable, Tuple
 from dataclasses import dataclass
+from copy import deepcopy
 import numpy as np
 from myproject.strategy.comparison_class import StrategyComparison
 
@@ -49,8 +51,13 @@ class StrategyComparerV2:
     """
     
     def __init__(self):
-        """Initialise le comparateur avec les configurations de métriques."""
-        self.metrics_config = self._create_metrics_config()
+        """
+        Initialise le comparateur avec les configurations de métriques.
+        
+        ✅ _base_metrics_config reste immuable pour éviter les effets de bord
+        entre appels successifs de compare_and_rank().
+        """
+        self._base_metrics_config = self._create_metrics_config()
     
     def _create_metrics_config(self) -> List[MetricConfig]:
         """
@@ -288,31 +295,41 @@ class StrategyComparerV2:
         Compare et classe les stratégies selon un système de scoring multi-critères.
         
         ✅ Les poids sont automatiquement normalisés à 1.0 pour rendre les scores comparables.
+        ✅ Clone les métriques à chaque appel pour éviter les effets de bord.
+        
+        Args:
+            strategies: Liste des stratégies à comparer
+            top_n: Nombre de meilleures stratégies à retourner
+            weights: Poids personnalisés partiels (les autres gardent leur valeur par défaut)
         
         Example:
             >>> comparer = StrategyComparerV2()
-            >>> best = comparer.compare_and_rank(strategies, top_n=5)
-            >>> for s in best:
-            ...     print(f"{s.rank}. {s.strategy_name} - Score: {s.score:.3f}")
+            >>> # Premier appel avec poids custom
+            >>> best = comparer.compare_and_rank(strategies, weights={'surface_profit': 0.5})
+            >>> # Deuxième appel : repart des poids par défaut, pas des normalisés
+            >>> best2 = comparer.compare_and_rank(strategies, weights={'average_pnl': 0.8})
         """
         if not strategies:
             print("⚠️ Aucune stratégie à comparer")
             return []
         
+        # ✅ CORRECTION: Cloner la config de base pour éviter les mutations
+        metrics_config = deepcopy(self._base_metrics_config)
+        
         # Appliquer les poids personnalisés si fournis
         if weights:
-            for metric in self.metrics_config:
+            for metric in metrics_config:
                 if metric.name in weights:
                     metric.weight = weights[metric.name]
         
         # ✅ Normaliser les poids à 1.0
-        total_weight = sum(m.weight for m in self.metrics_config)
+        total_weight = sum(m.weight for m in metrics_config)
         if total_weight > 0:
-            for metric in self.metrics_config:
+            for metric in metrics_config:
                 metric.weight /= total_weight
         
-        # Calculer les scores
-        strategies = self._calculate_scores(strategies)
+        # Calculer les scores avec la config clonée
+        strategies = self._calculate_scores(strategies, metrics_config)
         
         # Trier par score décroissant
         strategies.sort(key=lambda x: x.score, reverse=True)
@@ -326,9 +343,15 @@ class StrategyComparerV2:
         
         return strategies
     
-    def _calculate_scores(self, strategies: List[StrategyComparison]) -> List[StrategyComparison]:
+    def _calculate_scores(self, 
+                         strategies: List[StrategyComparison],
+                         metrics_config: List[MetricConfig]) -> List[StrategyComparison]:
         """
         Calcule les scores composites pour chaque stratégie avec numpy (optimisé).
+        
+        Args:
+            strategies: Liste des stratégies à scorer
+            metrics_config: Configuration des métriques (clonée, pas la base)
         
         Utilise des arrays numpy pour des calculs vectorisés rapides.
         ~10-100x plus rapide que les boucles Python pour de grandes listes.
@@ -337,14 +360,14 @@ class StrategyComparerV2:
             return strategies
         
         n_strategies = len(strategies)
-        n_metrics = len(self.metrics_config)
+        n_metrics = len(metrics_config)
         
         # ============ ÉTAPE 1: EXTRACTION EN ARRAY NUMPY ============
         # Créer une matrice (n_strategies x n_metrics) avec toutes les valeurs
         metric_matrix = np.zeros((n_strategies, n_metrics))
         weights = np.zeros(n_metrics)
         
-        for j, metric in enumerate(self.metrics_config):
+        for j, metric in enumerate(metrics_config):
             # Extraire toutes les valeurs pour cette métrique (vectorisé)
             metric_matrix[:, j] = [metric.extractor(s) for s in strategies]
             weights[j] = metric.weight
@@ -353,10 +376,10 @@ class StrategyComparerV2:
         # Pour chaque métrique, calculer min/max et normaliser
         scores_matrix = np.zeros_like(metric_matrix)
         
-        for j, metric in enumerate(self.metrics_config):
+        for j, metric in enumerate(metrics_config):
             values = metric_matrix[:, j]
             
-            #  Appeler  le normalizer
+            # ✅ Appeler réellement le normalizer
             min_val, max_val = metric.normalizer(values.tolist())
             
             if max_val > min_val or (max_val == min_val and max_val != 0):

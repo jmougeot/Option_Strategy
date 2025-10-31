@@ -22,6 +22,7 @@ class Option:
     
     # ============ IDENTIFICATION ============
     ticker: Optional[str] = None
+    bloomberg_ticker: Optional[str] = None  # Ticker Bloomberg complet
     underlying_symbol: Optional[str] = None
     exchange: Optional[str] = None
     currency: Optional[str] = None
