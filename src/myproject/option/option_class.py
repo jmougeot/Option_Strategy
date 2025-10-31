@@ -9,7 +9,7 @@ class Option:
     option_type: str  # 'call' ou 'put'
     strike: float
     premium: float
-    timestamp: float
+    timestamp: Optional[float] = None 
 
     # ============ CHAMPS OBLIGATOIRES ============
     expiration_day : Optional[str]= None
