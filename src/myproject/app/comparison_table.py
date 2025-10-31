@@ -7,6 +7,18 @@ from myproject.strategy.comparison_class import StrategyComparison
 from myproject.option.option_class import Option
 
 
+def format_currency(value: float) -> str:
+    """Formate une valeur monétaire."""
+    if value is None:
+        return '-'
+    return f"${value:,.2f}"
+
+
+def format_expiration_date(month: str, year: int) -> str:
+    """Formate la date d'expiration."""
+    return f"{month}{year}"
+
+
 def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFrame:
     """Crée un DataFrame pour l'affichage des comparaisons avec TOUS les critères de scoring."""
     
@@ -23,9 +35,9 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
             'Zone ±': format_currency(comp.profit_zone_width),
             'P&L@Target': format_currency(comp.profit_at_target),
             'Target %': f"{comp.profit_at_target_pct:.1f}%",
-            'Surf. Profit': f"{comp.surface_profit:.2f}",
-            'Surf. Loss': f"{comp.surface_loss:.2f}",
-            'P/L Ratio': f"{(comp.surface_profit/comp.surface_loss):.2f}" if comp.surface_loss > 0 else '∞',
+            'Surf. Profit': f"{comp.surface_profit:.2f}" if comp.surface_profit is not None else '-',
+            'Surf. Loss': f"{comp.surface_loss:.2f}" if comp.surface_loss is not None else '-',
+            'P/L Ratio': f"{(comp.surface_profit/comp.surface_loss):.2f}" if (comp.surface_profit is not None and comp.surface_loss is not None and comp.surface_loss > 0) else '∞',
             'Avg P&L': format_currency(comp.average_pnl) if comp.average_pnl is not None else '-',
             'σ P&L': format_currency(comp.sigma_pnl) if comp.sigma_pnl is not None else '-',
             'Delta': f"{comp.total_delta:.3f}",
