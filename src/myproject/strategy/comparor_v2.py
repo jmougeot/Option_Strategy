@@ -170,6 +170,15 @@ class StrategyComparerV2:
                 scorer=self._score_lower_better  # Plus faible écart-type = meilleur
             ),
             
+            # ========== NOUVELLE MÉTRIQUE: PREMIUM ==========
+            MetricConfig(
+                name='premium',
+                weight=0.10,  # À ajuster
+                extractor=lambda s: s.premium,
+                normalizer=self._normalize_min_max,
+                scorer=self._score_negative_better  # Favorise premium négatif
+            ),
+            
         ]
     
     # ========== NORMALISATEURS ==========
@@ -222,6 +231,16 @@ class StrategyComparerV2:
         if value >= 0 and max_val > min_val:
             return (value - min_val) / (max_val - min_val)
         return 0.0
+    
+    # Nouveau scorer pour les valeurs où négatif = meilleur
+    @staticmethod
+    def _score_negative_better(value: float, min_val: float, max_val: float) -> float:
+        """Score favorisant les valeurs négatives (ex: premium)."""
+        if min_val >= max_val:
+            return 0.0
+        # Inverser : plus négatif = meilleur score
+        normalized = (value - min_val) / (max_val - min_val)
+        return 1.0 - normalized  # Les valeurs les plus négatives ont score proche de 1
     
     def compare_and_rank(self,
                         strategies: List[StrategyComparison],
@@ -323,6 +342,11 @@ class StrategyComparerV2:
                             (values - min_val) / (max_val - min_val),
                             0.0
                         )
+                
+                elif metric.scorer == self._score_negative_better:
+                    if min_val < max_val:
+                        normalized = (values - min_val) / (max_val - min_val)
+                        scores_matrix[:, j] = 1.0 - normalized  # Les valeurs les plus négatives ont score proche de 1
         
         # ============ ÉTAPE 3: CALCUL DU SCORE FINAL (vectorisé) ============
         # Multiplication matrice-vecteur: (n_strategies x n_metrics) @ (n_metrics)
@@ -333,4 +357,4 @@ class StrategyComparerV2:
             strat.score = float(final_scores[idx])
         
         return strategies
-    
+
