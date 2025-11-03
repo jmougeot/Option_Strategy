@@ -97,6 +97,12 @@ def filter_extreme_strategies(strategy: StrategyComparison) -> bool:
         if strategy.sigma_pnl > 50:  # Écart-type > 50 = stratégie extrêmement risquée
             return False
     
+    # 18. Limiter le nombre de short calls (risque illimité)
+    short_call_count = sum(1 for opt in strategy.all_options 
+                          if opt.is_short and opt.is_call)
+    if short_call_count > 3:
+        return False
+    
     # Stratégie valide
     return True
 
