@@ -210,37 +210,42 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     
     print("\n[DEBUG extract_best_values] Début extraction des valeurs")
     
-    # Prix (cascade de fallbacks pour maximiser les chances d'avoir une valeur)
-    # Priorité: LAST_PRICE > PX_LAST > PREV_SES_LAST_PRICE > ADJUSTED_PREV_LAST_PRICE > PX_MID > moyenne BID/ASK
+    # Prix (cascade de fallbacks)
     premium_value = None
-    premium_source = None
-    
-    # Essayer dans l'ordre de préférence
     for field in ['LAST_PRICE', 'PX_LAST', 'PREV_SES_LAST_PRICE', 'ADJUSTED_PREV_LAST_PRICE', 'PX_MID']:
-        premium_value = data.get(field)
-        print(f"[DEBUG] Tentative {field}: {premium_value}")
-        if premium_value is not None and premium_value > 0:
-            premium_source = field
+        v = data.get(field)
+        print(f"[DEBUG] Tentative {field}: {v}")
+        if v is not None and v != 0:
+            premium_value = v
             print(f"[DEBUG] ✓ Premium trouvé via {field}: {premium_value}")
             break
     
-    # Si toujours rien, calculer la moyenne bid/ask
-    if not premium_value or premium_value <= 0:
+    # fallback bid/ask
+    if premium_value is None:
         bid = data.get('PX_BID')
         ask = data.get('PX_ASK')
         print(f"[DEBUG] Fallback bid/ask: bid={bid}, ask={ask}")
-        if bid and ask and bid > 0 and ask > 0:
+        if bid is not None and ask is not None and bid > 0 and ask > 0:
             premium_value = (bid + ask) / 2
-            premium_source = "BID_ASK_AVG"
             print(f"[DEBUG] ✓ Premium calculé via moyenne bid/ask: {premium_value}")
     
-    result['premium'] = premium_value or 0.0
-    print(f"[DEBUG] Premium final: {result['premium']} (source: {premium_source or 'NONE'})")
+    # keep None instead of forcing 0.0
+    result['premium'] = premium_value
+    print(f"[DEBUG] Premium final: {result['premium']}")
     
-    # Bid/Ask
-    result['bid'] = data.get('PX_BID') or result['premium']
-    result['ask'] = data.get('PX_ASK') or result['premium']
+    # bid/ask keep raw if present
+    result['bid'] = data.get('PX_BID')
+    result['ask'] = data.get('PX_ASK')
     print(f"[DEBUG] Bid: {result['bid']}, Ask: {result['ask']}")
+    
+    # status
+    if result['premium'] is None and result['bid'] is None and result['ask'] is None:
+        result['status'] = 'NO_MARKET_DATA'
+    elif result['premium'] is None and (result['bid'] is not None or result['ask'] is not None):
+        result['status'] = 'NOT_TRADED_BUT_QUOTED'
+    else:
+        result['status'] = 'OK'
+    print(f"[DEBUG] Status: {result['status']}")
     
     # Greeks (priorité: _MID > format court > OPT_)
     result['delta'] = (data.get('DELTA_MID') or 
