@@ -220,22 +220,26 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
             print(f"[DEBUG] ✓ Premium trouvé via {field}: {premium_value}")
             break
     
-    # fallback bid/ask
+    # bid/ask keep raw if present
+    result['bid'] = data.get('PX_BID')
+    result['ask'] = data.get('PX_ASK')
+    
+    # fallback bid/ask pour le premium
     if premium_value is None:
-        bid = data.get('PX_BID')
-        ask = data.get('PX_ASK')
-        print(f"[DEBUG] Fallback bid/ask: bid={bid}, ask={ask}")
-        if bid is not None and ask is not None and bid > 0 and ask > 0:
-            premium_value = (bid + ask) / 2
+        print(f"[DEBUG] Fallback bid/ask: bid={result['bid']}, ask={result['ask']}")
+        if result['bid'] is not None and result['ask'] is not None and result['bid'] > 0 and result['ask'] > 0:
+            premium_value = (result['bid'] + result['ask']) / 2
             print(f"[DEBUG] ✓ Premium calculé via moyenne bid/ask: {premium_value}")
+        elif result['bid'] is not None and result['bid'] > 0:
+            premium_value = result['bid']
+            print(f"[DEBUG] ✓ Premium = bid: {premium_value}")
+        elif result['ask'] is not None and result['ask'] > 0:
+            premium_value = result['ask']
+            print(f"[DEBUG] ✓ Premium = ask: {premium_value}")
     
     # keep None instead of forcing 0.0
     result['premium'] = premium_value
     print(f"[DEBUG] Premium final: {result['premium']}")
-    
-    # bid/ask keep raw if present
-    result['bid'] = data.get('PX_BID')
-    result['ask'] = data.get('PX_ASK')
     print(f"[DEBUG] Bid: {result['bid']}, Ask: {result['ask']}")
     
     # status
