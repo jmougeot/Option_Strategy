@@ -225,6 +225,15 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     if premium_value == 0.0 and bid and ask and bid > 0 and ask > 0:
         premium_value = (bid + ask) / 2
     
+    if premium_value == 0.0 and bid and bid > 0 :
+        premium_value = bid / 2
+    result['premium'] = premium_value
+
+    if premium_value == 0.0 and ask and ask > 0 :
+        premium_value = ask / 2
+    result['premium'] = premium_value
+
+
     if premium_value == 0.0 and bid and ask and bid > 0 and ask > 0:
         premium_value = (bid + ask) / 2
     result['premium'] = premium_value
