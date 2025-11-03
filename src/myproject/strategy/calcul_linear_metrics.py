@@ -1,141 +1,197 @@
 """
-Calcul Complet des Métriques de Stratégie d'Options
+Calcul Complet et Optimisé des Métriques de Stratégie d'Options
+Version ultra-optimisée avec NumPy vectorization et calcul en une passe
 """
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Optional
 from myproject.option.option_class import Option
+from myproject.strategy.comparison_class import StrategyComparison
+from myproject.strategy.strategy_naming_v2 import generate_strategy_name
+from myproject.option.option_utils_v2 import get_expiration_info
 import numpy as np
 
 
-def calculate_linear_metrics(options: List[Option]) -> Dict:
+def create_strategy_fast(
+    options: List[Option],
+    target_price: float
+) -> Optional[StrategyComparison]:
     """
-    Calcule TOUTES les métriques d'une stratégie d'options en une fois.
+    Crée une StrategyComparison complète en une seule passe (ultra-optimisé).
     
-    Cette fonction est optimisée pour calculer :
-    1. Métriques linéaires (coût, Greeks, IV) - en une passe sur les options
-    2. Métriques de surface (profit/loss) - par calcul vectorisé si demandé
-    3. Métriques pondérées par mixture gaussienne (si fournie)
+    Calcule toutes les métriques (linéaires + non-linéaires) avec vectorisation NumPy
+    et retourne directement un objet StrategyComparison sans dictionnaire intermédiaire.
     
     Args:
         options: Liste d'options constituant la stratégie
-        mixture: Distribution de probabilité gaussienne (optionnel)
-                 Si fournie, calcule les métriques pondérées
-        prices: Grille de prix correspondant à la mixture (optionnel)
-                Requis si mixture est fourni
-        min_price: Prix minimum pour les calculs (optionnel)
-        max_price: Prix maximum pour les calculs (optionnel)
+        target_price: Prix cible pour les calculs
         
     Returns:
-        Dict avec toutes les métriques (linéaires + pondérées par mixture si applicable)
-        
-    Examples:
-        # Sans mixture (calculs classiques)
-        metrics = calculate_linear_metrics([call, put])
-        
-        # Avec mixture gaussienne
-        prices = np.linspace(80, 120, 500)
-        mixture = create_gaussian_mixture(prices, centers=[100], std_devs=[5])
-        metrics = calculate_linear_metrics([call, put], mixture=mixture, prices=prices)
+        StrategyComparison complète ou None si invalide
     """
-    # Initialiser les accumulateurs
-    total_premium = 0.0
-    total_loss_surface_ponderated = 0.0
-    total_profit_surface_ponderated = 0.0
-    total_average_pnl = 0.0
-    total_pnl_array: Optional[np.ndarray] = None  # Initialisé à None, sera créé au premier usage
+    if not options:
+        return None
     
-    # Accumulateurs pour les métriques basées sur la mixture
-    total_average_pnl = 0.0
-    total_sigma_pnl = 0.0
+    # ========== PHASE 1: Extraction vectorisée des données ==========
+    n_options = len(options)
     
-    # Accumulateur pour le P&L array (stratégie complète)
-    total_delta = 0.0
-    total_gamma = 0.0
-    total_vega = 0.0
-    total_theta = 0.0
-    total_ivs = 0.0
-
-    # Parcourir toutes les options UNE SEULE FOIS
-    for option in options:
-        if option.position == 'long':
-            total_profit_surface_ponderated += option.profit_surface_ponderated
-            total_loss_surface_ponderated += option.loss_surface_ponderated
-            total_average_pnl += option.average_pnl
-            total_ivs += option.implied_volatility
-            
-            #Greeks
-            total_delta += option.delta
-            total_gamma += option.gamma
-            total_vega += option.vega
-            total_theta += option.theta
-            total_premium += option.premium 
-            
-            if option.pnl_array is not None:
-                if total_pnl_array is None:
-                    total_pnl_array = option.pnl_array.copy()
-                else:
-                    total_pnl_array += option.pnl_array
-            
-            total_sigma_pnl += (option.sigma_pnl ** 2)
-
-        if option.position == 'short':
-
-            #Surface
-            total_profit_surface_ponderated -= option.loss_surface_ponderated
-            total_loss_surface_ponderated -= option.profit_surface_ponderated
-            total_average_pnl -= option.average_pnl
-            total_ivs -= option.implied_volatility
-
-            #Greeks
-            total_delta -= option.delta
-            total_gamma -= option.gamma
-            total_vega -= option.vega
-            total_theta -= option.theta
-
-            #Premium
-            total_premium -= option.premium
-
-            
-            # Initialiser ou soustraire le pnl_array (vérifier que ce n'est pas None)
-            if option.pnl_array is not None:
-                if total_pnl_array is None:
-                    total_pnl_array = -option.pnl_array.copy()
-                else:
-                    total_pnl_array -= option.pnl_array
-            
-            total_sigma_pnl += (option.sigma_pnl ** 2)
+    # Pré-allouer les arrays NumPy pour éviter les réallocations
+    is_long = np.array([opt.position == 'long' for opt in options], dtype=bool)
+    signs = np.where(is_long, 1.0, -1.0)  # +1 pour long, -1 pour short
     
-    total_sigma_pnl = np.sqrt(total_sigma_pnl)
+    # Extraire toutes les valeurs en une fois (vectorisé)
+    premiums = np.array([opt.premium for opt in options], dtype=np.float64)
+    deltas = np.array([opt.delta for opt in options], dtype=np.float64)
+    gammas = np.array([opt.gamma for opt in options], dtype=np.float64)
+    vegas = np.array([opt.vega for opt in options], dtype=np.float64)
+    thetas = np.array([opt.theta for opt in options], dtype=np.float64)
+    ivs = np.array([opt.implied_volatility for opt in options], dtype=np.float64)
+    
+    profit_surfaces = np.array([opt.profit_surface_ponderated for opt in options], dtype=np.float64)
+    loss_surfaces = np.array([opt.loss_surface_ponderated for opt in options], dtype=np.float64)
+    average_pnls = np.array([opt.average_pnl for opt in options], dtype=np.float64)
+    sigma_pnls = np.array([opt.sigma_pnl for opt in options], dtype=np.float64)
+    
+    # ========== PHASE 2: Calculs vectorisés des totaux ==========
+    # Long: +values, Short: -values (fait en une opération matricielle)
+    total_premium = np.sum(signs * premiums)
+    total_delta = np.sum(signs * deltas)
+    total_gamma = np.sum(signs * gammas)
+    total_vega = np.sum(signs * vegas)
+    total_theta = np.sum(signs * thetas)
+    total_iv = np.sum(signs * ivs)
+    
+    # Pour surfaces: long ajoute profit/loss, short inverse
+    # Long: +profit, +loss | Short: -loss (profit inversé), -profit (loss inversé)
+    total_profit_surface = np.sum(np.where(is_long, profit_surfaces, -loss_surfaces))
+    total_loss_surface = np.sum(np.where(is_long, loss_surfaces, -profit_surfaces))
+    
+    # Average PnL et Sigma
+    total_average_pnl = np.sum(signs * average_pnls)
+    # Sigma: somme des variances puis racine carrée
+    total_sigma_pnl = np.sqrt(np.sum(sigma_pnls ** 2))
+    
+    # ========== PHASE 3: P&L Array (construction optimisée) ==========
+    # Récupérer le prices array (on sait qu'il existe car les options l'ont)
     prices = options[0].prices
+    if prices is None:
+        return None  # Stratégie invalide
     
-    if total_pnl_array is None:
-        total_pnl_array = np.zeros_like(prices)
-
-
+    # Initialiser avec zeros, même taille que prices
+    total_pnl_array = np.zeros_like(prices, dtype=np.float64)
     
-    # ============ PRÉPARER LE DICTIONNAIRE DE RÉSULTATS ============
-    result = {
-        # Coût
-        'premium': total_premium,
-
-        # MÉTRIQUES DE SURFACE (accumulées depuis les options)
-        'loss_surface_ponderated': total_loss_surface_ponderated,
-        'profit_surface': total_profit_surface_ponderated,
+    # Parcourir les options UNE SEULE FOIS pour additionner les P&L arrays
+    for i, option in enumerate(options):
+        if option.pnl_array is not None:
+            total_pnl_array += signs[i] * option.pnl_array
+    
+    # ========== PHASE 4: Métriques non-linéaires (vectorisées) ==========
+    # Max profit/loss (opérations NumPy ultra-rapides)
+    max_profit = float(np.max(total_pnl_array))
+    max_loss = float(np.min(total_pnl_array))
+    
+    # Risk/Reward ratio
+    if max_loss < 0:
+        risk_reward_ratio = abs(max_profit / max_loss)
+    elif max_profit > 0:
+        risk_reward_ratio = float('inf')
+    else:
+        risk_reward_ratio = 0.0
+    
+    # Breakeven points (recherche vectorisée des changements de signe)
+    sign_changes = total_pnl_array[:-1] * total_pnl_array[1:] < 0
+    breakeven_indices = np.where(sign_changes)[0]
+    
+    breakeven_points = []
+    for idx in breakeven_indices:
+        # Interpolation linéaire pour point exact
+        price_be = prices[idx] + (prices[idx + 1] - prices[idx]) * (
+            -total_pnl_array[idx] / (total_pnl_array[idx + 1] - total_pnl_array[idx])
+        )
+        breakeven_points.append(float(price_be))
+    
+    # Profit zone (zones où P&L > 0)
+    profitable_mask = total_pnl_array > 0
+    profitable_indices = np.where(profitable_mask)[0]
+    
+    if len(profitable_indices) > 0:
+        min_profit_price = float(prices[profitable_indices[0]])
+        max_profit_price = float(prices[profitable_indices[-1]])
+        profit_zone_width = max_profit_price - min_profit_price
+        profit_range = (min_profit_price, max_profit_price)
+    else:
+        profit_range = (0.0, 0.0)
+        profit_zone_width = 0.0
+    
+    # Profit au prix cible (interpolation rapide)
+    profit_at_target = float(np.interp(target_price, prices, total_pnl_array))
+    
+    profit_at_target_pct = 0.0
+    if max_profit > 0:
+        profit_at_target_pct = (profit_at_target / max_profit) * 100.0
+    
+    # ========== PHASE 5: Informations de la stratégie ==========
+    strategy_name = generate_strategy_name(options)
+    exp_info = get_expiration_info(options)
+    
+    # ========== PHASE 6: Construction directe du StrategyComparison ==========
+    try:
+        strategy = StrategyComparison(
+            # Identité
+            strategy_name=strategy_name,
+            strategy=None,
+            target_price=target_price,
+            premium=float(total_premium),
+            all_options=options,
+            
+            # Expiration
+            expiration_day=exp_info.get('expiration_day'),
+            expiration_week=exp_info.get('expiration_week'),
+            expiration_month=exp_info.get('expiration_month', 'F'),
+            expiration_year=exp_info.get('expiration_year', 6),
+            
+            # Métriques non-linéaires
+            max_profit=max_profit,
+            max_loss=max_loss,
+            breakeven_points=breakeven_points,
+            profit_range=profit_range,
+            profit_zone_width=profit_zone_width,
+            
+            # Surfaces
+            surface_profit=float(total_profit_surface),
+            surface_loss=float(total_loss_surface),
+            surface_profit_ponderated=float(total_profit_surface),
+            surface_loss_ponderated=float(total_loss_surface),
+            
+            # Métriques pondérées
+            average_pnl=float(total_average_pnl),
+            sigma_pnl=float(total_sigma_pnl),
+            
+            # Arrays
+            pnl_array=total_pnl_array,
+            prices=prices,
+            
+            # Risk/Reward
+            risk_reward_ratio=risk_reward_ratio,
+            risk_reward_ratio_ponderated=risk_reward_ratio,
+            
+            # Greeks
+            total_delta=float(total_delta),
+            total_gamma=float(total_gamma),
+            total_vega=float(total_vega),
+            total_theta=float(total_theta),
+            avg_implied_volatility=float(total_iv),
+            
+            # Performance au prix cible
+            profit_at_target=profit_at_target,
+            profit_at_target_pct=profit_at_target_pct,
+            
+            # Score (sera calculé par le comparateur)
+            score=0.0,
+            rank=0
+        )
         
-        # MÉTRIQUES PONDÉRÉES PAR MIXTURE (si disponibles)
-        'average_pnl': total_average_pnl,
-        'sigma_pnl': total_sigma_pnl,
-
-        # Greeks - Total
-        'delta_total': total_delta ,
-        'gamma_total': total_gamma,
-        'vega_total': total_vega,
-        'theta_total': total_vega,
+        return strategy
         
-        # Volatilité
-        'avg_implied_volatility': total_ivs,
-        'pnl_array': total_pnl_array,
-        'prices': prices
-    }
-
-    return result
+    except Exception as e:
+        print(f"⚠️ Erreur création stratégie: {e}")
+        return None
