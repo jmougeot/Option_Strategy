@@ -214,10 +214,8 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     premium_value = None
     for field in ['LAST_PRICE', 'PX_LAST', 'PREV_SES_LAST_PRICE', 'ADJUSTED_PREV_LAST_PRICE', 'PX_MID']:
         v = data.get(field)
-        print(f"[DEBUG] Tentative {field}: {v}")
         if v is not None and v != 0:
             premium_value = v
-            print(f"[DEBUG] ✓ Premium trouvé via {field}: {premium_value}")
             break
     
     # bid/ask keep raw if present
@@ -229,18 +227,14 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
         print(f"[DEBUG] Fallback bid/ask: bid={result['bid']}, ask={result['ask']}")
         if result['bid'] is not None and result['ask'] is not None and result['bid'] > 0 and result['ask'] > 0:
             premium_value = (result['bid'] + result['ask']) / 2
-            print(f"[DEBUG] ✓ Premium calculé via moyenne bid/ask: {premium_value}")
         elif result['bid'] is not None and result['bid'] > 0:
             premium_value = result['bid']
-            print(f"[DEBUG] ✓ Premium = bid: {premium_value}")
         elif result['ask'] is not None and result['ask'] > 0:
             premium_value = result['ask']
-            print(f"[DEBUG] ✓ Premium = ask: {premium_value}")
     
     # keep None instead of forcing 0.0
     result['premium'] = premium_value
     print(f"[DEBUG] Premium final: {result['premium']}")
-    print(f"[DEBUG] Bid: {result['bid']}, Ask: {result['ask']}")
     
     # status
     if result['premium'] is None and result['bid'] is None and result['ask'] is None:
@@ -249,8 +243,7 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
         result['status'] = 'NOT_TRADED_BUT_QUOTED'
     else:
         result['status'] = 'OK'
-    print(f"[DEBUG] Status: {result['status']}")
-    
+
     # Greeks (priorité: _MID > format court > OPT_)
     result['delta'] = (data.get('DELTA_MID') or 
                       data.get('DELTA') or 
@@ -277,7 +270,6 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
                 data.get('IMP_VOL') or 
                 data.get('IVOL_MID') or 
                 data.get('OPT_IVOL_MID'))
-    print(f"[DEBUG] IV - OPT_IMP_VOL: {data.get('OPT_IMP_VOL')}, IMP_VOL: {data.get('IMP_VOL')}, IVOL_MID: {data.get('IVOL_MID')}, OPT_IVOL_MID: {data.get('OPT_IVOL_MID')}")
     result['implied_volatility'] = iv_value or 0.15
     
     # Informations du contrat
