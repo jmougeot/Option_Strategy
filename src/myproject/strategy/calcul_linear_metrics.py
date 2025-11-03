@@ -7,9 +7,7 @@ from myproject.option.option_class import Option
 import numpy as np
 
 
-def calculate_linear_metrics(
-    options: List[Option],
-) -> Optional[Dict]:
+def calculate_linear_metrics(options: List[Option]) -> Dict:
     """
     Calcule TOUTES les métriques d'une stratégie d'options en une fois.
     
@@ -55,17 +53,7 @@ def calculate_linear_metrics(
     total_gamma = 0.0
     total_vega = 0.0
     total_theta = 0.0
-    total_ivs =0.0
-    
-    for option in options:
-        if option.position == 'long':
-            total_premium += option.premium 
-
-        elif option.position == 'short':
-            total_premium -= option.premium
-    if total_premium > 0.05 :
-        return None
-    
+    total_ivs = 0.0
 
     # Parcourir toutes les options UNE SEULE FOIS
     for option in options:
