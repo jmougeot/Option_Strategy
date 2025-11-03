@@ -98,7 +98,7 @@ def create_strategy_fast(
     
     # ========== FILTRAGE PHASE 2 (après max_profit/max_loss) ==========
     
-    if max_loss < -10.0:
+    if max_loss < -0.10:
         return None
     
     # Risk/Reward ratio
@@ -150,10 +150,6 @@ def create_strategy_fast(
     
     # 11. Surfaces extrêmes
     if abs(total_profit_surface) > 1000 or abs(total_loss_surface) > 1000:
-        return None
-    
-    # 12. IV moyenne anormale
-    if total_iv < 0.01 or total_iv > 5.0:
         return None
     
     # ========== PHASE 5: Informations de la stratégie ==========
