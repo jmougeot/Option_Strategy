@@ -64,16 +64,11 @@ def create_strategy_fast(
     # Long: +profit, +loss | Short: -loss (profit inversé), -profit (loss inversé)
     total_profit_surface = np.sum(np.where(is_long, profit_surfaces, -loss_surfaces))
     total_loss_surface = np.sum(np.where(is_long, loss_surfaces, -profit_surfaces))
-    
-    # Average PnL et Sigma
     total_average_pnl = np.sum(signs * average_pnls)
-    # Sigma: somme des variances puis racine carrée
     total_sigma_pnl = np.sqrt(np.sum(sigma_pnls ** 2))
     
     # ========== FILTRAGE PRÉCOCE (Early Exit pour Optimisation) ==========
-    # Éliminer les stratégies avec valeurs extrêmes AVANT les calculs coûteux
-    # Économise ~70% du temps pour les stratégies rejetées
-    
+
     # 1. Premium extrême (filtre le plus discriminant)
     if abs(total_premium) > 0.1:
         return None
@@ -88,27 +83,21 @@ def create_strategy_fast(
     
     
     # ========== PHASE 3: P&L Array (construction optimisée) ==========
-    # Récupérer le prices array (on sait qu'il existe car les options l'ont)
     prices = options[0].prices
     if prices is None:
         return None  # Stratégie invalide
-    
-    # Initialiser avec zeros, même taille que prices
     total_pnl_array = np.zeros_like(prices, dtype=np.float64)
     
-    # Parcourir les options UNE SEULE FOIS pour additionner les P&L arrays
     for i, option in enumerate(options):
         if option.pnl_array is not None:
             total_pnl_array += signs[i] * option.pnl_array
     
     # ========== PHASE 4: Métriques non-linéaires (vectorisées) ==========
-    # Max profit/loss (opérations NumPy ultra-rapides)
     max_profit = float(np.max(total_pnl_array))
     max_loss = float(np.min(total_pnl_array))
     
     # ========== FILTRAGE PHASE 2 (après max_profit/max_loss) ==========
     
-    # 8. Max loss positif (incohérence mathématique)
     if max_loss < -10.0:
         return None
     
@@ -119,10 +108,7 @@ def create_strategy_fast(
         risk_reward_ratio = float('inf')
     else:
         risk_reward_ratio = 0.0
-    
-    # 9. Risk/Reward ratio invalide
-    if not (-1000 < risk_reward_ratio < 1000):
-        return None
+
     
     # Breakeven points (recherche vectorisée des changements de signe)
     sign_changes = total_pnl_array[:-1] * total_pnl_array[1:] < 0
