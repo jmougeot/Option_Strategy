@@ -191,7 +191,7 @@ def scoring_weights_block() -> dict:
     strategy_choice = st.selectbox(
         "Choisir une stratégie:",
         list(preset_strategies.keys()),
-        index=0,
+        index=len(preset_strategies) - 1,  # Manuel par défaut (dernier élément)
         help="Sélectionnez une stratégie prédéfinie ou 'Manuel' pour personnaliser"
     )
     
@@ -246,8 +246,8 @@ def scoring_weights_block() -> dict:
                 col_idx = idx % num_cols
                 with cols[col_idx]:
                     label = FIELD_LABELS.get(field_name, field_name) or field_name
-                    # Valeur par défaut de 5%
-                    default_value = 5
+                    # Valeur par défaut de 0%
+                    default_value = 0
                     weight = st.slider(
                         str(label),  # Garantir que c'est un str
                         min_value=0,

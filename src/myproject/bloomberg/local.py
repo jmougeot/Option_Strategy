@@ -238,7 +238,7 @@ def import_local_option(mixture) -> List[Option]:
     for option in option_list :
             option.prices, option.mixture = mixture
             option._calcul_all_surface()
-
+         
 
 
     return option_list

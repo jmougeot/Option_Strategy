@@ -41,7 +41,7 @@ def sidebar_params() -> UIParams:
     strikes = strike_list(price_min, price_max, price_step)
 
 
-    max_legs = st.slider("Nombre maximum de legs par stratégie:", 1, 4, 4)
+    max_legs = st.slider("Nombre maximum de legs par stratégie:", 1, 6, 4)
 
     years = [int(y.strip()) for y in years_input.split(",") if y.strip()]
     months = [m.strip() for m in months_input.split(",") if m.strip()]
