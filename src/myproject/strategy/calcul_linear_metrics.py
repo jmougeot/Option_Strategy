@@ -97,7 +97,7 @@ def create_strategy_fast(
     
     # ========== FILTRAGE PHASE 2 (après max_profit/max_loss) ==========
     
-    if max_loss < -0.2:
+    if max_loss < -0.10:
         return None
     
     # Risk/Reward ratio
