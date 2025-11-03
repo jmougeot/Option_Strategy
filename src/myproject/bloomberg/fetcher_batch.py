@@ -158,8 +158,6 @@ def fetch_options_batch(
                                             present.append(elem.name())
                                         except Exception as ex:
                                             present.append(f"<err at {j}: {ex}>")
-                                    print(f"\n[DEBUG] ticker={ticker}")
-                                    print(f"[DEBUG] Fields présents dans fieldData: {present}")
                                     # ============================================================
                                     
                                     # Construire le dictionnaire de résultats
@@ -171,7 +169,6 @@ def fetch_options_batch(
                                                 ticker_data[field] = value
                                             except Exception as e:
                                                 ticker_data[field] = None
-                                                print(f"[DEBUG] Erreur lecture {field}: {e}")
                                         else:
                                             ticker_data[field] = None
                                     
