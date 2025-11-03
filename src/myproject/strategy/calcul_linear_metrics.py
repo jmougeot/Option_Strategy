@@ -107,14 +107,9 @@ def create_strategy_fast(
     max_loss = float(np.min(total_pnl_array))
     
     # ========== FILTRAGE PHASE 2 (après max_profit/max_loss) ==========
-    # Filtres qui dépendent de max_profit/max_loss
-    
-    # 7. Max profit négatif (stratégie qui ne peut que perdre)
-    if max_profit < -10.0:
-        return None
     
     # 8. Max loss positif (incohérence mathématique)
-    if max_loss > 10.0:
+    if max_loss < -10.0:
         return None
     
     # Risk/Reward ratio
