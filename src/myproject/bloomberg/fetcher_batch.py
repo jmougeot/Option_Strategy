@@ -224,21 +224,15 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
 
     if premium_value == 0.0 and bid and ask and bid > 0 and ask > 0:
         premium_value = (bid + ask) / 2
-
+    
+    if premium_value == 0.0 and bid and ask and bid > 0 and ask > 0:
+        premium_value = (bid + ask) / 2
     result['premium'] = premium_value
 
     # Bid/Ask -> jamais None
-    result['bid'] = bid if (bid and bid > 0) else (premium_value * 0.98 if premium_value > 0 else 0.0)
+    result['bid'] = bid if (bid and bid > 0) else 0.0
+    result['ask'] = ask if (ask and ask > 0) else 0.0
     print(f"[DEBUG] bid : {bid} et ask {ask}")
-    result['ask'] = ask if (ask and ask > 0) else (premium_value * 1.02 if premium_value > 0 else 0.0)
-
-    # Status
-    if result['premium'] == 0.0 and result['bid'] == 0.0 and result['ask'] == 0.0:
-        result['status'] = 'NO_DATA'           # l’option n’a aucune cotation dispo
-    elif result['premium'] == 0.0 and (result['bid'] > 0 or result['ask'] > 0):
-        result['status'] = 'NOT_TRADED'        # pas de last mais bid/ask => pas tradée
-    else:
-        result['status'] = 'OK'                # premium existe
 
 
     # Greeks (priorité: _MID > format court > OPT_)
