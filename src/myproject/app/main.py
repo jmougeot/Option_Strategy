@@ -17,6 +17,7 @@ from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.comparor_v2 import StrategyComparerV2
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
+from myproject.bloomberg.local import import_local_option
 from myproject.app.scenario import create_mixture_from_scenarios
 from myproject.app.widget import ScenarioData
 import numpy as np
@@ -64,7 +65,8 @@ def process_bloomberg_to_strategies(
     # ÉTAPE 1 : Import Bloomberg → Options
     if verbose:
         print("📥 Import des options depuis Bloomberg...")
-    
+
+    # options = import_local_option(mixture)
     options = import_euribor_options(
         underlying=underlying,
         months=months,
@@ -76,7 +78,6 @@ def process_bloomberg_to_strategies(
         price_max=price_max,
         mixture = mixture
     )
-    
     
     stats['nb_options'] = len(options)
     

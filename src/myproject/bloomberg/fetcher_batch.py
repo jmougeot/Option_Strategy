@@ -28,6 +28,11 @@ ALL_OPTION_FIELDS = [
     "PX_BID",
     "PX_ASK",
     "PX_MID",
+    "PREV_SES_LAST_PRICE",
+    "LAST_PRICE",
+    "ADJUSTED_PREV_LAST_PRICE"
+
+
     
     # Greeks - tous les formats possibles
     "DELTA_MID",
@@ -179,12 +184,26 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     result = {}
     
-    # Prix (priorité: LAST > MID > moyenne BID/ASK)
-    result['premium'] = data.get('PX_MID')
-    if not result['premium'] and data.get('PX_BID') and data.get('PX_ASK'):
-        result['premium'] = (data['PX_BID'] + data['PX_ASK']) / 2
-    result['premium'] = result['premium'] or 0.0
+    # Prix (cascade de fallbacks pour maximiser les chances d'avoir une valeur)
+    # Priorité: LAST_PRICE > PX_LAST > PREV_SES_LAST_PRICE > ADJUSTED_PREV_LAST_PRICE > PX_MID > moyenne BID/ASK
+    premium_value = None
     
+    # Essayer dans l'ordre de préférence
+    for field in ['LAST_PRICE', 'PX_LAST', 'PREV_SES_LAST_PRICE', 'ADJUSTED_PREV_LAST_PRICE', 'PX_MID']:
+        premium_value = data.get(field)
+        if premium_value is not None and premium_value > 0:
+            break
+    
+    # Si toujours rien, calculer la moyenne bid/ask
+    if not premium_value or premium_value <= 0:
+        bid = data.get('PX_BID')
+        ask = data.get('PX_ASK')
+        if bid and ask and bid > 0 and ask > 0:
+            premium_value = (bid + ask) / 2
+    
+    result['premium'] = premium_value or 0.0
+    
+    # Bid/Ask
     result['bid'] = data.get('PX_BID') or result['premium'] * 0.98
     result['ask'] = data.get('PX_ASK') or result['premium'] * 1.02
     

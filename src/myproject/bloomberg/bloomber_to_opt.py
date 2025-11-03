@@ -115,7 +115,6 @@ def create_option_from_bloomberg(
             underlying_price=float(bloomberg_data['underlying_price']),
             
             # Timestamp
-            timestamp=datetime.now()
         )
         
         # Initialiser la mixture et calculer les surfaces si les paramètres sont fournis

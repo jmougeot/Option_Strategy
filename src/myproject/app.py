@@ -202,28 +202,7 @@ def main():
             width='stretch',
             hide_index=True
         )
-        
-        # Graphique de comparaison des scores
-        st.subheader("Comparaison des Scores")
-        
-        score_data = pd.DataFrame({
-            'Stratégie': [c.strategy_name for c in comparisons],
-            'Score Total': [c.score for c in comparisons]
-        })
-        
-        fig = px.bar(
-            score_data,
-            x='Score Total',
-            y='Stratégie',
-            orientation='h',
-            color='Score Total',
-            color_continuous_scale='blues',
-            text='Score Total'
-        )
-        fig.update_traces(texttemplate='%{text:.3f}', textposition='outside')
-        fig.update_layout(height=400, showlegend=False)
-        st.plotly_chart(fig, width='stretch')
-    
+               
     # ----------------------------------------------------------------
     # TAB 2: DIAGRAMME P&L
     # ----------------------------------------------------------------

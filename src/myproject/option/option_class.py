@@ -69,6 +69,10 @@ class Option:
     @classmethod
     def empyOption(cls) -> "Option":
         return cls(option_type="call", strike=0.0, premium=0.0)
+    
+    # ============================================================================
+    # Calcul des surfaces en foncion des scénarios
+    # ============================================================================
         
     def _pnl_at_expiry_array(self) -> np.ndarray:
         """

@@ -69,18 +69,6 @@ def import_euribor_options(
     Returns:
         Liste d'objets Option directement utilisables
     """ 
-    print("=" * 70)
-    print("IMPORT DES OPTIONS DEPUIS BLOOMBERG")
-    print("=" * 70)
-    print(f"Sous-jacent: {underlying}")
-    print(f"Mois: {', '.join(months)}")
-    print(f"Années: {', '.join(map(str, years))}")
-    print(f"Strikes: {len(strikes)} strikes de {min(strikes)} à {max(strikes)}")
-    print(f"Types: {'Calls' if include_calls else ''}{' + ' if include_calls and include_puts else ''}{'Puts' if include_puts else ''}")
-    print(f"Range de prix: ${price_min} - ${price_max}")
-    print("=" * 70)
-    print()
-    
     option_objects: List[Option] = []
     total_attempts = 0
     total_success = 0
@@ -163,7 +151,7 @@ def import_euribor_options(
                         )
                         
                         # Vérifier que l'option est valide
-                        if option.strike > 0 and option.premium > 0:
+                        if option.strike > 0 :
                             option_objects.append(option)
                             month_options_count += 1
                             total_success += 1
@@ -176,7 +164,8 @@ def import_euribor_options(
                                   f"Premium={option.premium}, "
                                   f"Delta={option.delta}, "
                                   f"IV={option.implied_volatility}"
-                                  f"{surfaces_info}")                
+                                  f"{surfaces_info}")
+                                                  
                 if month_options_count > 0:
                     print(f"\n   ✓ {month_options_count} options récupérées pour ce mois")
                 else:
