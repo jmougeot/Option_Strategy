@@ -229,6 +229,7 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
 
     # Bid/Ask -> jamais None
     result['bid'] = bid if (bid and bid > 0) else (premium_value * 0.98 if premium_value > 0 else 0.0)
+    print(f"[DEBUG] bid : {bid} et ask {ask}")
     result['ask'] = ask if (ask and ask > 0) else (premium_value * 1.02 if premium_value > 0 else 0.0)
 
     # Status
