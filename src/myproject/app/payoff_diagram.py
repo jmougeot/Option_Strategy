@@ -58,7 +58,7 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
         Figure Plotly avec les courbes P&L
     """
     # Générer la plage de prix (±20% autour du prix cible)
-    price_range = [target_price * (1 + i/100) for i in range(-20, 21, 1)]
+    price_range = comparisons[0].prices
     
     fig = go.Figure()
     
@@ -71,15 +71,12 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', 
               '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
     
-    # Filtrer les stratégies valides (avec strategy != None)
-    valid_comparisons = [comp for comp in comparisons if comp.strategy is not None]
-    
     # Tracer chaque stratégie
-    for idx, comp in enumerate(valid_comparisons):
+    for idx, comp in enumerate(comparisons):
         color = colors[idx % len(colors)]
         
         # Calculer P&L (optimisé avec list comprehension)
-        pnl_values = [comp.strategy.profit_at_expiry(price) for price in price_range]
+        pnl_values = comp.pnl_array
         
         # Courbe P&L
         fig.add_trace(go.Scatter(
@@ -115,43 +112,9 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
         plot_bgcolor='white',
         xaxis=dict(gridcolor='lightgray'),
         yaxis=dict(gridcolor='lightgray', zeroline=True, zerolinecolor='gray')
-    )
-    
-    
+    ) 
     return fig
 
-
-def calculate_strategy_pnl(strategy: StrategyComparison, price: float) -> float:
-    """
-    Calcule le P&L d'une stratégie à un prix donné.
-    
-    Args:
-        strategy: Stratégie dont on veut calculer le P&L
-        price: Prix du sous-jacent
-        
-    Returns:
-        P&L total à ce prix
-    """
-    total_pnl = -strategy.premium  # Coût initial (négatif si débit, positif si crédit)
-    
-    for option in strategy.all_options:
-        # Calculer la valeur intrinsèque à l'expiration
-        if option.option_type == 'call':
-            intrinsic_value = max(0, price - option.strike)
-        else:  # put
-            intrinsic_value = max(0, option.strike - price)
-        
-        # Appliquer la position (long = acheté, short = vendu)
-        if option.position == 'long':
-            option_pnl = intrinsic_value - option.premium
-        else:  # short
-            option_pnl = option.premium - intrinsic_value
-        
-        # Multiplier par la quantité
-        quantity = option.quantity if option.quantity is not None else 1
-        total_pnl += option_pnl * quantity
-    
-    return total_pnl
 
 
 def create_single_strategy_payoff(strategy: StrategyComparison, target_price: float) -> go.Figure:
@@ -166,7 +129,7 @@ def create_single_strategy_payoff(strategy: StrategyComparison, target_price: fl
         Figure Plotly avec la courbe P&L
     """
     # Générer la plage de prix (±20% autour du prix cible)
-    price_range = [target_price * (1 + i/100) for i in range(-20, 21, 1)]
+    price_range = strategy.prices
     
     fig = go.Figure()
     
@@ -176,8 +139,7 @@ def create_single_strategy_payoff(strategy: StrategyComparison, target_price: fl
                   annotation_text="Target", opacity=0.7)
     
     # Calculer P&L pour toute la plage de prix
-    pnl_values = [calculate_strategy_pnl(strategy, price) for price in price_range]
-    
+    pnl_values = strategy.pnl_array
     # Courbe P&L
     fig.add_trace(go.Scatter(
         x=price_range,
@@ -202,7 +164,7 @@ def create_single_strategy_payoff(strategy: StrategyComparison, target_price: fl
         ))
     
     # Marker au prix cible
-    profit_at_target = calculate_strategy_pnl(strategy, target_price)
+    profit_at_target = strategy.profit_at_target
     fig.add_trace(go.Scatter(
         x=[target_price],
         y=[profit_at_target],
@@ -226,108 +188,3 @@ def create_single_strategy_payoff(strategy: StrategyComparison, target_price: fl
     )
     
     return fig
-
-
-def display_interactive_strategy_table(
-    strategies: List[StrategyComparison],
-    target_price: float,
-    key_prefix: str = "strategy_table"
-) -> None:
-    """
-    Affiche un tableau interactif des stratégies avec sélection.
-    Lorsqu'on clique sur une stratégie, son diagramme de payoff apparaît.
-    
-    Args:
-        strategies: Liste des stratégies à afficher
-        target_price: Prix cible pour les diagrammes
-        key_prefix: Préfixe pour les clés Streamlit (évite les conflits)
-    """
-    if not strategies:
-        st.warning("Aucune stratégie à afficher")
-        return
-    
-    # Créer le DataFrame pour le tableau
-    data = []
-    for idx, strat in enumerate(strategies):
-        data.append({
-            'Sélection': idx,
-            'Rang': strat.rank if strat.rank > 0 else idx + 1,
-            'Stratégie': strat.strategy_name,
-            'Score': f"{strat.score:.3f}",
-            'Premium': format_currency(strat.premium),
-            'Max Profit': format_currency(strat.max_profit),
-            'Max Loss': format_currency(strat.max_loss) if strat.max_loss != float('inf') else 'Illimité',
-            'R/R': f"{strat.risk_reward_ratio:.2f}" if strat.risk_reward_ratio != float('inf') else '∞',
-            'P&L@Target': format_currency(strat.profit_at_target),
-        })
-    
-    df = pd.DataFrame(data)
-    
-    # Configuration de l'affichage avec st.data_editor pour la sélection
-    st.subheader("📊 Tableau des Stratégies - Cliquez pour voir le Payoff")
-    
-    # Utiliser un selectbox pour choisir la stratégie
-    strategy_options = [f"{strat.rank if strat.rank > 0 else idx+1}. {strat.strategy_name}" 
-                       for idx, strat in enumerate(strategies)]
-    
-    selected_strategy_name = st.selectbox(
-        "Sélectionnez une stratégie pour voir son payoff :",
-        options=strategy_options,
-        key=f"{key_prefix}_selectbox"
-    )
-    
-    # Afficher le tableau complet
-    st.dataframe(
-        df.drop('Sélection', axis=1),
-        use_container_width=True,
-        hide_index=True,
-        height=400
-    )
-    
-    # Trouver l'index de la stratégie sélectionnée
-    selected_idx = strategy_options.index(selected_strategy_name)
-    selected_strategy = strategies[selected_idx]
-    
-    # Afficher le diagramme de payoff de la stratégie sélectionnée
-    st.divider()
-    st.subheader(f"📈 Diagramme de Payoff - {selected_strategy.strategy_name}")
-    
-    # Créer deux colonnes pour les métriques et le graphique
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.metric("Score", f"{selected_strategy.score:.3f}")
-        st.metric("Premium", format_currency(selected_strategy.premium))
-        st.metric("Max Profit", format_currency(selected_strategy.max_profit))
-        st.metric("Max Loss", format_currency(selected_strategy.max_loss) if selected_strategy.max_loss != float('inf') else 'Illimité')
-        st.metric("R/R Ratio", f"{selected_strategy.risk_reward_ratio:.2f}" if selected_strategy.risk_reward_ratio != float('inf') else '∞')
-        
-        if selected_strategy.average_pnl is not None:
-            st.metric("Avg P&L (Mixture)", format_currency(selected_strategy.average_pnl))
-        if selected_strategy.sigma_pnl is not None:
-            st.metric("σ P&L (Mixture)", format_currency(selected_strategy.sigma_pnl))
-    
-    with col2:
-        # Créer et afficher le diagramme
-        fig = create_single_strategy_payoff(selected_strategy, target_price)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    # Afficher les détails des options de la stratégie
-    with st.expander("📋 Détails des Options"):
-        if selected_strategy.all_options:
-            options_data = []
-            for opt in selected_strategy.all_options:
-                options_data.append({
-                    'Type': opt.option_type.upper(),
-                    'Strike': f"${opt.strike:.2f}",
-                    'Position': opt.position.upper(),
-                    'Premium': format_currency(opt.premium),
-                    'Delta': f"{opt.delta:.3f}" if opt.delta is not None else '-',
-                    'Gamma': f"{opt.gamma:.3f}" if opt.gamma is not None else '-',
-                    'Vega': f"{opt.vega:.3f}" if opt.vega is not None else '-',
-                    'IV': f"{opt.implied_volatility:.2%}" if opt.implied_volatility is not None else '-',
-                })
-            
-            options_df = pd.DataFrame(options_data)
-            st.dataframe(options_df, use_container_width=True, hide_index=True)
-

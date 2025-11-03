@@ -32,8 +32,7 @@ def create_strategy_fast(
         return None
     
     # ========== PHASE 1: Extraction vectorisée des données ==========
-    n_options = len(options)
-    
+
     # Pré-allouer les arrays NumPy pour éviter les réallocations
     is_long = np.array([opt.position == 'long' for opt in options], dtype=bool)
     signs = np.where(is_long, 1.0, -1.0)  # +1 pour long, -1 pour short
@@ -61,7 +60,6 @@ def create_strategy_fast(
     total_iv = np.sum(signs * ivs)
     
     # Pour surfaces: long ajoute profit/loss, short inverse
-    # Long: +profit, +loss | Short: -loss (profit inversé), -profit (loss inversé)
     total_profit_surface = np.sum(np.where(is_long, profit_surfaces, -loss_surfaces))
     total_loss_surface = np.sum(np.where(is_long, loss_surfaces, -profit_surfaces))
     total_average_pnl = np.sum(signs * average_pnls)
@@ -70,7 +68,7 @@ def create_strategy_fast(
     # ========== FILTRAGE PRÉCOCE (Early Exit pour Optimisation) ==========
 
     # 1. Premium extrême (filtre le plus discriminant)
-    if abs(total_premium) > 0.1:
+    if total_premium > 0.05 or total_premium < -0.1:
         return None
     
     # 2. Delta total extrême

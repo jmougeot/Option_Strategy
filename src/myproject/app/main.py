@@ -60,22 +60,21 @@ def process_bloomberg_to_strategies(
 
     print (scenarios)
     mixture= create_mixture_from_scenarios(scenarios, price_min, price_max, num_points, target_price)
-    print (mixture)
 
     # ÉTAPE 1 : Import Bloomberg → Options
     if verbose:
         print("📥 Import des options depuis Bloomberg...")
 
-    # options = import_local_option(mixture)
-    options = import_euribor_options(
-        underlying=underlying,
-        months=months,
-        years=years,
-        strikes=strikes,
-        default_position='long',
-        default_quantity=1,
-        mixture = mixture
-    )
+    options = import_local_option(mixture)
+    # options = import_euribor_options(
+    #     underlying=underlying,
+    #     months=months,
+    #     years=years,
+    #     strikes=strikes,
+    #     default_position='long',
+    #     default_quantity=1,
+    #     mixture = mixture
+    # )
     
     stats['nb_options'] = len(options)
     

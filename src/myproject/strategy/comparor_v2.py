@@ -54,7 +54,7 @@ class StrategyComparerV2:
         """
         Initialise le comparateur avec les configurations de métriques.
         
-        ✅ _base_metrics_config reste immuable pour éviter les effets de bord
+         _base_metrics_config reste immuable pour éviter les effets de bord
         entre appels successifs de compare_and_rank().
         """
         self._base_metrics_config = self._create_metrics_config()

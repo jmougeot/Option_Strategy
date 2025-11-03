@@ -17,8 +17,6 @@ from myproject.app.utils import (
     format_currency,
     create_comparison_table
 )
-from myproject.app.payoff_diagram import display_interactive_strategy_table
-
 from myproject.app.mixture_diagram import create_mixture_diagram
 
 
@@ -190,15 +188,10 @@ def main():
         # Tableau de comparaison
         st.subheader("Tableau Comparatif")
         df = create_comparison_table(comparisons)
-        
-        # Colorer la première ligne (gagnante)
-        def highlight_winner(row):
-            if row['Rang'] == 1:
-                return ['background-color: #d4edda'] * len(row)
-            return [''] * len(row)
+
         
         st.dataframe(
-            df.style.apply(highlight_winner, axis=1),
+            df.style,
             width='stretch',
             hide_index=True
         )
@@ -208,26 +201,18 @@ def main():
     # ----------------------------------------------------------------
     with tab2:
         st.header("Diagramme de Profit/Perte à l'Expiration")
-        
         fig_payoff = create_payoff_diagram(comparisons)
-        st.plotly_chart(fig_payoff, width='stretch')
+        st.plotly_chart(fig_payoff, use_container_width=True)
     
         
     with tab3: 
         st.header("Mixture Gaussienne")
         if mixture is not None:
             fig = create_mixture_diagram(mixture, target_price=best_target_price or 97.5)
-            st.plotly_chart(fig)
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("⚠️ Aucune mixture gaussienne disponible. Lancez une comparaison pour générer la mixture.")
     
-    with tab4: 
-        st.header("Tableau Interactif des Stratégies")
-        display_interactive_strategy_table(
-            strategies=comparisons,
-            target_price=best_target_price or 97.5,
-            key_prefix="main"
-        )
 # ============================================================================
 # POINT D'ENTRÉE
 # ============================================================================

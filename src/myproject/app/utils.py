@@ -65,7 +65,7 @@ def create_payoff_diagram(comparisons: List[StrategyComparison]):
     # Générer la plage de prix (±20% autour du prix cible)    
     fig = go.Figure()
 
-    for i in range (2):
+    for i in range (5):
         comp = comparisons[i]
         prices = comp.prices
         pnl = comp.pnl_array
