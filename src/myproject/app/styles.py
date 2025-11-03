@@ -31,12 +31,21 @@ CSS = """
     }
     .stTabs [data-baseweb="tab-list"] {
         gap: 24px;
+        background-color: transparent;
     }
     .stTabs [data-baseweb="tab"] {
         height: 50px;
         padding: 0 24px;
-        background-color: #f0f2f6;
+        background-color: transparent;
         border-radius: 4px 4px 0 0;
+        border: 1px solid rgba(128,128,128,0.2);
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: rgba(128,128,128,0.1);
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: rgba(31,119,180,0.1);
+        border-bottom: 2px solid #1f77b4;
     }
 </style>"""
 

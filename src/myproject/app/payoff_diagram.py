@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.option.option_class import Option
+import numpy as np
 
 
 def prepare_options_data(options: List[Option]) -> Dict[str, List[Option]]:
@@ -46,26 +47,42 @@ def format_expiration_date(month: str, year: int) -> str:
     
     return f"{month_name} {full_year}"
 
-def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: float):
+def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: Optional[float] = None, mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None):
     """
-    Crée un diagramme P&L interactif pour toutes les stratégies
+    Crée un diagramme P&L interactif pour toutes les stratégies avec mixture gaussienne optionnelle
     
     Args:
         comparisons: Liste des stratégies à afficher
         target_price: Prix cible pour la référence verticale
+        mixture: Tuple (prices, probabilities) pour afficher la distribution gaussienne (optionnel)
         
     Returns:
-        Figure Plotly avec les courbes P&L
+        Figure Plotly avec les courbes P&L et optionnellement la mixture
     """
-    # Générer la plage de prix (±20% autour du prix cible)
+    # Générer la plage de prix
     price_range = comparisons[0].prices
+    if target_price is None:
+        target_price = comparisons[0].target_price
     
-    fig = go.Figure()
+    # Créer une figure avec deux axes Y si mixture fournie
+    if mixture is not None:
+        from plotly.subplots import make_subplots
+        fig = make_subplots(
+            rows=1, cols=1,
+            specs=[[{"secondary_y": True}]]
+        )
+    else:
+        fig = go.Figure()
     
     # Lignes de référence
-    fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-    fig.add_vline(x=target_price, line_dash="dot", line_color="red", 
-                  annotation_text="Target", opacity=0.7)
+    if mixture is not None:
+        fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5, secondary_y=False)
+        fig.add_vline(x=target_price, line_dash="dot", line_color="red", 
+                      annotation_text="Target", opacity=0.7)
+    else:
+        fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+        fig.add_vline(x=target_price, line_dash="dot", line_color="red", 
+                      annotation_text="Target", opacity=0.7)
     
     # Palette de couleurs
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', 
@@ -79,39 +96,108 @@ def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: f
         pnl_values = comp.pnl_array
         
         # Courbe P&L
-        fig.add_trace(go.Scatter(
-            x=price_range,
-            y=pnl_values,
-            mode='lines',
-            name=comp.strategy_name,
-            line=dict(color=color, width=2.5),
-            hovertemplate='<b>%{fullData.name}</b><br>' +
-                         'Prix: $%{x:.2f}<br>' +
-                         'P&L: $%{y:.2f}<extra></extra>'
-        ))
+        if mixture is not None:
+            fig.add_trace(go.Scatter(
+                x=price_range,
+                y=pnl_values,
+                mode='lines',
+                name=comp.strategy_name,
+                line=dict(color=color, width=2.5),
+                hovertemplate='<b>%{fullData.name}</b><br>' +
+                             'Prix: $%{x:.2f}<br>' +
+                             'P&L: $%{y:.2f}<extra></extra>'
+            ), secondary_y=False)
+        else:
+            fig.add_trace(go.Scatter(
+                x=price_range,
+                y=pnl_values,
+                mode='lines',
+                name=comp.strategy_name,
+                line=dict(color=color, width=2.5),
+                hovertemplate='<b>%{fullData.name}</b><br>' +
+                             'Prix: $%{x:.2f}<br>' +
+                             'P&L: $%{y:.2f}<extra></extra>'
+            ))
         
         # Markers de breakeven
         if comp.breakeven_points:
-            fig.add_trace(go.Scatter(
-                x=comp.breakeven_points,
-                y=[0] * len(comp.breakeven_points),
-                mode='markers',
-                marker=dict(size=10, color=color, symbol='circle-open', line=dict(width=2)),
-                showlegend=False,
-                hovertemplate='<b>Breakeven</b><br>Prix: $%{x:.2f}<extra></extra>'
-            ))
+            if mixture is not None:
+                fig.add_trace(go.Scatter(
+                    x=comp.breakeven_points,
+                    y=[0] * len(comp.breakeven_points),
+                    mode='markers',
+                    marker=dict(size=10, color=color, symbol='circle-open', line=dict(width=2)),
+                    showlegend=False,
+                    hovertemplate='<b>Breakeven</b><br>Prix: $%{x:.2f}<extra></extra>'
+                ), secondary_y=False)
+            else:
+                fig.add_trace(go.Scatter(
+                    x=comp.breakeven_points,
+                    y=[0] * len(comp.breakeven_points),
+                    mode='markers',
+                    marker=dict(size=10, color=color, symbol='circle-open', line=dict(width=2)),
+                    showlegend=False,
+                    hovertemplate='<b>Breakeven</b><br>Prix: $%{x:.2f}<extra></extra>'
+                ))
+    
+    # Ajouter la mixture gaussienne si fournie
+    if mixture is not None:
+        prices_mixture, probabilities = mixture
+        
+        # Tracer la distribution sur l'axe Y secondaire
+        fig.add_trace(go.Scatter(
+            x=prices_mixture,
+            y=probabilities,
+            mode='lines',
+            name='Distribution Gaussienne',
+            fill='tozeroy',
+            line=dict(color='rgba(128, 128, 128, 0.8)', width=2, dash='dot'),
+            fillcolor='rgba(128, 128, 128, 0.2)',
+            hovertemplate='Prix: $%{x:.2f}<br>Probabilité: %{y:.4f}<extra></extra>',
+            yaxis='y2'
+        ), secondary_y=True)
+        
+        # Calculer les statistiques de la mixture
+        mean_price = np.average(prices_mixture, weights=probabilities)
+        
+        # Ajouter ligne de moyenne
+        fig.add_vline(
+            x=mean_price,
+            line_dash="dash",
+            line_color="gray",
+            annotation_text=f"μ = {mean_price:.2f}",
+            annotation_position="top right",
+            opacity=0.5
+        )
     
     # Configuration du layout
-    fig.update_layout(
-        title="Diagramme de P&L à l'Expiration",
-        xaxis_title="Prix du Sous-Jacent ($)",
-        yaxis_title="Profit / Perte ($)",
-        height=500,
-        hovermode='x unified',
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        plot_bgcolor='white',
-        xaxis=dict(gridcolor='lightgray'),
-        yaxis=dict(gridcolor='lightgray', zeroline=True, zerolinecolor='gray')
+    if mixture is not None:
+        fig.update_layout(
+            title="Diagramme de P&L à l'Expiration avec Distribution Gaussienne",
+            xaxis_title="Prix du Sous-Jacent ($)",
+            yaxis_title="Profit / Perte ($)",
+            yaxis2_title="Densité de Probabilité",
+            height=600,
+            hovermode='x unified',
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            plot_bgcolor='rgba(0,0,0,0)',  # Fond transparent
+            paper_bgcolor='rgba(0,0,0,0)',  # Papier transparent
+            xaxis=dict(gridcolor='rgba(128,128,128,0.2)'),
+            yaxis=dict(gridcolor='rgba(128,128,128,0.2)', zeroline=True, zerolinecolor='rgba(128,128,128,0.3)'),
+            yaxis2=dict(gridcolor='rgba(128,128,128,0.2)', overlaying='y', side='right')
+        )
+    else:
+        fig.update_layout(
+            title="Diagramme de P&L à l'Expiration",
+            xaxis_title="Prix du Sous-Jacent ($)",
+            yaxis_title="Profit / Perte ($)",
+            height=500,
+            hovermode='x unified',
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            plot_bgcolor='rgba(0,0,0,0)',  # Fond transparent
+            paper_bgcolor='rgba(0,0,0,0)',  # Papier transparent
+            xaxis=dict(gridcolor='rgba(128,128,128,0.2)'),
+            yaxis=dict(gridcolor='rgba(128,128,128,0.2)', zeroline=True, zerolinecolor='rgba(128,128,128,0.3)')
     ) 
     return fig
 

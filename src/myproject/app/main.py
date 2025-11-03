@@ -81,10 +81,6 @@ def process_bloomberg_to_strategies(
     if not options:
         return [], stats, mixture
     
-    # ÉTAPE 2 : Génération des stratégies
-    if verbose:
-        print(f"🔄 Génération des stratégies (max {max_legs} legs)...")
-    
     generator = OptionStrategyGeneratorV2(options)
     
     all_strategies = generator.generate_all_combinations(

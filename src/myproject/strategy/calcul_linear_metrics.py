@@ -78,7 +78,8 @@ def create_strategy_fast(
     # 3. Gamma total extrême
     if abs(total_gamma) > 50:
         return None
-    
+    if total_average_pnl < 0 : 
+        return None
     
     # ========== PHASE 3: P&L Array (construction optimisée) ==========
     prices = options[0].prices
@@ -96,7 +97,7 @@ def create_strategy_fast(
     
     # ========== FILTRAGE PHASE 2 (après max_profit/max_loss) ==========
     
-    if max_loss < -0.10:
+    if max_loss < -0.2:
         return None
     
     # Risk/Reward ratio

@@ -22,7 +22,7 @@ def format_currency(value: float) -> str:
     """Formats a value as currency."""
     if value == float('inf'):
         return "Unlimited"
-    return f"${value:.2f}"
+    return f"{value:.2f}"
 
 def format_percentage(value: float) -> str:
     """Formats a percentage."""
@@ -51,56 +51,23 @@ def format_expiration_date(month: str, year: int) -> str:
     return f"{month_name} {full_year}"
 
 
-def create_payoff_diagram(comparisons: List[StrategyComparison]):
+def create_payoff_diagram(comparisons: List[StrategyComparison], target_price: float , mixture: tuple):
     """
-    Crée un diagramme P&L interactif pour toutes les stratégies
+    Crée un diagramme P&L interactif pour toutes les stratégies avec mixture gaussienne optionnelle
     
     Args:
         comparisons: Liste des stratégies à afficher
         target_price: Prix cible pour la référence verticale
+        mixture: Tuple (prices, probabilities) pour afficher la distribution gaussienne (optionnel)
         
     Returns:
-        Figure Plotly avec les courbes P&L
+        Figure Plotly avec les courbes P&L et optionnellement la mixture
     """
-    # Générer la plage de prix (±20% autour du prix cible)    
-    fig = go.Figure()
-
-    for i in range (5):
-        comp = comparisons[i]
-        prices = comp.prices
-        pnl = comp.pnl_array
-        fig.add_trace(go.Scatter(
-            x=prices,
-            y=pnl,
-            mode='lines',
-            name=comp.strategy_name,
-            line=dict(width=2.5),
-            hovertemplate='<b>%{fullData.name}</b><br>' +
-                            'Prix: $%{x:.2f}<br>' +
-                            'P&L: $%{y:.2f}<extra></extra>'
-        ))
-        fig.add_trace(go.Scatter(
-            x=comp.breakeven_points,
-            y=[0] * len(comp.breakeven_points),
-            mode='markers',
-            marker=dict(size=10, symbol='circle-open', line=dict(width=2)),
-            showlegend=False,
-            hovertemplate='<b>Breakeven</b><br>Prix: $%{x:.2f}<extra></extra>'
-        ))
-
-    # Configuration du layout
-    fig.update_layout(
-        title="Diagramme de P&L à l'Expiration",
-        xaxis_title="Prix du Sous-Jacent ($)",
-        yaxis_title="Profit / Perte ($)",
-        height=500,
-        hovermode='x unified',
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        plot_bgcolor='white',
-        xaxis=dict(gridcolor='lightgray'),
-        yaxis=dict(gridcolor='lightgray', zeroline=True, zerolinecolor='gray'))
+    # Import ici pour éviter circular import
+    from myproject.app.payoff_diagram import create_payoff_diagram as create_payoff_full
     
-    return fig
+    # Déléguer à la fonction complète dans payoff_diagram.py
+    return create_payoff_full(comparisons, target_price, mixture)
 
 def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFrame:
     """Crée un DataFrame pour l'affichage des comparaisons avec TOUS les critères de scoring."""

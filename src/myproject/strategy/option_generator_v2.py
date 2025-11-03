@@ -49,8 +49,7 @@ class OptionStrategyGeneratorV2:
         self.price_max = price_max
         all_strategies = []
         
-        # Générer les combinaisons pour chaque taille (1 à max_legs)
-        for n_legs in range(1, min(max_legs + 1, 5)):  # Max 4 legs
+        for n_legs in range(1, max_legs + 1):
             print(f"🔄 Génération des stratégies à {n_legs} leg(s)...")
             
             # Générer toutes les combinaisons de n_legs options
