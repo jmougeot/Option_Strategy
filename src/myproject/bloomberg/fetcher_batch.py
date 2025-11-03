@@ -30,7 +30,7 @@ ALL_OPTION_FIELDS = [
     "PX_MID",
     "PREV_SES_LAST_PRICE",
     "LAST_PRICE",
-    "ADJUSTED_PREV_LAST_PRICE"
+    "ADJUSTED_PREV_LAST_PRICE",
 
 
     
@@ -150,15 +150,39 @@ def fetch_options_batch(
                                 if security.hasElement("fieldData"):
                                     field_data = security.getElement("fieldData")
                                     
+                                    # ========== DEBUG: Lister tous les éléments présents ==========
+                                    present = []
+                                    for j in range(field_data.numElements()):
+                                        try:
+                                            elem = field_data.getElement(j)
+                                            present.append(elem.name())
+                                        except Exception as ex:
+                                            present.append(f"<err at {j}: {ex}>")
+                                    print(f"\n[DEBUG] ticker={ticker}")
+                                    print(f"[DEBUG] Fields présents dans fieldData: {present}")
+                                    # ============================================================
+                                    
+                                    # Construire le dictionnaire de résultats
+                                    ticker_data = {}
                                     for field in ALL_OPTION_FIELDS:
                                         if field_data.hasElement(field):
                                             try:
                                                 value = field_data.getElement(field).getValue()
-                                                results[ticker][field] = value
-                                            except:
-                                                results[ticker][field] = None
+                                                ticker_data[field] = value
+                                            except Exception as e:
+                                                ticker_data[field] = None
+                                                print(f"[DEBUG] Erreur lecture {field}: {e}")
                                         else:
-                                            results[ticker][field] = None
+                                            ticker_data[field] = None
+                                    
+                                    # Afficher le dictionnaire construit
+                                    print(f"[DEBUG] Données extraites pour {ticker}:")
+                                    for key, val in ticker_data.items():
+                                        if val is not None:
+                                            print(f"  {key}: {val}")
+                                    
+                                    # Stocker dans results
+                                    results[ticker] = ticker_data
                 
                 if event.eventType() == blpapi.Event.RESPONSE:
                     break
@@ -184,28 +208,39 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     result = {}
     
+    print("\n[DEBUG extract_best_values] Début extraction des valeurs")
+    
     # Prix (cascade de fallbacks pour maximiser les chances d'avoir une valeur)
     # Priorité: LAST_PRICE > PX_LAST > PREV_SES_LAST_PRICE > ADJUSTED_PREV_LAST_PRICE > PX_MID > moyenne BID/ASK
     premium_value = None
+    premium_source = None
     
     # Essayer dans l'ordre de préférence
     for field in ['LAST_PRICE', 'PX_LAST', 'PREV_SES_LAST_PRICE', 'ADJUSTED_PREV_LAST_PRICE', 'PX_MID']:
         premium_value = data.get(field)
+        print(f"[DEBUG] Tentative {field}: {premium_value}")
         if premium_value is not None and premium_value > 0:
+            premium_source = field
+            print(f"[DEBUG] ✓ Premium trouvé via {field}: {premium_value}")
             break
     
     # Si toujours rien, calculer la moyenne bid/ask
     if not premium_value or premium_value <= 0:
         bid = data.get('PX_BID')
         ask = data.get('PX_ASK')
+        print(f"[DEBUG] Fallback bid/ask: bid={bid}, ask={ask}")
         if bid and ask and bid > 0 and ask > 0:
             premium_value = (bid + ask) / 2
+            premium_source = "BID_ASK_AVG"
+            print(f"[DEBUG] ✓ Premium calculé via moyenne bid/ask: {premium_value}")
     
     result['premium'] = premium_value or 0.0
+    print(f"[DEBUG] Premium final: {result['premium']} (source: {premium_source or 'NONE'})")
     
     # Bid/Ask
-    result['bid'] = data.get('PX_BID') or result['premium'] * 0.98
-    result['ask'] = data.get('PX_ASK') or result['premium'] * 1.02
+    result['bid'] = data.get('PX_BID') or result['premium']
+    result['ask'] = data.get('PX_ASK') or result['premium']
+    print(f"[DEBUG] Bid: {result['bid']}, Ask: {result['ask']}")
     
     # Greeks (priorité: _MID > format court > OPT_)
     result['delta'] = (data.get('DELTA_MID') or 
@@ -229,10 +264,12 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
                     data.get('OPT_RHO') or 0.0)
     
     # Volatilité implicite
-    result['implied_volatility'] = (data.get('OPT_IMP_VOL') or 
-                                   data.get('IMP_VOL') or 
-                                   data.get('IVOL_MID') or 
-                                   data.get('OPT_IVOL_MID') or 0.15)
+    iv_value = (data.get('OPT_IMP_VOL') or 
+                data.get('IMP_VOL') or 
+                data.get('IVOL_MID') or 
+                data.get('OPT_IVOL_MID'))
+    print(f"[DEBUG] IV - OPT_IMP_VOL: {data.get('OPT_IMP_VOL')}, IMP_VOL: {data.get('IMP_VOL')}, IVOL_MID: {data.get('IVOL_MID')}, OPT_IVOL_MID: {data.get('OPT_IVOL_MID')}")
+    result['implied_volatility'] = iv_value or 0.15
     
     # Informations du contrat
     result['strike'] = data.get('OPT_STRIKE_PX') or 0.0

@@ -74,8 +74,6 @@ def process_bloomberg_to_strategies(
         strikes=strikes,
         default_position='long',
         default_quantity=1,
-        price_min=price_min,
-        price_max=price_max,
         mixture = mixture
     )
     
