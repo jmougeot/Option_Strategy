@@ -26,7 +26,7 @@ def sidebar_params() -> UIParams:
 
     c1, c2 = st.columns(2)
     with c1:
-        months_input = st.text_input("Mois d'expiration:", value="F,G,H,K,M,N",
+        months_input = st.text_input("Mois d'expiration:", value="F",
                                      help="F=Jan, G=Feb, H=Mar, K=Apr, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec")
     with c2:
         strike = st.number_input("Strike :", value=98.0, format="%.4f", help="Target Price")
@@ -35,14 +35,13 @@ def sidebar_params() -> UIParams:
     with c1:
         price_min = st.number_input("Prix Min ($)", value=97.750, step=0.0001, format="%.4f")
     with c2:
-        price_max = st.number_input("Prix Max ($)", value=98.250, step=0.0001, format="%.4f")
+        price_max = st.number_input("Prix Max ($)", value=98.750, step=0.0001, format="%.4f")
 
     price_step = st.number_input("Pas de Prix ($)", value=0.0625, step=0.0001, format="%.4f")
     strikes = strike_list(price_min, price_max, price_step)
 
 
     max_legs = st.slider("Nombre maximum de legs par stratégie:", 1, 4, 4)
-    top_n = st.number_input("Nombre de meilleures structures à afficher:", value=10, min_value=1, max_value=100)
 
     years = [int(y.strip()) for y in years_input.split(",") if y.strip()]
     months = [m.strip() for m in months_input.split(",") if m.strip()]
