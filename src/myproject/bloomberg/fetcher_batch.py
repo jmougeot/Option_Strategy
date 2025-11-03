@@ -207,42 +207,38 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
         Dictionnaire avec les valeurs unifiées
     """
     result = {}
-    
-    print("\n[DEBUG extract_best_values] Début extraction des valeurs")
-    
+        
     # Prix (cascade de fallbacks)
-    premium_value = None
+    # Prix (cascade de fallbacks)
+    premium_value = 0.0  # jamais None
+
     for field in ['LAST_PRICE', 'PX_LAST', 'PREV_SES_LAST_PRICE', 'ADJUSTED_PREV_LAST_PRICE', 'PX_MID']:
         v = data.get(field)
-        if v is not None and v != 0:
+        if v is not None and v > 0:
             premium_value = v
             break
-    
-    # bid/ask keep raw if present
-    result['bid'] = data.get('PX_BID')
-    result['ask'] = data.get('PX_ASK')
-    
-    # fallback bid/ask pour le premium
-    if premium_value is None:
-        print(f"[DEBUG] Fallback bid/ask: bid={result['bid']}, ask={result['ask']}")
-        if result['bid'] is not None and result['ask'] is not None and result['bid'] > 0 and result['ask'] > 0:
-            premium_value = (result['bid'] + result['ask']) / 2
-        elif result['bid'] is not None and result['bid'] > 0:
-            premium_value = result['bid']
-        elif result['ask'] is not None and result['ask'] > 0:
-            premium_value = result['ask']
-    
-    # keep None instead of forcing 0.0
+
+    # Si toujours rien → calcul via bid/ask
+    bid = data.get('PX_BID')
+    ask = data.get('PX_ASK')
+
+    if premium_value == 0.0 and bid and ask and bid > 0 and ask > 0:
+        premium_value = (bid + ask) / 2
+
     result['premium'] = premium_value
-    print(f"[DEBUG] Premium final: {result['premium']}")
-    
-    # status
-    if result['premium'] is None and result['bid'] is None and result['ask'] is None:
-        result['status'] = 'NO_MARKET_DATA'
-    elif result['premium'] is None and (result['bid'] is not None or result['ask'] is not None):
-        result['status'] = 'NOT_TRADED_BUT_QUOTED'
+
+    # Bid/Ask -> jamais None
+    result['bid'] = bid if (bid and bid > 0) else (premium_value * 0.98 if premium_value > 0 else 0.0)
+    result['ask'] = ask if (ask and ask > 0) else (premium_value * 1.02 if premium_value > 0 else 0.0)
+
+    # Status
+    if result['premium'] == 0.0 and result['bid'] == 0.0 and result['ask'] == 0.0:
+        result['status'] = 'NO_DATA'           # l’option n’a aucune cotation dispo
+    elif result['premium'] == 0.0 and (result['bid'] > 0 or result['ask'] > 0):
+        result['status'] = 'NOT_TRADED'        # pas de last mais bid/ask => pas tradée
     else:
-        result['status'] = 'OK'
+        result['status'] = 'OK'                # premium existe
+
 
     # Greeks (priorité: _MID > format court > OPT_)
     result['delta'] = (data.get('DELTA_MID') or 
