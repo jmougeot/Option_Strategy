@@ -9,7 +9,7 @@ import numpy as np
 
 def calculate_linear_metrics(
     options: List[Option],
-) -> Dict:
+) -> Optional[Dict]:
     """
     Calcule TOUTES les métriques d'une stratégie d'options en une fois.
     
@@ -56,15 +56,19 @@ def calculate_linear_metrics(
     total_vega = 0.0
     total_theta = 0.0
     total_ivs =0.0
-
-    quantity = 1
     
+    for option in options:
+        if option.position == 'long':
+            total_premium += option.premium 
+
+        elif option.position == 'short':
+            total_premium -= option.premium
+    if total_premium > 0.05 :
+        return None
+    
+
     # Parcourir toutes les options UNE SEULE FOIS
     for option in options:
-        
-        
-        # ============ SURFACES (stockées dans chaque option) ============
-        # Accumuler les surfaces de profit et de perte
         if option.position == 'long':
             total_profit_surface_ponderated += option.profit_surface_ponderated
             total_loss_surface_ponderated += option.loss_surface_ponderated
@@ -76,10 +80,8 @@ def calculate_linear_metrics(
             total_gamma += option.gamma
             total_vega += option.vega
             total_theta += option.theta
-
             total_premium += option.premium 
             
-            # Initialiser ou additionner le pnl_array (vérifier que ce n'est pas None)
             if option.pnl_array is not None:
                 if total_pnl_array is None:
                     total_pnl_array = option.pnl_array.copy()

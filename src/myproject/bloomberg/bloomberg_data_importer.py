@@ -165,9 +165,9 @@ def import_euribor_options(
                                   f"{surfaces_info}")
                                                   
                 if month_options_count > 0:
-                    print(f"\n   ✓ {month_options_count} options récupérées pour ce mois")
+                    print(f"\n ✓ {month_options_count} options récupérées pour ce mois")
                 else:
-                    print(f"\n   ⚠️  Aucune option récupérée pour ce mois")
+                    print(f"\n ⚠️  Aucune option récupérée pour ce mois")
     
     except Exception as e:
         print(f"\n✗ Erreur lors du fetch batch: {e}")
