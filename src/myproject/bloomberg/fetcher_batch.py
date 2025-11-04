@@ -21,20 +21,18 @@ import blpapi
 from myproject.bloomberg.connection import BloombergConnection
 
 
-# Liste complète des champs à récupérer (tous en un coup)
+# Liste des champs à récupérer (optimisée - sans doublons)
 ALL_OPTION_FIELDS = [
     # Prix
+    "LAST_PRICE",
     "PX_LAST",
     "PX_BID",
     "PX_ASK",
     "PX_MID",
     "PREV_SES_LAST_PRICE",
-    "LAST_PRICE",
     "ADJUSTED_PREV_LAST_PRICE",
-
-
     
-    # Greeks - tous les formats possibles
+    # Greeks
     "DELTA_MID",
     "OPT_DELTA",
     "GAMMA_MID",
@@ -46,17 +44,11 @@ ALL_OPTION_FIELDS = [
     "RHO_MID",
     "OPT_RHO",
     
-    # Greeks bid/ask
-    "OPT_DELTA_BID",
-    "OPT_DELTA_ASK",
-    
-    # Volatilité implicite - tous les formats
+    # Volatilité implicite
     "OPT_IMP_VOL",
     "IMP_VOL",
     "IVOL_MID",
     "OPT_IVOL_MID",
-    "OPT_IVOL_BID",
-    "OPT_IVOL_ASK",
     
     # Informations du contrat
     "OPT_STRIKE_PX",
@@ -143,22 +135,12 @@ def fetch_options_batch(
                                 if security.hasElement("securityError"):
                                     error = security.getElement("securityError")
                                     error_msg = error.getElementAsString("message") if error.hasElement("message") else "Unknown error"
-                                    print(f"⚠️  Erreur pour {ticker}: {error_msg}")
+                                    print(f"⚠️ Erreur pour {ticker}: {error_msg}")
                                     continue
                                 
                                 # Extraire tous les champs
                                 if security.hasElement("fieldData"):
                                     field_data = security.getElement("fieldData")
-                                    
-                                    # ========== DEBUG: Lister tous les éléments présents ==========
-                                    present = []
-                                    for j in range(field_data.numElements()):
-                                        try:
-                                            elem = field_data.getElement(j)
-                                            present.append(elem.name())
-                                        except Exception as ex:
-                                            present.append(f"<err at {j}: {ex}>")
-                                    # ============================================================
                                     
                                     # Construire le dictionnaire de résultats
                                     ticker_data = {}
@@ -167,16 +149,10 @@ def fetch_options_batch(
                                             try:
                                                 value = field_data.getElement(field).getValue()
                                                 ticker_data[field] = value
-                                            except Exception as e:
+                                            except Exception:
                                                 ticker_data[field] = None
                                         else:
                                             ticker_data[field] = None
-                                    
-                                    # Afficher le dictionnaire construit
-                                    print(f"[DEBUG] Données extraites pour {ticker}:")
-                                    for key, val in ticker_data.items():
-                                        if val is not None:
-                                            print(f"  {key}: {val}")
                                     
                                     # Stocker dans results
                                     results[ticker] = ticker_data
@@ -206,39 +182,32 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     result = {}
         
     # Prix (cascade de fallbacks)
-    # Prix (cascade de fallbacks)
-    premium_value = 0.0  # jamais None
-
+    premium_value = 0.0
+    
+    # Essayer les champs de prix dans l'ordre de préférence
     for field in ['LAST_PRICE', 'PX_LAST', 'PREV_SES_LAST_PRICE', 'ADJUSTED_PREV_LAST_PRICE', 'PX_MID']:
         v = data.get(field)
         if v is not None and v > 0:
             premium_value = v
             break
-
-    # Si toujours rien → calcul via bid/ask
+    
+    # Si toujours aucun prix → calcul via bid/ask
     bid = data.get('PX_BID')
     ask = data.get('PX_ASK')
-
-    if premium_value == 0.0 and bid and ask and bid > 0 and ask > 0:
-        premium_value = (bid + ask) / 2
     
-    if premium_value == 0.0 and bid and bid > 0 :
-        premium_value = bid / 2
+    if premium_value == 0.0:
+        if bid and ask and bid > 0 and ask > 0:
+            premium_value = (bid + ask) / 2
+        elif bid and bid > 0:
+            premium_value = bid
+        elif ask and ask > 0:
+            premium_value = ask
+    
     result['premium'] = premium_value
-
-    if premium_value == 0.0 and ask and ask > 0 :
-        premium_value = ask / 2
-    result['premium'] = premium_value
-
-
-    if premium_value == 0.0 and bid and ask and bid > 0 and ask > 0:
-        premium_value = (bid + ask) / 2
-    result['premium'] = premium_value
-
-    # Bid/Ask -> jamais None
+    
+    # Bid/Ask
     result['bid'] = bid if (bid and bid > 0) else 0.0
     result['ask'] = ask if (ask and ask > 0) else 0.0
-    print(f"[DEBUG] bid : {bid} et ask {ask}")
 
 
     # Greeks (priorité: _MID > format court > OPT_)
