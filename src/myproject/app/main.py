@@ -72,7 +72,6 @@ def process_bloomberg_to_strategies(
         years=years,
         strikes=strikes,
         default_position='long',
-        default_quantity=1,
         mixture = mixture
     )
     

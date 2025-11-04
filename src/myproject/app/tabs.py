@@ -64,8 +64,8 @@ def display_overview_tab(comparisons: List[StrategyComparison]):
 
 def display_payoff_tab(
     top_5_comparisons: List[StrategyComparison],
-    best_target_price: Optional[float],
-    mixture: Optional[Tuple[np.ndarray, np.ndarray]]
+    best_target_price: float,
+    mixture: Tuple[np.ndarray, np.ndarray]
 ):
     """
     Affiche le tab Diagramme P&L avec la mixture gaussienne intégrée.
@@ -84,9 +84,3 @@ def display_payoff_tab(
         mixture=mixture
     )
     st.plotly_chart(fig_payoff, use_container_width=True)
-    
-    if mixture is not None:
-        st.info("📊 La distribution gaussienne est affichée en gris sur l'axe de droite")
-    else:
-        st.info("ℹ️ Lancez une comparaison pour voir la distribution gaussienne")
-

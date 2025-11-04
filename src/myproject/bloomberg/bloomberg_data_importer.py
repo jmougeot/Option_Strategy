@@ -36,14 +36,11 @@ MONTH_EXPIRY_DAY = {
 
 def import_euribor_options(
     underlying: str = "ER",
-    months: Optional[List[str]] = None,
-    years: Optional[List[int]] = None,
-    strikes: Optional[List[float]] = None,
+    months: List[str] = [],
+    years: List[int] = [] ,
+    strikes: List[float] = [],
     suffix: str = "Comdty",
-    include_calls: bool = True,
-    include_puts: bool = True,
     default_position: Literal['long', 'short'] = 'long',
-    default_quantity: int = 1,
     mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None ,
 ) -> List[Option]:
     """
@@ -67,7 +64,7 @@ def import_euribor_options(
     Returns:
         Liste d'objets Option directement utilisables
     """ 
-    option_objects: List[Option] = []
+    list_option: List[Option] = []
     total_attempts = 0
     total_success = 0
     
@@ -80,8 +77,6 @@ def import_euribor_options(
         for month in months:
             month_code = cast(MonthCode, month)
             for strike in strikes:
-                # Calls
-                if include_calls:
                     ticker = build_option_ticker(underlying, month_code, year, 'C', strike, suffix)
                     all_tickers.append(ticker)
                     ticker_metadata[ticker] = {
@@ -92,9 +87,7 @@ def import_euribor_options(
                         'year': year
                     }
                     total_attempts += 1
-                
-                # Puts
-                if include_puts:
+
                     ticker = build_option_ticker(underlying, month_code, year, 'P', strike, suffix)
                     all_tickers.append(ticker)
                     ticker_metadata[ticker] = {
@@ -105,9 +98,7 @@ def import_euribor_options(
                         'year': year
                     }
                     total_attempts += 1
-    
-    print(f"\n📡 Récupération des données Bloomberg en batch...")
-    
+        
     # FETCH EN BATCH
     try:
         batch_data = fetch_options_batch(all_tickers, use_overrides=True)
@@ -144,13 +135,12 @@ def import_euribor_options(
                             option_type_str=meta['option_type'],
                             bloomberg_data=extracted,
                             position=default_position,
-                            quantity=default_quantity,
                             mixture = mixture,    
                         )
                         
                         # Vérifier que l'option est valide
                         if option.strike > 0 :
-                            option_objects.append(option)
+                            list_option.append(option)
                             month_options_count += 1
                             total_success += 1
                             
@@ -161,13 +151,7 @@ def import_euribor_options(
                             print(f"✓ {opt_symbol} {option.strike}: "
                                   f"Premium={option.premium}, "
                                   f"Delta={option.delta}, "
-                                  f"IV={option.implied_volatility}"
-                                  f"{surfaces_info}")
-                                                  
-                if month_options_count > 0:
-                    print(f"\n ✓ {month_options_count} options récupérées pour ce mois")
-                else:
-                    print(f"\n ⚠️  Aucune option récupérée pour ce mois")
+                                  f"IV={option.implied_volatility}")
     
     except Exception as e:
         print(f"\n✗ Erreur lors du fetch batch: {e}")
@@ -181,7 +165,6 @@ def import_euribor_options(
     print(f"Total tentatives: {total_attempts}")
     print(f"Succès: {total_success} ({total_success/total_attempts*100:.1f}%)" if total_attempts > 0 else "Succès: 0")
     print(f"Échecs: {total_attempts - total_success}")
-    print(f"Options importées: {len(option_objects)}")
     print("=" * 70)
     
-    return option_objects
+    return list_option

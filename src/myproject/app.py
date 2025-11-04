@@ -57,9 +57,7 @@ def main():
     
     # Déterminer quelle source de stratégies utiliser
     all_comparisons = None
-    best_target_price = None
-    mixture = None  # Initialiser mixture
-    
+    best_target_price = None    
     # Utiliser les stratégies chargées si disponibles
         
     if compare_button:

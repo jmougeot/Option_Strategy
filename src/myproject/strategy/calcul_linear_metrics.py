@@ -48,8 +48,8 @@ def create_strategy_fast(
     thetas = np.array([opt.theta for opt in options], dtype=np.float64)
     ivs = np.array([opt.implied_volatility for opt in options], dtype=np.float64)
     
-    profit_surfaces = np.array([opt.profit_surface_ponderated for opt in options], dtype=np.float64)
-    loss_surfaces = np.array([opt.loss_surface_ponderated for opt in options], dtype=np.float64)
+    profit_surfaces_ponderated = np.array([opt.profit_surface_ponderated for opt in options], dtype=np.float64)
+    loss_surfaces_ponderated = np.array([opt.loss_surface_ponderated for opt in options], dtype=np.float64)
     average_pnls = np.array([opt.average_pnl for opt in options], dtype=np.float64)
     sigma_pnls = np.array([opt.sigma_pnl for opt in options], dtype=np.float64)
     
@@ -63,8 +63,8 @@ def create_strategy_fast(
     total_iv = np.sum(signs * ivs)
     
     # Pour surfaces: long ajoute profit/loss, short inverse
-    total_profit_surface = np.sum(np.where(is_long, profit_surfaces, -loss_surfaces))
-    total_loss_surface = np.sum(np.where(is_long, loss_surfaces, -profit_surfaces))
+    total_profit_surface = np.sum(np.where(is_long, profit_surfaces_ponderated, -loss_surfaces_ponderated))
+    total_loss_surface = np.sum(np.where(is_long, loss_surfaces_ponderated, -profit_surfaces_ponderated))
     total_average_pnl = np.sum(signs * average_pnls)
     total_sigma_pnl = np.sqrt(np.sum(sigma_pnls ** 2))
     
@@ -144,6 +144,17 @@ def create_strategy_fast(
     if max_profit > 0:
         profit_at_target_pct = (profit_at_target / max_profit) * 100.0
     
+    # Calcul des surfaces non pondérées (intégration par la méthode des trapèzes)
+    dx = float(np.mean(np.diff(prices)))  # Pas moyen
+    
+    # Surface de profit: intégration des valeurs positives de P&L
+    positive_pnl = np.maximum(total_pnl_array, 0.0)
+    surface_profit_nonponderated = float(np.sum(positive_pnl) * dx)
+    
+    # Surface de perte: intégration des valeurs négatives de P&L (en valeur absolue)
+    negative_pnl = np.minimum(total_pnl_array, 0.0)
+    surface_loss_nonponderated = float(np.abs(np.sum(negative_pnl)) * dx)
+    
     # ========== FILTRAGE PHASE 3 (filtres finaux) ==========
     
     # 10. Profit at target extrême
@@ -182,8 +193,8 @@ def create_strategy_fast(
             profit_zone_width=profit_zone_width,
             
             # Surfaces
-            surface_profit=float(total_profit_surface),
-            surface_loss=float(total_loss_surface),
+            surface_profit=surface_profit_nonponderated,
+            surface_loss=surface_loss_nonponderated,
             surface_profit_ponderated=float(total_profit_surface),
             surface_loss_ponderated=float(total_loss_surface),
             

@@ -47,7 +47,6 @@ def create_option_from_bloomberg(
     option_type_str: str,
     bloomberg_data: dict,
     position: Literal['long', 'short'] = 'long',
-    quantity: int = 1,
     mixture: Optional[Tuple[np.ndarray,np.ndarray]] = None ,
 ) -> Option:
     """
@@ -85,7 +84,6 @@ def create_option_from_bloomberg(
             expiration_day=exp_day,
             
             # Position
-            quantity=quantity,
             position=position,
             
             # Identification
