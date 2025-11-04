@@ -13,6 +13,7 @@ Utilise les fonctions optimisées des modules :
 """
 
 from typing import List, Dict, Optional, Tuple
+from myproject.option.option_class import Option
 from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.comparor_v2 import StrategyComparerV2
 from myproject.strategy.comparison_class import StrategyComparison
@@ -65,7 +66,6 @@ def process_bloomberg_to_strategies(
     if verbose:
         print("📥 Import des options depuis Bloomberg...")
 
-    # options = import_local_option(mixture)
     options = import_euribor_options(
         underlying=underlying,
         months=months,
