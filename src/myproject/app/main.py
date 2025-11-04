@@ -58,7 +58,7 @@ def process_bloomberg_to_strategies(
         verbose: Affichage détaillé
     """
     stats = {}
-    
+
     mixture= create_mixture_from_scenarios(scenarios, price_min, price_max, num_points, target_price)
 
     options = import_euribor_options(
@@ -101,7 +101,5 @@ def process_bloomberg_to_strategies(
     
     stats['nb_strategies_classees'] = len(best_strategies)
     
-    if verbose:
-        print(f"✅ Terminé : {stats['nb_options']} options → {stats['nb_strategies_totales']} stratégies → Top {stats['nb_strategies_classees']}")
     
     return best_strategies, stats, mixture
