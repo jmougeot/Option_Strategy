@@ -32,7 +32,6 @@ def create_strategy_fast(
         return None
     
     # ========== PHASE 1: Extraction vectorisée des données ==========
-    # Filtrer les stratégies avec plus de 3 short calls (risque illimité)
     short_call_count = sum(1 for opt in options if opt.is_short() and opt.is_call())
     if short_call_count > 3:
         return None
