@@ -58,13 +58,8 @@ def process_bloomberg_to_strategies(
         verbose: Affichage détaillé
     """
     stats = {}
-
-    print (scenarios)
+    
     mixture= create_mixture_from_scenarios(scenarios, price_min, price_max, num_points, target_price)
-
-    # ÉTAPE 1 : Import Bloomberg → Options
-    if verbose:
-        print("📥 Import des options depuis Bloomberg...")
 
     options = import_euribor_options(
         underlying=underlying,
