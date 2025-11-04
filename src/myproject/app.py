@@ -25,8 +25,6 @@ st.set_page_config(
 
 inject_css()
 
-
-
 # ============================================================================
 # INTERFACE PRINCIPALE
 # ============================================================================
@@ -98,8 +96,8 @@ def main():
             st.error("❌ Aucune stratégie disponible")
             return
         
-        # Sauvegarder dans session_state
-        save_to_session_state(all_comparisons, params, best_strategies[0].target_price)
+        # Sauvegarder dans session_state (incluant les scénarios)
+        save_to_session_state(all_comparisons, params, best_strategies[0].target_price, scenarios)
     
     # Si on arrive ici sans stratégies, ne rien afficher
     if not all_comparisons:

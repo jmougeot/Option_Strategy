@@ -2,8 +2,11 @@
 Module pour la logique de traitement et de filtrage des stratégies
 """
 
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, TYPE_CHECKING
 from myproject.strategy.comparison_class import StrategyComparison
+
+if TYPE_CHECKING:
+    from myproject.app.widget import ScenarioData
 
 
 def process_comparison_results(
@@ -35,7 +38,8 @@ def process_comparison_results(
 def save_to_session_state(
     all_comparisons: List[StrategyComparison],
     params: Any,
-    best_target_price: Optional[float]
+    best_target_price: Optional[float],
+    scenarios: Optional["ScenarioData"] = None
 ):
     """
     Sauvegarde les stratégies et paramètres dans session_state.
@@ -44,6 +48,7 @@ def save_to_session_state(
         all_comparisons: Toutes les stratégies
         params: Paramètres de la sidebar
         best_target_price: Prix cible optimal
+        scenarios: Scénarios de marché (optionnel)
     """
     import streamlit as st
     
@@ -58,6 +63,14 @@ def save_to_session_state(
         'price_min': params.price_min,
         'price_max': params.price_max
     }
+    
+    # Enregistrer les scénarios si fournis
+    if scenarios is not None:
+        st.session_state['current_scenarios'] = {
+            'centers': scenarios.centers,
+            'std_devs': scenarios.std_devs,
+            'weights': scenarios.weights
+        }
 
 
 def display_success_stats(stats: Dict[str, Any]):

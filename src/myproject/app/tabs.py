@@ -3,7 +3,6 @@ Module pour gérer les différents tabs de l'application Streamlit
 """
 
 import streamlit as st
-import pandas as pd
 import numpy as np
 from typing import List, Tuple, Optional
 from myproject.strategy.comparison_class import StrategyComparison
