@@ -9,20 +9,31 @@ scenario: ScenarioData = ScenarioData([98], [0.1], [100])
 step = 0.0625
 price_min = 97.75
 price_max = 98.5
-price= price_min
+price = price_min
 strikes = strike_list(price_min, price_max, step)
 target_price = 98.25  # Prix cible au milieu de la range
 
+# Mois d'expiration Bloomberg (F=Feb, G=Apr, H=Jun, J=Jul, K=Aug, M=Sep, N=Oct, Q=Nov, U=Dec, Z=Jan)
+months = ["Z"]  # Janvier 2026
+years = [6]     # 2026
+
 # Générer toutes les stratégies possibles
 print("🔍 Génération des stratégies...")
+print(f"   Underlying: ER")
+print(f"   Mois: {months}")
+print(f"   Années: {years}")
+print(f"   Strikes: {len(strikes)} strikes de {price_min} à {price_max}")
+print(f"   Target price: {target_price}\n")
+
 all_strategies = process_bloomberg_to_strategies(
     underlying="ER",
+    months=months,  # IMPORTANT: Spécifier les mois d'expiration Bloomberg
+    years=years,
     strikes=strikes,
     target_price=target_price,
-    years=[6],
     price_min=price_min,
     price_max=price_max,
-    scenarios=scenario,  # Pas de scénarios personnalisés
+    scenarios=scenario,
 )
 
 print(f"✅ {len(all_strategies)} stratégies générées\n")
