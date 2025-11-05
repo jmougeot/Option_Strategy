@@ -24,7 +24,7 @@ all_strategies = process_bloomberg_to_strategies(
     years=[6],
     price_min=price_min,
     price_max=price_max,
-    scenarios=None,  # Pas de scénarios personnalisés
+    scenarios=scenario,  # Pas de scénarios personnalisés
 )
 
 print(f"✅ {len(all_strategies)} stratégies générées\n")
