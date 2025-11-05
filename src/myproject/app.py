@@ -70,7 +70,6 @@ def main():
                 months=params.months,
                 years=params.years,
                 strikes=params.strikes,
-                target_price=params.strike,
                 price_min=params.price_min,
                 price_max=params.price_max,
                 max_legs=params.max_legs,
