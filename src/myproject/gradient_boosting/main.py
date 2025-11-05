@@ -1,10 +1,13 @@
 from myproject.gradient_boosting.bloomberg_to_strat import process_bloomberg_to_strategies
 from myproject.gradient_boosting.data_bulilder import train_regression_model, predict_and_rank_strategies
 from myproject.app.utils import strike_list
+from myproject.app.widget import ScenarioData
+
+scenario: ScenarioData = ScenarioData([98], [0.1], [100])
 
 # Configuration
 step = 0.625
-price_min = 98
+price_min = 97.75
 price_max = 98.5
 price= price_min
 strikes = strike_list(price_min, price_max, step)

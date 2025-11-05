@@ -210,7 +210,7 @@ def train_regression_model(
     train_r2 = r2_score(y_train, y_pred_train)
     test_r2 = r2_score(y_test, y_pred_test)
     
-    print("\nðŸ“ˆ RÃ©sultats:")
+    print("\nRésultats:")
     print(f"   Train - MSE: {train_mse:.4f}, MAE: {train_mae:.4f}, RÂ²: {train_r2:.4f}")
     print(f"   Test  - MSE: {test_mse:.4f}, MAE: {test_mae:.4f}, RÂ²: {test_r2:.4f}")
     
