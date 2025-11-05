@@ -6,7 +6,7 @@ from myproject.app.widget import ScenarioData
 scenario: ScenarioData = ScenarioData([98], [0.1], [100])
 
 # Configuration
-step = 0.625
+step = 0.0625
 price_min = 97.75
 price_max = 98.5
 price= price_min
