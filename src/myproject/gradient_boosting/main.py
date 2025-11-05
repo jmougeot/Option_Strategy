@@ -1,16 +1,15 @@
 from myproject.gradient_boosting.bloomberg_to_strat import process_bloomberg_to_strategies
 from myproject.gradient_boosting.data_bulilder import train_regression_model, predict_and_rank_strategies
+from myproject.app.utils import strike_list
 
 # Configuration
-steps = 0.625
+step = 0.625
 price_min = 98
 price_max = 98.5
 price= price_min
-strikes = []
-while price<=price_max: 
-    strikes.append(price)
-    price+=steps
-    
+strikes = strike_list(price_min, price_max, step)
+
+
 target_price = 98.25  # Prix cible au milieu de la range
 
 # Générer toutes les stratégies possibles

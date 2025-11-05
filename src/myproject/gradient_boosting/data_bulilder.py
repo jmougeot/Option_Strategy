@@ -194,7 +194,7 @@ def train_regression_model(
         verbose=-1
     )
     
-    print("\nðŸš€ EntraÃ®nement du modÃ¨le de rÃ©gression...")
+    print("\n EntraÃ®nement du modéle de régression...")
     model.fit(
         X_train, y_train,
         eval_set=[(X_test, y_test)]
@@ -240,21 +240,7 @@ def predict_and_rank_strategies(
     strategies: List[StrategyComparison],
     top_n: int = 10
 ) -> List[StrategyComparison]:
-    """
-    PrÃ©dit les scores et retourne les meilleures stratÃ©gies.
-    
-    Args:
-        model: ModÃ¨le entraÃ®nÃ©
-        strategies: Liste de stratÃ©gies Ã  Ã©valuer
-        top_n: Nombre de meilleures stratÃ©gies
-        
-    Returns:
-        Liste des top_n meilleures stratÃ©gies
-    """
-    if model is None:
-        print("âš ï¸ Aucun modÃ¨le fourni")
-        return strategies[:top_n]
-    
+
     # Générer features
     X, _ = data_frame(strategies)
     
@@ -270,6 +256,6 @@ def predict_and_rank_strategies(
     print(f"\nâœ¨ Top {top_n} stratÃ©gies sÃ©lectionnÃ©es:")
     for i, (idx, score) in enumerate(zip(top_indices, predicted_scores[top_indices]), 1):
         strategy = strategies[idx]
-        print(f"{i}. {strategy.strategy_name} - Score prÃ©dit: {score:.2f}")
+        print(f"{i}. {strategy.strategy_name} - Score: {score:.2f}")
     
     return best_strategies
