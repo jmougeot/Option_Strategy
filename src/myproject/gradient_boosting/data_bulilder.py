@@ -27,59 +27,42 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     
     # 1. Score de profit attendu (0-25 points)
     avg_pnl = strategy.average_pnl or 0
-    if avg_pnl > 0:
-        score += min(avg_pnl * 500, 25)  # Bonus pour profit positif
-    else:
-        score += max(avg_pnl * 500, -10)  # PÃ©nalitÃ© pour profit nÃ©gatif
-    
-    # 2. Score de risk/reward (0-20 points)
-    rr_ratio = strategy.risk_reward_ratio_ponderated or 0
-    if rr_ratio > 0:
-        score += min(rr_ratio * 5, 20)
-    
-    # 3. Score de max_loss (0-15 points) - moins c'est risquÃ©, mieux c'est
+    score += min(avg_pnl * 500, 25)  # Bonus pour profit positif
+
     max_loss = abs(strategy.max_loss or 0)
-    if max_loss < 0.02:
-        score += 15
-    elif max_loss < 0.05:
-        score += 10
+    if max_loss < 0.05:
+        score -= 8
     elif max_loss < 0.10:
-        score += 5
+        score -=15
+    elif max_loss < 0.20:
+        score += 20
     else:
-        score -= min(max_loss * 50, 10)  # PÃ©nalitÃ© pour pertes importantes
-    
-    # 4. Score de profit au target (0-15 points)
-    profit_target = strategy.profit_at_target or 0
+        score -= min(max_loss * 50, 10) 
+
+    profit_target = strategy.profit_at_target
     if profit_target > 0:
         score += min(profit_target * 300, 15)
     else:
-        score += max(profit_target * 300, -10)
+        score += max(profit_target * 300, -7)
     
     # 5. Score de zone profitable (0-10 points)
     zone_width = strategy.profit_zone_width or 0
     score += min(zone_width * 50, 10)
     
-    # 6. Score de surfaces pondÃ©rÃ©es (0-10 points)
-    surface_profit = strategy.surface_profit_ponderated or 0
-    surface_loss = abs(strategy.surface_loss_ponderated or 0)
-    if surface_loss > 0:
-        surface_ratio = surface_profit / surface_loss
-        score += min(surface_ratio * 2, 10)
-    elif surface_profit > 0:
-        score += 10
-    
-    # 7. PÃ©nalitÃ© pour volatilitÃ© (0 Ã  -5 points)
     sigma = strategy.sigma_pnl or 0
     if sigma > 0.05:
-        score -= min((sigma - 0.05) * 50, 5)
-    
-    # 8. Bonus pour premium reÃ§u (0-5 points)
-    premium = strategy.premium or 0
-    if premium < 0:  # CrÃ©dit reÃ§u
+        score -= 7
+
+    premium = strategy.premium
+    if premium < 0:
         score += min(abs(premium) * 100, 5)
-    
-    # Normaliser le score entre 0 et 100
-    return max(0, min(score, 100))
+    if premium > 5:
+        score -= 25
+
+    delta = strategy.total_delta
+    if abs(delta) > 100:
+        score -=25
+        return max(0, min(score, 100))
 
 
 def data_frame(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.ndarray]:

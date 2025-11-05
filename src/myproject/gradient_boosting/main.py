@@ -14,7 +14,7 @@ strikes = strike_list(price_min, price_max, step)
 target_price = 98.25  # Prix cible au milieu de la range
 
 # Mois d'expiration Bloomberg (F=Feb, G=Apr, H=Jun, J=Jul, K=Aug, M=Sep, N=Oct, Q=Nov, U=Dec, Z=Jan)
-months = ["Z"]  # Janvier 2026
+months = ["H"]  
 years = [6]     # 2026
 
 # Générer toutes les stratégies possibles
