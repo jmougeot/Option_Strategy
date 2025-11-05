@@ -11,14 +11,12 @@ price_min = 97.75
 price_max = 98.5
 price= price_min
 strikes = strike_list(price_min, price_max, step)
-
-
 target_price = 98.25  # Prix cible au milieu de la range
 
 # Générer toutes les stratégies possibles
 print("🔍 Génération des stratégies...")
 all_strategies = process_bloomberg_to_strategies(
-    underlying='ER',
+    underlying="ER",
     strikes=strikes,
     target_price=target_price,
     years=[6],
