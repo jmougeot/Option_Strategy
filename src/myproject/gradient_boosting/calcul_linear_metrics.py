@@ -49,6 +49,13 @@ def create_strategy_fast(
     average_pnls = np.array([opt.average_pnl for opt in options], dtype=np.float64)
     sigma_pnls = np.array([opt.sigma_pnl for opt in options], dtype=np.float64)
     
+    call_count = 0
+    for opt in options:
+        if opt.is_short() and opt.is_call():
+            call_count += 1
+        if opt.is_long() and opt.is_call():
+            call_count -= 1
+    
     # ========== PHASE 2: Calculs vectorisés des totaux ==========
     # Long: +values, Short: -values (fait en une opération matricielle)
     total_premium = np.sum(signs * premiums)
@@ -138,6 +145,7 @@ def create_strategy_fast(
     try:
         strategy = StrategyComparison(
             # Identité
+            call_count=call_count,
             strategy_name=strategy_name,
             strategy=None,
             target_price=target_price,

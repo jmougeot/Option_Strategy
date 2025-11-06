@@ -25,17 +25,10 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     """
     score = 0.0
 
-    call_count = 0
-    for opt in strategy.all_options:
-        if opt.is_short() and opt.is_call():
-            call_count += 1
-        if opt.is_long() and opt.is_call():
-            call_count -= 1
-    strategy.call_count = call_count
 
-    if call_count > 2:
+    if strategy.call_count > 2:
         score -= 50
-    elif call_count > 1 :
+    elif strategy.call_count > 1 :
         score -= 15
 
     # 1. Score de profit attendu (0-25 points)

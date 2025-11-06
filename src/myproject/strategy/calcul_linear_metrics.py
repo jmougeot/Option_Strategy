@@ -35,11 +35,16 @@ def create_strategy_fast(
     short_call_count = sum(1 for opt in options if opt.is_short() and opt.is_call())
     if short_call_count > 3:
         return None
+    call_count = 0
+    for opt in options:
+        if opt.is_short() and opt.is_call():
+            call_count += 1
+        if opt.is_long() and opt.is_call():
+            call_count -= 1
 
     # Pré-allouer les arrays NumPy pour éviter les réallocations
     is_long = np.array([opt.position == 'long' for opt in options], dtype=bool)
     signs = np.where(is_long, 1.0, -1.0)  # +1 pour long, -1 pour short
-    
     # Extraire toutes les valeurs en une fois (vectorisé)
     premiums = np.array([opt.premium for opt in options], dtype=np.float64)
     deltas = np.array([opt.delta for opt in options], dtype=np.float64)
@@ -178,6 +183,8 @@ def create_strategy_fast(
             target_price=target_price,
             premium=float(total_premium),
             all_options=options,
+            call_count = call_count,
+
             
             # Expiration
             expiration_day=exp_info.get('expiration_day'),
