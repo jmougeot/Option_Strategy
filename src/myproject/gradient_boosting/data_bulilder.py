@@ -29,7 +29,7 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     if strategy.call_count > 2:
         score -= 50
     elif strategy.call_count > 1 :
-        score -= 15
+        score -= 20
 
     # 1. Score de profit attendu (0-25 points)
     avg_pnl = strategy.average_pnl or 0
