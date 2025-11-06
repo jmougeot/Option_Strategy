@@ -11,6 +11,17 @@ from typing import List
 from myproject.option.option_class import Option
 
 
+def _format_option(o: Option) -> str:
+    """
+    Formate une option au format: +-{underlying}{month}{year} {strike}
+    Exemple: +ERZ6 98.5 ou -ERZ6 98.0
+    """
+    sign = "+" if o.is_long() else "-"
+    underlying = o.underlying_symbol or "ER"
+    month = o.expiration_month
+    year = o.expiration_year
+    return f"{sign}{underlying}{month}{year} {o.strike}"
+
 
 def generate_strategy_name(options: List[Option]) -> str:
     """
@@ -134,10 +145,8 @@ def generate_strategy_name(options: List[Option]) -> str:
                 return f"Modified Bear Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
             
             else:
-                pos1 = "L" if o1.is_long() else "S"
-                pos2 = "L" if o2.is_long() else "S"
-                pos3 = "L" if o3.is_long() else "S"
-                return f"Call Strip 3-Leg {pos1}{o1.strike}/{pos2}{o2.strike}/{pos3}{o3.strike}"
+                parts = [_format_option(o) for o in options]
+                return "/".join(parts)
         
         # ================== PUTS UNIQUEMENT ==================
         elif o1.is_put() and o2.is_put() and o3.is_put():
@@ -166,30 +175,14 @@ def generate_strategy_name(options: List[Option]) -> str:
                 return f"Modified Bull Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
             
             else:
-                pos1 = "L" if o1.is_long() else "S"
-                pos2 = "L" if o2.is_long() else "S"
-                pos3 = "L" if o3.is_long() else "S"
-                return f"Put Strip 3-Leg {pos1}{o1.strike}/{pos2}{o2.strike}/{pos3}{o3.strike}"
+                parts = [_format_option(o) for o in options]
+                return "/".join(parts)
         
         # ================== TYPES MIXTES (CALL + PUT) ==================
         else:
-            # Génération des noms avec préfixes détaillés : LC, LP, SC, SP
-            parts = []
-            for o in options:
-                if o.is_long_call():
-                    prefix = "LC"
-                elif o.is_short_call():
-                    prefix = "SC"
-                elif o.is_long_put():
-                    prefix = "LP"
-                elif o.is_short_put():
-                    prefix = "SP"
-                else:
-                    prefix = "?"
-                parts.append(f"{prefix}{o.strike}")
-            
-            strikes = "/".join(parts)
-            return f"{strikes}"
+            # Génération des noms avec format complet
+            parts = [_format_option(o) for o in options]
+            return "/".join(parts)
 
     # ======================================================================
     # 4 LEGS
@@ -223,23 +216,9 @@ def generate_strategy_name(options: List[Option]) -> str:
                 return f"Reverse Iron Condor {puts[0].strike}/{puts[1].strike}/{calls[0].strike}/{calls[1].strike}"
             
             else:
-                # Génération des noms avec préfixes détaillés : LC, LP, SC, SP
-                parts = []
-                for o in options:
-                    if o.is_long_call():
-                        prefix = "LC"
-                    elif o.is_short_call():
-                        prefix = "SC"
-                    elif o.is_long_put():
-                        prefix = "LP"
-                    elif o.is_short_put():
-                        prefix = "SP"
-                    else:
-                        prefix = "?"
-                    parts.append(f"{prefix}{o.strike}")
-                
-                strikes = "/".join(parts)
-                return f"{strikes}"
+                # Génération des noms avec format complet
+                parts = [_format_option(o) for o in options]
+                return "/".join(parts)
         
         # Tous calls
         elif n_calls == 4:
@@ -251,8 +230,8 @@ def generate_strategy_name(options: List[Option]) -> str:
                   o3.is_long_call() and o4.is_short_call()):
                 return f"Short Call Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
             else:
-                strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
-                return f"Call Strip 4-Leg {strikes}"
+                parts = [_format_option(o) for o in options]
+                return "/".join(parts)
         
         # Tous puts
         elif n_puts == 4:
@@ -263,31 +242,17 @@ def generate_strategy_name(options: List[Option]) -> str:
                   o3.is_long_put() and o4.is_short_put()):
                 return f"Short Put Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
             else:
-                strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
-                return f"Put Strip 4-Leg {strikes}"
+                parts = [_format_option(o) for o in options]
+                return "/".join(parts)
         
         # Autres combinaisons
         else:
-            # Génération des noms avec préfixes détaillés : LC, LP, SC, SP
-            parts = []
-            for o in options:
-                if o.is_long_call():
-                    prefix = "LC"
-                elif o.is_short_call():
-                    prefix = "SC"
-                elif o.is_long_put():
-                    prefix = "LP"
-                elif o.is_short_put():
-                    prefix = "SP"
-                else:
-                    prefix = "?"
-                parts.append(f"{prefix}{o.strike}")
-            
-            strikes = "/".join(parts)
-            return f"{strikes}"
+            # Génération des noms avec format complet
+            parts = [_format_option(o) for o in options]
+            return "/".join(parts)
 
     # ======================================================================
     # 5+ LEGS (fallback)
     # ======================================================================
-    strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
-    return f"Custom {n_legs}-Leg {strikes}"
+    parts = [_format_option(o) for o in options]
+    return "/".join(parts)
