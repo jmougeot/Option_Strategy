@@ -3,12 +3,13 @@ from myproject.gradient_boosting.data_bulilder import train_regression_model, pr
 from myproject.app.utils import strike_list
 from myproject.app.widget import ScenarioData
 
-scenario: ScenarioData = ScenarioData([98], [0.1], [100])
+scenario: ScenarioData = ScenarioData([96.03, 96.35 ,96.1, 96.35], [0.03, 0.03, 0.03, 0.03], [15, 60, 15, 10])
 
 # Configuration
+underlying = "SFR"
 step = 0.0625
-price_min = 97.75
-price_max = 98.5
+price_min = 95.75
+price_max = 96.6
 price = price_min
 strikes = strike_list(price_min, price_max, step)
 target_price = 98.25  # Prix cible au milieu de la range
@@ -26,7 +27,7 @@ print(f"   Strikes: {len(strikes)} strikes de {price_min} à {price_max}")
 print(f"   Target price: {target_price}\n")
 
 all_strategies = process_bloomberg_to_strategies(
-    underlying="ER",
+    underlying=underlying,
     months=months,  # IMPORTANT: Spécifier les mois d'expiration Bloomberg
     years=years,
     strikes=strikes,
