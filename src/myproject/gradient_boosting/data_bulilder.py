@@ -110,7 +110,8 @@ def data_frame(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.n
         'total_gamma',
         'total_vega',
         'profit_zone_width',
-        'max_loss_penalty'
+        'max_loss_penalty',
+        'IV'
     ]
     
     for s in strategies:
@@ -136,6 +137,7 @@ def data_frame(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.n
         feats.append(s.total_vega if s.total_vega else 0.0)
         feats.append(s.profit_zone_width if s.profit_zone_width else 0.0)
         feats.append(s.max_loss if s.max_loss else 0.0)
+        feats.append(s.avg_implied_volatility)
         
         feature_list.append(feats)
         

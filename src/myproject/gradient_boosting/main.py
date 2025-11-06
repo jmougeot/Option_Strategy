@@ -3,7 +3,7 @@ from myproject.gradient_boosting.data_bulilder import train_regression_model, pr
 from myproject.app.utils import strike_list
 from myproject.app.widget import ScenarioData
 
-scenario: ScenarioData = ScenarioData([96.03, 96.35 ,96.1, 96,85, 96.35], [0.03, 0.03, 0.03, 0.03, 10], [15, 60, 15, 10, 100])
+scenario: ScenarioData = ScenarioData([96.03, 96.35 ,96.1, 96,85, 96.35], [0.03, 0.03, 0.03, 0.03, 10], [15, 60, 15, 10, 50])
 
 # Configuration
 underlying = "SFR"
