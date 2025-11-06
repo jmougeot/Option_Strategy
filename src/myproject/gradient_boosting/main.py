@@ -69,6 +69,7 @@ for i, strat in enumerate(best_strategies, 1):
     print(f"   Risk/Reward: {strat.risk_reward_ratio_ponderated:.2f}")
     print(f"   Premium: {strat.premium:.4f}")
     print(f"   Breakevens: {len(strat.breakeven_points)}")
+    print(f"   Delat {strat.total_delta}")
 
 print("\n" + "="*60)
 print("✨ TERMINÉ")

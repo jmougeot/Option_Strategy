@@ -14,8 +14,8 @@ def max_loss_penalty(max_loss, threshold=20):
 
 def calculate_strategy_score(strategy: StrategyComparison) -> float:
     """
-    Calcule un score continu pour une stratÃ©gie (0-100).
-    Plus le score est Ã©levÃ©, meilleure est la stratÃ©gie.
+    Calcule un score continu pour une stratégie (0-100).
+    Plus le score est élevé, meilleure est la stratégie.
     
     Args:
         strategy: Stratégie à évaluer
@@ -36,9 +36,9 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     max_loss = abs(strategy.max_loss or 0)
 
     if max_loss > 0.10:
-        score -=10
+        score -=5
     elif max_loss > 0.15:
-        score -= 20
+        score -= 15
     elif max_loss > 0.20:
         score -= 30
     else:
@@ -61,12 +61,14 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     premium = strategy.premium
     if premium < 0:
         score += min(abs(premium) * 100, 5)
-    if premium > 5:
+    elif premium < -0.10:
+        score -= 15
+    if premium > 0.05:
         score -= 25
 
     delta = strategy.total_delta
     if abs(delta) > 100:
-        score -= 25
+        score -= 20
     
     # Toujours retourner un score normalisé entre 0 et 100
     return max(0, min(score, 100))
@@ -154,7 +156,7 @@ def train_regression_model(
         Tuple (model, feature_importance, metrics)
     """
     
-    # GÃ©nÃ©rer features et scores
+    # Générer features et scores
     X, y = data_frame(strategies)
     
     print(f" Dataset: {len(X)} stratagies")
@@ -170,7 +172,7 @@ def train_regression_model(
     print(f"Train set: {len(X_train)} stratagies")
     print(f"Test set: {len(X_test)} stratagies")
     
-    # CrÃ©er et entraÃ®ner le modÃ¨le de rÃ©gression
+    # Créer et entraéner le modèle de régression
     model = LGBMRegressor(
         n_estimators=1000,
         learning_rate=0.05,
