@@ -13,14 +13,15 @@ from myproject.option.option_class import Option
 
 def _format_option(o: Option) -> str:
     """
-    Formate une option au format: +-{underlying}{month}{year} {strike}
-    Exemple: +ERZ6 98.5 ou -ERZ6 98.0
+    Formate une option au format: +-{underlying}{month}{year} {strike}{C/P}
+    Exemple: +ERZ6 98.5C ou -ERZ6 98.0P
     """
     sign = "+" if o.is_long() else "-"
     underlying = o.underlying_symbol or "ER"
     month = o.expiration_month
     year = o.expiration_year
-    return f"{sign}{underlying}{month}{year} {o.strike}"
+    option_type = "C" if o.is_call() else "P"
+    return f"{sign}{underlying}{month}{year} {o.strike}{option_type}"
 
 
 def generate_strategy_name(options: List[Option]) -> str:
@@ -146,7 +147,7 @@ def generate_strategy_name(options: List[Option]) -> str:
             
             else:
                 parts = [_format_option(o) for o in options]
-                return "/".join(parts)
+                return " ".join(parts)
         
         # ================== PUTS UNIQUEMENT ==================
         elif o1.is_put() and o2.is_put() and o3.is_put():
@@ -176,13 +177,13 @@ def generate_strategy_name(options: List[Option]) -> str:
             
             else:
                 parts = [_format_option(o) for o in options]
-                return "/".join(parts)
+                return " ".join(parts)
         
         # ================== TYPES MIXTES (CALL + PUT) ==================
         else:
             # Génération des noms avec format complet
             parts = [_format_option(o) for o in options]
-            return "/".join(parts)
+            return " ".join(parts)
 
     # ======================================================================
     # 4 LEGS
@@ -218,7 +219,7 @@ def generate_strategy_name(options: List[Option]) -> str:
             else:
                 # Génération des noms avec format complet
                 parts = [_format_option(o) for o in options]
-                return "/".join(parts)
+                return " ".join(parts)
         
         # Tous calls
         elif n_calls == 4:
@@ -231,7 +232,7 @@ def generate_strategy_name(options: List[Option]) -> str:
                 return f"Short Call Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
             else:
                 parts = [_format_option(o) for o in options]
-                return "/".join(parts)
+                return " ".join(parts)
         
         # Tous puts
         elif n_puts == 4:
@@ -243,16 +244,16 @@ def generate_strategy_name(options: List[Option]) -> str:
                 return f"Short Put Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
             else:
                 parts = [_format_option(o) for o in options]
-                return "/".join(parts)
+                return " ".join(parts)
         
         # Autres combinaisons
         else:
             # Génération des noms avec format complet
             parts = [_format_option(o) for o in options]
-            return "/".join(parts)
+            return " ".join(parts)
 
     # ======================================================================
     # 5+ LEGS (fallback)
     # ======================================================================
     parts = [_format_option(o) for o in options]
-    return "/".join(parts)
+    return " ".join(parts)
