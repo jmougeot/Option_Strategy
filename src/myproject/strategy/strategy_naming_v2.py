@@ -173,64 +173,23 @@ def generate_strategy_name(options: List[Option]) -> str:
         
         # ================== TYPES MIXTES (CALL + PUT) ==================
         else:
-            # Compter calls et puts
-            n_calls = sum(1 for o in options if o.is_call())
-            n_puts = sum(1 for o in options if o.is_put())
-            
-            # Collar : 1 call + 2 puts OU 1 put + 2 calls (généralement pour protéger une position)
-            if n_calls == 1 and n_puts == 2:
-                call = [o for o in options if o.is_call()][0]
-                puts = sorted([o for o in options if o.is_put()], key=lambda o: o.strike)
-                
-                # Collar classique : long stock, long put, short call
-                # Ici on simule : long put bas + long put haut + short call
-                if puts[0].is_long_put() and puts[1].is_long_put() and call.is_short_call():
-                    return f"Collar {puts[0].strike}/{puts[1].strike}/{call.strike}"
+            # Génération des noms avec préfixes détaillés : LC, LP, SC, SP
+            parts = []
+            for o in options:
+                if o.is_long_call():
+                    prefix = "LC"
+                elif o.is_short_call():
+                    prefix = "SC"
+                elif o.is_long_put():
+                    prefix = "LP"
+                elif o.is_short_put():
+                    prefix = "SP"
                 else:
-                    pos1 = "L" if o1.is_long() else "S"
-                    pos2 = "L" if o2.is_long() else "S"
-                    pos3 = "L" if o3.is_long() else "S"
-                    return f"Custom Put Collar {pos1}{o1.strike}/{pos2}{o2.strike}/{pos3}{o3.strike}"
+                    prefix = "?"
+                parts.append(f"{prefix}{o.strike}")
             
-            elif n_calls == 2 and n_puts == 1:
-                calls = sorted([o for o in options if o.is_call()], key=lambda o: o.strike)
-                put = [o for o in options if o.is_put()][0]
-                
-                # Collar inversé ou protection call
-                if calls[0].is_long_call() and calls[1].is_long_call() and put.is_short_put():
-                    return f"Reverse Collar {put.strike}/{calls[0].strike}/{calls[1].strike}"
-                else:
-                    pos1 = "L" if o1.is_long() else "S"
-                    pos2 = "L" if o2.is_long() else "S"
-                    pos3 = "L" if o3.is_long() else "S"
-                    return f"Custom Call Collar {pos1}{o1.strike}/{pos2}{o2.strike}/{pos3}{o3.strike}"
-            
-            # Covered Short Straddle : short call + short put (même strike) + position sous-jacente
-            # Ici détection : 1 call + 1 put + 1 autre option
-            # Approximation : si on a 2 shorts du même strike + 1 long
-            else:
-                # Covered Short Straddle/Strangle : détecter si même strike
-                calls = [o for o in options if o.is_call()]
-                puts = [o for o in options if o.is_put()]
-                
-                if len(calls) == 1 and len(puts) == 1:
-                    call = calls[0]
-                    put = puts[0]
-                    third = [o for o in options if o != call and o != put][0]
-                    
-                    # Covered Short Straddle : short call + short put + long third
-                    if call.is_short() and put.is_short() and third.is_long():
-                        if call.strike == put.strike:
-                            return f"Covered Short Straddle {call.strike}/{third.strike}"
-                        else:
-                            return f"Covered Short Strangle {put.strike}/{call.strike}/{third.strike}"
-                    
-                    # Autres patterns
-                    elif call.is_long() and put.is_long() and third.is_short():
-                        return f"Protected Long Strangle {o1.strike}/{o2.strike}/{o3.strike}"
-                
-                strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
-                return f"Custom 3-Leg {strikes}"
+            strikes = "/".join(parts)
+            return f"{strikes}"
 
     # ======================================================================
     # 4 LEGS
@@ -264,8 +223,23 @@ def generate_strategy_name(options: List[Option]) -> str:
                 return f"Reverse Iron Condor {puts[0].strike}/{puts[1].strike}/{calls[0].strike}/{calls[1].strike}"
             
             else:
-                strikes = "/".join(f"{'L' if o.is_long() else 'S'}{o.strike}" for o in options)
-                return f"Custom Mixed 4-Leg {strikes}"
+                # Génération des noms avec préfixes détaillés : LC, LP, SC, SP
+                parts = []
+                for o in options:
+                    if o.is_long_call():
+                        prefix = "LC"
+                    elif o.is_short_call():
+                        prefix = "SC"
+                    elif o.is_long_put():
+                        prefix = "LP"
+                    elif o.is_short_put():
+                        prefix = "SP"
+                    else:
+                        prefix = "?"
+                    parts.append(f"{prefix}{o.strike}")
+                
+                strikes = "/".join(parts)
+                return f"{strikes}"
         
         # Tous calls
         elif n_calls == 4:

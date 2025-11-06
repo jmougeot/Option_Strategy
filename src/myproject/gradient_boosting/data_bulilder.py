@@ -70,7 +70,7 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
 
     delta = strategy.total_delta
     if abs(delta) > 100:
-        score -= 20
+        score -= 30
     
     # Toujours retourner un score normalisé entre 0 et 100
     return max(0, min(score, 100))
