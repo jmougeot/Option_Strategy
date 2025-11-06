@@ -90,7 +90,7 @@ def data_frame(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.n
     labels = []
     
     feature_names = [
-        'call_count'
+        'call_count',
         'average_pnl',
         'num_breakevens',
         'max_profit',
