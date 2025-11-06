@@ -31,6 +31,7 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
             call_count += 1
         if opt.is_long() and opt.is_call():
             call_count -= 1
+    strategy.call_count = call_count
 
     if call_count > 2:
         score -= 50
@@ -96,6 +97,7 @@ def data_frame(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.n
     labels = []
     
     feature_names = [
+        'call_count'
         'average_pnl',
         'num_breakevens',
         'max_profit',
@@ -120,6 +122,7 @@ def data_frame(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.n
     
     for s in strategies:
         feats = []
+        feats.append(s.call_count if s.call_count else 0.0)
         feats.append(s.average_pnl if s.average_pnl else 0.0)
         feats.append(len(s.breakeven_points) if s.breakeven_points else 0)
         feats.append(s.max_profit if s.max_profit else 0.0)

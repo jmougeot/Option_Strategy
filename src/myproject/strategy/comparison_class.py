@@ -12,6 +12,7 @@ class StrategyComparison:
     target_price: float
     premium : float
     all_options: List[Option]  # Toutes les options
+    call_count : Optional[int]
 
 
     # ================= Epiration date ======================
