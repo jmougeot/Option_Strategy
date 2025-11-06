@@ -52,14 +52,9 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
         score -= 30
     else:
         score -= min(max_loss * 50, 10) 
-
-    profit_target = strategy.profit_at_target
-    if profit_target > 0:
-        score += min(profit_target * 300, 15)
-    else:
-        score += max(profit_target * 300, -7)
+        
     
-    # 5. Score de zone profitable (0-10 points)
+
     zone_width = strategy.profit_zone_width or 0
     score += min(zone_width * 50, 10)
     
