@@ -61,8 +61,10 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
 
     delta = strategy.total_delta
     if abs(delta) > 100:
-        score -=25
-        return max(0, min(score, 100))
+        score -= 25
+    
+    # Toujours retourner un score normalisé entre 0 et 100
+    return max(0, min(score, 100))
 
 
 def data_frame(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.ndarray]:
