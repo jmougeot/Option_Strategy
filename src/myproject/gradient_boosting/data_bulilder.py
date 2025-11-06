@@ -18,13 +18,17 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     Plus le score est Ã©levÃ©, meilleure est la stratÃ©gie.
     
     Args:
-        strategy: StratÃ©gie Ã  Ã©valuer
+        strategy: Stratégie à évaluer
         
     Returns:
         Score entre 0 et 100
     """
     score = 0.0
-    
+
+    short_call_count = sum(1 for opt in strategy.all_options if opt.is_short() and opt.is_call())
+    if short_call_count > 3:
+        score -= 50
+            
     # 1. Score de profit attendu (0-25 points)
     avg_pnl = strategy.average_pnl or 0
     score += min(avg_pnl * 500, 25)  # Bonus pour profit positif
@@ -238,7 +242,7 @@ def predict_and_rank_strategies(
     # Retourner les meilleures stratagies
     best_strategies = [strategies[i] for i in top_indices]
     
-    print(f"\nâœ¨ Top {top_n} stratÃ©gies sÃ©lectionnÃ©es:")
+    print(f"\nâœ¨ Top {top_n} stratatégies sélectionnées:")
     for i, (idx, score) in enumerate(zip(top_indices, predicted_scores[top_indices]), 1):
         strategy = strategies[idx]
         print(f"{i}. {strategy.strategy_name} - Score: {score:.2f}")
