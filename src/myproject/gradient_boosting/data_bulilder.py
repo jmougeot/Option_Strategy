@@ -205,7 +205,7 @@ def train_regression_model(
         'importance': model.feature_importances_
     }).sort_values('importance', ascending=False)
     
-    print("\nðŸ”‘ Top 10 features importantes:")
+    print("\ Top 10 features importantes:")
     print(feature_importance.head(10))
     
     metrics = {
