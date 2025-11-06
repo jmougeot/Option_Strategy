@@ -25,18 +25,27 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     """
     score = 0.0
 
-    short_call_count = sum(1 for opt in strategy.all_options if opt.is_short() and opt.is_call())
-    if short_call_count > 3:
+    call_count = 0
+    for opt in strategy.all_options:
+        if opt.is_short() and opt.is_call():
+            call_count += 1
+        if opt.is_long() and opt.is_call():
+            call_count -= 1
+
+    if call_count > 2:
         score -= 50
-            
+    elif call_count > 1 :
+        score -= 15
+
     # 1. Score de profit attendu (0-25 points)
     avg_pnl = strategy.average_pnl or 0
-    score += min(avg_pnl * 500, 25)  # Bonus pour profit positif
+    
+    score += min(avg_pnl * 500, 30)  # Bonus pour profit positif
 
     max_loss = abs(strategy.max_loss or 0)
 
     if max_loss > 0.10:
-        score -=5
+        score -= 5
     elif max_loss > 0.15:
         score -= 15
     elif max_loss > 0.20:
@@ -60,10 +69,12 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
 
     premium = strategy.premium
     if premium < 0:
-        score += min(abs(premium) * 100, 5)
+        score += min(abs(premium) * 100, 8)
     elif premium < -0.10:
         score -= 15
-    if premium > 0.05:
+    elif premium > 0.05:
+        score -= 10
+    elif premium > 0.1:
         score -= 25
 
     delta = strategy.total_delta
