@@ -162,8 +162,8 @@ def train_regression_model(
         X, y, test_size=test_size, random_state=random_state
     )
     
-    print(f"\nðŸ”„ Train set: {len(X_train)} stratagies")
-    print(f"ðŸ§ª Test set: {len(X_test)} stratagies")
+    print(f"Train set: {len(X_train)} stratagies")
+    print(f"Test set: {len(X_test)} stratagies")
     
     # CrÃ©er et entraÃ®ner le modÃ¨le de rÃ©gression
     model = LGBMRegressor(
@@ -179,7 +179,7 @@ def train_regression_model(
         verbose=-1
     )
     
-    print("\n EntraÃ®nement du modéle de régression...")
+    print("\n Entrainement du modéle de régression...")
     model.fit(
         X_train, y_train,
         eval_set=[(X_test, y_test)]
