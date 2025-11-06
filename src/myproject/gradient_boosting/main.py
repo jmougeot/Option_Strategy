@@ -20,7 +20,7 @@ years = [6]     # 2026
 
 # Générer toutes les stratégies possibles
 print("🔍 Génération des stratégies...")
-print(f"   Underlying: ER")
+print(f"   Underlying: {underlying}")
 print(f"   Mois: {months}")
 print(f"   Années: {years}")
 print(f"   Strikes: {len(strikes)} strikes de {price_min} à {price_max}")
