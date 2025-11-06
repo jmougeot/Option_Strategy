@@ -50,6 +50,8 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
         score -= 15
     elif max_loss > 0.20:
         score -= 30
+    elif max_loss > 0.50:
+        score -= 50
     else:
         score -= min(max_loss * 50, 10) 
         
