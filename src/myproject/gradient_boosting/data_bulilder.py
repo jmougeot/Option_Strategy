@@ -34,11 +34,11 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     score += min(avg_pnl * 500, 25)  # Bonus pour profit positif
 
     max_loss = abs(strategy.max_loss or 0)
-    if max_loss < -0.05:
+    if max_loss > 0.05:
         score -= 8
-    elif max_loss < -0.10:
+    elif max_loss > 0.10:
         score -=15
-    elif max_loss < -0.20:
+    elif max_loss > 0.20:
         score -= 30
     else:
         score -= min(max_loss * 50, 10) 
