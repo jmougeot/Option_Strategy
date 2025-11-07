@@ -123,27 +123,27 @@ def generate_strategy_name(options: List[Option]) -> str:
         if o1.is_call() and o2.is_call() and o3.is_call():
             # Long Call Butterfly : long-short-long (1-2-1 pattern)
             if o1.is_long_call() and o2.is_short_call() and o3.is_long_call():
-                return f"Long Call Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Long Call Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
             
             # Short Call Butterfly : short-long-short
             elif o1.is_short_call() and o2.is_long_call() and o3.is_short_call():
-                return f"Short Call Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Short Call Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
             
             # Bull Call Ladder (Long Call Ladder) : long-long-short
             elif o1.is_long_call() and o2.is_long_call() and o3.is_short_call():
-                return f"Bull Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Bull Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
             
             # Bear Call Ladder (Short Call Ladder) : short-short-long
             elif o1.is_short_call() and o2.is_short_call() and o3.is_long_call():
-                return f"Bear Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Bear Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
             
             # Long Call Ladder inversé : long-short-short
             elif o1.is_long_call() and o2.is_short_call() and o3.is_short_call():
-                return f"Modified Bull Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Modified Bull Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
             
             # Short Call Ladder inversé : short-long-long
             elif o1.is_short_call() and o2.is_long_call() and o3.is_long_call():
-                return f"Modified Bear Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Modified Bear Call Ladder {o1.strike}/{o2.strike}/{o3.strike}"
             
             else:
                 parts = [_format_option(o) for o in options]
@@ -153,27 +153,27 @@ def generate_strategy_name(options: List[Option]) -> str:
         elif o1.is_put() and o2.is_put() and o3.is_put():
             # Long Put Butterfly : long-short-long
             if o1.is_long_put() and o2.is_short_put() and o3.is_long_put():
-                return f"Long Put Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Long Put Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
             
             # Short Put Butterfly : short-long-short
             elif o1.is_short_put() and o2.is_long_put() and o3.is_short_put():
-                return f"Short Put Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Short Put Butterfly {o1.strike}/{o2.strike}/{o3.strike}"
             
             # Bear Put Ladder (Long Put Ladder) : long-long-short
             elif o1.is_long_put() and o2.is_long_put() and o3.is_short_put():
-                return f"Bear Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Bear Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
             
             # Bull Put Ladder (Short Put Ladder) : short-short-long
             elif o1.is_short_put() and o2.is_short_put() and o3.is_long_put():
-                return f"Bull Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Bull Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
             
             # Long Put Ladder inversé : long-short-short
             elif o1.is_long_put() and o2.is_short_put() and o3.is_short_put():
-                return f"Modified Bear Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Modified Bear Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
             
             # Short Put Ladder inversé : short-long-long
             elif o1.is_short_put() and o2.is_long_put() and o3.is_long_put():
-                return f"Modified Bull Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} Modified Bull Put Ladder {o1.strike}/{o2.strike}/{o3.strike}"
             
             else:
                 parts = [_format_option(o) for o in options]
@@ -191,10 +191,38 @@ def generate_strategy_name(options: List[Option]) -> str:
     if n_legs == 4:
         o1, o2, o3, o4 = options[0], options[1], options[2], options[3]
         
-        # Iron Condor : 4 options, 2 calls + 2 puts
         n_calls = sum(1 for o in options if o.is_call())
         n_puts = sum(1 for o in options if o.is_put())
         
+        # ================== BUTTERFLIES (4 legs avec strike du milieu répété) ==================
+        # Vérifier si c'est un butterfly : strike1, strike2, strike2, strike3
+        # Les 2 legs du milieu ont le même strike et la même position
+        if (o2.strike == o3.strike and 
+            o2.position == o3.position and
+            o1.strike < o2.strike < o4.strike):
+            
+            # CALL BUTTERFLY
+            if n_calls == 4:
+                # Long Call Butterfly : long-short-short-long
+                if o1.is_long_call() and o2.is_short_call() and o3.is_short_call() and o4.is_long_call():
+                    return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} {o1.strike}/{o2.strike}/{o4.strike} Call Fly"
+                
+                # Short Call Butterfly : short-long-long-short
+                elif o1.is_short_call() and o2.is_long_call() and o3.is_long_call() and o4.is_short_call():
+                    return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} {o1.strike}/{o2.strike}/{o4.strike} Short Call Fly"
+            
+            # PUT BUTTERFLY
+            elif n_puts == 4:
+                # Long Put Butterfly : long-short-short-long
+                if o1.is_long_put() and o2.is_short_put() and o3.is_short_put() and o4.is_long_put():
+                    return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} {o1.strike}/{o2.strike}/{o4.strike} Put Fly"
+                
+                # Short Put Butterfly : short-long-long-short
+                elif o1.is_short_put() and o2.is_long_put() and o3.is_long_put() and o4.is_short_put():
+                    return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year} {o1.strike}/{o2.strike}/{o4.strike} Short Put Fly"
+        
+        # ================== IRON CONDOR ==================
+        # Iron Condor : 4 options, 2 calls + 2 puts
         if n_calls == 2 and n_puts == 2:
             # Séparer calls et puts
             calls = [o for o in options if o.is_call()]
@@ -203,18 +231,17 @@ def generate_strategy_name(options: List[Option]) -> str:
             # Trier par strike
             calls.sort(key=lambda o: o.strike)
             puts.sort(key=lambda o: o.strike)
-            
             # Iron Condor : short middle, long wings
             # Put spread: long low put + short high put
             # Call spread: short low call + long high call
             if (puts[0].is_long_put() and puts[1].is_short_put() and
                 calls[0].is_short_call() and calls[1].is_long_call()):
-                return f"Iron Condor {puts[0].strike}/{puts[1].strike}/{calls[0].strike}/{calls[1].strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year}{puts[0].strike}/{puts[1].strike}/{calls[0].strike}/{calls[1].strike} Iron Condor"
             
             # Reverse Iron Condor
             elif (puts[0].is_short_put() and puts[1].is_long_put() and
                   calls[0].is_long_call() and calls[1].is_short_call()):
-                return f"Reverse Iron Condor {puts[0].strike}/{puts[1].strike}/{calls[0].strike}/{calls[1].strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year}{puts[0].strike}/{puts[1].strike}/{calls[0].strike}/{calls[1].strike} Reverse Iron Condor"
             
             else:
                 # Génération des noms avec format complet
@@ -229,7 +256,7 @@ def generate_strategy_name(options: List[Option]) -> str:
                 return f"Long Call Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
             elif (o1.is_short_call() and o2.is_long_call() and 
                   o3.is_long_call() and o4.is_short_call()):
-                return f"Short Call Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year}{o1.strike}/{o2.strike}/{o3.strike}/{o4.strike} Short Call Condor"
             else:
                 parts = [_format_option(o) for o in options]
                 return " ".join(parts)
@@ -238,10 +265,10 @@ def generate_strategy_name(options: List[Option]) -> str:
         elif n_puts == 4:
             if (o1.is_long_put() and o2.is_short_put() and 
                 o3.is_short_put() and o4.is_long_put()):
-                return f"Long Put Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year}{o1.strike}/{o2.strike}/{o3.strike}/{o4.strike} Long Put Condor"
             elif (o1.is_short_put() and o2.is_long_put() and 
                   o3.is_long_put() and o4.is_short_put()):
-                return f"Short Put Condor {o1.strike}/{o2.strike}/{o3.strike}/{o4.strike}"
+                return f"{o1.underlying_symbol}{o1.expiration_month}{o1.expiration_year}{o1.strike}/{o2.strike}/{o3.strike}/{o4.strike} Short Put Condor"
             else:
                 parts = [_format_option(o) for o in options]
                 return " ".join(parts)
