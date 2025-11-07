@@ -8,7 +8,7 @@ Utilise itertools.combinations pour générer efficacement toutes les combinaiso
 """
 from itertools import product
 from typing import List, Tuple, Optional
-from itertools import combinations
+from itertools import combinations_with_replacement
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.strategy.calcul_linear_metrics import create_strategy_fast
@@ -53,7 +53,7 @@ class OptionStrategyGeneratorV2:
             print(f"🔄 Génération des stratégies à {n_legs} leg(s)...")
             
             # Générer toutes les combinaisons de n_legs options
-            for combo in combinations(self.options, n_legs):
+            for combo in combinations_with_replacement(self.options, n_legs):
                 # Pour chaque combinaison, tester différentes configurations de positions
                 strategies = self._generate_position_variants(
                     list(combo), 

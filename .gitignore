@@ -7,8 +7,7 @@ __pycache__/
 venv/
 env/
 ENV/
-*.egg-info/
-dist/
+src/myproject/trade_monitor_data/
 build/
 *.pyc
 
