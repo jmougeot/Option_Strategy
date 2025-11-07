@@ -76,7 +76,7 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     # Les noms contiennent : "ERJ4 96.375/96.50/96.625 Call Fly" ou "ERJ4 Long Put Butterfly 95/96/97"
     strategy_name_lower = strategy.strategy_name.lower()
     if 'fly' in strategy_name_lower or 'butterfly' in strategy_name_lower or 'condor' in strategy_name_lower:
-        score += 10
+        score += 5
 
     
     # Toujours retourner un score normalisé entre 0 et 100
