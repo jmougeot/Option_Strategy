@@ -52,10 +52,6 @@ bloomberg_credentials.json
 user_settings.json
 custom_strategies.py
 
-# Jupyter Notebooks
-.ipynb_checkpoints/
-*.ipynb
-
 # Tests
 .pytest_cache/
 .coverage
