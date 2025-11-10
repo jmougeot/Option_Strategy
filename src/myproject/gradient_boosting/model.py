@@ -3,7 +3,8 @@ from sklearn.metrics import root_mean_squared_error, r2_score, mean_absolute_err
 from sklearn.model_selection import train_test_split
 from myproject.gradient_boosting.data_bulilder import data_frame_bloomberg
 from myproject.strategy.comparison_class import StrategyComparison
-from typing import List, Tuple
+from typing import List, Tuple, Union
+from pathlib import Path
 import numpy as np
 import pandas as pd
 
@@ -40,9 +41,9 @@ def xgboost_pretrain_and_finetune(
     print(f"   - Score max: {np.max(y_bloomberg):.2f}")
     
     # Charger les stratégies Trade Monitor depuis le CSV
-    if isinstance(trade_monitor_strategies, str):
+    if isinstance(trade_monitor_strategies, (str, Path)):
         # C'est un chemin vers un CSV, le charger
-        tm_df = pd.read_csv(trade_monitor_strategies)
+        tm_df = pd.read_csv(str(trade_monitor_strategies))
         X_tm = tm_df.drop(columns=['score'], errors='ignore')
         y_tm = np.array(tm_df['score'].values)
     else:
