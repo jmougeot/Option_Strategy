@@ -174,4 +174,55 @@ def data_frame_bloomberg(strategies: List[StrategyComparison]) -> Tuple[pd.DataF
     X = pd.DataFrame(feature_list, columns=feature_names)
     y = np.array(labels)  # Scores continus entre 0 et 100
     
-    return X, y 
+    # Nettoyer le DataFrame pour XGBoost
+    X = prepare_dataframe_for_xgboost(X)
+    
+    return X, y
+
+
+def prepare_dataframe_for_xgboost(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prépare le DataFrame pour XGBoost en convertissant/supprimant les colonnes non numériques
+    
+    Args:
+        df: DataFrame brut avec des colonnes de type object
+        
+    Returns:
+        DataFrame nettoyé avec uniquement des colonnes numériques
+    """
+    # Colonnes à supprimer (identifiants et textes non encodables)
+    columns_to_drop = [
+        'original', 'underlying', 'month_expiracy', 'year_expiray', 'normalized',
+        'strikes', 'REF O', 'REF C', 'what is closed', 'CLOSE SIZE', 
+        'CLOSE PRICE', 'CLOSE DATE', 'DELTA'
+    ]
+    
+    # Supprimer les colonnes
+    df = df.drop(columns=[col for col in columns_to_drop if col in df.columns], errors='ignore')
+    
+    # Encoder les colonnes catégorielles (strategy_type, option_type)
+    categorical_columns = ['strategy_type', 'option_type']
+    
+    for col in categorical_columns:
+        if col in df.columns:
+            # Label encoding simple
+            df[col] = pd.Categorical(df[col]).codes
+    
+    # Convertir 'P&L' en float si c'est un object
+    if 'P&L' in df.columns:
+        df['P&L'] = pd.to_numeric(df['P&L'], errors='coerce')
+    
+    # Convertir is_trade_monitor_data en int
+    if 'is_trade_monitor_data' in df.columns:
+        df['is_trade_monitor_data'] = df['is_trade_monitor_data'].astype(int)
+    
+    # Remplacer les NaN par 0
+    df = df.fillna(0)
+    
+    # S'assurer que toutes les colonnes sont numériques
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    
+    return df
+ 

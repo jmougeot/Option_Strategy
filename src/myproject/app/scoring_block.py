@@ -97,69 +97,6 @@ def scoring_weights_block() -> dict:
             'avg_implied_volatility': 0.02
         },
         
-        "Directional (Directionnel)": {
-            # Favorise max profit, risk/reward, average_pnl
-            'max_profit': 0.20,
-            'max_loss': 0.03,
-            'risk_reward_ratio': 0.15,
-            'profit_at_target': 0.15,
-            'surface_profit': 0.12,
-            'surface_loss': 0.02,
-            'surface_profit_ponderated': 0.08,
-            'surface_loss_ponderated': 0.02,
-            'profit_zone_width': 0.05,
-            'breakeven_points': 0.02,
-            'total_delta': 0.03,
-            'total_gamma': 0.03,
-            'total_vega': 0.02,
-            'total_theta': 0.02,
-            'average_pnl': 0.08,
-            'sigma_pnl': 0.02,
-            'avg_implied_volatility': 0.01
-        },
-        
-        "Income (Génération de Revenus)": {
-            # Favorise theta, zone profitable, surfaces pondérées
-            'max_profit': 0.10,
-            'max_loss': 0.05,
-            'risk_reward_ratio': 0.08,
-            'profit_at_target': 0.10,
-            'surface_profit': 0.05,
-            'surface_loss': 0.03,
-            'surface_profit_ponderated': 0.12,
-            'surface_loss_ponderated': 0.08,
-            'profit_zone_width': 0.12,
-            'breakeven_points': 0.05,
-            'total_delta': 0.04,
-            'total_gamma': 0.03,
-            'total_vega': 0.03,
-            'total_theta': 0.18,
-            'average_pnl': 0.06,
-            'sigma_pnl': 0.03,
-            'avg_implied_volatility': 0.02
-        },
-        
-        "Delta Neutral (Market Neutral)": {
-            # Favorise neutralité delta, surfaces pondérées équilibrées
-            'max_profit': 0.08,
-            'max_loss': 0.05,
-            'risk_reward_ratio': 0.10,
-            'profit_at_target': 0.07,
-            'surface_profit': 0.08,
-            'surface_loss': 0.05,
-            'surface_profit_ponderated': 0.10,
-            'surface_loss_ponderated': 0.08,
-            'profit_zone_width': 0.10,
-            'breakeven_points': 0.05,
-            'total_delta': 0.20,  # Important !
-            'total_gamma': 0.06,
-            'total_vega': 0.08,
-            'total_theta': 0.05,
-            'average_pnl': 0.05,
-            'sigma_pnl': 0.03,
-            'avg_implied_volatility': 0.02
-        },
-        
         "Manuel (Personnalisé)": None  # Sera configuré manuellement
     }
     

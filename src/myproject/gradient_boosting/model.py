@@ -1,9 +1,9 @@
 import xgboost as xgb
 from sklearn.metrics import root_mean_squared_error, r2_score, mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
-from myproject.gradient_boosting.data_bulilder import data_frame_bloomberg
+from myproject.gradient_boosting.data_bulilder import data_frame_bloomberg, prepare_dataframe_for_xgboost
 from myproject.strategy.comparison_class import StrategyComparison
-from typing import List, Tuple, Union
+from typing import List, Tuple
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -44,8 +44,9 @@ def xgboost_pretrain_and_finetune(
     if isinstance(trade_monitor_strategies, (str, Path)):
         # C'est un chemin vers un CSV, le charger
         tm_df = pd.read_csv(str(trade_monitor_strategies))
-        X_tm = tm_df.drop(columns=['score'], errors='ignore')
         y_tm = np.array(tm_df['score'].values)
+        X_tm = tm_df.drop(columns=['score'], errors='ignore')
+        X_tm = prepare_dataframe_for_xgboost(X_tm)
     else:
         # C'est une liste de stratégies, la convertir
         X_tm, y_tm = data_frame_bloomberg(trade_monitor_strategies)
@@ -54,6 +55,22 @@ def xgboost_pretrain_and_finetune(
     print(f"   - Score moyen: {np.mean(y_tm):.2f}")
     print(f"   - Score min: {np.min(y_tm):.2f}")
     print(f"   - Score max: {np.max(y_tm):.2f}")
+    
+    # Aligner les colonnes entre Bloomberg et Trade Monitor
+    # Utiliser les colonnes de Bloomberg comme référence
+    print(f"\nAlignement des colonnes...")
+    print(f"   - Colonnes Bloomberg: {len(X_bloomberg.columns)}")
+    print(f"   - Colonnes Trade Monitor: {len(X_tm.columns)}")
+    
+    # Ajouter les colonnes manquantes dans Trade Monitor avec des 0
+    for col in X_bloomberg.columns:
+        if col not in X_tm.columns:
+            X_tm[col] = 0
+    
+    # Supprimer les colonnes en trop dans Trade Monitor
+    X_tm = X_tm[X_bloomberg.columns]
+    
+    print(f"   - Colonnes alignées: {len(X_tm.columns)}")
     
     # Split Trade Monitor en train/test pour validation
     X_tm_train, X_tm_test, y_tm_train, y_tm_test = train_test_split(
