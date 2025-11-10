@@ -7,11 +7,6 @@ from lightgbm import LGBMRegressor
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
 
-def max_loss_penalty(max_loss, threshold=20):
-    """ pour les pertes maximales."""
-    return min(abs(max_loss), threshold) / threshold
-
-
 def calculate_strategy_score(strategy: StrategyComparison) -> float:
     """
     Calcule un score continu pour une stratégie (0-100).
@@ -25,7 +20,6 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     """
     score = 0.0
 
-
     if strategy.call_count > 2:
         score -= 50
     elif strategy.call_count > 1 :
@@ -33,9 +27,7 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
 
     # 1. Score de profit attendu (0-25 points)
     avg_pnl = strategy.average_pnl or 0
-    
     score += min(avg_pnl * 500, 30)  # Bonus pour profit positif
-
     max_loss = abs(strategy.max_loss or 0)
 
     if max_loss > 0.10:
@@ -50,11 +42,10 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
         score -= min(max_loss * 50, 10) 
         
     
-
     zone_width = strategy.profit_zone_width or 0
     score += min(zone_width * 50, 10)
-    
     sigma = strategy.sigma_pnl or 0
+
     if sigma > 0.05:
         score -= 7
 
@@ -71,32 +62,43 @@ def calculate_strategy_score(strategy: StrategyComparison) -> float:
     delta = strategy.total_delta
     if abs(delta) > 100:
         score -= 30
-    
-    # Bonus pour Butterfly et Condor (stratégies à risque limité)
-    # Les noms contiennent : "ERJ4 96.375/96.50/96.625 Call Fly" ou "ERJ4 Long Put Butterfly 95/96/97"
+
     strategy_name_lower = strategy.strategy_name.lower()
     if 'fly' in strategy_name_lower or 'butterfly' in strategy_name_lower or 'condor' in strategy_name_lower:
         score += 5
 
-    
-    # Toujours retourner un score normalisé entre 0 et 100
     return max(0, min(score, 100))
 
 
-def data_frame(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.ndarray]:
+def data_frame_bloomberg(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.ndarray]:
     """
     Convertit une liste de stratégies en DataFrame de features et array de labels.
-    
     Args:
         strategies: Liste de StrategyComparison
-        
     Returns:
-        Tuple (X, y) oÃ¹ X est le DataFrame des features et y les labels
+        Tuple (X, y) ou X est le DataFrame des features et y les labels
     """
+
     feature_list = []
     labels = []
     
     feature_names = [
+        'original',
+        'underlying',
+        'month_expiracy',
+        'year_expiray',
+        'normalized',
+        'strategy_type',
+        'option_type',
+        'strikes',
+        'REF O',
+        'REF C',
+        'DELTA',
+        'what is closed',
+        'CLOSE SIZE',
+        'CLOSE PRICE',
+        'CLOSE DATE',
+        'P&L',
         'call_count',
         'average_pnl',
         'num_breakevens',
@@ -118,33 +120,56 @@ def data_frame(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.n
         'total_vega',
         'profit_zone_width',
         'max_loss_penalty',
-        'IV'
+        'IV',
+        'is_trade_monitor_data'
     ]
     
     for s in strategies:
         feats = []
-        feats.append(s.call_count if s.call_count else 0.0)
-        feats.append(s.average_pnl if s.average_pnl else 0.0)
+        # Informations de base
+        feats.append(s.strategy_name if hasattr(s, 'strategy_name') else None)  # original
+        feats.append(getattr(s, 'underlying', None))  # underlying
+        feats.append(s.expiration_month if hasattr(s, 'expiration_month') else None)  # month_expiracy
+        feats.append(s.expiration_year if hasattr(s, 'expiration_year') else None)  # year_expiray
+        feats.append(None)  # normalized (pas d'attribut direct)
+        feats.append(getattr(s, 'strategy_type', None))  # strategy_type
+        feats.append(getattr(s, 'option_type', None))  # option_type
+        feats.append(str([opt.strike for opt in s.all_options]) if hasattr(s, 'all_options') else None)  # strikes
+        
+        # Colonnes du Trade Monitor (None pour les stratégies Bloomberg)
+        feats.append(getattr(s, 'ref_o', None))  # REF O
+        feats.append(getattr(s, 'ref_c', None))  # REF C
+        feats.append(getattr(s, 'delta_trade', None))  # DELTA
+        feats.append(getattr(s, 'what_is_closed', None))  # what is closed
+        feats.append(getattr(s, 'close_size', None))  # CLOSE SIZE
+        feats.append(getattr(s, 'close_price_trade', None))  # CLOSE PRICE
+        feats.append(getattr(s, 'close_date', None))  # CLOSE DATE
+        feats.append(getattr(s, 'pnl_ticks', None))  # P&L
+        
+        # Métriques calculées
+        feats.append(s.call_count if s.call_count else None)
+        feats.append(s.average_pnl if s.average_pnl else None)
         feats.append(len(s.breakeven_points) if s.breakeven_points else 0)
-        feats.append(s.max_profit if s.max_profit else 0.0)
-        feats.append(s.max_loss if s.max_loss else 0.0)
-        feats.append(s.premium if s.premium else 0.0)
-        feats.append(s.profit_at_target if s.profit_at_target else 0.0)
-        feats.append(s.profit_range[0] if s.profit_range else 0.0)
-        feats.append(s.profit_range[1] if s.profit_range else 0.0)
-        feats.append(s.sigma_pnl if s.sigma_pnl else 0.0)
-        feats.append(s.surface_loss_ponderated if s.surface_loss_ponderated else 0.0)
-        feats.append(s.surface_profit_ponderated if s.surface_profit_ponderated else 0.0)
-        feats.append(s.surface_loss if s.surface_loss else 0.0)
-        feats.append(s.surface_profit if s.surface_profit else 0.0)
-        feats.append(s.risk_reward_ratio_ponderated if s.risk_reward_ratio_ponderated else 0.0)
-        feats.append(s.total_delta if s.total_delta else 0.0)
-        feats.append(s.total_theta if s.total_theta else 0.0)
-        feats.append(s.total_gamma if s.total_gamma else 0.0)
-        feats.append(s.total_vega if s.total_vega else 0.0)
-        feats.append(s.profit_zone_width if s.profit_zone_width else 0.0)
-        feats.append(s.max_loss if s.max_loss else 0.0)
-        feats.append(s.avg_implied_volatility)
+        feats.append(s.max_profit if s.max_profit else None)
+        feats.append(s.max_loss if s.max_loss else None)
+        feats.append(s.premium if s.premium else None)
+        feats.append(s.profit_at_target if s.profit_at_target else None)
+        feats.append(s.profit_range[0] if s.profit_range else None)
+        feats.append(s.profit_range[1] if s.profit_range else None)
+        feats.append(s.sigma_pnl if s.sigma_pnl else None)
+        feats.append(s.surface_loss_ponderated if s.surface_loss_ponderated else None)
+        feats.append(s.surface_profit_ponderated if s.surface_profit_ponderated else None)
+        feats.append(s.surface_loss if s.surface_loss else None)
+        feats.append(s.surface_profit if s.surface_profit else None)
+        feats.append(s.risk_reward_ratio_ponderated if s.risk_reward_ratio_ponderated else None)
+        feats.append(s.total_delta if s.total_delta else None)
+        feats.append(s.total_theta if s.total_theta else None)
+        feats.append(s.total_gamma if s.total_gamma else None)
+        feats.append(s.total_vega if s.total_vega else None)
+        feats.append(s.profit_zone_width if s.profit_zone_width else None)
+        feats.append(s.max_loss if s.max_loss else None)  # max_loss_penalty
+        feats.append(s.avg_implied_volatility if s.avg_implied_volatility else None)
+        feats.append(getattr(s, 'is_trade_monitor_data', False))  # is_trade_monitor_data
         
         feature_list.append(feats)
         
@@ -156,111 +181,3 @@ def data_frame(strategies: List[StrategyComparison]) -> Tuple[pd.DataFrame, np.n
     y = np.array(labels)  # Scores continus entre 0 et 100
     
     return X, y 
-
-
-
-def train_regression_model(
-    strategies: List[StrategyComparison],
-    test_size: float = 0.2,
-    random_state: int = 42
-):
-    """     
-    Returns:
-        Tuple (model, feature_importance, metrics)
-    """
-    
-    # Générer features et scores
-    X, y = data_frame(strategies)
-    
-    print(f" Dataset: {len(X)} stratagies")
-    print(f"   - Score moyen: {np.mean(y):.2f}")
-    print(f"   - Score min: {np.min(y):.2f}")
-    print(f"   - Score max: {np.max(y):.2f}")
-    
-    # Split train/test
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
-    
-    print(f"Train set: {len(X_train)} stratagies")
-    print(f"Test set: {len(X_test)} stratagies")
-    
-    # Créer et entraéner le modèle de régression
-    model = LGBMRegressor(
-        n_estimators=1000,
-        learning_rate=0.05,
-        max_depth=6,
-        num_leaves=31,
-        min_child_samples=20,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        n_jobs=-1,
-        random_state=random_state,
-        verbose=-1
-    )
-    
-    print("\n Entrainement du modéle de régression...")
-    model.fit(
-        X_train, y_train,
-        eval_set=[(X_test, y_test)]
-    )
-    
-    y_pred_train = model.predict(X_train)
-    y_pred_test = model.predict(X_test)
-    
-    train_mse = mean_squared_error(y_train, y_pred_train)
-    test_mse = mean_squared_error(y_test, y_pred_test)
-    train_mae = mean_absolute_error(y_train, y_pred_train)
-    test_mae = mean_absolute_error(y_test, y_pred_test)
-    train_r2 = r2_score(y_train, y_pred_train)
-    test_r2 = r2_score(y_test, y_pred_test)
-    
-    print("\nRésultats:")
-    print(f"   Train - MSE: {train_mse:.4f}, MAE: {train_mae:.4f}, RÂ²: {train_r2:.4f}")
-    print(f"   Test  - MSE: {test_mse:.4f}, MAE: {test_mae:.4f}, RÂ²: {test_r2:.4f}")
-    
-    # Feature importance
-    feature_importance = pd.DataFrame({
-        'feature': X.columns,
-        'importance': model.feature_importances_
-    }).sort_values('importance', ascending=False)
-    
-    print("\ Top 10 features importantes:")
-    print(feature_importance.head(10))
-    
-    metrics = {
-        'train_mse': train_mse,
-        'test_mse': test_mse,
-        'train_mae': train_mae,
-        'test_mae': test_mae,
-        'train_r2': train_r2,
-        'test_r2': test_r2
-    }
-    
-    return model, feature_importance, metrics
-
-
-def predict_and_rank_strategies(
-    model,
-    strategies: List[StrategyComparison],
-    top_n: int = 10
-) -> List[StrategyComparison]:
-
-    # Générer features
-    X, _ = data_frame(strategies)
-    
-    # Prédire les scores
-    predicted_scores = model.predict(X)
-    
-    # Trier par score décroissant
-    top_indices = np.argsort(predicted_scores)[::-1][:top_n]
-    
-    # Retourner les meilleures stratagies
-    best_strategies = [strategies[i] for i in top_indices]
-    
-    print(f"\nâœ¨ Top {top_n} stratatégies sélectionnées:")
-    for i, (idx, score) in enumerate(zip(top_indices, predicted_scores[top_indices]), 1):
-        strategy = strategies[idx]
-        print(f"{i}. {strategy.strategy_name} - Score: {score:.2f}")
-    
-    return best_strategies
