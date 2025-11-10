@@ -3,7 +3,6 @@ from myproject.gradient_boosting.model import xgboost_pretrain_and_finetune, pre
 from myproject.app.utils import strike_list
 from myproject.app.widget import ScenarioData
 from myproject.gradient_boosting.build_strategies_complete import normalize_and_export_mapping
-
 from pathlib import Path
 
 def SFR ():
