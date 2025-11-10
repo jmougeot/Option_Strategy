@@ -18,7 +18,6 @@ def process_bloomberg_to_strategies(
     max_legs: int = 4,
     scenarios: Optional[ScenarioData] = None ,
     num_points : int = 200
-
 ) ->  List[StrategyComparison]:
     """
     Fonction principale simplifiée pour Streamlit.
