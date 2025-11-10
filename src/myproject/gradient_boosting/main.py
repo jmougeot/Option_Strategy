@@ -99,6 +99,13 @@ print("="*80)
 trade_monitor_path = Path(__file__).parent.parent / "trade_monitor_data" / "Trade_monitor.csv"
 mapping_csv_path = Path(__file__).parent.parent / "trade_monitor_data" / "Strategy_mapping.csv"
 
+print(f"\nChemin Trade_monitor.csv: {trade_monitor_path}")
+print(f"Fichier existe: {trade_monitor_path.exists()}")
+
+# Vérifier que le fichier Trade_monitor.csv existe
+if not trade_monitor_path.exists():
+    raise FileNotFoundError(f"Le fichier Trade_monitor.csv n'existe pas: {trade_monitor_path}")
+
 # Générer le fichier de mapping si nécessaire
 if not mapping_csv_path.exists():
     print("Generation du fichier Strategy_mapping.csv...")

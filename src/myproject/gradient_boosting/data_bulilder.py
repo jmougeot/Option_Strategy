@@ -141,7 +141,6 @@ def data_frame_bloomberg(strategies: List[StrategyComparison]) -> Tuple[pd.DataF
         feats.append(getattr(s, 'close_size', None))  # CLOSE SIZE
         feats.append(getattr(s, 'close_price_trade', None))  # CLOSE PRICE
         feats.append(getattr(s, 'close_date', None))  # CLOSE DATE
-        feats.append(getattr(s, 'pnl_ticks', None))  # P&L
         feats.append(s.call_count if s.call_count else None)
         feats.append(s.average_pnl if s.average_pnl else None)
         feats.append(len(s.breakeven_points) if s.breakeven_points else 0)
