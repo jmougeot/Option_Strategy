@@ -1,7 +1,7 @@
 import xgboost as xgb
 from sklearn.metrics import root_mean_squared_error, r2_score, mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
-from myproject.gradient_boosting.data_bulilder import data_frame_bloomberg, data_frame_trade_monitor
+from myproject.gradient_boosting.data_bulilder import data_frame_bloomberg
 from myproject.strategy.comparison_class import StrategyComparison
 from typing import List, Tuple
 import numpy as np
@@ -10,7 +10,7 @@ import pandas as pd
 
 def xgboost_pretrain_and_finetune(
     bloomberg_strategies: List[StrategyComparison],
-    trade_monitor_strategies: List[StrategyComparison],
+    trade_monitor_strategies,
     test_size: float = 0.2,
     random_state: int = 42
 ):
@@ -39,8 +39,15 @@ def xgboost_pretrain_and_finetune(
     print(f"   - Score min: {np.min(y_bloomberg):.2f}")
     print(f"   - Score max: {np.max(y_bloomberg):.2f}")
     
-    # Convertir les stratégies Trade Monitor en features
-    X_tm, y_tm = data_frame_trade_monitor(trade_monitor_strategies)
+    # Charger les stratégies Trade Monitor depuis le CSV
+    if isinstance(trade_monitor_strategies, str):
+        # C'est un chemin vers un CSV, le charger
+        tm_df = pd.read_csv(trade_monitor_strategies)
+        X_tm = tm_df.drop(columns=['score'], errors='ignore')
+        y_tm = np.array(tm_df['score'].values)
+    else:
+        # C'est une liste de stratégies, la convertir
+        X_tm, y_tm = data_frame_bloomberg(trade_monitor_strategies)
     
     print(f"\nDataset Trade Monitor: {len(X_tm)} strategies")
     print(f"   - Score moyen: {np.mean(y_tm):.2f}")
@@ -165,7 +172,6 @@ def xgboost_pretrain_and_finetune(
 def predict_and_rank_strategies(
     model,
     strategies: List[StrategyComparison],
-    is_trade_monitor: bool = True,
     top_n: int = 10
 ) -> List[Tuple[StrategyComparison, float]]:
     """
@@ -182,10 +188,8 @@ def predict_and_rank_strategies(
     """
     
     # Générer features selon le type de données
-    if is_trade_monitor:
-        X, _ = data_frame_trade_monitor(strategies)
-    else:
-        X, _ = data_frame_bloomberg(strategies)
+  
+    X, _ = data_frame_bloomberg(strategies)
     
     # Prédire les scores
     predicted_scores = model.predict(X)

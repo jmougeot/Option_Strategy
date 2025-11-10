@@ -98,7 +98,6 @@ def data_frame_bloomberg(strategies: List[StrategyComparison]) -> Tuple[pd.DataF
         'CLOSE SIZE',
         'CLOSE PRICE',
         'CLOSE DATE',
-        'P&L',
         'call_count',
         'average_pnl',
         'num_breakevens',
@@ -135,8 +134,6 @@ def data_frame_bloomberg(strategies: List[StrategyComparison]) -> Tuple[pd.DataF
         feats.append(getattr(s, 'strategy_type', None))  # strategy_type
         feats.append(getattr(s, 'option_type', None))  # option_type
         feats.append(str([opt.strike for opt in s.all_options]) if hasattr(s, 'all_options') else None)  # strikes
-        
-        # Colonnes du Trade Monitor (None pour les stratégies Bloomberg)
         feats.append(getattr(s, 'ref_o', None))  # REF O
         feats.append(getattr(s, 'ref_c', None))  # REF C
         feats.append(getattr(s, 'delta_trade', None))  # DELTA
@@ -145,8 +142,6 @@ def data_frame_bloomberg(strategies: List[StrategyComparison]) -> Tuple[pd.DataF
         feats.append(getattr(s, 'close_price_trade', None))  # CLOSE PRICE
         feats.append(getattr(s, 'close_date', None))  # CLOSE DATE
         feats.append(getattr(s, 'pnl_ticks', None))  # P&L
-        
-        # Métriques calculées
         feats.append(s.call_count if s.call_count else None)
         feats.append(s.average_pnl if s.average_pnl else None)
         feats.append(len(s.breakeven_points) if s.breakeven_points else 0)
