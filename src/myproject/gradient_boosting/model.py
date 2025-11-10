@@ -98,6 +98,17 @@ def xgboost_pretrain_and_finetune(
     print("ENTRAINEMENT PHASE 1: Pre-train sur Bloomberg")
     print("="*80)
     
+    # Vérifier les données avant l'entraînement
+    print(f"\nVérification des données Bloomberg:")
+    print(f"   - Valeurs NaN: {X_bloomberg.isna().sum().sum()}")
+    print(f"   - Valeurs inf: {np.isinf(X_bloomberg.values).sum()}")
+    print(f"   - Shape: {X_bloomberg.shape}")
+    
+    print(f"\nVérification des données Trade Monitor Test:")
+    print(f"   - Valeurs NaN: {X_tm_test.isna().sum().sum()}")
+    print(f"   - Valeurs inf: {np.isinf(X_tm_test.values).sum()}")
+    print(f"   - Shape: {X_tm_test.shape}")
+    
     # Pre-train sur Bloomberg avec validation sur Trade Monitor test
     model.fit(
         X_bloomberg, 

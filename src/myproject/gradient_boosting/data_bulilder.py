@@ -224,5 +224,22 @@ def prepare_dataframe_for_xgboost(df: pd.DataFrame) -> pd.DataFrame:
         if df[col].dtype == 'object':
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     
+    # Compter les valeurs infinies avant remplacement
+    inf_count = np.isinf(df.values).sum()
+    if inf_count > 0:
+        print(f"   Warning: {inf_count} valeurs infinies detectees et remplacees")
+    
+    # Remplacer les valeurs infinies par des valeurs finies
+    # Remplacer inf par une grande valeur et -inf par une petite valeur
+    df = df.replace([np.inf, -np.inf], [1e10, -1e10])
+    
+    # Vérifier et clipper les valeurs extrêmes
+    for col in df.columns:
+        # Clipper les valeurs entre -1e10 et 1e10
+        df[col] = df[col].clip(-1e10, 1e10)
+    
+    # Vérification finale: remplacer tout NaN restant
+    df = df.fillna(0)
+    
     return df
  
