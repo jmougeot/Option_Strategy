@@ -60,7 +60,7 @@ def create_strategy_fast_with_signs(
     # Calculer call_count vectorisé (conversion en int pour l'arithmétique)
     call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32) - np.sum((signs > 0) & is_call, dtype=np.int32))
   
-    if call_count > 1:
+    if call_count >= 1:
         return None
     is_long = signs > 0
     total_premium = np.sum(signs * premiums)
