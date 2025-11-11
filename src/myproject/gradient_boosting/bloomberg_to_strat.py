@@ -59,8 +59,6 @@ def process_bloomberg_to_strategies(
         price_min=price_min,
         price_max=price_max,
         max_legs=max_legs,
-        include_long=True,
-        include_short=True,
     )
 
     return all_strategies

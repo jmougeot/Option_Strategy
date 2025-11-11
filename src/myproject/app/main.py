@@ -74,10 +74,9 @@ def process_bloomberg_to_strategies(
     if not options:
         return [], stats, mixture
 
-    # OPTIMISATION: Utiliser le cache Streamlit pour éviter de régénérer
-    # les stratégies si les paramètres d'entrée sont identiques
-    all_strategies = OptionStrategyGeneratorV2.generate_with_cache(  # type: ignore
-        options=options,
+    generator = OptionStrategyGeneratorV2(options)
+
+    all_strategies = generator.generate_all_combinations(
         target_price=target_price,
         price_min=price_min,
         price_max=price_max,

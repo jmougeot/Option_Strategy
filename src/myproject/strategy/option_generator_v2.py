@@ -8,7 +8,7 @@ Utilise itertools.combinations pour générer efficacement toutes les combinaiso
 """
 
 from itertools import product
-from typing import List, Optional
+from typing import List
 from itertools import combinations_with_replacement
 import numpy as np
 from myproject.option.option_class import Option
