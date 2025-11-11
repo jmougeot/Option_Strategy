@@ -13,12 +13,10 @@ Utilise les fonctions optimisées des modules :
 """
 
 from typing import List, Dict, Optional, Tuple
-from myproject.option.option_class import Option
 from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.comparor_v2 import StrategyComparerV2
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
-from myproject.bloomberg.local import import_local_option
 from myproject.app.scenario import create_mixture_from_scenarios
 from myproject.app.widget import ScenarioData
 import numpy as np
@@ -36,14 +34,13 @@ def process_bloomberg_to_strategies(
     top_n: int = 10,
     scoring_weights: Optional[Dict[str, float]] = None,
     verbose: bool = False,
-    scenarios: Optional[ScenarioData] = None ,
-    num_points : int = 200
-
+    scenarios: Optional[ScenarioData] = None,
+    num_points: int = 200,
 ) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray]]:
     """
     Fonction principale simplifiée pour Streamlit.
     Importe les options depuis Bloomberg et retourne les meilleures stratégies + stats.
-    
+
     Args:
         underlying: Symbole du sous-jacent (ex: "ER")
         months: Liste des mois Bloomberg (ex: ['M', 'U'])
@@ -59,47 +56,44 @@ def process_bloomberg_to_strategies(
     """
     stats = {}
 
-    mixture= create_mixture_from_scenarios(scenarios, price_min, price_max, num_points, target_price)
+    mixture = create_mixture_from_scenarios(
+        scenarios, price_min, price_max, num_points, target_price
+    )
 
     options = import_euribor_options(
         underlying=underlying,
         months=months,
         years=years,
         strikes=strikes,
-        default_position='long',
-        mixture = mixture
+        default_position="long",
+        mixture=mixture,
     )
-    
-    stats['nb_options'] = len(options)
-    
+
+    stats["nb_options"] = len(options)
+
     if not options:
         return [], stats, mixture
-    
+
     generator = OptionStrategyGeneratorV2(options)
-    
+
     all_strategies = generator.generate_all_combinations(
         target_price=target_price,
         price_min=price_min,
         price_max=price_max,
         max_legs=max_legs,
-        include_long=True,
-        include_short=True
     )
-    
-    stats['nb_strategies_totales'] = len(all_strategies)
-    
+
+    stats["nb_strategies_totales"] = len(all_strategies)
+
     # ÉTAPE 3 : Comparaison et ranking
     if verbose:
         print(f"📊 Comparaison et ranking (top {top_n})...")
-    
+
     comparer = StrategyComparerV2()
     best_strategies = comparer.compare_and_rank(
-        strategies=all_strategies,
-        top_n=top_n,
-        weights=scoring_weights
+        strategies=all_strategies, top_n=top_n, weights=scoring_weights
     )
-    
-    stats['nb_strategies_classees'] = len(best_strategies)
-    
-    
+
+    stats["nb_strategies_classees"] = len(best_strategies)
+
     return best_strategies, stats, mixture

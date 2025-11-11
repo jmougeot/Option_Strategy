@@ -1,4 +1,5 @@
 import streamlit as st
+
 # ============================================================================
 # STYLES CSS PERSONNALISÉS
 # ============================================================================
@@ -49,7 +50,7 @@ CSS = """
     }
 </style>"""
 
+
 def inject_css():
     """Injecte le style CSS global dans Streamlit."""
     st.markdown(f"<style>{CSS}</style>", unsafe_allow_html=True)
-

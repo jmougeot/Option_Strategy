@@ -12,23 +12,22 @@ Auteur: BGC Trading Desk
 Date: 2025-10-17
 """
 
-from datetime import date, datetime
 from typing import Literal, Optional
 
 
 def build_option_ticker(
     underlying: str,
-    expiry_month : Literal['F' , 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z' ],
-    expiry_year : int,
-    option_type: Literal['C', 'P'],
+    expiry_month: Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"],
+    expiry_year: int,
+    option_type: Literal["C", "P"],
     strike: float,
-    suffix: Optional[str] = None
+    suffix: Optional[str] = None,
 ) -> str:
     """
     Construit un ticker Bloomberg pour options EURIBOR.
-    
+
     Format Bloomberg: [UNDERLYING][MONTH][YEAR][TYPE] [STRIKE] [SUFFIX]
-    
+
     Args:
         underlying: Symbole du sous-jacent (ex: "ER" pour EURIBOR)
         expiry_month: Code mois Bloomberg ('F', 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z')
@@ -36,10 +35,10 @@ def build_option_ticker(
         option_type: 'C' pour Call ou 'P' pour Put
         strike: Prix d'exercice (ex: 97.5)
         suffix: Suffixe Bloomberg (ex: "Comdty" pour commodités)
-    
+
     Returns:
         Ticker Bloomberg formaté (ex: "ERH5C 97.5 Comdty")
-    
+
     Examples:
         >>> build_option_ticker("ER", "H", 5, "C", 97.5, "Comdty")
         'ERH5C 97.5 Comdty'
@@ -48,10 +47,9 @@ def build_option_ticker(
     """
     # Format: ERH5C 97.5 Comdty (PAS d'espaces entre underlying, month, year, type)
     ticker = f"{underlying.upper()}{expiry_month}{expiry_year}{option_type} {strike}"
-    
+
     # Ajouter le suffixe si fourni
     if suffix:
         ticker = f"{ticker} {suffix}"
-    
+
     return ticker
-    

@@ -1,5 +1,4 @@
-
-from typing import List, Optional 
+from typing import List, Optional
 from myproject.gradient_boosting.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
@@ -16,13 +15,13 @@ def process_bloomberg_to_strategies(
     price_min: float = 0.0,
     price_max: float = 100.0,
     max_legs: int = 4,
-    scenarios: Optional[ScenarioData] = None ,
-    num_points : int = 200
-) ->  List[StrategyComparison]:
+    scenarios: Optional[ScenarioData] = None,
+    num_points: int = 200,
+) -> List[StrategyComparison]:
     """
     Fonction principale simplifiée pour Streamlit.
     Importe les options depuis Bloomberg et retourne les meilleures stratégies + stats.
-    
+
     Args:
         underlying: Symbole du sous-jacent (ex: "ER")
         months: Liste des mois Bloomberg (ex: ['M', 'U'])
@@ -38,21 +37,22 @@ def process_bloomberg_to_strategies(
     """
     stats = {}
 
-    mixture= create_mixture_from_scenarios(scenarios, price_min, price_max, num_points, target_price)
+    mixture = create_mixture_from_scenarios(
+        scenarios, price_min, price_max, num_points, target_price
+    )
 
     options = import_euribor_options(
         underlying=underlying,
         months=months,
         years=years,
         strikes=strikes,
-        default_position='long',
-        mixture = mixture
+        default_position="long",
+        mixture=mixture,
     )
-    
-    stats['nb_options'] = len(options)
-    
+
+    stats["nb_options"] = len(options)
+
     generator = OptionStrategyGeneratorV2(options)
-    
 
     all_strategies = generator.generate_all_combinations(
         target_price=target_price,
@@ -60,8 +60,7 @@ def process_bloomberg_to_strategies(
         price_max=price_max,
         max_legs=max_legs,
         include_long=True,
-        include_short=True
+        include_short=True,
     )
-    
-    return all_strategies
 
+    return all_strategies
