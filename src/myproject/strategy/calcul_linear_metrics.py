@@ -30,32 +30,40 @@ def create_strategy_fast_with_signs(
 
     # Extraction vectorisée ultra-rapide
     n_options = len(options)
+    
+    # P&L Array - Vérifier d'abord que c'est valide
+    prices = options[0].prices
+    if prices is None or options[0].pnl_array is None:
+        return None
+    
+    pnl_length = len(options[0].pnl_array)
+    
     premiums = np.empty(n_options, dtype=np.float64)
     deltas = np.empty(n_options, dtype=np.float64)
     gammas = np.empty(n_options, dtype=np.float64)
     vegas = np.empty(n_options, dtype=np.float64)
     thetas = np.empty(n_options, dtype=np.float64)
     ivs = np.empty(n_options, dtype=np.float64)
-    profit_surfaces_ponderated = np.empty(n_options, dtype=np.float64)
-    loss_surfaces_ponderated = np.empty(n_options, dtype=np.float64)
     average_pnls = np.empty(n_options, dtype=np.float64)
     sigma_pnls = np.empty(n_options, dtype=np.float64)
     is_call = np.empty(n_options, dtype=bool)
+    pnl_stack = np.empty((n_options, pnl_length), dtype=np.float64)
   
     for i, opt in enumerate(options):
+        if opt.pnl_array is None:
+            return None
         premiums[i] = opt.premium
         deltas[i] = opt.delta
         gammas[i] = opt.gamma
         vegas[i] = opt.vega
         thetas[i] = opt.theta
         ivs[i] = opt.implied_volatility
-        profit_surfaces_ponderated[i] = opt.profit_surface_ponderated
-        loss_surfaces_ponderated[i] = opt.loss_surface_ponderated
         average_pnls[i] = opt.average_pnl
         sigma_pnls[i] = opt.sigma_pnl
         is_call[i] = opt.option_type == "call"
+        pnl_stack[i] = opt.pnl_array
 
-    # Calculer call_count vectorisé (conversion en int pour l'arithmétique)
+    # Calculer call_count vectorisé
     call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32) - np.sum((signs > 0) & is_call, dtype=np.int32))
 
     if call_count >= 1:
@@ -69,30 +77,21 @@ def create_strategy_fast_with_signs(
     total_theta = np.sum(signs * thetas)
     total_iv = np.sum(signs * ivs)
 
-
     # Filtrage précoce AVANT calculs coûteux
     if total_premium > 0.05 or total_premium < -0.1:
         return None
     if abs(total_delta) > 0.7:
         return None
     
-    total_profit_surface = np.sum(np.where(is_long, profit_surfaces_ponderated, -loss_surfaces_ponderated))
-    total_loss_surface = np.sum(np.where(is_long, loss_surfaces_ponderated, -profit_surfaces_ponderated))
     total_average_pnl = np.sum(signs * average_pnls)
-    total_sigma_pnl = np.sqrt(np.sum(sigma_pnls**2))
-
     if total_average_pnl < 0:
         return None
-    # P&L Array - Extraction vectorisée
-    prices = options[0].prices
-    if prices is None:
-        return None
 
-    pnl_arrays = np.array([opt.pnl_array for opt in options if opt.pnl_array is not None])
-    total_pnl_array = np.sum(pnl_arrays * signs[:, np.newaxis], axis=0)
+    # P&L Array - Produit matriciel ultra-rapide (OPTIMISATION #2)
+    total_pnl_array = np.dot(signs, pnl_stack)
 
-    max_profit = float(np.max(total_pnl_array))
-    max_loss = float(np.min(total_pnl_array))
+    # Calcul min/max en une seule passe (OPTIMISATION #3)
+    max_profit, max_loss = float(np.max(total_pnl_array)), float(np.min(total_pnl_array))
 
     if max_loss < -0.10:
         return None
@@ -142,8 +141,20 @@ def create_strategy_fast_with_signs(
     positive_pnl = np.maximum(total_pnl_array, 0.0)
     negative_pnl = np.minimum(total_pnl_array, 0.0)
     surface_profit_nonponderated = float(np.sum(positive_pnl) * dx)
-    surface_profit_nonponderated = float(np.sum(positive_pnl) * dx)
     surface_loss_nonponderated = float(np.abs(np.sum(negative_pnl)) * dx)
+
+    # OPTIMISATION #4: Calcul des surfaces pondérées SEULEMENT si nécessaire
+    # (après tous les filtres précoces)
+    profit_surfaces_ponderated = np.empty(n_options, dtype=np.float64)
+    loss_surfaces_ponderated = np.empty(n_options, dtype=np.float64)
+    
+    for i, opt in enumerate(options):
+        profit_surfaces_ponderated[i] = opt.profit_surface_ponderated
+        loss_surfaces_ponderated[i] = opt.loss_surface_ponderated
+    
+    total_profit_surface = np.sum(np.where(is_long, profit_surfaces_ponderated, -loss_surfaces_ponderated))
+    total_loss_surface = np.sum(np.where(is_long, loss_surfaces_ponderated, -profit_surfaces_ponderated))
+    total_sigma_pnl = np.sqrt(np.sum(sigma_pnls**2))
 
     # Calcul du nom et expiration SEULEMENT si on va créer la stratégie (calculs coûteux)
     strategy_name = generate_strategy_name(options, signs)

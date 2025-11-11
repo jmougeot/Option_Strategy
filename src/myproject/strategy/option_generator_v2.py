@@ -30,7 +30,6 @@ class OptionStrategyGeneratorV2:
         4: [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=4)],
         5: [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=5)],
         6: [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=6)],
-
     }
 
     def __init__(self, options: List[Option]):
