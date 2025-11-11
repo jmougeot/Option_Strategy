@@ -30,17 +30,15 @@ def create_strategy_fast(
     """
     if not options:
         return None
-    
-    # ========== PHASE 1: Extraction vectorisée des données ==========
-    short_call_count = sum(1 for opt in options if opt.is_short() and opt.is_call())
-    if short_call_count > 3:
-        return None
+     
     call_count = 0
     for opt in options:
         if opt.is_short() and opt.is_call():
             call_count += 1
         if opt.is_long() and opt.is_call():
             call_count -= 1
+    if call_count > 1 : 
+        return None 
 
     # Pré-allouer les arrays NumPy pour éviter les réallocations
     is_long = np.array([opt.position == 'long' for opt in options], dtype=bool)
