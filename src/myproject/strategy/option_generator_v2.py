@@ -23,6 +23,16 @@ class OptionStrategyGeneratorV2:
     Teste toutes les combinaisons de 1 à 4 options avec différentes positions (long/short).
     """
 
+    SIGN_ARRAYS_CACHE = {
+        1: [np.array([s], dtype=np.float64) for s in [-1.0, 1.0]],
+        2: [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=2)],
+        3: [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=3)],
+        4: [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=4)],
+        5: [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=5)],
+        6: [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=6)],
+
+    }
+
     def __init__(self, options: List[Option]):
         """
         Initialise le générateur avec une liste d'options triées par expiration.
@@ -68,7 +78,6 @@ class OptionStrategyGeneratorV2:
             
             total_combos_tested += combos_this_level
             total_combos_filtered += filtered_this_level
-            print(f"  ✓ {combos_this_level:,} combos testées, {filtered_this_level:,} filtrées ({filtered_this_level/combos_this_level*100:.1f}%)")
 
         print(f"\n📊 Résumé:")
         print(f"  • Total combos testées: {total_combos_tested:,}")
@@ -104,53 +113,25 @@ class OptionStrategyGeneratorV2:
             ):
                 return []
 
-        # OPTIMISATION CRITIQUE: Pré-filtrage des combinaisons impossibles
-        # Calculer les Greeks totaux pour vérifier les limites AVANT de générer les positions
-        # Extraire les valeurs une seule fois
-        premiums = [opt.premium for opt in options]
-        deltas = [opt.delta for opt in options]
-        gammas = [opt.gamma for opt in options]
-        average_pnls = [opt.average_pnl for opt in options]
-        profit_surfaces = [opt.profit_surface_ponderated for opt in options]
-        loss_surfaces = [opt.loss_surface_ponderated for opt in options]
-        
-        # Calculer les limites min/max (tous long vs tous short)
-        total_premium_max = sum(premiums)  # Tous long (+1)
-        total_premium_min = -total_premium_max  # Tous short (-1)
-        
-        # Filtre 1: Premium - Si AUCUNE combinaison de signes ne peut satisfaire
-        if total_premium_min > 0.05 or total_premium_max < -0.1:
-            return []
-        
-        # Filtre 2: Delta - Maximum absolu possible
-        total_delta_max = sum(abs(d) for d in deltas)
-        if total_delta_max > 1:
-            return []
-        
-        # Filtre 3: Gamma - Maximum absolu possible
-        total_gamma_max = sum(abs(g) for g in gammas)
-        if total_gamma_max > 50:
-            return []
-        
-        # Filtre 4: Average PnL - Le meilleur cas doit être positif
-        total_average_pnl_max = sum(abs(a) for a in average_pnls)
-        # Si même dans le meilleur cas (tout combiné positivement) c'est négatif
-        if total_average_pnl_max < 0:
-            return []
-        
-        # Filtre 5: Surfaces - Maximum absolu possible
-        total_surface_max = sum(abs(p) + abs(l) for p, l in zip(profit_surfaces, loss_surfaces))
-        if total_surface_max > 1000:
-            return []
+            deltas = np.array([opt.delta for opt in options])
+            pos_deltas = np.sum(deltas[deltas > 0])
+            neg_deltas = np.sum(np.abs(deltas[deltas < 0]))
+            min_possible_delta = abs(pos_deltas - neg_deltas)
+            if min_possible_delta > 0.7:
+                return []
 
-        # Générer directement les signes numpy (+1/-1) au lieu de strings "long"/"short"
-        sign_space = list(product((-1.0, 1.0), repeat=n))
+        # OPTIMISATION MAJEURE: Utiliser le cache de signes pré-calculés
+        sign_arrays = self.SIGN_ARRAYS_CACHE.get(n)
+        if sign_arrays is None:
+            # Fallback pour n > 4 (ne devrait jamais arriver avec max_legs=4)
+            sign_arrays = [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=n)]
+        
         strategies: List[StrategyComparison] = []
 
-        # ===== Génération des stratégies =====
-        for signs_tuple in sign_space:
-            signs = np.array(signs_tuple, dtype=np.float64)
+        # ===== Génération des stratégies (optimisé) =====
+        for signs in sign_arrays:
             strat = create_strategy_fast_with_signs(options, signs, target_price)
-            if strat:
+            if strat is not None:  # Vérification explicite plus rapide que if strat
                 strategies.append(strat)
+        
         return strategies
