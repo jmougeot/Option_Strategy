@@ -285,6 +285,8 @@ class StrategyComparerV2:
             return 1.0
         elif value == 1:
             return 0.5
+        elif value == 2:
+            return 1
         else:  # value <= -2
             return 0.0
         
