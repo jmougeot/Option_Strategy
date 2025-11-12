@@ -65,8 +65,9 @@ def create_strategy_fast_with_signs(
 
     # Calculer call_count vectorisé
     call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32) - np.sum((signs > 0) & is_call, dtype=np.int32))
-
-    if call_count >= 1:
+    put_count = int(np.sum((signs <0) & is_call==False, dtype=np.int32) - np.sum((signs > 0) &   is_call==False, dtype=np.int32))
+    
+    if call_count >= 1 or put_count >=2:
         return None
     
     is_long = signs > 0
