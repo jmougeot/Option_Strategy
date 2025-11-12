@@ -275,19 +275,22 @@ class StrategyComparerV2:
     @staticmethod
     def _score_call_put(value: float, min_val: float, max_val: float) -> float:
         """
-        Score basé sur put_count:
-        - put_count >= 0: score = 1.0 (pas de risque à la hausse)
-        - put_count = -1: score = 0.5 (risque modéré)
-        - put_count = -2: score = 0.0 (risque maximal)
-        - put_count < -2: score = 0.0 (risque maximal)
+        Score basé sur put_count (SHORT - LONG):
+        Pénalise l'EXCÈS de puts SHORT (vendre trop de puts = risque à la baisse)
+        
+        - put_count <= 0: score = 1.0 (puts LONG ou neutre, OK)
+        - put_count == 1: score = 0.5 (1 put SHORT en excès, risque modéré)
+        - put_count >= 2: score = 0.0 (2+ puts SHORT en excès, risque maximal)
+        
+        Interprétation:
+        - put_count <= 0: on achète plus ou autant qu'on vend (OK)
+        - put_count > 0: on vend plus qu'on achète (exposition excessive à la baisse)
         """
-        if value <= 0:
+        if value <= 0:  # Neutre ou plus de puts LONG
             return 1.0
-        elif value == 1:
+        elif value == 1:  # 1 put SHORT en excès
             return 0.5
-        elif value == 2:
-            return 0.0
-        else:  # value <= -2
+        else:  # value >= 2 (2+ puts SHORT en excès)
             return 0.0
         
     @staticmethod
@@ -444,11 +447,12 @@ class StrategyComparerV2:
                             0.0,
                         )
                 elif scorer_name == "_score_call_put":
-                    # Score spécial pour put_count: >= 0 -> 1.0, -1 -> 0.5, <= -2 -> 0.0
+                    # Score spécial pour put_count (SHORT-LONG): pénalise l'excès de puts SHORT
+                    # <= 0 -> 1.0 (neutre/long OK), 1 -> 0.5 (1 short), >= 2 -> 0.0 (2+ short)
                     scores_matrix[:, j] = np.where(
-                        values >= 0,
+                        values <= 0,  # Neutre ou plus de puts LONG
                         1.0,
-                        np.where(values == -1, 0.5, 0.0)
+                        np.where(values == 1, 0.5, 0.0)  # 1 put SHORT -> 0.5, >= 2 -> 0.0
                     )
                 elif scorer_name == "_score_negative_better":
                     # Supprimé car redondant avec _score_lower_better
