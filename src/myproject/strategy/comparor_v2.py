@@ -69,14 +69,22 @@ class StrategyComparerV2:
         return [
             # ========== MÉTRIQUES FINANCIÈRES ==========
             MetricConfig(
+                name = "Risque à la hausse",
+                weight = 0.10,
+                extractor=lambda s: self._safe_value(s.put_count),
+                normalizer=self._normalize_count ,
+                scorer=self._score_call_put,
+            ),
+
+            MetricConfig(
                 name="max_profit",
                 weight=0.10,
                 extractor=lambda s: self._safe_value(s.max_profit),
                 normalizer=self._normalize_max,
-                scorer=self._score_higher_better,
+                scorer=self._score_higher_better
             ),
             MetricConfig(
-                name="risk_over_reward",  # Clarifié: Risk/Reward (plus petit = mieux)
+                name="risk_over_reward", 
                 weight=0.10,
                 extractor=lambda s: self._safe_value(s.risk_reward_ratio),
                 normalizer=self._normalize_min_max,
@@ -236,8 +244,7 @@ class StrategyComparerV2:
     @staticmethod
     def _normalize_min_max(values: List[float]) -> Tuple[float, float]:
         """
-        Normalisation avec minimum et maximum.
-        ✅ Garde les 0 (valeur informative), filtre uniquement None/NaN/Inf.
+        Garde les 0 (valeur informative), filtre uniquement None/NaN/Inf.
         """
         valid_values = [v for v in values if np.isfinite(v)]
         if not valid_values:
@@ -247,9 +254,40 @@ class StrategyComparerV2:
         if max_val == min_val:
             return min_val, min_val + 1.0  # Éviter division par zéro
         return min_val, max_val
-
+    
+    @staticmethod
+    def _normalize_count(values: List[float]) -> Tuple[float, float]:
+        """
+        Normalise une métrique de compte (ex: nombre de puts).
+        Garde les 0, filtre None/NaN/Inf; retourne (min, max) pour compatibilité.
+        """
+        valid_values = [v for v in values if np.isfinite(v)]
+        if not valid_values:
+            return 0.0, 1.0
+        min_val = min(valid_values)
+        max_val = max(valid_values)
+        if max_val == min_val:
+            return min_val, min_val + 1.0  # éviter division par zéro
+        return min_val, max_val
+        
     # ========== SCORERS ==========
 
+    @staticmethod
+    def _score_call_put(value: float, min_val: float, max_val: float) -> float:
+        """
+        Score basé sur put_count:
+        - put_count >= 0: score = 1.0 (pas de risque à la hausse)
+        - put_count = -1: score = 0.5 (risque modéré)
+        - put_count = -2: score = 0.0 (risque maximal)
+        - put_count < -2: score = 0.0 (risque maximal)
+        """
+        if value >= 0:
+            return 1.0
+        elif value == -1:
+            return 0.5
+        else:  # value <= -2
+            return 0.0
+        
     @staticmethod
     def _score_higher_better(value: float, min_val: float, max_val: float) -> float:
         """Score normalisé: plus élevé = meilleur."""
@@ -290,8 +328,7 @@ class StrategyComparerV2:
         """
         Compare et classe les stratégies selon un système de scoring multi-critères.
 
-        ✅ Les poids sont automatiquement normalisés à 1.0 pour rendre les scores comparables.
-        ✅ Clone les métriques à chaque appel pour éviter les effets de bord.
+        Clone les métriques à chaque appel pour éviter les effets de bord.
 
         Args:
             strategies: Liste des stratégies à comparer
@@ -348,9 +385,6 @@ class StrategyComparerV2:
         Args:
             strategies: Liste des stratégies à scorer
             metrics_config: Configuration des métriques (clonée, pas la base)
-
-        Utilise des arrays numpy pour des calculs vectorisés rapides.
-        ~10-100x plus rapide que les boucles Python pour de grandes listes.
         """
         if not strategies:
             return strategies
@@ -407,6 +441,13 @@ class StrategyComparerV2:
                             np.clip((values - min_val) / (max_val - min_val), 0.0, 1.0),
                             0.0,
                         )
+                elif scorer_name == "_score_call_put":
+                    # Score spécial pour put_count: >= 0 -> 1.0, -1 -> 0.5, <= -2 -> 0.0
+                    scores_matrix[:, j] = np.where(
+                        values >= 0,
+                        1.0,
+                        np.where(values == -1, 0.5, 0.0)
+                    )
                 elif scorer_name == "_score_negative_better":
                     # Supprimé car redondant avec _score_lower_better
                     if max_val > min_val:

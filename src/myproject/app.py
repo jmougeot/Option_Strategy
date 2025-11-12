@@ -46,11 +46,9 @@ def main():
     # ========================================================================
 
     with st.sidebar:
-        params = sidebar_params()
-
-        # Widget de scénarios de marché
-        st.markdown("---")
         scenarios = scenario_params()
+        st.markdown("---")
+        params = sidebar_params()
         scoring_weights = scoring_weights_block()
 
     # ========================================================================

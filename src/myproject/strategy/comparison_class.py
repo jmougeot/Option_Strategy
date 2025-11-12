@@ -16,6 +16,7 @@ class StrategyComparison:
     all_options: List[Option]  # Toutes les options
     signs: np.ndarray  # Signes (+1 pour long, -1 pour short) correspondant aux options
     call_count: int
+    put_count : int 
     expiration_day: Optional[str]
     expiration_week: Optional[str]
     expiration_month: Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]

@@ -4,6 +4,12 @@ from typing import List
 
 # Définition des catégories de métriques basées sur comparor_v2.py
 SCORING_CATEGORIES = {
+    "Risque Directionnel": {
+        "fields": ["Risque à la hausse"],
+        "color": "⚠️",
+        "description": "Exposition au risque de hausse (put_count)",
+    },
+
     "Financier": {
         "fields": ["max_profit", "risk_over_reward", "profit_zone_width", "profit_at_target"],
         "color": "💰",
@@ -39,6 +45,7 @@ SCORING_CATEGORIES = {
 
 # Mapping des noms de champs vers des noms lisibles
 FIELD_LABELS = {
+    "Risque à la hausse": "Risque à la hausse",
     "max_profit": "Max Profit",
     "risk_over_reward": "Risk/Reward",
     "profit_at_target": "Profit @ Target",
@@ -68,31 +75,26 @@ def get_available_scoring_fields() -> List[str]:
 
 
 def scoring_weights_block() -> dict:
-    st.subheader("Pondération du Score - COMPLET")
-
+    st.subheader("Pondération du Score")
     # STRATÉGIES PRÉDÉFINIES - Basées sur comparor_v2.py
     preset_strategies = {
         "Balanced (Équilibré)": {
-            # Financier (36%)
+            "Risque à la hausse": 0.10,
             "max_profit": 0.10,
             "risk_over_reward": 0.10,
             "profit_zone_width": 0.08,
             "profit_at_target": 0.08,
-            # Surfaces (46%)
             "surface_profit": 0.12,
             "surface_loss": 0.08,
             "surface_profit_ponderated": 0.08,
             "surface_loss_ponderated": 0.08,
             "reward_over_risk": 0.10,
-            # Greeks (18%)
             "delta_neutral": 0.06,
             "gamma_low": 0.04,
             "vega_low": 0.04,
             "theta_positive": 0.04,
-            # Mixture (18%)
             "average_pnl": 0.15,
             "sigma_pnl": 0.03,
-            # Volatilité & Coût (9%)
             "implied_vol_moderate": 0.04,
             "premium_credit": 0.05,
         },
@@ -135,18 +137,13 @@ def scoring_weights_block() -> dict:
 
     # Mode MANUEL - Afficher tous les sliders organisés par catégories
 
-    with st.expander("📊 Personnaliser TOUS les poids de scoring", expanded=True):
-        st.markdown(
-            "**Configuration basée sur comparor_v2.py. Total doit être ~100%**"
-        )
+    with st.expander("📊 Personnaliser le scoring", expanded=True):
 
         weights_manual = {}
 
         # Parcourir chaque catégorie et créer les sliders
         for category_name, category_info in SCORING_CATEGORIES.items():
             st.markdown(f"### {category_info['color']} {category_name}")
-            st.caption(category_info["description"])
-
             # Créer des colonnes pour les sliders (max 3 par ligne)
             fields_in_category = category_info["fields"]
             num_cols = min(len(fields_in_category), 3)

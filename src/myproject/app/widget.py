@@ -17,8 +17,6 @@ class UIParams:
 
 
 def sidebar_params() -> UIParams:
-    st.header("⚙️ Paramètres")
-
     c1, c2 = st.columns(2)
     with c1:
         underlying = st.text_input(
@@ -125,7 +123,6 @@ def scenario_params() -> Optional[ScenarioData]:
                 st.session_state.scenarios[i]["weight"] = weight
 
             with col5:
-                # Permettre la suppression seulement s'il y a au moins 2 scénarios
                 if len(st.session_state.scenarios) > 1:
                     if st.button("🗑️", key=f"delete_{i}", help="Supprimer ce scénario"):
                         scenarios_to_delete.append(i)
@@ -134,7 +131,6 @@ def scenario_params() -> Optional[ScenarioData]:
 
             st.divider()
 
-    # Supprimer les scénarios marqués (seulement si on garde au moins 1 scénario)
     if (
         scenarios_to_delete
         and len(st.session_state.scenarios) - len(scenarios_to_delete) >= 1

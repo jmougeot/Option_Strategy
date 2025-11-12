@@ -70,6 +70,7 @@ def create_strategy_fast_with_signs(
     if call_count >= 1 or put_count >=2:
         return None
     
+    
     is_long = signs > 0
     total_premium = np.sum(signs * premiums)
     total_delta = np.sum(signs * deltas)
@@ -170,6 +171,7 @@ def create_strategy_fast_with_signs(
             all_options=options,
             signs=signs,  # Stocker les signes utilisés
             call_count=call_count,
+            put_count=put_count,
             expiration_day=exp_info.get("expiration_day"),
             expiration_week=exp_info.get("expiration_week"),
             expiration_month=exp_info.get("expiration_month", "F"),
