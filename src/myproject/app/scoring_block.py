@@ -2,10 +2,10 @@ import streamlit as st
 from typing import List
 
 
-# Définition des catégories de métriques basées sur StrategyComparison
+# Définition des catégories de métriques basées sur comparor_v2.py
 SCORING_CATEGORIES = {
     "Financier": {
-        "fields": ["max_profit", "max_loss", "risk_reward_ratio", "profit_at_target"],
+        "fields": ["max_profit", "risk_over_reward", "profit_zone_width", "profit_at_target"],
         "color": "💰",
         "description": "Métriques de profit et risque",
     },
@@ -15,17 +15,13 @@ SCORING_CATEGORIES = {
             "surface_loss",
             "surface_profit_ponderated",
             "surface_loss_ponderated",
+            "reward_over_risk",
         ],
         "color": "📐",
         "description": "Aires sous la courbe de P&L",
     },
-    "Zone Profitable": {
-        "fields": ["profit_zone_width", "breakeven_points"],
-        "color": "🎯",
-        "description": "Largeur et points d'équilibre",
-    },
     "Greeks": {
-        "fields": ["total_delta", "total_gamma", "total_vega", "total_theta"],
+        "fields": ["delta_neutral", "gamma_low", "vega_low", "theta_positive"],
         "color": "🔢",
         "description": "Sensibilités aux facteurs de marché",
     },
@@ -34,32 +30,32 @@ SCORING_CATEGORIES = {
         "color": "📊",
         "description": "Métriques pondérées par probabilité",
     },
-    "Volatilité": {
-        "fields": ["avg_implied_volatility"],
+    "Volatilité & Coût": {
+        "fields": ["implied_vol_moderate", "premium_credit"],
         "color": "🌊",
-        "description": "Volatilité implicite moyenne",
+        "description": "Volatilité implicite et coût/crédit",
     },
 }
 
 # Mapping des noms de champs vers des noms lisibles
 FIELD_LABELS = {
     "max_profit": "Max Profit",
-    "max_loss": "Max Loss",
-    "risk_reward_ratio": "Risk/Reward",
+    "risk_over_reward": "Risk/Reward",
     "profit_at_target": "Profit @ Target",
+    "profit_zone_width": "Largeur Zone",
     "surface_profit": "Surface Profit",
     "surface_loss": "Surface Loss",
     "surface_profit_ponderated": "Surface Profit Pond.",
     "surface_loss_ponderated": "Surface Loss Pond.",
-    "profit_zone_width": "Largeur Zone",
-    "breakeven_points": "Breakevens",
-    "total_delta": "Delta Total",
-    "total_gamma": "Gamma Total",
-    "total_vega": "Vega Total",
-    "total_theta": "Theta Total",
+    "reward_over_risk": "Reward/Risk Ratio",
+    "delta_neutral": "Delta Neutral",
+    "gamma_low": "Gamma Low",
+    "vega_low": "Vega Low",
+    "theta_positive": "Theta Positive",
     "average_pnl": "Average P&L",
     "sigma_pnl": "Sigma P&L",
-    "avg_implied_volatility": "IV Moyenne",
+    "implied_vol_moderate": "IV Modérée",
+    "premium_credit": "Premium (Crédit)",
 }
 
 
@@ -72,34 +68,33 @@ def get_available_scoring_fields() -> List[str]:
 
 
 def scoring_weights_block() -> dict:
-    st.subheader("⚖️ Pondération du Score - COMPLET")
+    st.subheader("Pondération du Score - COMPLET")
 
-    # STRATÉGIES PRÉDÉFINIES - Basées sur les champs de StrategyComparison
+    # STRATÉGIES PRÉDÉFINIES - Basées sur comparor_v2.py
     preset_strategies = {
         "Balanced (Équilibré)": {
-            # Financier (30%)
+            # Financier (36%)
             "max_profit": 0.10,
-            "max_loss": 0.05,
-            "risk_reward_ratio": 0.10,
-            "profit_at_target": 0.05,
-            # Surfaces (25%)
-            "surface_profit": 0.10,
-            "surface_loss": 0.05,
-            "surface_profit_ponderated": 0.06,
-            "surface_loss_ponderated": 0.04,
-            # Zone Profitable (15%)
-            "profit_zone_width": 0.10,
-            "breakeven_points": 0.05,
-            # Greeks (20%)
-            "total_delta": 0.06,
-            "total_gamma": 0.04,
-            "total_vega": 0.05,
-            "total_theta": 0.05,
-            # Mixture (8%)
-            "average_pnl": 0.05,
+            "risk_over_reward": 0.10,
+            "profit_zone_width": 0.08,
+            "profit_at_target": 0.08,
+            # Surfaces (46%)
+            "surface_profit": 0.12,
+            "surface_loss": 0.08,
+            "surface_profit_ponderated": 0.08,
+            "surface_loss_ponderated": 0.08,
+            "reward_over_risk": 0.10,
+            # Greeks (18%)
+            "delta_neutral": 0.06,
+            "gamma_low": 0.04,
+            "vega_low": 0.04,
+            "theta_positive": 0.04,
+            # Mixture (18%)
+            "average_pnl": 0.15,
             "sigma_pnl": 0.03,
-            # Volatilité (2%)
-            "avg_implied_volatility": 0.02,
+            # Volatilité & Coût (9%)
+            "implied_vol_moderate": 0.04,
+            "premium_credit": 0.05,
         },
         "Manuel (Personnalisé)": None,  # Sera configuré manuellement
     }
@@ -142,7 +137,7 @@ def scoring_weights_block() -> dict:
 
     with st.expander("📊 Personnaliser TOUS les poids de scoring", expanded=True):
         st.markdown(
-            "**Configuration basée sur les champs de StrategyComparison. Total doit être ~100%**"
+            "**Configuration basée sur comparor_v2.py. Total doit être ~100%**"
         )
 
         weights_manual = {}
