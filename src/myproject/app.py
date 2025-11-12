@@ -33,7 +33,6 @@ inject_css()
 # INTERFACE PRINCIPALE
 # ============================================================================
 
-
 def main():
     # En-tête
     st.markdown(

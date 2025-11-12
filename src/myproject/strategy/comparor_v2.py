@@ -17,7 +17,6 @@ Optimisé avec numpy pour des calculs vectorisés rapides.
 8. Greeks modérés: gamma/vega utilisent _score_lower_better (faible expo = meilleur)
 9. Target performance: max(value, 0) pour récompenser uniquement les profits
 10. Premium: scorer=_score_lower_better (crédit = meilleur)
-11. ✅ ISOLATION DES POIDS: deepcopy() pour éviter mutations entre appels
 """
 
 from typing import List, Dict, Optional, Callable, Tuple
@@ -104,16 +103,16 @@ class StrategyComparerV2:
                 extractor=lambda s: self._safe_value(s.surface_profit),
                 normalizer=self._normalize_max,
                 scorer=self._score_higher_better,
-            ),
+            ),  
             MetricConfig(
-                name="surface_loss",  # ✅ CORRIGÉ: lower_better
+                name="surface_loss",
                 weight=0.08,
                 extractor=lambda s: abs(self._safe_value(s.surface_loss)),
                 normalizer=self._normalize_max,
                 scorer=self._score_lower_better,  # Plus petite perte = meilleur
             ),
             MetricConfig(
-                name="surface_loss_ponderated",  # ✅ CORRIGÉ: lower_better
+                name="surface_loss_ponderated",  
                 weight=0.08,
                 extractor=lambda s: abs(self._safe_value(s.surface_loss_ponderated)),
                 normalizer=self._normalize_max,
@@ -272,7 +271,6 @@ class StrategyComparerV2:
         if max_val <= 0:
             return 0.0
         normalized = value / max_val
-        # Score optimal à 0.5, pénalise les extrêmes
         score = 1.0 - abs(normalized - 0.5) * 2.0
         return max(0.0, score)
 
