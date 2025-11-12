@@ -410,11 +410,6 @@ class StrategyComparerV2:
             # Extraire toutes les valeurs pour cette métrique (vectorisé)
             metric_matrix[:, j] = [metric.extractor(s) for s in strategies]
             weights[j] = metric.weight
-            
-            # Debug pour la métrique put_count
-            if metric.name == "Risque à la hausse":
-                put_counts = metric_matrix[:, j]
-                print(f"🔍 DEBUG put_count: min={put_counts.min()}, max={put_counts.max()}, unique={np.unique(put_counts)}")
 
         # ============ ÉTAPE 2: NORMALISATION VECTORISÉE ============
         # Pour chaque métrique, calculer min/max et normaliser
@@ -457,16 +452,16 @@ class StrategyComparerV2:
                         )
                 elif scorer_name == "_score_call_put":
                     # Score spécial pour put_count: FAVORISE puts LONG, PÉNALISE puts SHORT
+                    # <= -1 -> 1.0 (long), 0 -> 0.8 (neutre), 1 -> 0.3 (1 short), >= 2 -> 0.0
                     scores_matrix[:, j] = np.where(
+                        values <= -1,  # Puts LONG (protection)
+                        1.0,
                         np.where(
                             values == 0,  # Neutre
-                            1,
+                            0.8,
                             np.where(values == 1, 0.3, 0.0)  # 1 short -> 0.3, 2+ -> 0.0
                         )
                     )
-                    # Debug
-                    print(f"🎯 Scores put_count: {np.unique(values, return_counts=True)}")
-                    print(f"   → Scores appliqués: {np.unique(scores_matrix[:, j], return_counts=True)}")
                 elif scorer_name == "_score_negative_better":
                     # Supprimé car redondant avec _score_lower_better
                     if max_val > min_val:
