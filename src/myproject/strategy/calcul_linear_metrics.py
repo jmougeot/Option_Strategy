@@ -158,7 +158,7 @@ def create_strategy_fast_with_signs(
     total_loss_surface = np.sum(np.where(is_long, loss_surfaces_ponderated, -profit_surfaces_ponderated))
     total_sigma_pnl = np.sqrt(np.sum(sigma_pnls**2))
 
-    # Calcul du nom et expiration SEULEMENT si on va créer la stratégie (calculs coûteux)
+    # Calcul du nom et expiration
     strategy_name = generate_strategy_name(options, signs)
     exp_info = get_expiration_info(options)
 

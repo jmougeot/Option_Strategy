@@ -281,9 +281,9 @@ class StrategyComparerV2:
         - put_count = -2: score = 0.0 (risque maximal)
         - put_count < -2: score = 0.0 (risque maximal)
         """
-        if value >= 0:
+        if value <= 0:
             return 1.0
-        elif value == -1:
+        elif value == 1:
             return 0.5
         else:  # value <= -2
             return 0.0
