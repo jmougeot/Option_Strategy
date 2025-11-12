@@ -4,10 +4,10 @@ from typing import List
 
 # Définition des catégories de métriques basées sur comparor_v2.py
 SCORING_CATEGORIES = {
-    "Risque Directionnel": {
-        "fields": ["Risque à la hausse"],
-        "color": "⚠️",
-        "description": "Exposition au risque de hausse (put_count)",
+    "Protection": {
+        "fields": ["Protection Put"],
+        "color": "🛡️",
+        "description": "Favorise les puts LONG (protection), pénalise puts SHORT",
     },
 
     "Financier": {
@@ -45,7 +45,7 @@ SCORING_CATEGORIES = {
 
 # Mapping des noms de champs vers des noms lisibles
 FIELD_LABELS = {
-    "Risque à la hausse": "Risque à la hausse",
+    "Protection Put": "Protection Put",
     "max_profit": "Max Profit",
     "risk_over_reward": "Risk/Reward",
     "profit_at_target": "Profit @ Target",
@@ -79,7 +79,7 @@ def scoring_weights_block() -> dict:
     # STRATÉGIES PRÉDÉFINIES - Basées sur comparor_v2.py
     preset_strategies = {
         "Balanced (Équilibré)": {
-            "Risque à la hausse": 0.10,
+            "Protection Put": 0.10,
             "max_profit": 0.10,
             "risk_over_reward": 0.10,
             "profit_zone_width": 0.08,

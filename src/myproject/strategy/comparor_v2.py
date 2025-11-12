@@ -69,7 +69,7 @@ class StrategyComparerV2:
         return [
             # ========== MÉTRIQUES FINANCIÈRES ==========
             MetricConfig(
-                name="Risque à la hausse",
+                name="Protection Put",  # Favorise les puts LONG (protection)
                 weight=0.10,
                 extractor=lambda s: self._safe_value(s.put_count),
                 normalizer=self._normalize_count,
@@ -276,21 +276,25 @@ class StrategyComparerV2:
     def _score_call_put(value: float, min_val: float, max_val: float) -> float:
         """
         Score basé sur put_count (SHORT - LONG):
-        Pénalise l'EXCÈS de puts SHORT (vendre trop de puts = risque à la baisse)
+        FAVORISE les puts LONG (protection), PÉNALISE les puts SHORT (risque baisse)
         
-        - put_count <= 0: score = 1.0 (puts LONG ou neutre, OK)
-        - put_count == 1: score = 0.5 (1 put SHORT en excès, risque modéré)
-        - put_count >= 2: score = 0.0 (2+ puts SHORT en excès, risque maximal)
+        - put_count <= -2: score = 1.0 (2+ puts LONG, protection maximale ✅)
+        - put_count == -1: score = 1.0 (1 put LONG, protection OK ✅)
+        - put_count == 0: score = 0.8 (neutre en puts, acceptable)
+        - put_count == 1: score = 0.3 (1 put SHORT, risque modéré ⚠️)
+        - put_count >= 2: score = 0.0 (2+ puts SHORT, risque maximal ❌)
         
         Interprétation:
-        - put_count <= 0: on achète plus ou autant qu'on vend (OK)
-        - put_count > 0: on vend plus qu'on achète (exposition excessive à la baisse)
+        - put_count < 0: on ACHÈTE des puts (protection contre baisse) → BON
+        - put_count > 0: on VEND des puts (exposition à la baisse) → MAUVAIS
         """
-        if value <= 0:  # Neutre ou plus de puts LONG
+        if value <= -1:  # 1+ puts LONG (protection)
             return 1.0
-        elif value == 1:  # 1 put SHORT en excès
-            return 0.5
-        else:  # value >= 2 (2+ puts SHORT en excès)
+        elif value == 0:  # Neutre
+            return 0.8
+        elif value == 1:  # 1 put SHORT
+            return 0.3
+        else:  # value >= 2 (2+ puts SHORT)
             return 0.0
         
     @staticmethod
@@ -452,12 +456,13 @@ class StrategyComparerV2:
                             0.0,
                         )
                 elif scorer_name == "_score_call_put":
-                    # Score spécial pour put_count (SHORT-LONG): pénalise l'excès de puts SHORT
-                    # <= 0 -> 1.0 (neutre/long OK), 1 -> 0.5 (1 short), >= 2 -> 0.0 (2+ short)
+                    # Score spécial pour put_count: FAVORISE puts LONG, PÉNALISE puts SHORT
                     scores_matrix[:, j] = np.where(
-                        values <= 0,  # Neutre ou plus de puts LONG
-                        1.0,
-                        np.where(values == 1, 0.5, 0.0)  # 1 put SHORT -> 0.5, >= 2 -> 0.0
+                        np.where(
+                            values == 0,  # Neutre
+                            1,
+                            np.where(values == 1, 0.3, 0.0)  # 1 short -> 0.3, 2+ -> 0.0
+                        )
                     )
                     # Debug
                     print(f"🎯 Scores put_count: {np.unique(values, return_counts=True)}")
