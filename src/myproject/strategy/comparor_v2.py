@@ -381,7 +381,12 @@ class StrategyComparerV2:
         for i, strat in enumerate(strategies, 1):
             strat.rank = i
 
-        print(f"✅ {len(strategies)} stratégies classées (top {top_n})")
+        # 🔍 DEBUG: Afficher put_count des 3 meilleures
+        print(f"\n🔍 DEBUG TOP 3 put_count:")
+        for i, strat in enumerate(strategies[:3], 1):
+            print(f"  #{i} {strat.strategy_name}: put_count={strat.put_count}, score={strat.score:.4f}")
+        
+        print(f"\n✅ {len(strategies)} stratégies classées (top {top_n})")
 
         return strategies
 
@@ -453,6 +458,10 @@ class StrategyComparerV2:
                 elif scorer_name == "_score_call_put":
                     # Score spécial pour put_count: FAVORISE puts LONG, PÉNALISE puts SHORT
                     # <= -1 -> 1.0 (long), 0 -> 0.8 (neutre), 1 -> 0.3 (1 short), >= 2 -> 0.0
+                    print(f"\n🔍 DEBUG Protection Put:")
+                    print(f"   put_count values: min={values.min()}, max={values.max()}")
+                    print(f"   unique: {np.unique(values, return_counts=True)}")
+                    
                     scores_matrix[:, j] = np.where(
                         values <= -1,  # Puts LONG (protection)
                         1.0,
@@ -462,6 +471,8 @@ class StrategyComparerV2:
                             np.where(values == 1, 0.3, 0.0)  # 1 short -> 0.3, 2+ -> 0.0
                         )
                     )
+                    
+                    print(f"   Scores: {np.unique(scores_matrix[:, j], return_counts=True)}")
                 elif scorer_name == "_score_negative_better":
                     # Supprimé car redondant avec _score_lower_better
                     if max_val > min_val:
