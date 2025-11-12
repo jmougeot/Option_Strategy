@@ -67,7 +67,7 @@ def create_strategy_fast_with_signs(
     call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32) - np.sum((signs > 0) & is_call, dtype=np.int32))
     put_count = int(np.sum((signs <0) & is_call==False, dtype=np.int32) - np.sum((signs > 0) &   is_call==False, dtype=np.int32))
 
-    if call_count >= 1 or put_count >=2:
+    if call_count >= 1 or put_count >=3:
         return None
     
     
