@@ -67,7 +67,10 @@ def create_strategy_fast_with_signs(
     call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32) - np.sum((signs > 0) & is_call, dtype=np.int32))
     put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32) - np.sum((signs > 0) & (~is_call), dtype=np.int32))
 
-    if call_count >= 1 or put_count >=3:
+    if call_count >= 1:
+        return None
+    
+    if (call_count + put_count)> 1: 
         return None
     
     
@@ -89,10 +92,7 @@ def create_strategy_fast_with_signs(
     if total_average_pnl < 0:
         return None
 
-    # P&L Array - Produit matriciel ultra-rapide (OPTIMISATION #2)
     total_pnl_array = np.dot(signs, pnl_stack)
-
-    # Calcul min/max en une seule passe (OPTIMISATION #3)
     max_profit, max_loss = float(np.max(total_pnl_array)), float(np.min(total_pnl_array))
 
     if max_loss < -0.10:
@@ -126,7 +126,6 @@ def create_strategy_fast_with_signs(
         profit_range = (0.0, 0.0)
         profit_zone_width = 0.0
 
-    # Profit au prix cible
     profit_at_target = float(np.interp(target_price, prices, total_pnl_array))
     
     if abs(profit_at_target) > 100:
@@ -136,9 +135,7 @@ def create_strategy_fast_with_signs(
     if max_profit > 0:
         profit_at_target_pct = (profit_at_target / max_profit) * 100.0
 
-    # Surfaces non pondérées (calcul optimisé)
-    # Si les prix sont uniformément espacés, pas besoin de np.mean
-    dx = prices[1] - prices[0]  # Beaucoup plus rapide que np.mean(np.diff(prices))
+    dx = prices[1] - prices[0]
     
     positive_pnl = np.maximum(total_pnl_array, 0.0)
     negative_pnl = np.minimum(total_pnl_array, 0.0)
