@@ -54,40 +54,51 @@ def create_strategy_fast_with_signs(
             return None
         premiums[i] = opt.premium
         deltas[i] = opt.delta
+
+    for i, opt in enumerate(options):
+        if opt.pnl_array is None:
+            return None
         gammas[i] = opt.gamma
         vegas[i] = opt.vega
         thetas[i] = opt.theta
         ivs[i] = opt.implied_volatility
         average_pnls[i] = opt.average_pnl
         sigma_pnls[i] = opt.sigma_pnl
-        is_call[i] = opt.option_type == "call"
         pnl_stack[i] = opt.pnl_array
 
     # Calculer call_count put_count vectorisé : plus on en vend plus le score est haut
-    call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32) - np.sum((signs > 0) & is_call, dtype=np.int32))
-    put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32) - np.sum((signs > 0) & (~is_call), dtype=np.int32))
-    long_callcount = int(np.sum((signs > 0) & is_call, dtype=np.int32))
+    long_call_count = int(np.sum((signs > 0) & is_call, dtype=np.int32))
+    short_call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32))
+    call_count = short_call_count - long_call_count
 
     if call_count >= 1:
         return None
+    
+    # Calculer short_count put_count vectorisé : plus on en vend plus le score est haut
+    long_put_count = int(np.sum((signs > 0) & (~is_call), dtype=np.int32))
+    short_put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32))
+    put_count = long_put_count - short_put_count
 
-    if (long_callcount + put_count)> 1: 
+    if (long_call_count + short_put_count)> 1: 
         return None
     
-    
     is_long = signs > 0
+
+    # Calcul est filtre du premium 
     total_premium = np.sum(signs * premiums)
+    if total_premium > 0.06 or total_premium < -0.1:
+        return None
+    
+    #Calcul est filtre du delta 
     total_delta = np.sum(signs * deltas)
+    if abs(total_delta) > 0.75:
+        return None
+
     total_gamma = np.sum(signs * gammas)
     total_vega = np.sum(signs * vegas)
     total_theta = np.sum(signs * thetas)
     total_iv = np.sum(signs * ivs)
 
-    # Filtrage précoce AVANT calculs coûteux
-    if total_premium > 0.05 or total_premium < -0.1:
-        return None
-    if abs(total_delta) > 0.7:
-        return None
     
     total_average_pnl = np.sum(signs * average_pnls)
     if total_average_pnl < 0:
