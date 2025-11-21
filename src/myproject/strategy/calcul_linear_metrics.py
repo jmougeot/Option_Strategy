@@ -73,8 +73,8 @@ def create_strategy_fast_with_signs(
     # Calculer call_count put_count vectorisé : plus on en vend plus le score est haut
     long_call_count = int(np.sum((signs > 0) & is_call, dtype=np.int32))
     short_call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32))
-    call_count = short_call_count - long_call_count
-    if call_count >= 1:
+    call_count =  long_call_count - short_call_count
+    if call_count <= -1:
         return None
     
     # Calculer short_count put_count vectorisé : plus on en vend plus le score est haut
@@ -82,7 +82,7 @@ def create_strategy_fast_with_signs(
     short_put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32))
     put_count = long_put_count - short_put_count
 
-    if (long_call_count + short_put_count)> 1: 
+    if (short_put_count - long_call_count)> 1: 
         return None
     
     is_long = signs > 0
