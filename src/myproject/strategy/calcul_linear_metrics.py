@@ -37,7 +37,6 @@ def create_strategy_fast_with_signs(
         return None
     
     pnl_length = len(options[0].pnl_array)
-    
     premiums = np.empty(n_options, dtype=np.float64)
     deltas = np.empty(n_options, dtype=np.float64)
     gammas = np.empty(n_options, dtype=np.float64)
@@ -66,11 +65,15 @@ def create_strategy_fast_with_signs(
         sigma_pnls[i] = opt.sigma_pnl
         pnl_stack[i] = opt.pnl_array
 
+    #Eliminer la vente d'un put ou d'un call qui ne rapporte rien 
+    useless_sell = int(np.sum((signs < 0) & (premiums < 0.4), dtype=np.int32))
+    if useless_sell > 0 :
+        return None
+    
     # Calculer call_count put_count vectorisé : plus on en vend plus le score est haut
     long_call_count = int(np.sum((signs > 0) & is_call, dtype=np.int32))
     short_call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32))
     call_count = short_call_count - long_call_count
-
     if call_count >= 1:
         return None
     
