@@ -191,10 +191,6 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     # Essayer les champs de prix dans l'ordre de préférence (PX_MID en priorité)
     for field in [
         "PX_MID",
-        "LAST_PRICE",
-        "PX_LAST",
-        "PREV_SES_LAST_PRICE",
-        "ADJUSTED_PREV_LAST_PRICE",
     ]:
         v = data.get(field)
         if v is not None and v > 0:
