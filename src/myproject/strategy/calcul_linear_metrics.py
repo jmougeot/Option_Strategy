@@ -12,7 +12,7 @@ import numpy as np
 
 
 def create_strategy_fast_with_signs(
-    options: List[Option], signs: np.ndarray, target_price: float
+    options: List[Option], signs: np.ndarray, target_price: float, max_loss_params : float, max_premium_params :float, ouvert:bool 
 ) -> Optional[StrategyComparison]:
     """
     Version optimisée qui prend les signes directement (évite les copies d'options).
@@ -83,6 +83,8 @@ def create_strategy_fast_with_signs(
     short_put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32))
     put_count = long_put_count - short_put_count
 
+    if ouvert == False and put_count>1:
+        return None
     if (short_put_count - long_call_count - long_put_count) > 1: 
         return None
     
@@ -90,7 +92,7 @@ def create_strategy_fast_with_signs(
 
     # Calcul est filtre du premium 
     total_premium = np.sum(signs * premiums)
-    if total_premium > 0.6 or total_premium < -1:
+    if total_premium > max_premium_params:
         return None
     
     #Calcul est filtre du delta 
@@ -103,6 +105,7 @@ def create_strategy_fast_with_signs(
     total_theta = np.sum(signs * thetas)
     total_iv = np.sum(signs * ivs)
 
+
     
     total_average_pnl = np.sum(signs * average_pnls)
     if total_average_pnl < 0:
@@ -110,7 +113,7 @@ def create_strategy_fast_with_signs(
 
     total_pnl_array = np.dot(signs, pnl_stack)
     max_profit, max_loss = float(np.max(total_pnl_array)), float(np.min(total_pnl_array))
-    if max_loss < -0.51:
+    if max_loss < -max_loss_params:
         return None
 
     # Breakeven points (vectorisé)

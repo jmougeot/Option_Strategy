@@ -14,6 +14,9 @@ class UIParams:
     price_step: float
     max_legs: int
     strikes: list[float]
+    max_loss:float
+    max_premium: float
+    ouvert:bool
 
 
 def sidebar_params() -> UIParams:
@@ -27,12 +30,26 @@ def sidebar_params() -> UIParams:
             "Années:", value="6", help="6=2026, 7=2027 (séparées par virgule)"
         )
 
-    c1 = st.columns(1)[0]
+    c1 , c2= st.columns(2)
     with c1:
         months_input = st.text_input(
             "Mois d'expiration:",
             value="F",
             help="F=Jan, G=Feb, H=Mar, K=Apr, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec",
+        )
+    with c2:
+            price_step = st.number_input(
+        "Pas de Prix ($)", value=0.0625, step=0.0001, format="%.4f"
+    )
+    c1 , c2= st.columns(2)
+
+    with c1:
+        max_loss= st.number_input(
+        "Max loss", value= 0.01, format="%.4f", help="Perte maximum accéptée"
+        )
+    with c2:
+        max_premium = st.number_input(
+        "Max premium" , value=0.06, format="%.4f", help="Prix maximum de la stratégie"
         )
 
     c1, c2 = st.columns(2)
@@ -44,10 +61,14 @@ def sidebar_params() -> UIParams:
         price_max = st.number_input(
             "Prix Max ($)", value=98.750, step=0.0001, format="%.4f"
         )
-
-    price_step = st.number_input(
-        "Pas de Prix ($)", value=0.0625, step=0.0001, format="%.4f"
+        
+    ouvert = st.checkbox(
+        "Risque Ouvert", 
+        value=False, 
+        help="Autoriser les stratégies à risque illimité (vente de calls/puts non couverts)"
     )
+
+
     strikes = strike_list(price_min, price_max, price_step)
 
     max_legs = st.slider("Nombre maximum de legs par stratégie:", 1, 6, 4)
@@ -56,7 +77,7 @@ def sidebar_params() -> UIParams:
     months = [m.strip() for m in months_input.split(",") if m.strip()]
 
     return UIParams(
-        underlying, months, years, price_min, price_max, price_step, max_legs, strikes
+        underlying, months, years, price_min, price_max, price_step, max_legs, strikes, max_loss, max_premium, ouvert
     )
 
 

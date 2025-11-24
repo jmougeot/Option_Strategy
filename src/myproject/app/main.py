@@ -36,6 +36,9 @@ def process_bloomberg_to_strategies(
     verbose: bool = False,
     scenarios: Optional[ScenarioData] = None,
     num_points: int = 200,
+    max_loss: float = 0.1,
+    max_premium: float = 0.06,
+    ouvert:bool = True 
 ) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray]]:
     """
     Fonction principale simplifiée pour Streamlit.
@@ -81,6 +84,9 @@ def process_bloomberg_to_strategies(
         price_min=price_min,
         price_max=price_max,
         max_legs=max_legs,
+        max_loss=max_loss,
+        max_premium=max_premium,
+        ouvert=ouvert
     )
 
     stats["nb_strategies_totales"] = len(all_strategies)

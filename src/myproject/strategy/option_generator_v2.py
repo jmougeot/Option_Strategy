@@ -45,7 +45,7 @@ class OptionStrategyGeneratorV2:
         self.price_max = None
 
     def generate_all_combinations(
-        self, target_price: float, price_min: float, price_max: float, max_legs: int = 4
+        self, target_price: float, price_min: float, price_max: float, max_loss: float, max_premium: float, ouvert:bool, max_legs: int = 4
     ) -> List[StrategyComparison]:
         """
         Génère toutes les combinaisons possibles d'options (1 à max_legs).
@@ -70,6 +70,9 @@ class OptionStrategyGeneratorV2:
                 strategies = self._generate_position_variants(
                     list(combo),
                     target_price,
+                    max_loss,
+                    max_premium,
+                    ouvert
                 )
                 if not strategies:
                     filtered_this_level += 1
@@ -88,6 +91,9 @@ class OptionStrategyGeneratorV2:
         self,
         options: List[Option],
         target_price: float,
+        max_loss : float,
+        max_premium : float,
+        ouvert: bool
     ) -> List[StrategyComparison]:
         """
         Génère les variantes de positions pour une combinaison d'options.
@@ -129,7 +135,7 @@ class OptionStrategyGeneratorV2:
 
         # ===== Génération des stratégies (optimisé) =====
         for signs in sign_arrays:
-            strat = create_strategy_fast_with_signs(options, signs, target_price)
+            strat = create_strategy_fast_with_signs(options, signs, target_price, max_loss, max_premium, ouvert)
             if strat is not None:  # Vérification explicite plus rapide que if strat
                 strategies.append(strat)
         

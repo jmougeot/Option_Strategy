@@ -85,6 +85,9 @@ def main():
                 scoring_weights=scoring_weights,
                 verbose=False,
                 scenarios=scenarios,
+                max_loss=params.max_loss,
+                max_premium=params.max_premium,
+                ouvert=params.ouvert
             )
 
             # Vérifier les résultats
