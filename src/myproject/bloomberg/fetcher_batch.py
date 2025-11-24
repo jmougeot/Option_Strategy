@@ -189,18 +189,14 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     premium_value = 0.0
 
     # Essayer les champs de prix dans l'ordre de préférence (PX_MID en priorité)
-    for field in [
-        "PX_MID",
-    ]:
-        v = data.get(field)
-        if v is not None and v > 0:
-            premium_value = v
-            break
+
+    Mid = data.get("PX_MID")
+    if Mid is not None and Mid > 0:
+        premium_value = Mid
 
     # Si toujours aucun prix → calcul via bid/ask
     bid = data.get("PX_BID")
     ask = data.get("PX_ASK")
-
     if premium_value == 0.0:
         if bid and ask and bid > 0 and ask > 0:
             premium_value = (bid + ask) / 2
@@ -208,6 +204,10 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
             premium_value = bid
         elif ask and ask > 0:
             premium_value = ask
+    
+    if premium_value == 0.0: 
+        last = data.get("PX_LAST")
+        premium_value = last
 
     result["premium"] = premium_value
 
