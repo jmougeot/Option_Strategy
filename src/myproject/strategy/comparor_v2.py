@@ -355,7 +355,7 @@ class StrategyComparerV2:
             print("⚠️ Aucune stratégie à comparer")
             return []
 
-        # ✅ CORRECTION: Cloner la config de base pour éviter les mutations
+        #  CORRECTION: Cloner la config de base pour éviter les mutations
         metrics_config = deepcopy(self._base_metrics_config)
 
         # Appliquer les poids personnalisés si fournis
