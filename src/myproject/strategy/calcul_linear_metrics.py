@@ -63,26 +63,27 @@ def create_strategy_fast_with_signs(
         ivs[i] = opt.implied_volatility
         average_pnls[i] = opt.average_pnl
         sigma_pnls[i] = opt.sigma_pnl
+        is_call[i] = opt.option_type.lower() == "call"
         pnl_stack[i] = opt.pnl_array
 
     #Eliminer la vente d'un put ou d'un call qui ne rapporte rien 
-    useless_sell = int(np.sum((signs < 0) & (premiums < 0.04), dtype=np.int32))
+    useless_sell = int(np.sum((signs < 0) & (abs(premiums) < 0.04), dtype=np.int32))
     if useless_sell > 0 :
         return None
     
-    # Calculer call_count put_count vectorisé : plus on en vend plus le score est haut
+    # Calculer call_count put_count vectorisé
     long_call_count = int(np.sum((signs > 0) & is_call, dtype=np.int32))
     short_call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32))
     call_count =  long_call_count - short_call_count
     if call_count <= -1:
         return None
     
-    # Calculer short_count put_count vectorisé : plus on en vend plus le score est haut
+    # Calculer short_count put_count vectorisé
     long_put_count = int(np.sum((signs > 0) & (~is_call), dtype=np.int32))
     short_put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32))
     put_count = long_put_count - short_put_count
 
-    if (short_put_count - long_call_count)> 1: 
+    if (short_put_count - long_call_count) > 1: 
         return None
     
     is_long = signs > 0
@@ -110,13 +111,6 @@ def create_strategy_fast_with_signs(
     total_pnl_array = np.dot(signs, pnl_stack)
     max_profit, max_loss = float(np.max(total_pnl_array)), float(np.min(total_pnl_array))
 
-    if max_loss < -0.5:
-        return None
-    if max_loss < 0:
-        risk_reward_ratio = abs(max_profit / max_loss)
-    else:
-        risk_reward_ratio = float("inf") if max_profit > 0 else 0.0
-
     # Breakeven points (vectorisé)
     sign_changes = total_pnl_array[:-1] * total_pnl_array[1:] < 0
     breakeven_indices = np.where(sign_changes)[0]
@@ -141,14 +135,6 @@ def create_strategy_fast_with_signs(
         profit_range = (0.0, 0.0)
         profit_zone_width = 0.0
 
-    profit_at_target = float(np.interp(target_price, prices, total_pnl_array))
-    
-    if abs(profit_at_target) > 100:
-        return None
-    
-    profit_at_target_pct = 0.0
-    if max_profit > 0:
-        profit_at_target_pct = (profit_at_target / max_profit) * 100.0
 
     dx = prices[1] - prices[0]
     
@@ -201,15 +187,15 @@ def create_strategy_fast_with_signs(
             sigma_pnl=float(total_sigma_pnl),
             pnl_array=total_pnl_array,
             prices=prices,
-            risk_reward_ratio=risk_reward_ratio,
-            risk_reward_ratio_ponderated=risk_reward_ratio,
+            risk_reward_ratio=0,
+            risk_reward_ratio_ponderated=0,
             total_delta=float(total_delta),
             total_gamma=float(total_gamma),
             total_vega=float(total_vega),
             total_theta=float(total_theta),
             avg_implied_volatility=float(total_iv),
-            profit_at_target=profit_at_target,
-            profit_at_target_pct=profit_at_target_pct,
+            profit_at_target=0,
+            profit_at_target_pct=0,
             score=0.0,
             rank=0,
         )
