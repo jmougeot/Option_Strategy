@@ -66,7 +66,7 @@ def create_strategy_fast_with_signs(
         pnl_stack[i] = opt.pnl_array
 
     #Eliminer la vente d'un put ou d'un call qui ne rapporte rien 
-    useless_sell = int(np.sum((signs < 0) & (premiums < 0.4), dtype=np.int32))
+    useless_sell = int(np.sum((signs < 0) & (premiums < 0.04), dtype=np.int32))
     if useless_sell > 0 :
         return None
     
@@ -89,7 +89,7 @@ def create_strategy_fast_with_signs(
 
     # Calcul est filtre du premium 
     total_premium = np.sum(signs * premiums)
-    if total_premium > 0.06 or total_premium < -0.1:
+    if total_premium > 0.6 or total_premium < -1:
         return None
     
     #Calcul est filtre du delta 
@@ -110,7 +110,7 @@ def create_strategy_fast_with_signs(
     total_pnl_array = np.dot(signs, pnl_stack)
     max_profit, max_loss = float(np.max(total_pnl_array)), float(np.min(total_pnl_array))
 
-    if max_loss < -0.10:
+    if max_loss < -0.5:
         return None
     if max_loss < 0:
         risk_reward_ratio = abs(max_profit / max_loss)
