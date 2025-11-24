@@ -19,6 +19,7 @@ from myproject.strategy.comparison_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
 from myproject.app.scenario import create_mixture_from_scenarios
 from myproject.app.widget import ScenarioData
+from myproject.app.utils import filter_same_strategies
 import numpy as np
 
 
@@ -99,6 +100,8 @@ def process_bloomberg_to_strategies(
     best_strategies = comparer.compare_and_rank(
         strategies=all_strategies, top_n=top_n, weights=scoring_weights
     )
+
+    filter_same_strategies(best_strategies)
 
     stats["nb_strategies_classees"] = len(best_strategies)
 

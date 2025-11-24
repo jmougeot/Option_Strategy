@@ -152,3 +152,30 @@ def strike_list(strike_min: float, strike_max: float, step: float) -> List[float
         strike_list.append(strike)
         strike += step
     return strike_list
+
+def filter_same_strategies(comparisons: List[StrategyComparison]) -> List[StrategyComparison]:
+    """
+    Filtre les stratégies ayant le même profil P&L (pnl_array identique).
+    
+    Args:
+        comparisons: Liste de StrategyComparison à filtrer
+        
+    Returns:
+        Liste de StrategyComparison sans doublons (conserve la première occurrence)
+    """
+    import numpy as np
+    
+    vues = set()  # Contiendra les signatures (hash) des pnl_array déjà vus
+    strategies_uniques = []  # Contiendra les stratégies uniques
+    
+    for comp in comparisons:
+        signature = tuple(comp.pnl_array)
+        if signature not in vues:
+            vues.add(signature)
+            strategies_uniques.append(comp)
+    
+    nb_doublons = len(comparisons) - len(strategies_uniques)
+    if nb_doublons > 0:
+        print(f"  🔍 Doublons détectés: {nb_doublons} stratégies identiques éliminées")
+    
+    return strategies_uniques

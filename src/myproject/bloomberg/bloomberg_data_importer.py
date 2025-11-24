@@ -163,7 +163,6 @@ def import_euribor_options(
 
                             # Afficher un résumé
                             opt_symbol = "C" if option.option_type == "call" else "P"
-                            surfaces_info = f", Surf.P={option.profit_surface_ponderated:.2f}, Surf.L={option.loss_surface_ponderated:.2f}"
 
                             print(
                                 f"✓ {opt_symbol} {option.strike}: "
