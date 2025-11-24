@@ -83,7 +83,7 @@ def create_strategy_fast_with_signs(
     short_put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32))
     put_count = long_put_count - short_put_count
 
-    if (short_put_count - long_call_count) > 1: 
+    if (short_put_count - long_call_count - long_put_count) > 1: 
         return None
     
     is_long = signs > 0
