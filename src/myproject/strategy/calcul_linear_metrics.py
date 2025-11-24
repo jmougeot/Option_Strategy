@@ -110,7 +110,7 @@ def create_strategy_fast_with_signs(
 
     total_pnl_array = np.dot(signs, pnl_stack)
     max_profit, max_loss = float(np.max(total_pnl_array)), float(np.min(total_pnl_array))
-    if max_loss > 0.51:
+    if max_loss < -0.51:
         return None
 
     # Breakeven points (vectorisé)
