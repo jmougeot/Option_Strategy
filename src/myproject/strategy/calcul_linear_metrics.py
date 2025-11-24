@@ -83,8 +83,9 @@ def create_strategy_fast_with_signs(
     short_put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32))
     put_count = long_put_count - short_put_count
 
-    if ouvert == False and put_count>1:
+    if ouvert == False and short_put_count > long_put_count:
         return None
+    
     if (short_put_count - long_call_count - long_put_count) > 1: 
         return None
     
@@ -104,7 +105,6 @@ def create_strategy_fast_with_signs(
     total_vega = np.sum(signs * vegas)
     total_theta = np.sum(signs * thetas)
     total_iv = np.sum(signs * ivs)
-
 
     
     total_average_pnl = np.sum(signs * average_pnls)
