@@ -67,7 +67,7 @@ def create_strategy_fast_with_signs(
         pnl_stack[i] = opt.pnl_array
 
     #Eliminer la vente d'un put ou d'un call qui ne rapporte rien 
-    useless_sell = int(np.sum((signs < 0) & (abs(premiums) < 0.04), dtype=np.int32))
+    useless_sell = int(np.sum((signs < 0) & (premiums < 0.04), dtype=np.int32))
     if useless_sell > 0 :
         return None
     
@@ -144,7 +144,6 @@ def create_strategy_fast_with_signs(
     surface_loss_nonponderated = float(np.abs(np.sum(negative_pnl)) * dx)
 
     # OPTIMISATION #4: Calcul des surfaces pondérées SEULEMENT si nécessaire
-    # (après tous les filtres précoces)
     profit_surfaces_ponderated = np.empty(n_options, dtype=np.float64)
     loss_surfaces_ponderated = np.empty(n_options, dtype=np.float64)
     
