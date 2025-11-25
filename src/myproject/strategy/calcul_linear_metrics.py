@@ -93,7 +93,7 @@ def create_strategy_fast_with_signs(
 
     # Calcul est filtre du premium 
     total_premium = np.sum(signs * premiums)
-    if total_premium > max_premium_params:
+    if abs(total_premium) > max_premium_params:
         return None
     
     #Calcul est filtre du delta 
