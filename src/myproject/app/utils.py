@@ -169,7 +169,14 @@ def filter_same_strategies(comparisons: List[StrategyComparison]) -> List[Strate
     strategies_uniques = []  # Contiendra les stratégies uniques
     
     for comp in comparisons:
-        signature = tuple(comp.pnl_array)
+        # If pnl_array missing, use a fallback signature (keep them)
+        if comp.pnl_array is None:
+            signature = ("__no_pnl__", comp.strategy_name)
+        else:
+            # Round to avoid tiny floating differences producing distinct signatures
+            pnl_rounded = np.round(comp.pnl_array, decimals=6)
+            signature = tuple(pnl_rounded.tolist())
+
         if signature not in vues:
             vues.add(signature)
             strategies_uniques.append(comp)

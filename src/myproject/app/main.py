@@ -101,7 +101,8 @@ def process_bloomberg_to_strategies(
         strategies=all_strategies, top_n=top_n, weights=scoring_weights
     )
 
-    filter_same_strategies(best_strategies)
+    # Remove duplicate strategies with identical P&L profiles
+    best_strategies = filter_same_strategies(best_strategies)
 
     stats["nb_strategies_classees"] = len(best_strategies)
 

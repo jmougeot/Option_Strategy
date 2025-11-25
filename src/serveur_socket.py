@@ -85,22 +85,42 @@ class RemoteClient:
 
 # ============= UTILISATION =============
 if __name__ == "__main__":
-    
+    """Usage:
+    - Start server (default host 0.0.0.0, port 5555):
+        python serveur_socket.py server [host] [port]
+
+    - Run client (default host 127.0.0.1, port 5555):
+        python serveur_socket.py client [host] [port] [code]
+
+    If [code] is omitted, a short test snippet is executed.
+    """
+
     if len(sys.argv) > 1 and sys.argv[1] == "server":
-        # Démarrer le serveur
-        executor = RemoteExecutor(port=5555)
+        # Démarrer le serveur. Optional: host, port
+        host = sys.argv[2] if len(sys.argv) > 2 else "0.0.0.0"
+        port = int(sys.argv[3]) if len(sys.argv) > 3 else 5555
+        executor = RemoteExecutor(host=host, port=port)
         executor.start()
-    
-    else:
-        # Mode client - exécuter du code distant
-        client = RemoteClient("192.168.1.100")  # Remplacez par l'IP du serveur
-        
-        code = """
+
+    elif len(sys.argv) > 1 and sys.argv[1] == "client":
+        # Mode client - optional: host, port, code
+        host = sys.argv[2] if len(sys.argv) > 2 else "127.0.0.1"
+        port = int(sys.argv[3]) if len(sys.argv) > 3 else 5555
+
+        # If code supplied as 4th arg, use it; else use default snippet
+        if len(sys.argv) > 4:
+            code = sys.argv[4]
+        else:
+            code = """
 x = 10
 y = 20
 z = x + y
 print(f"Résultat: {z}")
 """
-        
+
+        client = RemoteClient(host, port=port)
         result = client.execute(code)
         print(result)
+
+    else:
+        print(__doc__ if '__doc__' in globals() and globals()['__doc__'] else "Usage: serveur_socket.py server|client")
