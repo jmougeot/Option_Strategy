@@ -93,12 +93,8 @@ def main():
             # Vérifier les résultats
             if not best_strategies:
                 st.error("❌ Aucune stratégie générée")
-                st.info(
-                    f"📊 Statistiques : {stats.get('nb_options', 0)} options converties"
-                )
                 return
 
-            # Afficher les statistiques
             display_success_stats(stats)
 
         # Utiliser best_strategies pour l'affichage

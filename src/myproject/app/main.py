@@ -24,6 +24,7 @@ import numpy as np
 
 
 def process_bloomberg_to_strategies(
+    scenarios: ScenarioData,
     underlying: str = "ER",
     months: List[str] = [],
     years: List[int] = [],
@@ -35,7 +36,6 @@ def process_bloomberg_to_strategies(
     top_n: int = 10,
     scoring_weights: Optional[Dict[str, float]] = None,
     verbose: bool = False,
-    scenarios: Optional[ScenarioData] = None,
     num_points: int = 200,
     max_loss: float = 0.1,
     max_premium: float = 0.06,
@@ -61,7 +61,7 @@ def process_bloomberg_to_strategies(
     stats = {}
 
     mixture = create_mixture_from_scenarios(
-        scenarios, price_min, price_max, num_points, target_price
+        scenarios, price_min, price_max, num_points
     )
 
     options = import_euribor_options(

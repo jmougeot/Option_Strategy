@@ -153,49 +153,35 @@ def strike_list(strike_min: float, strike_max: float, step: float) -> List[float
         strike += step
     return strike_list
 
-def filter_same_strategies(comparisons: List[StrategyComparison], tolerance: float = 1e-4, debug: bool = False) -> List[StrategyComparison]:
+def filter_same_strategies(comparisons: List[StrategyComparison], decimals: int = 4) -> List[StrategyComparison]:
     """
-    Filtre les stratégies ayant le même profil P&L (pnl_array identique).
-    Utilise une approche plus robuste avec tolérance pour grouper les payoffs quasi-identiques.
+    Filtre les stratégies ayant le même profil P&L.
     
     Args:
         comparisons: Liste de StrategyComparison à filtrer
-        tolerance: Tolérance pour considérer deux payoffs identiques (default 1e-4 = 0.0001)
-        debug: Afficher des infos de debug sur les doublons détectés
+        decimals: Nombre de décimales pour l'arrondi (4 = tolérance 0.0001)
         
     Returns:
-        Liste de StrategyComparison sans doublons (conserve la première occurrence)
+        Liste sans doublons (conserve la première occurrence)
     """
     import numpy as np
     
-    strategies_uniques = []
+    vues = set()
+    uniques = []
     
     for comp in comparisons:
-        # If pnl_array missing, keep it
         if comp.pnl_array is None:
-            strategies_uniques.append(comp)
+            uniques.append(comp)
             continue
         
-        # Check if this payoff is already represented
-        is_duplicate = False
-        for existing in strategies_uniques:
-            if existing.pnl_array is None:
-                continue
-            
-            # Use allclose to compare with tolerance
-            if np.allclose(comp.pnl_array, existing.pnl_array, rtol=0, atol=tolerance):
-                is_duplicate = True
-                if debug:
-                    print(f"  ⚠️ Doublon: '{comp.strategy_name}' ≈ '{existing.strategy_name}'")
-                    max_diff = np.max(np.abs(comp.pnl_array - existing.pnl_array))
-                    print(f"     Max diff: {max_diff:.8f}")
-                break
-        
-        if not is_duplicate:
-            strategies_uniques.append(comp)
+        # Signature = tuple du pnl_array arrondi
+        sig = tuple(np.round(comp.pnl_array, decimals))
+        if sig not in vues:
+            vues.add(sig)
+            uniques.append(comp)
     
-    nb_doublons = len(comparisons) - len(strategies_uniques)
-    if nb_doublons > 0:
-        print(f"  🔍 Doublons détectés: {nb_doublons} stratégies avec payoffs quasi-identiques éliminées")
+    n = len(comparisons) - len(uniques)
+    if n > 0:
+        print(f"  🔍 {n} doublons éliminés")
     
-    return strategies_uniques
+    return uniques
