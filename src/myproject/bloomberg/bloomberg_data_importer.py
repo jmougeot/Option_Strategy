@@ -5,6 +5,7 @@ Importe les données d'options depuis Bloomberg et les convertit directement
 en objets Option avec calcul optionnel des surfaces.
 """
 
+import re
 from typing import List, Literal, Optional, cast, Tuple
 from myproject.bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
 from myproject.bloomberg.ticker_builder import build_option_ticker, build_option_ticker_brut
@@ -15,6 +16,8 @@ import numpy as np
 # Type pour les mois valides
 MonthCode = Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
 
+# Mois Bloomberg valides
+VALID_MONTHS = {"F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"}
 
 # Mapping des mois Bloomberg vers les noms complets
 MONTH_NAMES = {
@@ -47,6 +50,66 @@ MONTH_EXPIRY_DAY = {
 }
 
 
+def parse_brut_code(brut_code: str) -> dict:
+    """
+    Parse un code brut Bloomberg pour extraire les métadonnées.
+    
+    Exemples de codes bruts:
+    - "ERF6C" → underlying="ER", month="F", year=6, option_type="call"
+    - "RXWF26P" → underlying="RXW", month="F", year=26, option_type="put"
+    
+    Args:
+        brut_code: Code Bloomberg sans strike ni suffix (ex: "ERF6C", "RXWF26P")
+        
+    Returns:
+        Dict avec underlying, month, year, option_type
+    """
+    code = brut_code.upper().strip()
+    
+    # Pattern: [UNDERLYING][MONTH][YEAR][C/P]
+    # Le month est une lettre parmi FGHKMNQUVXZ
+    # Le year peut être 1 ou 2 chiffres
+    # Le type est C ou P à la fin
+    
+    # Trouver le type (C ou P) à la fin
+    if code.endswith("C"):
+        option_type = "call"
+        code_without_type = code[:-1]
+    elif code.endswith("P"):
+        option_type = "put"
+        code_without_type = code[:-1]
+    else:
+        # Pas de type explicite, par défaut call
+        option_type = "call"
+        code_without_type = code
+    
+    # Trouver l'année (1 ou 2 chiffres à la fin)
+    match = re.search(r'(\d{1,2})$', code_without_type)
+    if match:
+        year = int(match.group(1))
+        code_without_year = code_without_type[:match.start()]
+    else:
+        year = 6  # Défaut
+        code_without_year = code_without_type
+    
+    # Trouver le mois (dernière lettre valide)
+    month = "F"  # Défaut
+    underlying = code_without_year
+    
+    if code_without_year:
+        last_char = code_without_year[-1].upper()
+        if last_char in VALID_MONTHS:
+            month = last_char
+            underlying = code_without_year[:-1]
+    
+    return {
+        "underlying": underlying,
+        "month": month,
+        "year": year,
+        "option_type": option_type,
+    }
+
+
 def import_euribor_options(
     brut_code: Optional[List[str]],
     underlying: str = "",
@@ -61,19 +124,14 @@ def import_euribor_options(
     Importe un ensemble d'options depuis Bloomberg et retourne directement des objets Option.
 
     Args:
-        underlying: Symbole du sous-jacent (ex: "ER" pour Euribor)
-        months: Liste des mois Bloomberg (ex: ['M', 'U', 'Z'])
-        years: Liste des années (ex: [6, 7] pour 2026, 2027)
+        brut_code: Liste de codes Bloomberg bruts (ex: ["ERF6C", "ERF6P"]) ou None pour mode standard
+        underlying: Symbole du sous-jacent (ex: "ER" pour Euribor) - ignoré si brut_code
+        months: Liste des mois Bloomberg (ex: ['M', 'U', 'Z']) - ignoré si brut_code
+        years: Liste des années (ex: [6, 7] pour 2026, 2027) - ignoré si brut_code
         strikes: Liste des strikes à importer
         suffix: Suffixe Bloomberg (ex: "Comdty")
-        include_calls: Inclure les calls
-        include_puts: Inclure les puts
         default_position: Position par défaut ('long' ou 'short')
-        default_quantity: Quantité par défaut
-        price_min: Prix minimum pour le calcul des surfaces
-        price_max: Prix maximum pour le calcul des surfaces
-        calculate_surfaces: Si True, calcule profit_surface et loss_surface
-        num_points: Nombre de points pour le calcul des surfaces
+        mixture: Tuple (prices, probas) pour le calcul des surfaces pondérées
 
     Returns:
         Liste d'objets Option directement utilisables
@@ -88,7 +146,8 @@ def import_euribor_options(
 
     print("\n🔨 Construction des tickers...")
 
-    if brut_code is None :
+    if brut_code is None:
+        # Mode standard: construire à partir de underlying/months/years
         for year in years:
             for month in months:
                 month_code = cast(MonthCode, month)
@@ -118,53 +177,74 @@ def import_euribor_options(
                         "year": year,
                     }
                     total_attempts += 1
-    else : 
-        for strike in strikes:
-            for code in brut_code:
-                all_tickers.append(build_option_ticker_brut(code, strike, suffix)) 
-
+    else:
+        # Mode brut: parser les codes pour extraire les métadonnées
+        for code in brut_code:
+            meta = parse_brut_code(code)
+            for strike in strikes:
+                ticker = build_option_ticker_brut(code, strike, suffix)
+                all_tickers.append(ticker)
+                ticker_metadata[ticker] = {
+                    "underlying": meta["underlying"],
+                    "strike": strike,
+                    "option_type": meta["option_type"],
+                    "month": meta["month"],
+                    "year": meta["year"],
+                }
+                total_attempts += 1
 
     # FETCH EN BATCH
     try:
         batch_data = fetch_options_batch(all_tickers, use_overrides=True)
 
+        # Collecter les mois/années uniques depuis les métadonnées
+        if brut_code is not None:
+            # Extraire les mois/années uniques des codes bruts
+            unique_periods = set()
+            for meta in ticker_metadata.values():
+                unique_periods.add((meta["year"], meta["month"]))
+            periods = sorted(unique_periods)
+        else:
+            # Utiliser les années/mois fournis
+            periods = [(year, month) for year in years for month in months]
+
         # Traiter les résultats par mois
-        for year in years:
-            for month in months:
-                month_options_count = 0
+        for year, month in periods:
+            month_options_count = 0
+            month_name = MONTH_NAMES.get(month, month)
 
-                print(f"\n📅 {MONTH_NAMES[month]} 20{20+year}")
-                print("-" * 70)
+            print(f"\n📅 {month_name} 20{20+year}")
+            print("-" * 70)
 
-                for ticker in all_tickers:
-                    meta = ticker_metadata[ticker]
+            for ticker in all_tickers:
+                meta = ticker_metadata[ticker]
 
-                    # Filtrer par mois/année
-                    if meta["month"] != month or meta["year"] != year:
-                        continue
+                # Filtrer par mois/année
+                if meta["month"] != month or meta["year"] != year:
+                    continue
 
-                    # Récupérer les données brutes
-                    raw_data = batch_data.get(ticker, {})
+                # Récupérer les données brutes
+                raw_data = batch_data.get(ticker, {})
 
-                    if raw_data and not all(v is None for v in raw_data.values()):
-                        # Extraire les meilleures valeurs
-                        extracted = extract_best_values(raw_data)
+                if raw_data and not all(v is None for v in raw_data.values()):
+                    # Extraire les meilleures valeurs
+                    extracted = extract_best_values(raw_data)
 
-                        # Créer l'option directement (les surfaces sont calculées dans create_option_from_bloomberg)
-                        option = create_option_from_bloomberg(
-                            ticker=ticker,
-                            underlying=meta["underlying"],
-                            strike=meta["strike"],
-                            month=meta["month"],
-                            year=meta["year"],
-                            option_type_str=meta["option_type"],
-                            bloomberg_data=extracted,
-                            position=default_position,
-                            mixture=mixture,
-                        )
+                    # Créer l'option directement (les surfaces sont calculées dans create_option_from_bloomberg)
+                    option = create_option_from_bloomberg(
+                        ticker=ticker,
+                        underlying=meta["underlying"],
+                        strike=meta["strike"],
+                        month=meta["month"],
+                        year=meta["year"],
+                        option_type_str=meta["option_type"],
+                        bloomberg_data=extracted,
+                        position=default_position,
+                        mixture=mixture,
+                    )
 
-                        # Vérifier que l'option est valide
-                        if option.strike > 0:
+                    # Vérifier que l'option est valide
+                    if option.strike > 0:
                             list_option.append(option)
                             month_options_count += 1
                             total_success += 1
