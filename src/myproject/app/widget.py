@@ -156,7 +156,6 @@ def scenario_params() -> Optional[ScenarioData]:
                     weight = st.number_input(
                         "Proba",
                         value=float(scenario["weight"]),
-                        max_value=100.0,
                         step=1.0,
                         format="%.1f",
                         key=f"weight_{i}",
