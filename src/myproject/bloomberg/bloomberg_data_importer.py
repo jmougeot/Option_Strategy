@@ -121,7 +121,7 @@ def import_euribor_options(
     else : 
         for strike in strikes:
             for code in brut_code:
-                all_tickers.append(build_option_ticker_brut(code, suffix)) 
+                all_tickers.append(build_option_ticker_brut(code, strike, suffix)) 
 
 
     # FETCH EN BATCH
