@@ -20,13 +20,12 @@ def _format_option(o: Option, sign: float) -> str:
     sign_str = "+" if sign == 1 else "-"
     # Accès direct à l'attribut au lieu de o.is_call()
     option_type = "C" if o.option_type == "call" else "P"
-    return f"{sign_str} {o.strike}{option_type}"
+    return f"{sign_str}{o.strike}{option_type}"
 
 
 def generate_strategy_name(options: List[Option], signs: np.ndarray) -> str:
     underlying = options[0].underlying_symbol or "ER"
     month = options[0].expiration_month
     year = options[0].expiration_year
-
-    parts = [_format_option(o, signs[i]) for i, o in enumerate(options)]
-    return (f"{underlying}{month}{year}".join(parts))
+    parts = "".join([_format_option(o, signs[i]) for i, o in enumerate(options)])
+    return (f"{underlying}{month}{year} {parts}")
