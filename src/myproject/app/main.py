@@ -65,7 +65,7 @@ def process_bloomberg_to_strategies(
     )
 
     options = import_euribor_options(
-        brut_code=brut_code
+        brut_code=brut_code,
         underlying=underlying,
         months=months,
         years=years,
