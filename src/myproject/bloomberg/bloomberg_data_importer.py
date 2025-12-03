@@ -57,6 +57,7 @@ def parse_brut_code(brut_code: str) -> dict:
     Exemples de codes bruts:
     - "ERF6C" → underlying="ER", month="F", year=6, option_type="call"
     - "RXWF26P" → underlying="RXW", month="F", year=26, option_type="put"
+    - "ERF6P2" → underlying="ER", month="F", year=6, option_type="put"
     
     Args:
         brut_code: Code Bloomberg sans strike ni suffix (ex: "ERF6C", "RXWF26P")
@@ -66,18 +67,14 @@ def parse_brut_code(brut_code: str) -> dict:
     """
     code = brut_code.upper().strip()
     
-    # Pattern: [UNDERLYING][MONTH][YEAR][C/P]
-    # Le month est une lettre parmi FGHKMNQUVXZ
-    # Le year peut être 1 ou 2 chiffres
-    # Le type est C ou P à la fin
-    
-    # Trouver le type (C ou P) à la fin
-    if code.endswith("C"):
+    # Trouver le type C ou P dans toute la chaîne (pas seulement à la fin)
+    if "C" in code:
         option_type = "call"
-        code_without_type = code[:-1]
-    elif code.endswith("P"):
+        # Retirer le C de la chaîne pour parser le reste
+        code_without_type = code.replace("C", "", 1)  # Remplacer seulement le premier C
+    elif "P" in code:
         option_type = "put"
-        code_without_type = code[:-1]
+        code_without_type = code.replace("P", "", 1)
     else:
         # Pas de type explicite, par défaut call
         option_type = "call"
@@ -93,7 +90,7 @@ def parse_brut_code(brut_code: str) -> dict:
         code_without_year = code_without_type
     
     # Trouver le mois (dernière lettre valide)
-    month = "F"  # Défaut
+    month = ""  # Défaut
     underlying = code_without_year
     
     if code_without_year:
