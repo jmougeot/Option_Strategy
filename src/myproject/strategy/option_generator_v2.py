@@ -69,7 +69,6 @@ class OptionStrategyGeneratorV2:
                 # Pour chaque combinaison, tester différentes configurations de positions
                 strategies = self._generate_position_variants(
                     list(combo),
-                    target_price,
                     max_loss,
                     max_premium,
                     ouvert
@@ -90,7 +89,6 @@ class OptionStrategyGeneratorV2:
     def _generate_position_variants(
         self,
         options: List[Option],
-        target_price: float,
         max_loss : float,
         max_premium : float,
         ouvert: bool
@@ -135,7 +133,7 @@ class OptionStrategyGeneratorV2:
 
         # ===== Génération des stratégies (optimisé) =====
         for signs in sign_arrays:
-            strat = create_strategy_fast_with_signs(options, signs, target_price, max_loss, max_premium, ouvert)
+            strat = create_strategy_fast_with_signs(options, signs, max_loss, max_premium, ouvert)
             if strat is not None:  # Vérification explicite plus rapide que if strat
                 strategies.append(strat)
         

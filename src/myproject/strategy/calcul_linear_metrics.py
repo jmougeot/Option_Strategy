@@ -12,7 +12,7 @@ import numpy as np
 
 
 def create_strategy_fast_with_signs(
-    options: List[Option], signs: np.ndarray, target_price: float, max_loss_params : float, max_premium_params :float, ouvert:bool 
+    options: List[Option], signs: np.ndarray, max_loss_params : float, max_premium_params :float, ouvert:bool 
 ) -> Optional[StrategyComparison]:
     """
     Version optimisée qui prend les signes directement (évite les copies d'options).
@@ -89,7 +89,6 @@ def create_strategy_fast_with_signs(
     if (short_put_count - long_call_count - long_put_count) > 1: 
         return None
     
-    is_long = signs > 0
 
     # Calcul est filtre du premium 
     total_premium = np.sum(signs * premiums)
@@ -116,7 +115,6 @@ def create_strategy_fast_with_signs(
     if max_loss < -max_loss_params:
         return None
 
-    # Breakeven points (vectorisé)
     sign_changes = total_pnl_array[:-1] * total_pnl_array[1:] < 0
     breakeven_indices = np.where(sign_changes)[0]
 
@@ -147,8 +145,6 @@ def create_strategy_fast_with_signs(
     negative_pnl = np.minimum(total_pnl_array, 0.0)
     surface_profit_nonponderated = float(np.sum(positive_pnl) * dx)
     surface_loss_nonponderated = float(np.abs(np.sum(negative_pnl)) * dx)
-
-    # OPTIMISATION #4: Calcul des surfaces pondérées SEULEMENT si nécessaire
     profit_surfaces_ponderated = np.empty(n_options, dtype=np.float64)
     loss_surfaces_ponderated = np.empty(n_options, dtype=np.float64)
     
@@ -156,8 +152,8 @@ def create_strategy_fast_with_signs(
         profit_surfaces_ponderated[i] = opt.profit_surface_ponderated
         loss_surfaces_ponderated[i] = opt.loss_surface_ponderated
     
-    total_profit_surface = np.sum(np.where(is_long, profit_surfaces_ponderated, -loss_surfaces_ponderated))
-    total_loss_surface = np.sum(np.where(is_long, loss_surfaces_ponderated, -profit_surfaces_ponderated))
+    total_profit_surface = np.sum(np.where((signs>0), profit_surfaces_ponderated, -loss_surfaces_ponderated))
+    total_loss_surface = np.sum(np.where((signs>0), loss_surfaces_ponderated, -profit_surfaces_ponderated))
     total_sigma_pnl = np.sqrt(np.sum(sigma_pnls**2))
 
     # Calcul du nom et expiration
@@ -168,7 +164,7 @@ def create_strategy_fast_with_signs(
         strategy = StrategyComparison(
             strategy_name=strategy_name,
             strategy=None,
-            target_price=target_price,
+            target_price=98,
             premium=float(total_premium),
             all_options=options,
             signs=signs,  # Stocker les signes utilisés

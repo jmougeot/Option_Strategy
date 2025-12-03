@@ -92,9 +92,6 @@ def process_bloomberg_to_strategies(
 
     stats["nb_strategies_totales"] = len(all_strategies)
 
-    # ÉTAPE 3 : Comparaison et ranking
-    if verbose:
-        print(f"📊 Comparaison et ranking (top {top_n})...")
 
     comparer = StrategyComparerV2()
     best_strategies = comparer.compare_and_rank(
