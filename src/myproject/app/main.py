@@ -35,11 +35,11 @@ def process_bloomberg_to_strategies(
     max_legs: int = 4,
     top_n: int = 10,
     scoring_weights: Optional[Dict[str, float]] = None,
-    verbose: bool = False,
     num_points: int = 200,
     max_loss: float = 0.1,
     max_premium: float = 0.06,
-    ouvert:bool = True 
+    ouvert:bool = True,
+    brut_code: Optional[List[str]] =None
 ) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray]]:
     """
     Fonction principale simplifiée pour Streamlit.
@@ -65,6 +65,7 @@ def process_bloomberg_to_strategies(
     )
 
     options = import_euribor_options(
+        brut_code=brut_code
         underlying=underlying,
         months=months,
         years=years,

@@ -74,6 +74,7 @@ def main():
         ):
             # Appeler la fonction principale qui fait TOUT
             best_strategies, stats, mixture = process_bloomberg_to_strategies(
+                brut_code=params.brut_code,
                 underlying=params.underlying,
                 months=params.months,
                 years=params.years,
@@ -83,7 +84,6 @@ def main():
                 max_legs=params.max_legs,
                 top_n=500,
                 scoring_weights=scoring_weights,
-                verbose=False,
                 scenarios=scenarios,
                 max_loss=params.max_loss,
                 max_premium=params.max_premium,

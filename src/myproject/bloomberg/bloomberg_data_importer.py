@@ -7,7 +7,7 @@ en objets Option avec calcul optionnel des surfaces.
 
 from typing import List, Literal, Optional, cast, Tuple
 from myproject.bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
-from myproject.bloomberg.ticker_builder import build_option_ticker
+from myproject.bloomberg.ticker_builder import build_option_ticker, build_option_ticker_brut
 from myproject.bloomberg.bloomber_to_opt import create_option_from_bloomberg
 from myproject.option.option_class import Option
 import numpy as np
@@ -48,7 +48,8 @@ MONTH_EXPIRY_DAY = {
 
 
 def import_euribor_options(
-    underlying: str = "ER",
+    brut_code: Optional[List[str]],
+    underlying: str = "",
     months: List[str] = [],
     years: List[int] = [],
     strikes: List[float] = [],
@@ -86,35 +87,42 @@ def import_euribor_options(
     ticker_metadata = {}
 
     print("\n🔨 Construction des tickers...")
-    for year in years:
-        for month in months:
-            month_code = cast(MonthCode, month)
-            for strike in strikes:
-                ticker = build_option_ticker(
-                    underlying, month_code, year, "C", strike, suffix
-                )
-                all_tickers.append(ticker)
-                ticker_metadata[ticker] = {
-                    "underlying": underlying,
-                    "strike": strike,
-                    "option_type": "call",
-                    "month": month,
-                    "year": year,
-                }
-                total_attempts += 1
 
-                ticker = build_option_ticker(
-                    underlying, month_code, year, "P", strike, suffix
-                )
-                all_tickers.append(ticker)
-                ticker_metadata[ticker] = {
-                    "underlying": underlying,
-                    "strike": strike,
-                    "option_type": "put",
-                    "month": month,
-                    "year": year,
-                }
-                total_attempts += 1
+    if brut_code is None :
+        for year in years:
+            for month in months:
+                month_code = cast(MonthCode, month)
+                for strike in strikes:
+                    ticker = build_option_ticker(
+                        underlying, month_code, year, "C", strike, suffix
+                    )
+                    all_tickers.append(ticker)
+                    ticker_metadata[ticker] = {
+                        "underlying": underlying,
+                        "strike": strike,
+                        "option_type": "call",
+                        "month": month,
+                        "year": year,
+                    }
+                    total_attempts += 1
+
+                    ticker = build_option_ticker(
+                        underlying, month_code, year, "P", strike, suffix
+                    )
+                    all_tickers.append(ticker)
+                    ticker_metadata[ticker] = {
+                        "underlying": underlying,
+                        "strike": strike,
+                        "option_type": "put",
+                        "month": month,
+                        "year": year,
+                    }
+                    total_attempts += 1
+    else : 
+        for strike in strikes:
+            for code in brut_code:
+                all_tickers.append(build_option_ticker_brut(code, suffix)) 
+
 
     # FETCH EN BATCH
     try:

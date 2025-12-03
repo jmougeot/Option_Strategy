@@ -53,3 +53,17 @@ def build_option_ticker(
         ticker = f"{ticker} {suffix}"
 
     return ticker
+
+def build_option_ticker_brut(
+        brut_code:str,
+        suffix: str
+    ) -> str :
+    """
+    Construit un ticket avcec le code brut
+    """
+    ticker=f"{brut_code} {suffix}"
+    
+    return ticker
+
+
+
