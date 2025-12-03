@@ -170,10 +170,6 @@ def filter_same_strategies(comparisons: List[StrategyComparison], decimals: int 
     uniques = []
     
     for comp in comparisons:
-        if comp.pnl_array is None:
-            uniques.append(comp)
-            continue
-        
         # Signature = tuple du pnl_array arrondi
         sig = tuple(np.round(comp.pnl_array, decimals))
         if sig not in vues:
@@ -185,3 +181,6 @@ def filter_same_strategies(comparisons: List[StrategyComparison], decimals: int 
         print(f"  🔍 {n} doublons éliminés")
     
     return uniques
+
+
+

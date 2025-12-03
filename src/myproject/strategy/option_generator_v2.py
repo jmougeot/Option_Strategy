@@ -119,7 +119,7 @@ class OptionStrategyGeneratorV2:
         # OPTIMISATION MAJEURE: Utiliser le cache de signes pré-calculés
         sign_arrays = self.SIGN_ARRAYS_CACHE.get(n)
         if sign_arrays is None:
-            # Fallback pour n > 4 (ne devrait jamais arriver avec max_legs=4)
+            print("pblm with sign array")
             sign_arrays = [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=n)]
         
         strategies: List[StrategyComparison] = []

@@ -3,6 +3,7 @@ Calcul Complet et Optimisé des Métriques de Stratégie d'Options
 Version ultra-optimisée avec NumPy vectorization et calcul en une passe
 """
 
+from calendar import c
 from typing import List, Optional
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
@@ -78,6 +79,17 @@ def create_strategy_fast_with_signs(
     if call_count <= -1:
         return None
     
+    # Filtre l'achat et la vente de la même option
+    vues = set()
+    for call, sign in zip(is_call, signs) :
+        # Signature = tuple du pnl_array arrondi
+        sig = (call , sign)
+        if sig not in vues:
+            vues.add(sig)
+        else :
+            return None
+    
+
     # Calculer short_count put_count vectorisé
     long_put_count = int(np.sum((signs > 0) & (~is_call), dtype=np.int32))
     short_put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32))
