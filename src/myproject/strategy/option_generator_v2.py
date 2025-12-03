@@ -116,13 +116,6 @@ class OptionStrategyGeneratorV2:
             ):
                 return []
 
-            deltas = np.array([opt.delta for opt in options])
-            pos_deltas = np.sum(deltas[deltas > 0])
-            neg_deltas = np.sum(np.abs(deltas[deltas < 0]))
-            min_possible_delta = abs(pos_deltas - neg_deltas)
-            if min_possible_delta > 0.7:
-                return []
-
         # OPTIMISATION MAJEURE: Utiliser le cache de signes pré-calculés
         sign_arrays = self.SIGN_ARRAYS_CACHE.get(n)
         if sign_arrays is None:
