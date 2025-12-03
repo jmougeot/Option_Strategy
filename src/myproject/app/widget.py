@@ -22,8 +22,8 @@ class UIParams:
 
 def sidebar_params() -> UIParams:
     brut_code_check =st.checkbox(
-        "Donner le code brut"
-        value=False
+        "Donner le code brut",
+        value=False,
         help="Donner le code bloomberg complet"
     )
     if brut_code_check is False : 
@@ -54,9 +54,9 @@ def sidebar_params() -> UIParams:
         c1 , c2= st.columns(2)
         with c1:
             code_brut=st.text_input(
-                "Code bloomberg complet"
-                value="RXWF26C2,RXWF26P2"
-                help"chercher le code bloomberg et mettre put et call"
+                "Code bloomberg complet",
+                value="RXWF26C2,RXWF26P2",
+                help="chercher le code bloomberg et mettre put et call"
             )
         with c2:
             price_step = st.number_input(
