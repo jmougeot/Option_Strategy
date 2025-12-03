@@ -3,7 +3,6 @@ Calcul Complet et Optimisé des Métriques de Stratégie d'Options
 Version ultra-optimisée avec NumPy vectorization et calcul en une passe
 """
 
-from calendar import c
 from typing import List, Optional
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison

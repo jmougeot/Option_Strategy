@@ -17,7 +17,7 @@ class UIParams:
     max_loss:float
     max_premium: float
     ouvert:bool
-    brut_code:Optional[List[str]]=None
+    brut_code: Optional[List[str]]=None
 
 
 def sidebar_params() -> UIParams:
@@ -26,6 +26,14 @@ def sidebar_params() -> UIParams:
         value=False,
         help="Donner le code bloomberg complet"
     )
+    
+    # Valeurs par défaut
+    underlying = "ER"
+    years_input = "6"
+    months_input = "F"
+    code_brut = None  # None par défaut, liste si mode brut
+    
+    
     if brut_code_check is False : 
         c1, c2 = st.columns(2)
         with c1:
@@ -98,11 +106,16 @@ def sidebar_params() -> UIParams:
 
     years = [int(y.strip()) for y in years_input.split(",") if y.strip()]
     months = [m.strip() for m in months_input.split(",") if m.strip()]
-    brut_code = [(y.strip()) for y in code_brut.split(",") if y.strip()]
+    
+    # None si pas de code brut, sinon liste des codes
+    if code_brut:
+        brut_code_result = [y.strip() for y in code_brut.split(",") if y.strip()] or None
+    else:
+        brut_code_result = None
 
 
     return UIParams(
-        underlying, months, years, price_min, price_max, price_step, max_legs, strikes, max_loss, max_premium, ouvert, brut_code,
+        underlying, months, years, price_min, price_max, price_step, max_legs, strikes, max_loss, max_premium, ouvert, brut_code_result,
     )
 
 
