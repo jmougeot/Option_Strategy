@@ -79,15 +79,14 @@ def create_strategy_fast_with_signs(
     if call_count <= -1:
         return None
     
-    # Filtre l'achat et la vente de la même option
-    vues = set()
-    for call, sign in zip(is_call, signs) :
-        # Signature = tuple du pnl_array arrondi
-        sig = (call , sign)
-        if sig not in vues:
-            vues.add(sig)
-        else :
-            return None
+    # Filtre l'achat et la vente de la même option (même strike + même type)
+    for i in range(n_options):
+        for j in range(i + 1, n_options):
+            # Même type (call/put) et même strike mais signes opposés = inutile
+            if (is_call[i] == is_call[j] and 
+                options[i].strike == options[j].strike and 
+                signs[i] != signs[j]):
+                return None
     
 
     # Calculer short_count put_count vectorisé
