@@ -191,8 +191,28 @@ def import_euribor_options(
                 total_attempts += 1
 
     # FETCH EN BATCH
+    import os
+    TEST_MODE = os.environ.get("TEST_BBG_IMPORT", "0") == "1"
+
     try:
-        batch_data = fetch_options_batch(all_tickers, use_overrides=True)
+        if TEST_MODE:
+            print("\n⚡ Mode TEST_BBG_IMPORT=1 : génération de données random pour chaque ticker")
+            batch_data = {}
+            rng = np.random.default_rng()
+            for ticker in all_tickers:
+                batch_data[ticker] = {
+                    "PX_LAST": float(rng.uniform(90, 110)),
+                    "BID": float(rng.uniform(0.1, 2.0)),
+                    "ASK": float(rng.uniform(0.1, 2.0)),
+                    "IVOL_MID": float(rng.uniform(0.1, 0.5)),
+                    "DELTA": float(rng.uniform(-1, 1)),
+                    "GAMMA": float(rng.uniform(0, 0.1)),
+                    "THETA": float(rng.uniform(-0.1, 0)),
+                    "VEGA": float(rng.uniform(0, 0.2)),
+                    "PREMIUM": float(rng.uniform(0.1, 2.0)),
+                }
+        else:
+            batch_data = fetch_options_batch(all_tickers, use_overrides=True)
 
         # Collecter les mois/années uniques depuis les métadonnées
         if brut_code is not None:

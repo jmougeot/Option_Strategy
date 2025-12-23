@@ -13,7 +13,7 @@ from itertools import combinations_with_replacement
 import numpy as np
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
-from myproject.strategy.calcul_linear_metrics import create_strategy_fast_with_signs
+from myproject.strategy.calcul_linear_metrics_cpp import create_strategy_fast_with_signs
 from myproject.option.option_filter import sort_options_by_expiration
 
 
