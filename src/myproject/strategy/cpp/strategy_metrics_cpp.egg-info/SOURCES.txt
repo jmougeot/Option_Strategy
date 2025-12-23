@@ -1,0 +1,11 @@
+README.md
+bindings.cpp
+pyproject.toml
+setup.py
+strategy_metrics.cpp
+strategy_metrics_cpp.egg-info/PKG-INFO
+strategy_metrics_cpp.egg-info/SOURCES.txt
+strategy_metrics_cpp.egg-info/dependency_links.txt
+strategy_metrics_cpp.egg-info/not-zip-safe
+strategy_metrics_cpp.egg-info/requires.txt
+strategy_metrics_cpp.egg-info/top_level.txt

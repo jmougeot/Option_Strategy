@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: strategy_metrics_cpp
+Version: 1.0.0
+Summary: Module C++ optimisé pour les calculs de métriques de stratégies
+Author: Option Strategy Team
+Requires-Python: >=3.8
+Requires-Dist: pybind11>=2.11.0
+Dynamic: author
+Dynamic: requires-python

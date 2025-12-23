@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools>=45", "pybind11>=2.11.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "strategy_metrics_cpp"
+version = "1.0.0"
+description = "Module C++ optimisé pour les calculs de métriques de stratégies"
+requires-python = ">=3.8"
+dependencies = ["pybind11>=2.11.0"]
