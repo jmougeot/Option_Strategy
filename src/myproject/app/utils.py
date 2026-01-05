@@ -146,11 +146,21 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
 
 
 def strike_list(strike_min: float, strike_max: float, step: float) -> List[float]:
-    strike_list = []
-    strike = strike_min
-    while strike <= strike_max:
-        strike_list.append(strike)
-        strike += step
+    """
+    Génère une liste de strikes avec un step défini, en évitant les erreurs d'arrondis.
+    
+    Utilise une approche par multiplication pour éviter l'accumulation d'erreurs
+    lors d'additions répétées de floats.
+    """
+    # Calculer le nombre de steps nécessaires
+    num_steps = int(round((strike_max - strike_min) / step)) + 1
+    
+    # Générer les strikes par multiplication pour éviter l'accumulation d'erreurs
+    strike_list = [round(strike_min + i * step, 10) for i in range(num_steps)]
+    
+    # Filtrer pour respecter la limite max (au cas où l'arrondi dépasse)
+    strike_list = [s for s in strike_list if s <= strike_max + 1e-9]
+    
     return strike_list
 
 def filter_same_strategies(comparisons: List[StrategyComparison], decimals: int = 4) -> List[StrategyComparison]:
