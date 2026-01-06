@@ -96,7 +96,7 @@ def create_strategy_fast_with_signs(
     if ouvert == False and short_put_count > long_put_count:
         return None
     
-    if (short_put_count - long_call_count - long_put_count) > 1: 
+    if (short_put_count - long_call_count - long_put_count) > 0: 
         return None
     
 
