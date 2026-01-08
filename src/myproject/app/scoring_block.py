@@ -11,7 +11,7 @@ SCORING_CATEGORIES = {
     },
 
     "Financier": {
-        "fields": ["max_profit", "risk_over_reward", "profit_zone_width", "profit_at_target"],
+        "fields": ["max_profit", "profit_zone_width", "profit_at_target"],
         "color": "💰",
         "description": "Métriques de profit et risque",
     },
@@ -27,7 +27,7 @@ SCORING_CATEGORIES = {
         "description": "Aires sous la courbe de P&L",
     },
     "Greeks": {
-        "fields": ["delta_neutral", "gamma_low", "vega_low", "theta_positive"],
+        "fields": ["delta_neutral"],
         "color": "🔢",
         "description": "Sensibilités aux facteurs de marché",
     },
@@ -47,7 +47,6 @@ SCORING_CATEGORIES = {
 FIELD_LABELS = {
     "Protection Put": "Protection Put",
     "max_profit": "Max Profit",
-    "risk_over_reward": "Risk/Reward",
     "profit_at_target": "Profit @ Target",
     "profit_zone_width": "Largeur Zone",
     "surface_profit": "Surface Profit",
@@ -56,7 +55,6 @@ FIELD_LABELS = {
     "surface_loss_ponderated": "Surface Loss Pond.",
     "reward_over_risk": "Reward/Risk Ratio",
     "delta_neutral": "Delta Neutral",
-    "gamma_low": "Gamma Low",
     "vega_low": "Vega Low",
     "theta_positive": "Theta Positive",
     "average_pnl": "Average P&L",
@@ -81,7 +79,6 @@ def scoring_weights_block() -> dict:
         "Balanced (Équilibré)": {
             "Protection Put": 0.10,
             "max_profit": 0.10,
-            "risk_over_reward": 0.10,
             "profit_zone_width": 0.08,
             "profit_at_target": 0.08,
             "surface_profit": 0.12,
@@ -90,7 +87,6 @@ def scoring_weights_block() -> dict:
             "surface_loss_ponderated": 0.08,
             "reward_over_risk": 0.10,
             "delta_neutral": 0.06,
-            "gamma_low": 0.04,
             "vega_low": 0.04,
             "theta_positive": 0.04,
             "average_pnl": 0.15,

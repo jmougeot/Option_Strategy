@@ -26,8 +26,6 @@ import numpy as np
 def process_bloomberg_to_strategies(
     scenarios: ScenarioData,
     underlying: str = "ER",
-
-
     months: List[str] = [],
     years: List[int] = [],
     strikes: List[float] = [],

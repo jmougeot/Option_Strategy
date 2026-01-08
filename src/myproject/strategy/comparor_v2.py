@@ -8,7 +8,6 @@ Optimisé avec numpy pour des calculs vectorisés rapides.
 ✅ CORRECTIONS APPORTÉES (Audit 31/10/2025):
 ---------------------------------------------------
 1. Surface Loss: scorer=_score_lower_better (plus petite perte = meilleur)
-2. Risk/Reward: renommé "risk_over_reward" pour clarté
 3. Reward/Risk: nouveau ratio "reward_over_risk" = surface_profit/surface_loss
 4. Poids normalisés: division automatique par la somme (scores comparables)
 5. Comparaison de méthodes: utilise scorer.__name__ au lieu de ==
@@ -84,13 +83,6 @@ class StrategyComparerV2:
                 scorer=self._score_higher_better
             ),
             MetricConfig(
-                name="risk_over_reward", 
-                weight=0.10,
-                extractor=lambda s: self._safe_value(s.risk_reward_ratio),
-                normalizer=self._normalize_min_max,
-                scorer=self._score_lower_better,
-            ),
-            MetricConfig(
                 name="profit_zone_width",
                 weight=0.08,
                 extractor=lambda s: self._safe_value(s.profit_zone_width),
@@ -147,13 +139,6 @@ class StrategyComparerV2:
                 extractor=lambda s: abs(self._safe_value(s.total_delta)),
                 normalizer=self._normalize_max,
                 scorer=self._score_lower_better,  # Plus proche de 0 = meilleur
-            ),
-            MetricConfig(
-                name="gamma_low",  # ✅ CORRIGÉ: lower_better au lieu de moderate
-                weight=0.04,
-                extractor=lambda s: abs(self._safe_value(s.total_gamma)),
-                normalizer=self._normalize_max,
-                scorer=self._score_lower_better,  # Faible exposition = meilleur
             ),
             MetricConfig(
                 name="vega_low",  # ✅ CORRIGÉ: lower_better au lieu de moderate
