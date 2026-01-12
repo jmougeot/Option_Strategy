@@ -203,7 +203,7 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
         elif ask and ask > 0:
             premium_value = ask/2
 
-    result["premium"] = None
+    result["premium"] = premium_value
 
     # Bid/Ask
     result["bid"] = bid if (bid and bid > 0) else 0.0
