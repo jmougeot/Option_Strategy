@@ -4,40 +4,18 @@ from typing import List
 
 # Définition des catégories de métriques basées sur comparor_v2.py
 SCORING_CATEGORIES = {
-    "Protection": {
-        "fields": ["Protection Put"],
-        "color": "🛡️",
-        "description": "Favorise les puts LONG (protection), pénalise puts SHORT",
-    },
-
-    "Financier": {
-        "fields": ["max_profit", "risk_over_reward", "profit_zone_width", "profit_at_target"],
-        "color": "💰",
-        "description": "Métriques de profit et risque",
-    },
-    "Surfaces": {
-        "fields": [
-            "surface_profit",
-            "surface_loss",
-            "surface_profit_ponderated",
-            "surface_loss_ponderated",
-            "reward_over_risk",
-        ],
-        "color": "📐",
-        "description": "Aires sous la courbe de P&L",
+    "Mixture Gaussienne": {
+        "fields": ["average_pnl", "sigma_pnl"],
+        "color": "📊",
+        "description": "Métriques pondérées par probabilité",
     },
     "Greeks": {
         "fields": ["delta_neutral", "gamma_low", "vega_low", "theta_positive"],
         "color": "🔢",
         "description": "Sensibilités aux facteurs de marché",
     },
-    "Mixture Gaussienne": {
-        "fields": ["average_pnl", "sigma_pnl"],
-        "color": "📊",
-        "description": "Métriques pondérées par probabilité",
-    },
     "Volatilité & Coût": {
-        "fields": ["implied_vol_moderate", "premium_credit"],
+        "fields": ["implied_vol_moderate"],
         "color": "🌊",
         "description": "Volatilité implicite et coût/crédit",
     },
@@ -45,16 +23,6 @@ SCORING_CATEGORIES = {
 
 # Mapping des noms de champs vers des noms lisibles
 FIELD_LABELS = {
-    "Protection Put": "Protection Put",
-    "max_profit": "Max Profit",
-    "risk_over_reward": "Risk/Reward",
-    "profit_at_target": "Profit @ Target",
-    "profit_zone_width": "Largeur Zone",
-    "surface_profit": "Surface Profit",
-    "surface_loss": "Surface Loss",
-    "surface_profit_ponderated": "Surface Profit Pond.",
-    "surface_loss_ponderated": "Surface Loss Pond.",
-    "reward_over_risk": "Reward/Risk Ratio",
     "delta_neutral": "Delta Neutral",
     "gamma_low": "Gamma Low",
     "vega_low": "Vega Low",
@@ -62,7 +30,6 @@ FIELD_LABELS = {
     "average_pnl": "Average P&L",
     "sigma_pnl": "Sigma P&L",
     "implied_vol_moderate": "IV Modérée",
-    "premium_credit": "Premium (Crédit)",
 }
 
 
@@ -153,8 +120,8 @@ def scoring_weights_block() -> dict:
                 col_idx = idx % num_cols
                 with cols[col_idx]:
                     label = FIELD_LABELS.get(field_name, field_name) or field_name
-                    # Valeur par défaut de 0%
-                    default_value = 0
+                    # Valeur par défaut : 100 pour average_pnl, 0 pour les autres
+                    default_value = 100 if field_name == "average_pnl" else 0
                     weight = (
                         st.slider(
                             str(label),  # Garantir que c'est un str
@@ -167,16 +134,4 @@ def scoring_weights_block() -> dict:
                         / 100
                     )
                     weights_manual[field_name] = weight
-
-        # Calculer et afficher le total
-        total = sum(weights_manual.values())
-
-        st.markdown("---")
-        if total < 0.95 or total > 1.05:
-            st.warning(
-                f"⚠️ Total des poids: {total*100:.1f}% (devrait être proche de 100%)"
-            )
-        else:
-            st.success(f"✅ Total des poids: {total*100:.1f}%")
-
     return weights_manual
