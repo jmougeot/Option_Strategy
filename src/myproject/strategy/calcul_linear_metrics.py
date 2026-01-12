@@ -76,10 +76,7 @@ def create_strategy_fast_with_signs(
     # Calculer call_count put_count vectorisé
     long_call_count = int(np.sum((signs > 0) & is_call, dtype=np.int32))
     short_call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32))
-    call_count =  long_call_count - short_call_count
-    if call_count <= -1:
-        return None
-    
+
     # Filtre l'achat et la vente de la même option (même strike + même type)
     for i in range(n_options):
         for j in range(i + 1, n_options):
@@ -180,7 +177,7 @@ def create_strategy_fast_with_signs(
             premium=float(total_premium),
             all_options=options,
             signs=signs,  # Stocker les signes utilisés
-            call_count=call_count,
+            call_count=0,
             put_count=put_count,
             expiration_day=exp_info.get("expiration_day"),
             expiration_week=exp_info.get("expiration_week"),
