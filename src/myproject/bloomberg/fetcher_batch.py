@@ -200,16 +200,10 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     if premium_value == 0.0:
         if bid and ask and bid > 0 and ask > 0:
             premium_value = (bid + ask) / 2
-        elif bid and bid > 0:
-            premium_value = bid
         elif ask and ask > 0:
-            premium_value = ask
-    
-    if premium_value == 0.0: 
-        last = data.get("PX_LAST")
-        premium_value = last
+            premium_value = ask/2
 
-    result["premium"] = premium_value
+    result["premium"] = None
 
     # Bid/Ask
     result["bid"] = bid if (bid and bid > 0) else 0.0
