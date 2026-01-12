@@ -14,9 +14,6 @@ class UIParams:
     price_step: float
     max_legs: int
     strikes: list[float]
-    max_loss:float
-    max_premium: float
-    ouvert:bool
     brut_code: Optional[List[str]]=None
 
 
@@ -70,18 +67,6 @@ def sidebar_params() -> UIParams:
             price_step = st.number_input(
             "Pas de Prix ($)", value=0.0625, step=0.0001, format="%.4f"
         )
-            
-
-    c1 , c2= st.columns(2)
-
-    with c1:
-        max_loss= st.number_input(
-        "Max loss", value= 0.01, format="%.4f", help="Perte maximum accéptée"
-        )
-    with c2:
-        max_premium = st.number_input(
-        "Max premium" , value=0.06, format="%.4f", help="Prix maximum de la stratégie"
-        )
 
     c1, c2 = st.columns(2)
     with c1:
@@ -91,13 +76,7 @@ def sidebar_params() -> UIParams:
     with c2:
         price_max = st.number_input(
             "Prix Max ($)", value=98.750, step=0.0001, format="%.4f"
-        )
-        
-    ouvert = st.checkbox(
-        "Risque Ouvert", 
-        value=False, 
-        help="Autoriser les stratégies à risque illimité (vente de calls/puts non couverts)"
-    )
+            )
 
 
     strikes = strike_list(price_min, price_max, price_step)
@@ -115,7 +94,7 @@ def sidebar_params() -> UIParams:
 
 
     return UIParams(
-        underlying, months, years, price_min, price_max, price_step, max_legs, strikes, max_loss, max_premium, ouvert, brut_code_result,
+        underlying, months, years, price_min, price_max, price_step, max_legs, strikes, brut_code_result,
     )
 
 

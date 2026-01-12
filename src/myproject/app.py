@@ -14,6 +14,7 @@ from myproject.app.processing import (
     save_to_session_state,
     display_success_stats,
 )
+from myproject.app.filter_widget import filter_params
 
 
 # ============================================================================
@@ -49,6 +50,7 @@ def main():
         scenarios = scenario_params()
         st.markdown("---")
         params = sidebar_params()
+        filter = filter_params()
         scoring_weights = scoring_weights_block()
 
     # ========================================================================
@@ -85,9 +87,7 @@ def main():
                 top_n=500,
                 scoring_weights=scoring_weights,
                 scenarios=scenarios,
-                max_loss=params.max_loss,
-                max_premium=params.max_premium,
-                ouvert=params.ouvert
+                filter=filter
             )
 
             # Vérifier les résultats

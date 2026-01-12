@@ -20,25 +20,24 @@ from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
 from myproject.app.scenario import create_mixture_from_scenarios
 from myproject.app.widget import ScenarioData
 from myproject.app.utils import filter_same_strategies
+from myproject.app.filter_widget import FilterData
 import numpy as np
 
 
 def process_bloomberg_to_strategies(
+    filter: FilterData,
     scenarios: ScenarioData,
     underlying: str = "ER",
     months: List[str] = [],
     years: List[int] = [],
     strikes: List[float] = [],
-    target_price: float = 0.0,
     price_min: float = 0.0,
     price_max: float = 100.0,
     max_legs: int = 4,
     top_n: int = 10,
     scoring_weights: Optional[Dict[str, float]] = None,
     num_points: int = 200,
-    max_loss: float = 0.1,
-    max_premium: float = 0.06,
-    ouvert:bool = True,
+
     brut_code: Optional[List[str]] =None
 ) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray]]:
     """
@@ -82,13 +81,10 @@ def process_bloomberg_to_strategies(
     generator = OptionStrategyGeneratorV2(options)
 
     all_strategies = generator.generate_all_combinations(
-        target_price=target_price,
         price_min=price_min,
         price_max=price_max,
         max_legs=max_legs,
-        max_loss=max_loss,
-        max_premium=max_premium,
-        ouvert=ouvert
+        filter=filter
     )
 
     stats["nb_strategies_totales"] = len(all_strategies)
