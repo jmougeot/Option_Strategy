@@ -147,7 +147,6 @@ def scenario_params() -> Optional[ScenarioData]:
                     else:
                         st.caption("Min: 1")
 
-            st.divider()
 
     if (
         scenarios_to_delete
