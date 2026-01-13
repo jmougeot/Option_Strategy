@@ -4,9 +4,7 @@ Module pour la logique de traitement et de filtrage des stratégies
 
 from typing import List, Tuple, Optional, Dict, Any, TYPE_CHECKING
 from myproject.strategy.comparison_class import StrategyComparison
-
-if TYPE_CHECKING:
-    from myproject.app.widget import ScenarioData
+from myproject.app.scenarios_widget import ScenarioData
 
 
 def process_comparison_results(

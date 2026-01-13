@@ -1,102 +1,10 @@
-import streamlit as st
+from myproject.mixture.mixture_gaussienne import mixture
+from myproject.mixture.gauss import gaussian, asymetric_gaussian
+import numpy as np
+from typing import Tuple
 from dataclasses import dataclass
-from myproject.app.utils import strike_list
-from typing import Optional,List
-
-
-@dataclass
-class UIParams:
-    underlying: str
-    months: list[str]
-    years: list[int]
-    price_min: float
-    price_max: float
-    price_step: float
-    max_legs: int
-    strikes: list[float]
-    brut_code: Optional[List[str]]=None
-
-
-def sidebar_params() -> UIParams:
-    brut_code_check =st.checkbox(
-        "Donner le code brut",
-        value=False,
-        help="Donner le code bloomberg complet"
-    )
-    
-    # Valeurs par défaut
-    underlying = "ER"
-    years_input = "6"
-    months_input = "F"
-    code_brut = None  # None par défaut, liste si mode brut
-    
-    
-    if brut_code_check is False : 
-        c1, c2 = st.columns(2)
-        with c1:
-            underlying = st.text_input(
-                "Sous-jacent:", value="ER", help="Code Bloomberg (ER = EURIBOR)"
-            )
-        with c2:
-            years_input = st.text_input(
-                "Années:", value="6", help="6=2026, 7=2027 (séparées par virgule)"
-            )
-
-        c1 , c2= st.columns(2)
-        with c1:
-            months_input = st.text_input(
-                "Mois d'expiration:",
-                value="F",
-                help="F=Jan, G=Feb, H=Mar, K=Apr, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec",
-            )
-    
-        with c2:
-                price_step = st.number_input(
-            "Pas de Prix ($)", value=0.0625, step=0.0001, format="%.4f"
-        )
-
-    else:
-        c1 , c2= st.columns(2)
-        with c1:
-            code_brut=st.text_input(
-                "Code bloomberg complet",
-                value="RXWF26C2,RXWF26P2",
-                help="chercher le code bloomberg et mettre put et call"
-            )
-        with c2:
-            price_step = st.number_input(
-            "Pas de Prix ($)", value=0.0625, step=0.0001, format="%.4f"
-        )
-
-    c1, c2 = st.columns(2)
-    with c1:
-        price_min = st.number_input(
-            "Prix Min ($)", value=97.750, step=0.0001, format="%.4f"
-        )
-    with c2:
-        price_max = st.number_input(
-            "Prix Max ($)", value=98.750, step=0.0001, format="%.4f"
-            )
-
-
-    strikes = strike_list(price_min, price_max, price_step)
-
-    max_legs = st.slider("Nombre maximum de legs par stratégie:", 1, 6, 4)
-
-    years = [int(y.strip()) for y in years_input.split(",") if y.strip()]
-    months = [m.strip() for m in months_input.split(",") if m.strip()]
-    
-    # None si pas de code brut, sinon liste des codes
-    if code_brut:
-        brut_code_result = [y.strip() for y in code_brut.split(",") if y.strip()] or None
-    else:
-        brut_code_result = None
-
-
-    return UIParams(
-        underlying, months, years, price_min, price_max, price_step, max_legs, strikes, brut_code_result,
-    )
-
+import streamlit as st
+from typing import Optional
 
 @dataclass
 class ScenarioData:
@@ -281,3 +189,56 @@ def scenario_params() -> Optional[ScenarioData]:
         weights=weights,
         asymmetric=asym_incertitude
     )
+
+
+def create_mixture_from_scenarios(
+    scenarios: ScenarioData,
+    price_min: float,
+    price_max: float,
+    num_points: int = 50,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Crée une mixture gaussienne à partir des scénarios définis par l'utilisateur.
+    Supporte les gaussiennes symétriques et asymétriques.
+
+    Args:
+        scenarios: ScenarioData avec centers, std_devs, std_devs_r, weights, asymmetric
+        price_min: Prix minimum de la grille
+        price_max: Prix maximum de la grille
+        num_points: Nombre de points dans la grille
+
+    Returns:
+        (prices, mixture_normalized): Grille de prix et mixture gaussienne normalisée
+    """
+    # Extraire les paramètres des scénarios
+    centers = scenarios.centers
+    std_devs = scenarios.std_devs
+    std_devs_r = scenarios.std_devs_r
+    proba = scenarios.weights
+    is_asymmetric = getattr(scenarios, 'asymmetric', False)
+
+    if is_asymmetric:
+        # Mode asymétrique: utiliser asymetric_gaussian
+        prices, mix = mixture(
+            price_min=price_min,
+            price_max=price_max,
+            num_points=num_points,
+            proba=proba,
+            mus=centers,
+            sigmas=std_devs,
+            f=asymetric_gaussian,
+            sigmas_r=std_devs_r,
+        )
+    else:
+        # Mode symétrique: utiliser gaussian standard
+        prices, mix = mixture(
+            price_min=price_min,
+            price_max=price_max,
+            num_points=num_points,
+            proba=proba,
+            mus=centers,
+            sigmas=std_devs,
+            f=gaussian,
+        )
+    
+    return prices, mix

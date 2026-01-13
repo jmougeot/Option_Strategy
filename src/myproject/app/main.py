@@ -17,8 +17,8 @@ from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.comparor_v2 import StrategyComparerV2
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
-from myproject.app.scenario import create_mixture_from_scenarios
-from myproject.app.widget import ScenarioData
+from myproject.app.scenarios_widget import create_mixture_from_scenarios
+from myproject.app.scenarios_widget import ScenarioData
 from myproject.app.utils import filter_same_strategies
 from myproject.app.filter_widget import FilterData
 import numpy as np

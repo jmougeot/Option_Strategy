@@ -6,8 +6,9 @@ Description: Web user interface to compare options strategies
 import streamlit as st
 from myproject.app.main import process_bloomberg_to_strategies
 from myproject.app.styles import inject_css
-from myproject.app.widget import sidebar_params, scenario_params
-from myproject.app.scoring_block import scoring_weights_block
+from myproject.app.params_widget import sidebar_params
+from myproject.app.scenarios_widget import scenario_params
+from myproject.app.scoring_widget import scoring_weights_block
 from myproject.app.tabs import display_overview_tab, display_payoff_tab
 from myproject.app.processing import (
     process_comparison_results,
@@ -86,7 +87,7 @@ def main():
                 max_legs=params.max_legs,
                 top_n=500,
                 scoring_weights=scoring_weights,
-                scenarios=scenarios,
+                scenarios=scenarios, #type: ignore
                 filter=filter
             )
 
@@ -129,7 +130,7 @@ def main():
         display_overview_tab(comparisons)
 
     with tab2:
-        display_payoff_tab(top_5_comparisons, best_target_price, mixture)
+        display_payoff_tab(top_5_comparisons, best_target_price, mixture) #type: ignore
 
 # ============================================================================
 # POINT D'ENTRÉE

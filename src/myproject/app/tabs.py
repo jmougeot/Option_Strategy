@@ -6,11 +6,9 @@ import streamlit as st
 import numpy as np
 from typing import List, Tuple
 from myproject.strategy.comparison_class import StrategyComparison
-from myproject.app.utils import (
-    create_payoff_diagram,
-    format_currency,
-    create_comparison_table,
-)
+from myproject.app.utils import format_currency
+from myproject.app.comparison_table import create_comparison_table
+from myproject.app.payoff_diagram import create_payoff_diagram
 
 
 def display_overview_tab(comparisons: List[StrategyComparison]):
