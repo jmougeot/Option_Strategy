@@ -38,7 +38,7 @@ inject_css()
 def main():
     # En-tête
     st.markdown(
-        '<div class="main-header">📊 Comparateur de Stratégies Options</div>',
+        '<div class="main-header">Comparateur de Stratégies Options</div>',
         unsafe_allow_html=True,
     )
     st.markdown("---")
@@ -59,7 +59,7 @@ def main():
     # ========================================================================
 
     compare_button = st.button(
-        "🚀 Lancer la Comparaison", type="primary", use_container_width=True
+        "Lancer la Comparaison", type="primary", use_container_width=True
     )
 
     # Déterminer quelle source de stratégies utiliser
