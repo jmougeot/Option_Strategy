@@ -115,39 +115,46 @@ def main():
         )
         st.markdown(f'<a href="{email_link}" target="_blank" style="text-decoration:none;">📧 <b>Send Configuration by Email</b></a>', unsafe_allow_html=True)
         
-        # Buttons to save/export diagrams
-        if "comparisons" in st.session_state and st.session_state.comparisons:
-            col_exp1, col_exp2 = st.columns(2)
-            
-            with col_exp1:
-                if st.button("💾 Payoff (PNG)", use_container_width=True):
-                    from myproject.app.payoff_diagram import save_payoff_diagram_png
-                    mixture_data = st.session_state.get("mixture", None)
-                    target = st.session_state.get("current_params", {}).get("target_price", None)
-                    saved_path = save_payoff_diagram_png(
-                        comparisons=st.session_state.comparisons[:5],
-                        target_price=target,
-                        mixture=mixture_data
-                    )
-                    if saved_path:
-                        st.session_state["diagram_path"] = saved_path
-                        st.success(f"✅ Saved!")
-                        st.caption(saved_path)
-                    else:
-                        st.warning("⚠️ kaleido missing")
-            
-            with col_exp2:
-                if st.button("📊 Top 5 (PNG)", use_container_width=True):
-                    from myproject.app.payoff_diagram import save_top5_summary_png
-                    saved_path = save_top5_summary_png(
-                        comparisons=st.session_state.comparisons
-                    )
-                    if saved_path:
-                        st.session_state["top5_summary_path"] = saved_path
-                        st.success(f"✅ Saved!")
-                        st.caption(saved_path)
-                    else:
-                        st.warning("⚠️ kaleido missing")
+        # Buttons to save/export diagrams (always visible)
+        st.markdown("---")
+        st.markdown("**📁 Export Results**")
+        
+        has_comparisons = "comparisons" in st.session_state and st.session_state.comparisons
+        
+        col_exp1, col_exp2 = st.columns(2)
+        
+        with col_exp1:
+            if st.button("💾 Payoff (PNG)", use_container_width=True, disabled=not has_comparisons):
+                from myproject.app.payoff_diagram import save_payoff_diagram_png
+                mixture_data = st.session_state.get("mixture", None)
+                target = st.session_state.get("current_params", {}).get("target_price", None)
+                saved_path = save_payoff_diagram_png(
+                    comparisons=st.session_state.comparisons[:5],
+                    target_price=target,
+                    mixture=mixture_data
+                )
+                if saved_path:
+                    st.session_state["diagram_path"] = saved_path
+                    st.success(f"✅ Saved!")
+                    st.caption(saved_path)
+                else:
+                    st.warning("⚠️ kaleido missing")
+        
+        with col_exp2:
+            if st.button("📊 Top 5 (PNG)", use_container_width=True, disabled=not has_comparisons):
+                from myproject.app.payoff_diagram import save_top5_summary_png
+                saved_path = save_top5_summary_png(
+                    comparisons=st.session_state.comparisons
+                )
+                if saved_path:
+                    st.session_state["top5_summary_path"] = saved_path
+                    st.success(f"✅ Saved!")
+                    st.caption(saved_path)
+                else:
+                    st.warning("⚠️ kaleido missing")
+        
+        if not has_comparisons:
+            st.caption("⚠️ Run comparison first")
 
     # ========================================================================
     # MAIN AREA
