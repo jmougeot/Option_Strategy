@@ -7,7 +7,7 @@ import numpy as np
 
 
 def prepare_options_data(options: List[Option]) -> Dict[str, List[Option]]:
-    """Sépare les calls et puts."""
+    """Separates calls and puts."""
     calls = [opt for opt in options if opt.option_type == "call"]
     puts = [opt for opt in options if opt.option_type == "put"]
 
@@ -28,14 +28,14 @@ def format_percentage(value: float) -> str:
 
 def format_expiration_date(month: str, year: int) -> str:
     """
-    Formate la date d'expiration à partir du mois Bloomberg et de l'année.
+    Formats expiration date from Bloomberg month and year.
 
     Args:
-        month: Code du mois Bloomberg (F, G, H, K, M, N, Q, U, V, X, Z)
-        year: Année (6 = 2026)
+        month: Bloomberg month code (F, G, H, K, M, N, Q, U, V, X, Z)
+        year: Year (6 = 2026)
 
     Returns:
-        Date formatée (ex: "Jun 2026")
+        Formatted date (ex: "Jun 2026")
     """
     month_names = {
         "F": "Jan",
@@ -63,22 +63,22 @@ def create_payoff_diagram(
     mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
 ):
     """
-    Crée un diagramme P&L interactif pour toutes les stratégies avec mixture gaussienne optionnelle
+    Creates an interactive P&L diagram for all strategies with optional Gaussian mixture
 
     Args:
-        comparisons: Liste des stratégies à afficher
-        target_price: Prix cible pour la référence verticale
-        mixture: Tuple (prices, probabilities) pour afficher la distribution gaussienne (optionnel)
+        comparisons: List of strategies to display
+        target_price: Target price for vertical reference
+        mixture: Tuple (prices, probabilities) for displaying Gaussian distribution (optional)
 
     Returns:
-        Figure Plotly avec les courbes P&L et optionnellement la mixture
+        Plotly figure with P&L curves and optionally the mixture
     """
-    # Générer la plage de prix
+    # Generate price range
     price_range = comparisons[0].prices
     if target_price is None:
         target_price = comparisons[0].target_price
 
-    # Créer une figure avec deux axes Y si mixture fournie
+    # Create a figure with two Y axes if mixture provided
     if mixture is not None:
         from plotly.subplots import make_subplots
 
@@ -86,7 +86,7 @@ def create_payoff_diagram(
     else:
         fig = go.Figure()
 
-    # Lignes de référence
+    # Reference lines
     if mixture is not None:
         fig.add_hline(
             y=0, line_dash="dash", line_color="gray", opacity=0.5, secondary_y=False

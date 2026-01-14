@@ -6,15 +6,15 @@ import pandas as pd
 
 
 def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFrame:
-    """Crée un DataFrame pour l'affichage des comparaisons avec TOUS les critères de scoring."""
+    """Creates a DataFrame for displaying comparisons with ALL scoring criteria."""
 
     data = []
     for idx, comp in enumerate(comparisons, 1):
         data.append(
             {
-                "Rang": idx,
-                "Stratégie": comp.strategy_name,
-                "Expiration": format_expiration_date(
+                "Rank": idx,
+                "Strategy": comp.strategy_name,
+                "Expiry": format_expiration_date(
                     comp.expiration_month, comp.expiration_year
                 ),
                 "Premium": format_currency(comp.premium),

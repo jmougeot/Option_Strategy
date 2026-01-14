@@ -17,132 +17,132 @@ class ScenarioData:
 
 def scenario_params() -> Optional[ScenarioData]:
     """
-    Interface pour définir les scénarios de marché (mixture gaussienne).
-    L'utilisateur peut ajouter autant de scénarios qu'il souhaite.
-    Chaque scénario = (prix cible, incertitude/volatilité, probabilité)
+    Interface to define market scenarios (Gaussian mixture).
+    The user can add as many scenarios as they wish.
+    Each scenario = (target price, uncertainty/volatility, probability)
     """
     if "scenarios" not in st.session_state:
         st.session_state.scenarios = [
-            {"price": 98.0, "std": 0.10, "std_r": 0.10, "weight": 50.0},  # Scénario neutre par défaut
+            {"price": 98.0, "std": 0.10, "std_r": 0.10, "weight": 50.0},  # Neutral scenario by default
         ]
 
     scenarios_to_delete = []
-    asym_incertitude=st.checkbox(label = "Incertitude asymetric", value = False)
+    asym_incertitude=st.checkbox(label = "Asymmetric Uncertainty", value = False)
 
     for i, scenario in enumerate(st.session_state.scenarios):
         with st.container():
-            # Assurer que std_r existe (rétrocompatibilité)
+            # Ensure std_r exists (backward compatibility)
             if "std_r" not in scenario:
                 st.session_state.scenarios[i]["std_r"] = scenario["std"]
             
             if asym_incertitude:
-                # 5 colonnes pour mode asymétrique
+                # 5 columns for asymmetric mode
                 col_name, col_price, col_std_l, col_std_r, col_weight, col_del = st.columns([1.5, 1.5, 1.5, 1.5, 1.5, 1])
                 
                 with col_name:
-                    st.markdown(f"**Scénario {i+1}**")
+                    st.markdown(f"**Scenario {i+1}**")
                 
                 with col_price:
                     price = st.number_input(
-                        "Prix Cible",
+                        "Target Price",
                         value=float(scenario["price"]),
                         step=0.01,
                         format="%.4f",
                         key=f"price_{i}",
-                        help="Prix attendu pour ce scénario",
+                        help="Expected price for this scenario",
                     )
                     st.session_state.scenarios[i]["price"] = price
                 
                 with col_std_l:
                     std_l = st.number_input(
-                        "σ gauche",
+                        "σ left",
                         value=float(scenario["std"]),
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
                         key=f"std_l_{i}",
-                        help="Incertitude côté baissier",
+                        help="Downside uncertainty",
                     )
                     st.session_state.scenarios[i]["std"] = std_l
                 
                 with col_std_r:
                     std_r = st.number_input(
-                        "σ droite",
+                        "σ right",
                         value=float(scenario["std_r"]),
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
                         key=f"std_r_{i}",
-                        help="Incertitude côté haussier",
+                        help="Upside uncertainty",
                     )
                     st.session_state.scenarios[i]["std_r"] = std_r
                 
                 with col_weight:
                     weight = st.number_input(
-                        "Proba",
+                        "Prob",
                         value=float(scenario["weight"]),
                         step=1.0,
                         format="%.1f",
                         key=f"weight_{i}",
-                        help="Poids du scénario (sera normalisé)",
+                        help="Scenario weight (will be normalized)",
                     )
                     st.session_state.scenarios[i]["weight"] = weight
                 
                 with col_del:
-                    st.markdown("")  # Espacement
+                    st.markdown("")  # Spacing
                     if len(st.session_state.scenarios) > 1:
-                        if st.button("🗑️", key=f"delete_{i}", help="Supprimer ce scénario"):
+                        if st.button("🗑️", key=f"delete_{i}", help="Delete this scenario"):
                             scenarios_to_delete.append(i)
                     else:
                         st.caption("Min: 1")
             
             else:
-                # 4 colonnes pour mode symétrique
+                # 4 columns for symmetric mode
                 col_name, col_price, col_std, col_weight, col_del = st.columns([2, 2, 2, 2, 0.5])
                 
                 with col_name:
-                    st.markdown(f"**Scénario {i+1}**")
+                    st.markdown(f"**Scenario {i+1}**")
                 
                 with col_price:
                     price = st.number_input(
-                        "Prix Cible",
+                        "Target Price",
                         value=float(scenario["price"]),
                         step=0.01,
                         format="%.4f",
                         key=f"price_{i}",
-                        help="Prix attendu pour ce scénario",
+                        help="Expected price for this scenario",
                     )
                     st.session_state.scenarios[i]["price"] = price
                 
                 with col_std:
                     std = st.number_input(
-                        "Incertitude",
+                        "Uncertainty",
                         value=float(scenario["std"]),
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
                         key=f"std_{i}",
-                        help="Écart-type : plus c'est grand, plus le scénario est incertain",
+                        help="Standard deviation: larger means more uncertain",
                     )
                     st.session_state.scenarios[i]["std"] = std
                     st.session_state.scenarios[i]["std_r"] = std
                 
                 with col_weight:
                     weight = st.number_input(
-                        "Probabilité",
+                        "Probability",
                         value=float(scenario["weight"]),
                         max_value=100.0,
                         step=1.0,
                         format="%.1f",
                         key=f"weight_{i}",
-                        help="Poids du scénario (sera normalisé)",
+                        help="Scenario weight (will be normalized)",
                     )
                     st.session_state.scenarios[i]["weight"] = weight
                 
                 with col_del:
-                    st.markdown("")  # Espacement
+                    st.markdown("")  # Spacing
                     if len(st.session_state.scenarios) > 1:
-                        if st.button("🗑️", key=f"delete_{i}", help="Supprimer ce scénario"):
+                        if st.button("🗑️", key=f"delete_{i}", help="Delete this scenario"):
                             scenarios_to_delete.append(i)
                     else:
                         st.caption("Min: 1")
@@ -156,10 +156,10 @@ def scenario_params() -> Optional[ScenarioData]:
             st.session_state.scenarios.pop(idx)
         st.rerun()
     elif scenarios_to_delete:
-        st.warning("⚠️ Vous devez conserver au moins 1 scénario")
+        st.warning("⚠️ You must keep at least 1 scenario")
 
-    if st.button("➕ Ajouter un scénario", use_container_width=True):
-        # Ajouter un nouveau scénario avec des valeurs par défaut
+    if st.button("➕ Add a scenario", use_container_width=True):
+        # Add a new scenario with default values
         last_price = (
             st.session_state.scenarios[-1]["price"]
             if st.session_state.scenarios

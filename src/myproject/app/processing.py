@@ -40,17 +40,18 @@ def save_to_session_state(
     scenarios: Optional["ScenarioData"] = None,
 ):
     """
-    Sauvegarde les stratégies et paramètres dans session_state.
+    Saves strategies and parameters in session_state.
 
     Args:
-        all_comparisons: Toutes les stratégies
-        params: Paramètres de la sidebar
-        best_target_price: Prix cible optimal
-        scenarios: Scénarios de marché (optionnel)
+        all_comparisons: All strategies
+        params: Sidebar parameters
+        best_target_price: Optimal target price
+        scenarios: Market scenarios (optional)
     """
     import streamlit as st
 
     st.session_state["current_strategies"] = all_comparisons
+    st.session_state["comparisons"] = all_comparisons  # For email link access
     st.session_state["current_params"] = {
         "underlying": params.underlying,
         "target_price": best_target_price,
@@ -62,7 +63,7 @@ def save_to_session_state(
         "price_max": params.price_max,
     }
 
-    # Enregistrer les scénarios si fournis
+    # Save scenarios if provided
     if scenarios is not None:
         st.session_state["current_scenarios"] = {
             "centers": scenarios.centers,
@@ -73,17 +74,17 @@ def save_to_session_state(
 
 def display_success_stats(stats: Dict[str, Any]):
     """
-    Affiche les statistiques de succès après le traitement.
+    Displays success statistics after processing.
 
     Args:
-        stats: Dictionnaire des statistiques
+        stats: Statistics dictionary
     """
     import streamlit as st
 
     st.success(
-        f"""✅ Traitement terminé avec succès !
-    • {stats.get('nb_options', 0)} options converties
-    • {stats.get('nb_strategies_totales', 0)} stratégies générées
-    • {stats.get('nb_strategies_classees', 0)} meilleures stratégies identifiées
+        f"""✅ Processing completed successfully!
+    • {stats.get('nb_options', 0)} options converted
+    • {stats.get('nb_strategies_totales', 0)} strategies generated
+    • {stats.get('nb_strategies_classees', 0)} best strategies identified
     """
     )

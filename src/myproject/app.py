@@ -19,7 +19,7 @@ from myproject.app.filter_widget import filter_params
 
 
 # ============================================================================
-# CONFIGURATION DE LA PAGE
+# PAGE CONFIGURATION
 # ============================================================================
 
 st.set_page_config(
@@ -32,19 +32,19 @@ st.set_page_config(
 inject_css()
 
 # ============================================================================
-# INTERFACE PRINCIPALE
+# MAIN INTERFACE
 # ============================================================================
 
 def main():
-    # En-tête
+    # Header
     st.markdown(
-        '<div class="main-header">Comparateur de Stratégies Options</div>',
+        '<div class="main-header">Options Strategy Comparator</div>',
         unsafe_allow_html=True,
     )
     st.markdown("---")
 
     # ========================================================================
-    # SIDEBAR - PARAMÈTRES
+    # SIDEBAR - PARAMETERS
     # ========================================================================
 
     with st.sidebar:
@@ -54,12 +54,36 @@ def main():
         filter = filter_params()
         scoring_weights = scoring_weights_block()
 
+        st.markdown("---")
+        from myproject.app.email_utils import generate_mailto_link
+        
+        # Use session state scenarios which are list of dicts
+        scenarios_list = st.session_state.get("scenarios", [])
+        
+        # Get best strategy info from session state if available
+        best_strategy_name = None
+        best_strategy_score = None
+        if "comparisons" in st.session_state and st.session_state.comparisons:
+            best = st.session_state.comparisons[0]
+            best_strategy_name = best.strategy_name
+            best_strategy_score = best.score
+        
+        email_link = generate_mailto_link(
+            ui_params=params, 
+            scenarios=scenarios_list, 
+            filters_data=filter, 
+            scoring_weights=scoring_weights,
+            best_strategy_name=best_strategy_name,
+            best_strategy_score=best_strategy_score
+        )
+        st.markdown(f'<a href="{email_link}" target="_blank" style="text-decoration:none;">📧 <b>Send Configuration by Email</b></a>', unsafe_allow_html=True)
+
     # ========================================================================
-    # ZONE PRINCIPALE
+    # MAIN AREA
     # ========================================================================
 
     compare_button = st.button(
-        "Lancer la Comparaison", type="primary", use_container_width=True
+        "Run Comparison", type="primary", use_container_width=True
     )
 
     # Déterminer quelle source de stratégies utiliser
@@ -69,13 +93,13 @@ def main():
 
     if compare_button:
         # ====================================================================
-        # ÉTAPE 1 : Traitement complet via la fonction main
+        # STEP 1: Full processing via main function
         # ====================================================================
 
         with st.spinner(
-            f"🔄 Génération et comparaison des stratégies (max {params.max_legs} legs)..."
+            f"🔄 Generating and comparing strategies (max {params.max_legs} legs)..."
         ):
-            # Appeler la fonction principale qui fait TOUT
+            # Call main function doing EVERYTHING
             best_strategies, stats, mixture = process_bloomberg_to_strategies(
                 brut_code=params.brut_code,
                 underlying=params.underlying,
@@ -91,18 +115,18 @@ def main():
                 filter=filter
             )
 
-            # Vérifier les résultats
+            # Check results
             if not best_strategies:
-                st.error("❌ Aucune stratégie générée")
+                st.error("❌ No strategy generated")
                 return
 
             display_success_stats(stats)
 
-        # Utiliser best_strategies pour l'affichage
+        # Use best_strategies for display
         all_comparisons = best_strategies
 
         if not all_comparisons:
-            st.error("❌ Aucune stratégie disponible")
+            st.error("❌ No strategy available")
             return
 
         # Sauvegarder dans session_state (incluant les scénarios)
@@ -120,12 +144,12 @@ def main():
     )
 
     # ====================================================================
-    # TABS POUR L'AFFICHAGE
+    # TABS FOR DISPLAY
     # ====================================================================
 
-    tab1, tab2 = st.tabs(["Vue d'Ensemble", "Diagramme P&L"])
+    tab1, tab2 = st.tabs(["Overview", "P&L Diagram"])
 
-    # Afficher chaque tab avec son module dédié
+    # Display each tab with its dedicated module
     with tab1:
         display_overview_tab(comparisons)
 
