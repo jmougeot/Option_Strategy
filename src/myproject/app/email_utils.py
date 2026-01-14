@@ -1,6 +1,28 @@
 import urllib.parse
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from dataclasses import dataclass
+
+
+@dataclass
+class StrategyEmailData:
+    """Data structure for strategy details in email."""
+    name: str
+    score: float
+    premium: float
+    max_profit: float
+    max_loss: float
+    profit_at_target: float
+    profit_at_target_pct: float
+    average_pnl: Optional[float]
+    sigma_pnl: Optional[float]
+    total_delta: float
+    total_gamma: float
+    total_vega: float
+    total_theta: float
+    avg_implied_volatility: float
+    breakeven_points: List[float]
+    legs_description: List[str]  # e.g. ["Long Call 98.00", "Short Put 97.50"]
 
 
 def _format_months(months: List[str]) -> str:
@@ -73,12 +95,13 @@ def generate_mailto_link(
     scenarios: List[Dict[str, float]],  # List of scenario dicts
     filters_data: Any,  # FilterData
     scoring_weights: Dict[str, float],
-    best_strategy_name: Optional[str] = None,
-    best_strategy_score: Optional[float] = None,
+    best_strategy: Optional[StrategyEmailData] = None,
+    top_strategies: Optional[List[StrategyEmailData]] = None,
 ) -> str:
     """
     Generates a mailto link with a well-formatted, explanatory email body.
     Following the professional template for options strategy communication.
+    Includes detailed strategy information from overview and payoff tabs.
     """
     # Build a descriptive subject line
     underlying_name = ui_params.underlying if ui_params.underlying else "Options"
@@ -164,19 +187,68 @@ def generate_mailto_link(
     # -------------------------------------------------------------------------
     body += "6. Result - Recommended Strategy\n\n"
     
-    if best_strategy_name:
-        body += f"   Best strategy identified: {best_strategy_name}\n"
-        if best_strategy_score is not None:
-            body += f"   Score: {best_strategy_score:.4f}\n"
+    if best_strategy:
+        body += f"   Best strategy identified: {best_strategy.name}\n"
+        body += f"   Score: {best_strategy.score:.4f}\n\n"
+        
+        # Strategy composition (legs)
+        body += "   Strategy Composition:\n"
+        for leg in best_strategy.legs_description:
+            body += f"      - {leg}\n"
         body += "\n"
-        body += "   Quick rationale:\n"
-        body += "   - Landing zone: centered on target price(s) from scenarios\n"
-        body += "   - Payout: optimized for expected P&L under Gaussian mixture\n"
-        body += "   - Main risk: see payoff diagram for tail exposure\n"
-        body += "   - Package cost/credit: see strategy premium details\n\n"
-        body += "   [Payoff diagram and details attached / screenshot]\n\n"
+        
+        # Key metrics (from Overview tab)
+        body += "   Key Metrics:\n"
+        premium_str = f"{best_strategy.premium:.4f}" if best_strategy.premium >= 0 else f"{best_strategy.premium:.4f} (credit)"
+        body += f"      - Premium: {premium_str}\n"
+        body += f"      - Max Profit: {best_strategy.max_profit:.4f}\n"
+        max_loss_str = f"{best_strategy.max_loss:.4f}" if best_strategy.max_loss != float('inf') else "Unlimited"
+        body += f"      - Max Loss: {max_loss_str}\n"
+        body += f"      - P&L at Target: {best_strategy.profit_at_target:.4f} ({best_strategy.profit_at_target_pct:.1f}% of max)\n"
+        if best_strategy.average_pnl is not None:
+            body += f"      - Expected P&L (Gaussian): {best_strategy.average_pnl:.4f}\n"
+        if best_strategy.sigma_pnl is not None:
+            body += f"      - P&L Std Dev: {best_strategy.sigma_pnl:.4f}\n"
+        body += "\n"
+        
+        # Greeks
+        body += "   Greeks:\n"
+        body += f"      - Delta: {best_strategy.total_delta:.4f}\n"
+        body += f"      - Gamma: {best_strategy.total_gamma:.4f}\n"
+        body += f"      - Vega: {best_strategy.total_vega:.4f}\n"
+        body += f"      - Theta: {best_strategy.total_theta:.4f}\n"
+        body += f"      - Avg IV: {best_strategy.avg_implied_volatility:.2%}\n"
+        body += "\n"
+        
+        # Breakeven points
+        if best_strategy.breakeven_points:
+            be_str = ", ".join([f"{bp:.4f}" for bp in best_strategy.breakeven_points])
+            body += f"   Breakeven Point(s): {be_str}\n\n"
+        
+        # Quick rationale
+        body += "   Quick Rationale:\n"
+        body += "      - Landing zone: centered on target price(s) from scenarios\n"
+        body += "      - Payout: optimized for expected P&L under Gaussian mixture\n"
+        if best_strategy.max_loss == float('inf'):
+            body += "      - Main risk: UNLIMITED loss potential on one side - monitor closely\n"
+        else:
+            body += f"      - Main risk: max loss capped at {best_strategy.max_loss:.4f}\n"
+        body += "\n"
     else:
         body += "   No strategy computed yet. Run the comparison to get recommendations.\n\n"
+    
+    # -------------------------------------------------------------------------
+    # 7. TOP 5 STRATEGIES (Payoff Tab Summary)
+    # -------------------------------------------------------------------------
+    if top_strategies and len(top_strategies) > 1:
+        body += "7. Top 5 Strategies Summary (from P&L Diagram)\n\n"
+        body += "   Rank | Strategy                     | Score   | Avg P&L  | Max Profit\n"
+        body += "   -----|------------------------------|---------|----------|------------\n"
+        for i, strat in enumerate(top_strategies[:5], 1):
+            name_short = strat.name[:28] if len(strat.name) > 28 else strat.name.ljust(28)
+            avg_pnl_str = f"{strat.average_pnl:.4f}" if strat.average_pnl else "N/A"
+            body += f"   {i:4} | {name_short} | {strat.score:.4f}  | {avg_pnl_str:8} | {strat.max_profit:.4f}\n"
+        body += "\n   [Payoff diagram attached / screenshot recommended]\n\n"
     
     # -------------------------------------------------------------------------
     # CLOSING

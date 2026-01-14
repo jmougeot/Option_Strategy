@@ -55,26 +55,56 @@ def main():
         scoring_weights = scoring_weights_block()
 
         st.markdown("---")
-        from myproject.app.email_utils import generate_mailto_link
+        from myproject.app.email_utils import generate_mailto_link, StrategyEmailData
         
         # Use session state scenarios which are list of dicts
         scenarios_list = st.session_state.get("scenarios", [])
         
         # Get best strategy info from session state if available
-        best_strategy_name = None
-        best_strategy_score = None
+        best_strategy_data = None
+        top_strategies_data = None
+        
         if "comparisons" in st.session_state and st.session_state.comparisons:
-            best = st.session_state.comparisons[0]
-            best_strategy_name = best.strategy_name
-            best_strategy_score = best.score
+            comparisons_list = st.session_state.comparisons
+            
+            # Build detailed strategy data for email
+            def build_strategy_email_data(comp) -> StrategyEmailData:
+                # Build legs description
+                legs_desc = []
+                for opt, sign in zip(comp.all_options, comp.signs):
+                    position = "Long" if sign > 0 else "Short"
+                    opt_type = opt.option_type.capitalize()
+                    legs_desc.append(f"{position} {opt_type} {opt.strike:.4f}")
+                
+                return StrategyEmailData(
+                    name=comp.strategy_name,
+                    score=comp.score,
+                    premium=comp.premium,
+                    max_profit=comp.max_profit,
+                    max_loss=comp.max_loss,
+                    profit_at_target=comp.profit_at_target,
+                    profit_at_target_pct=comp.profit_at_target_pct,
+                    average_pnl=comp.average_pnl,
+                    sigma_pnl=comp.sigma_pnl,
+                    total_delta=comp.total_delta,
+                    total_gamma=comp.total_gamma,
+                    total_vega=comp.total_vega,
+                    total_theta=comp.total_theta,
+                    avg_implied_volatility=comp.avg_implied_volatility,
+                    breakeven_points=comp.breakeven_points,
+                    legs_description=legs_desc
+                )
+            
+            best_strategy_data = build_strategy_email_data(comparisons_list[0])
+            top_strategies_data = [build_strategy_email_data(c) for c in comparisons_list[:5]]
         
         email_link = generate_mailto_link(
             ui_params=params, 
             scenarios=scenarios_list, 
             filters_data=filter, 
             scoring_weights=scoring_weights,
-            best_strategy_name=best_strategy_name,
-            best_strategy_score=best_strategy_score
+            best_strategy=best_strategy_data,
+            top_strategies=top_strategies_data
         )
         st.markdown(f'<a href="{email_link}" target="_blank" style="text-decoration:none;">📧 <b>Send Configuration by Email</b></a>', unsafe_allow_html=True)
 
