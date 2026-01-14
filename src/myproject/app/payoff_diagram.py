@@ -359,3 +359,146 @@ def create_single_strategy_payoff(
     )
 
     return fig
+
+
+def save_payoff_diagram_png(
+    comparisons: List[StrategyComparison],
+    target_price: Optional[float] = None,
+    mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    output_dir: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Saves the payoff diagram as a PNG file.
+    
+    Args:
+        comparisons: List of strategies to display
+        target_price: Target price for vertical reference
+        mixture: Tuple (prices, probabilities) for Gaussian distribution
+        output_dir: Directory to save the file (default: assets/payoff_diagrams)
+    
+    Returns:
+        Path to the saved PNG file, or None if failed
+    """
+    import os
+    from datetime import datetime
+    
+    # Create the figure
+    fig = create_payoff_diagram(comparisons, target_price, mixture)
+    
+    # Set white background for PNG export
+    fig.update_layout(
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+    )
+    
+    # Determine output directory
+    if output_dir is None:
+        # Get project root (go up from app folder)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        output_dir = os.path.join(project_root, "assets", "payoff_diagrams")
+    
+    # Create directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    best_strategy_name = comparisons[0].strategy_name.replace(" ", "_").replace("/", "-")[:30]
+    filename = f"payoff_{best_strategy_name}_{timestamp}.png"
+    filepath = os.path.join(output_dir, filename)
+    
+    try:
+        # Save as PNG (requires kaleido)
+        fig.write_image(filepath, width=1200, height=700, scale=2)
+        return filepath
+    except Exception as e:
+        print(f"Warning: Could not save payoff diagram: {e}")
+        print("Install kaleido with: pip install kaleido")
+        return None
+
+
+def save_top5_summary_png(
+    comparisons: List[StrategyComparison],
+    output_dir: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Saves a summary table of top 5 strategies as a PNG file.
+    
+    Args:
+        comparisons: List of strategies (top 5 will be used)
+        output_dir: Directory to save the file (default: assets/payoff_diagrams)
+    
+    Returns:
+        Path to the saved PNG file, or None if failed
+    """
+    import os
+    from datetime import datetime
+    
+    top5 = comparisons[:5]
+    
+    # Prepare table data
+    headers = ["Rank", "Strategy", "Score", "Premium", "Max Profit", "Avg P&L", "Delta", "Gamma", "IV"]
+    
+    cells_data = [
+        [str(i) for i in range(1, len(top5) + 1)],  # Rank
+        [c.strategy_name[:35] for c in top5],  # Strategy (truncated)
+        [f"{c.score:.4f}" for c in top5],  # Score
+        [f"${c.premium:.4f}" for c in top5],  # Premium
+        [f"${c.max_profit:.4f}" for c in top5],  # Max Profit
+        [f"${c.average_pnl:.4f}" if c.average_pnl else "N/A" for c in top5],  # Avg P&L
+        [f"{c.total_delta:.3f}" for c in top5],  # Delta
+        [f"{c.total_gamma:.3f}" for c in top5],  # Gamma
+        [f"{c.avg_implied_volatility:.1%}" for c in top5],  # IV
+    ]
+    
+    # Create figure with table
+    fig = go.Figure(data=[go.Table(
+        header=dict(
+            values=[f"<b>{h}</b>" for h in headers],
+            fill_color='#1f77b4',
+            font=dict(color='white', size=12),
+            align='center',
+            height=35
+        ),
+        cells=dict(
+            values=cells_data,
+            fill_color=[['#f9f9f9', 'white'] * 3],
+            font=dict(size=11),
+            align=['center', 'left', 'center', 'right', 'right', 'right', 'center', 'center', 'center'],
+            height=30
+        )
+    )])
+    
+    # Highlight best strategy row
+    fig.update_layout(
+        title=dict(
+            text="<b>Top 5 Strategies Summary</b>",
+            font=dict(size=16),
+            x=0.5
+        ),
+        width=1000,
+        height=250,
+        margin=dict(l=20, r=20, t=50, b=20),
+        paper_bgcolor='white'
+    )
+    
+    # Determine output directory
+    if output_dir is None:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        output_dir = os.path.join(project_root, "assets", "payoff_diagrams")
+    
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"top5_summary_{timestamp}.png"
+    filepath = os.path.join(output_dir, filename)
+    
+    try:
+        fig.write_image(filepath, width=1000, height=250, scale=2)
+        return filepath
+    except Exception as e:
+        print(f"Warning: Could not save top 5 summary: {e}")
+        print("Install kaleido with: pip install kaleido")
+        return None

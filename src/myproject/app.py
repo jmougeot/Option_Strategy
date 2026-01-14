@@ -63,12 +63,14 @@ def main():
         # Get best strategy info from session state if available
         best_strategy_data = None
         top_strategies_data = None
+        diagram_path = st.session_state.get("diagram_path", None)
+        top5_summary_path = st.session_state.get("top5_summary_path", None)
         
         if "comparisons" in st.session_state and st.session_state.comparisons:
             comparisons_list = st.session_state.comparisons
             
             # Build detailed strategy data for email
-            def build_strategy_email_data(comp) -> StrategyEmailData:
+            def build_strategy_email_data(comp, diag_path=None, top5_path=None) -> StrategyEmailData:
                 # Build legs description
                 legs_desc = []
                 for opt, sign in zip(comp.all_options, comp.signs):
@@ -92,11 +94,16 @@ def main():
                     total_theta=comp.total_theta,
                     avg_implied_volatility=comp.avg_implied_volatility,
                     breakeven_points=comp.breakeven_points,
-                    legs_description=legs_desc
+                    legs_description=legs_desc,
+                    diagram_path=diag_path,
+                    top5_summary_path=top5_path
                 )
             
-            best_strategy_data = build_strategy_email_data(comparisons_list[0])
-            top_strategies_data = [build_strategy_email_data(c) for c in comparisons_list[:5]]
+            best_strategy_data = build_strategy_email_data(comparisons_list[0], diagram_path, top5_summary_path)
+            top_strategies_data = [build_strategy_email_data(c, top5_summary_path=top5_summary_path) for c in comparisons_list[:5]]
+            # First strategy (best) also gets the diagram path
+            if top_strategies_data:
+                top_strategies_data[0] = build_strategy_email_data(comparisons_list[0], diagram_path, top5_summary_path)
         
         email_link = generate_mailto_link(
             ui_params=params, 
@@ -107,6 +114,40 @@ def main():
             top_strategies=top_strategies_data
         )
         st.markdown(f'<a href="{email_link}" target="_blank" style="text-decoration:none;">📧 <b>Send Configuration by Email</b></a>', unsafe_allow_html=True)
+        
+        # Buttons to save/export diagrams
+        if "comparisons" in st.session_state and st.session_state.comparisons:
+            col_exp1, col_exp2 = st.columns(2)
+            
+            with col_exp1:
+                if st.button("💾 Payoff (PNG)", use_container_width=True):
+                    from myproject.app.payoff_diagram import save_payoff_diagram_png
+                    mixture_data = st.session_state.get("mixture", None)
+                    target = st.session_state.get("current_params", {}).get("target_price", None)
+                    saved_path = save_payoff_diagram_png(
+                        comparisons=st.session_state.comparisons[:5],
+                        target_price=target,
+                        mixture=mixture_data
+                    )
+                    if saved_path:
+                        st.session_state["diagram_path"] = saved_path
+                        st.success(f"✅ Saved!")
+                        st.caption(saved_path)
+                    else:
+                        st.warning("⚠️ kaleido missing")
+            
+            with col_exp2:
+                if st.button("📊 Top 5 (PNG)", use_container_width=True):
+                    from myproject.app.payoff_diagram import save_top5_summary_png
+                    saved_path = save_top5_summary_png(
+                        comparisons=st.session_state.comparisons
+                    )
+                    if saved_path:
+                        st.session_state["top5_summary_path"] = saved_path
+                        st.success(f"✅ Saved!")
+                        st.caption(saved_path)
+                    else:
+                        st.warning("⚠️ kaleido missing")
 
     # ========================================================================
     # MAIN AREA
@@ -159,10 +200,12 @@ def main():
             st.error("❌ No strategy available")
             return
 
-        # Sauvegarder dans session_state (incluant les scénarios)
+        # Save to session_state (including scenarios)
         save_to_session_state(
             all_comparisons, params, best_strategies[0].target_price, scenarios
         )
+        # Also save mixture for diagram export
+        st.session_state["mixture"] = mixture
 
     # Si on arrive ici sans stratégies, ne rien afficher
     if not all_comparisons:

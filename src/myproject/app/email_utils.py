@@ -23,6 +23,8 @@ class StrategyEmailData:
     avg_implied_volatility: float
     breakeven_points: List[float]
     legs_description: List[str]  # e.g. ["Long Call 98.00", "Short Put 97.50"]
+    diagram_path: Optional[str] = None  # Path to saved payoff diagram PNG
+    top5_summary_path: Optional[str] = None  # Path to saved top 5 summary PNG
 
 
 def _format_months(months: List[str]) -> str:
@@ -234,6 +236,14 @@ def generate_mailto_link(
         else:
             body += f"      - Main risk: max loss capped at {best_strategy.max_loss:.4f}\n"
         body += "\n"
+        
+        # Payoff diagram reference
+        body += "   Payoff Diagram:\n"
+        if best_strategy.diagram_path:
+            body += f"      File saved at: {best_strategy.diagram_path}\n"
+            body += "      (Please attach this file to your email)\n\n"
+        else:
+            body += "      [Screenshot the P&L Diagram tab and attach to email]\n\n"
     else:
         body += "   No strategy computed yet. Run the comparison to get recommendations.\n\n"
     
@@ -248,7 +258,15 @@ def generate_mailto_link(
             name_short = strat.name[:28] if len(strat.name) > 28 else strat.name.ljust(28)
             avg_pnl_str = f"{strat.average_pnl:.4f}" if strat.average_pnl else "N/A"
             body += f"   {i:4} | {name_short} | {strat.score:.4f}  | {avg_pnl_str:8} | {strat.max_profit:.4f}\n"
-        body += "\n   [Payoff diagram attached / screenshot recommended]\n\n"
+        body += "\n"
+        
+        # Top 5 summary image reference
+        body += "   Top 5 Summary Image:\n"
+        if top_strategies[0].top5_summary_path:
+            body += f"      File saved at: {top_strategies[0].top5_summary_path}\n"
+            body += "      (Please attach this file to your email)\n\n"
+        else:
+            body += "      [Export the summary table and attach to email]\n\n"
     
     # -------------------------------------------------------------------------
     # CLOSING
