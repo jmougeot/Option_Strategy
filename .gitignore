@@ -10,6 +10,7 @@ ENV/
 src/myproject/trade_monitor_data/
 build/
 *.pyc
+assets/
 
 # Streamlit
 .streamlit/

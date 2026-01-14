@@ -1,123 +1,10 @@
-import streamlit as st
+from myproject.mixture.mixture_gaussienne import mixture
+from myproject.mixture.gauss import gaussian, asymetric_gaussian
+import numpy as np
+from typing import Tuple
 from dataclasses import dataclass
-from myproject.app.utils import strike_list
-from typing import Optional,List
-
-
-@dataclass
-class UIParams:
-    underlying: str
-    months: list[str]
-    years: list[int]
-    price_min: float
-    price_max: float
-    price_step: float
-    max_legs: int
-    strikes: list[float]
-    max_loss:float
-    max_premium: float
-    ouvert:bool
-    brut_code: Optional[List[str]]=None
-
-
-def sidebar_params() -> UIParams:
-    brut_code_check =st.checkbox(
-        "Donner le code brut",
-        value=False,
-        help="Donner le code bloomberg complet"
-    )
-    
-    # Valeurs par défaut
-    underlying = "ER"
-    years_input = "6"
-    months_input = "F"
-    code_brut = None  # None par défaut, liste si mode brut
-    
-    
-    if brut_code_check is False : 
-        c1, c2 = st.columns(2)
-        with c1:
-            underlying = st.text_input(
-                "Sous-jacent:", value="ER", help="Code Bloomberg (ER = EURIBOR)"
-            )
-        with c2:
-            years_input = st.text_input(
-                "Années:", value="6", help="6=2026, 7=2027 (séparées par virgule)"
-            )
-
-        c1 , c2= st.columns(2)
-        with c1:
-            months_input = st.text_input(
-                "Mois d'expiration:",
-                value="F",
-                help="F=Jan, G=Feb, H=Mar, K=Apr, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec",
-            )
-    
-        with c2:
-                price_step = st.number_input(
-            "Pas de Prix ($)", value=0.0625, step=0.0001, format="%.4f"
-        )
-
-    else:
-        c1 , c2= st.columns(2)
-        with c1:
-            code_brut=st.text_input(
-                "Code bloomberg complet",
-                value="RXWF26C2,RXWF26P2",
-                help="chercher le code bloomberg et mettre put et call"
-            )
-        with c2:
-            price_step = st.number_input(
-            "Pas de Prix ($)", value=0.0625, step=0.0001, format="%.4f"
-        )
-            
-
-    c1 , c2= st.columns(2)
-
-    with c1:
-        max_loss= st.number_input(
-        "Max loss", value= 0.01, format="%.4f", help="Perte maximum accéptée"
-        )
-    with c2:
-        max_premium = st.number_input(
-        "Max premium" , value=0.06, format="%.4f", help="Prix maximum de la stratégie"
-        )
-
-    c1, c2 = st.columns(2)
-    with c1:
-        price_min = st.number_input(
-            "Prix Min ($)", value=97.750, step=0.0001, format="%.4f"
-        )
-    with c2:
-        price_max = st.number_input(
-            "Prix Max ($)", value=98.750, step=0.0001, format="%.4f"
-        )
-        
-    ouvert = st.checkbox(
-        "Risque Ouvert", 
-        value=False, 
-        help="Autoriser les stratégies à risque illimité (vente de calls/puts non couverts)"
-    )
-
-
-    strikes = strike_list(price_min, price_max, price_step)
-
-    max_legs = st.slider("Nombre maximum de legs par stratégie:", 1, 6, 4)
-
-    years = [int(y.strip()) for y in years_input.split(",") if y.strip()]
-    months = [m.strip() for m in months_input.split(",") if m.strip()]
-    
-    # None si pas de code brut, sinon liste des codes
-    if code_brut:
-        brut_code_result = [y.strip() for y in code_brut.split(",") if y.strip()] or None
-    else:
-        brut_code_result = None
-
-
-    return UIParams(
-        underlying, months, years, price_min, price_max, price_step, max_legs, strikes, max_loss, max_premium, ouvert, brut_code_result,
-    )
-
+import streamlit as st
+from typing import Optional
 
 @dataclass
 class ScenarioData:
@@ -130,137 +17,136 @@ class ScenarioData:
 
 def scenario_params() -> Optional[ScenarioData]:
     """
-    Interface pour définir les scénarios de marché (mixture gaussienne).
-    L'utilisateur peut ajouter autant de scénarios qu'il souhaite.
-    Chaque scénario = (prix cible, incertitude/volatilité, probabilité)
+    Interface to define market scenarios (Gaussian mixture).
+    The user can add as many scenarios as they wish.
+    Each scenario = (target price, uncertainty/volatility, probability)
     """
     if "scenarios" not in st.session_state:
         st.session_state.scenarios = [
-            {"price": 98.0, "std": 0.10, "std_r": 0.10, "weight": 50.0},  # Scénario neutre par défaut
+            {"price": 98.0, "std": 0.10, "std_r": 0.10, "weight": 50.0},  # Neutral scenario by default
         ]
 
     scenarios_to_delete = []
-    asym_incertitude=st.checkbox(label = "Incertitude asymetric", value = False)
+    asym_incertitude=st.checkbox(label = "Asymmetric Uncertainty", value = False)
 
     for i, scenario in enumerate(st.session_state.scenarios):
         with st.container():
-            # Assurer que std_r existe (rétrocompatibilité)
+            # Ensure std_r exists (backward compatibility)
             if "std_r" not in scenario:
                 st.session_state.scenarios[i]["std_r"] = scenario["std"]
             
             if asym_incertitude:
-                # 5 colonnes pour mode asymétrique
+                # 5 columns for asymmetric mode
                 col_name, col_price, col_std_l, col_std_r, col_weight, col_del = st.columns([1.5, 1.5, 1.5, 1.5, 1.5, 1])
                 
                 with col_name:
-                    st.markdown(f"**Scénario {i+1}**")
+                    st.markdown(f"**Scenario {i+1}**")
                 
                 with col_price:
                     price = st.number_input(
-                        "Prix Cible",
+                        "Target Price",
                         value=float(scenario["price"]),
                         step=0.01,
                         format="%.4f",
                         key=f"price_{i}",
-                        help="Prix attendu pour ce scénario",
+                        help="Expected price for this scenario",
                     )
                     st.session_state.scenarios[i]["price"] = price
                 
                 with col_std_l:
                     std_l = st.number_input(
-                        "σ gauche",
+                        "σ left",
                         value=float(scenario["std"]),
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
                         key=f"std_l_{i}",
-                        help="Incertitude côté baissier",
+                        help="Downside uncertainty",
                     )
                     st.session_state.scenarios[i]["std"] = std_l
                 
                 with col_std_r:
                     std_r = st.number_input(
-                        "σ droite",
+                        "σ right",
                         value=float(scenario["std_r"]),
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
                         key=f"std_r_{i}",
-                        help="Incertitude côté haussier",
+                        help="Upside uncertainty",
                     )
                     st.session_state.scenarios[i]["std_r"] = std_r
                 
                 with col_weight:
                     weight = st.number_input(
-                        "Proba",
+                        "Prob",
                         value=float(scenario["weight"]),
                         step=1.0,
                         format="%.1f",
                         key=f"weight_{i}",
-                        help="Poids du scénario (sera normalisé)",
+                        help="Scenario weight (will be normalized)",
                     )
                     st.session_state.scenarios[i]["weight"] = weight
                 
                 with col_del:
-                    st.markdown("")  # Espacement
+                    st.markdown("")  # Spacing
                     if len(st.session_state.scenarios) > 1:
-                        if st.button("🗑️", key=f"delete_{i}", help="Supprimer ce scénario"):
+                        if st.button("🗑️", key=f"delete_{i}", help="Delete this scenario"):
                             scenarios_to_delete.append(i)
                     else:
                         st.caption("Min: 1")
             
             else:
-                # 4 colonnes pour mode symétrique
+                # 4 columns for symmetric mode
                 col_name, col_price, col_std, col_weight, col_del = st.columns([2, 2, 2, 2, 0.5])
                 
                 with col_name:
-                    st.markdown(f"**Scénario {i+1}**")
+                    st.markdown(f"**Scenario {i+1}**")
                 
                 with col_price:
                     price = st.number_input(
-                        "Prix Cible",
+                        "Target Price",
                         value=float(scenario["price"]),
                         step=0.01,
                         format="%.4f",
                         key=f"price_{i}",
-                        help="Prix attendu pour ce scénario",
+                        help="Expected price for this scenario",
                     )
                     st.session_state.scenarios[i]["price"] = price
                 
                 with col_std:
                     std = st.number_input(
-                        "Incertitude",
+                        "Uncertainty",
                         value=float(scenario["std"]),
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
                         key=f"std_{i}",
-                        help="Écart-type : plus c'est grand, plus le scénario est incertain",
+                        help="Standard deviation: larger means more uncertain",
                     )
                     st.session_state.scenarios[i]["std"] = std
                     st.session_state.scenarios[i]["std_r"] = std
                 
                 with col_weight:
                     weight = st.number_input(
-                        "Probabilité",
+                        "Probability",
                         value=float(scenario["weight"]),
                         max_value=100.0,
                         step=1.0,
                         format="%.1f",
                         key=f"weight_{i}",
-                        help="Poids du scénario (sera normalisé)",
+                        help="Scenario weight (will be normalized)",
                     )
                     st.session_state.scenarios[i]["weight"] = weight
                 
                 with col_del:
-                    st.markdown("")  # Espacement
+                    st.markdown("")  # Spacing
                     if len(st.session_state.scenarios) > 1:
-                        if st.button("🗑️", key=f"delete_{i}", help="Supprimer ce scénario"):
+                        if st.button("🗑️", key=f"delete_{i}", help="Delete this scenario"):
                             scenarios_to_delete.append(i)
                     else:
                         st.caption("Min: 1")
 
-            st.divider()
 
     if (
         scenarios_to_delete
@@ -270,10 +156,10 @@ def scenario_params() -> Optional[ScenarioData]:
             st.session_state.scenarios.pop(idx)
         st.rerun()
     elif scenarios_to_delete:
-        st.warning("⚠️ Vous devez conserver au moins 1 scénario")
+        st.warning("⚠️ You must keep at least 1 scenario")
 
-    if st.button("➕ Ajouter un scénario", use_container_width=True):
-        # Ajouter un nouveau scénario avec des valeurs par défaut
+    if st.button("➕ Add a scenario", use_container_width=True):
+        # Add a new scenario with default values
         last_price = (
             st.session_state.scenarios[-1]["price"]
             if st.session_state.scenarios
@@ -302,3 +188,56 @@ def scenario_params() -> Optional[ScenarioData]:
         weights=weights,
         asymmetric=asym_incertitude
     )
+
+
+def create_mixture_from_scenarios(
+    scenarios: ScenarioData,
+    price_min: float,
+    price_max: float,
+    num_points: int = 50,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Crée une mixture gaussienne à partir des scénarios définis par l'utilisateur.
+    Supporte les gaussiennes symétriques et asymétriques.
+
+    Args:
+        scenarios: ScenarioData avec centers, std_devs, std_devs_r, weights, asymmetric
+        price_min: Prix minimum de la grille
+        price_max: Prix maximum de la grille
+        num_points: Nombre de points dans la grille
+
+    Returns:
+        (prices, mixture_normalized): Grille de prix et mixture gaussienne normalisée
+    """
+    # Extraire les paramètres des scénarios
+    centers = scenarios.centers
+    std_devs = scenarios.std_devs
+    std_devs_r = scenarios.std_devs_r
+    proba = scenarios.weights
+    is_asymmetric = getattr(scenarios, 'asymmetric', False)
+
+    if is_asymmetric:
+        # Mode asymétrique: utiliser asymetric_gaussian
+        prices, mix = mixture(
+            price_min=price_min,
+            price_max=price_max,
+            num_points=num_points,
+            proba=proba,
+            mus=centers,
+            sigmas=std_devs,
+            f=asymetric_gaussian,
+            sigmas_r=std_devs_r,
+        )
+    else:
+        # Mode symétrique: utiliser gaussian standard
+        prices, mix = mixture(
+            price_min=price_min,
+            price_max=price_max,
+            num_points=num_points,
+            proba=proba,
+            mus=centers,
+            sigmas=std_devs,
+            f=gaussian,
+        )
+    
+    return prices, mix

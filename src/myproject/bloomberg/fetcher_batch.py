@@ -1,23 +1,17 @@
 """
-Bloomberg Batch Fetcher - Optimisé
-===================================
+Bloomberg Batch Fetcher
+=======================
 Récupère toutes les données d'options en un seul appel Bloomberg par ticker.
-Plus efficace que de faire plusieurs appels pour chaque champ.
 
 - Fait UN SEUL appel Bloomberg par ticker
 - Récupère TOUS les champs nécessaires d'un coup
-- Réduit drastiquement le temps d'import
 - Minimise la charge sur l'API Bloomberg
 """
 
-import sys
-from pathlib import Path
-from typing import Dict, List, Any
-
-# Add paths for imports
-sys.path.insert(0, str(Path(__file__).parent))
+from typing import Any
 
 import blpapi
+
 from myproject.bloomberg.connection import BloombergConnection
 
 
@@ -59,23 +53,17 @@ ALL_OPTION_FIELDS = [
 
 
 def fetch_options_batch(
-    tickers: List[str], use_overrides: bool = True
-) -> Dict[str, Dict[str, Any]]:
+    tickers: list[str], use_overrides: bool = True
+) -> dict[str, dict[str, Any]]:
     """
     Récupère les données pour plusieurs tickers en un seul appel Bloomberg.
 
     Args:
-        tickers: Liste des tickers Bloomberg (ex: ["ERF6C 97.5 Comdty", "ERF6P 97.5 Comdty"])
+        tickers: Liste des tickers Bloomberg
         use_overrides: Si True, ajoute les overrides pour forcer les Greeks
 
     Returns:
         Dictionnaire {ticker: {field: value}}
-
-    Example:
-        >>> tickers = ["ERF6C 97.5 Comdty", "ERG6C 97.5 Comdty"]
-        >>> data = fetch_options_batch(tickers)
-        >>> print(data["ERF6C 97.5 Comdty"]["DELTA_MID"])
-        0.6234
     """
     results = {ticker: {} for ticker in tickers}
 
@@ -173,7 +161,7 @@ def fetch_options_batch(
         return results
 
 
-def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
+def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:
     """
     Extrait les meilleures valeurs parmi les différents formats de champs.
 
@@ -183,37 +171,25 @@ def extract_best_values(data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionnaire avec les valeurs unifiées
     """
-    result = {}
+    result: dict[str, Any] = {}
 
     # Prix (cascade de fallbacks)
-    premium_value = 0.0
+    bid = data.get("PX_BID") or 0.0
+    ask = data.get("PX_ASK") or 0.0
+    mid = data.get("PX_MID") or 0.0
 
-    # Essayer les champs de prix dans l'ordre de préférence (PX_MID en priorité)
+    if mid > 0:
+        premium = mid
+    elif bid > 0 and ask > 0:
+        premium = (bid + ask) / 2
+    elif ask > 0:
+        premium = ask / 2
+    else:
+        premium = 0.0
 
-    Mid = data.get("PX_MID")
-    if Mid is not None and Mid > 0:
-        premium_value = Mid
-
-    # Si toujours aucun prix → calcul via bid/ask
-    bid = data.get("PX_BID")
-    ask = data.get("PX_ASK")
-    if premium_value == 0.0:
-        if bid and ask and bid > 0 and ask > 0:
-            premium_value = (bid + ask) / 2
-        elif bid and bid > 0:
-            premium_value = bid
-        elif ask and ask > 0:
-            premium_value = ask
-    
-    if premium_value == 0.0: 
-        last = data.get("PX_LAST")
-        premium_value = last
-
-    result["premium"] = premium_value
-
-    # Bid/Ask
-    result["bid"] = bid if (bid and bid > 0) else 0.0
-    result["ask"] = ask if (ask and ask > 0) else 0.0
+    result["premium"] = premium
+    result["bid"] = bid if bid > 0 else 0.0
+    result["ask"] = ask if ask > 0 else 0.0
 
     # Greeks (priorité: _MID > format court > OPT_)
     result["delta"] = (

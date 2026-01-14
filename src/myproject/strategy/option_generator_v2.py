@@ -18,6 +18,7 @@ from myproject.strategy.comparison_class import StrategyComparison
 from myproject.strategy.calcul_linear_metrics_cpp import create_strategy_fast_with_signs
 from myproject.strategy.calcul_cached import OptionsDataCache, create_strategy_from_cache, CPP_AVAILABLE
 from myproject.option.option_filter import sort_options_by_expiration
+from myproject.app.filter_widget import FilterData
 
 # Import direct du module C++ pour le batch
 try:
@@ -74,7 +75,7 @@ class OptionStrategyGeneratorV2:
             print("⚠️ Mode Python pur (C++ non disponible)")
 
     def generate_all_combinations(
-        self, target_price: float, price_min: float, price_max: float, max_loss: float, max_premium: float, ouvert:bool, max_legs: int = 4
+        self, price_min: float, price_max: float, filter: FilterData, max_legs: int = 4, 
     ) -> List[StrategyComparison]:
         """
         Génère toutes les combinaisons possibles d'options (1 à max_legs).
@@ -108,12 +109,7 @@ class OptionStrategyGeneratorV2:
                 combos_this_level += 1
                 total_sign_variants += 2 ** n_legs  # Nombre de variantes de signes
                 # Pour chaque combinaison, tester différentes configurations de positions
-                strategies = self._generate_position_variants(
-                    list(combo),
-                    max_loss,
-                    max_premium,
-                    ouvert
-                )
+                strategies = self._generate_position_variants(list(combo), filter)
                 if not strategies:
                     filtered_this_level += 1
                 all_strategies.extend(strategies)
@@ -300,9 +296,7 @@ class OptionStrategyGeneratorV2:
     def _generate_position_variants(
         self,
         options: List[Option],
-        max_loss : float,
-        max_premium : float,
-        ouvert: bool
+        filter,
     ) -> List[StrategyComparison]:
         """
         Génère les variantes de positions pour une combinaison d'options.
@@ -335,6 +329,11 @@ class OptionStrategyGeneratorV2:
         
         strategies: List[StrategyComparison] = []
 
+        # ===== Génération des stratégies (optimisé) =====
+        for signs in sign_arrays:
+            strat = create_strategy_fast_with_signs(options, signs, filter)
+            if strat is not None:  # Vérification explicite plus rapide que if strat
+                strategies.append(strat)
         # ===== Génération des stratégies (optimisé avec cache) =====
         if self.cache is not None and self.cache.valid:
             # Mode ultra-optimisé: utiliser le cache pré-extrait

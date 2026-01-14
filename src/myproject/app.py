@@ -6,18 +6,20 @@ Description: Web user interface to compare options strategies
 import streamlit as st
 from myproject.app.main import process_bloomberg_to_strategies
 from myproject.app.styles import inject_css
-from myproject.app.widget import sidebar_params, scenario_params
-from myproject.app.scoring_block import scoring_weights_block
+from myproject.app.params_widget import sidebar_params
+from myproject.app.scenarios_widget import scenario_params
+from myproject.app.scoring_widget import scoring_weights_block
 from myproject.app.tabs import display_overview_tab, display_payoff_tab
 from myproject.app.processing import (
     process_comparison_results,
     save_to_session_state,
     display_success_stats,
 )
+from myproject.app.filter_widget import filter_params
 
 
 # ============================================================================
-# CONFIGURATION DE LA PAGE
+# PAGE CONFIGURATION
 # ============================================================================
 
 st.set_page_config(
@@ -30,33 +32,104 @@ st.set_page_config(
 inject_css()
 
 # ============================================================================
-# INTERFACE PRINCIPALE
+# MAIN INTERFACE
 # ============================================================================
 
 def main():
-    # En-tête
+    # Header
     st.markdown(
-        '<div class="main-header">📊 Comparateur de Stratégies Options</div>',
+        '<div class="main-header">Options Strategy Comparator</div>',
         unsafe_allow_html=True,
     )
     st.markdown("---")
 
     # ========================================================================
-    # SIDEBAR - PARAMÈTRES
+    # SIDEBAR - PARAMETERS
     # ========================================================================
 
     with st.sidebar:
         scenarios = scenario_params()
         st.markdown("---")
         params = sidebar_params()
+        filter = filter_params()
         scoring_weights = scoring_weights_block()
 
+        st.markdown("---")
+        from myproject.app.email_utils import generate_mailto_link, StrategyEmailData
+        
+        # Use session state scenarios which are list of dicts
+        scenarios_list = st.session_state.get("scenarios", [])
+        
+        # Get best strategy info from session state if available
+        best_strategy_data = None
+        top_strategies_data = None
+        diagram_path = st.session_state.get("diagram_path", None)
+        top5_summary_path = st.session_state.get("top5_summary_path", None)
+        
+        if "comparisons" in st.session_state and st.session_state.comparisons:
+            comparisons_list = st.session_state.comparisons
+            
+            # Build detailed strategy data for email
+            def build_strategy_email_data(comp, diag_path=None, top5_path=None) -> StrategyEmailData:
+                # Build legs description
+                legs_desc = []
+                for opt, sign in zip(comp.all_options, comp.signs):
+                    position = "Long" if sign > 0 else "Short"
+                    opt_type = opt.option_type.capitalize()
+                    legs_desc.append(f"{position} {opt_type} {opt.strike:.4f}")
+                
+                return StrategyEmailData(
+                    name=comp.strategy_name,
+                    score=comp.score,
+                    premium=comp.premium,
+                    max_profit=comp.max_profit,
+                    max_loss=comp.max_loss,
+                    profit_at_target=comp.profit_at_target,
+                    profit_at_target_pct=comp.profit_at_target_pct,
+                    average_pnl=comp.average_pnl,
+                    sigma_pnl=comp.sigma_pnl,
+                    total_delta=comp.total_delta,
+                    total_gamma=comp.total_gamma,
+                    total_vega=comp.total_vega,
+                    total_theta=comp.total_theta,
+                    avg_implied_volatility=comp.avg_implied_volatility,
+                    breakeven_points=comp.breakeven_points,
+                    legs_description=legs_desc,
+                    diagram_path=diag_path,
+                    top5_summary_path=top5_path
+                )
+            
+            best_strategy_data = build_strategy_email_data(comparisons_list[0], diagram_path, top5_summary_path)
+            top_strategies_data = [build_strategy_email_data(c, top5_summary_path=top5_summary_path) for c in comparisons_list[:5]] 
+            # First strategy (best) also gets the diagram path
+            if top_strategies_data:
+                top_strategies_data[0] = build_strategy_email_data(comparisons_list[0], diagram_path, top5_summary_path)
+        
+        email_link = generate_mailto_link(
+            ui_params=params, 
+            scenarios=scenarios_list, 
+            filters_data=filter, 
+            scoring_weights=scoring_weights,
+            best_strategy=best_strategy_data,
+            top_strategies=top_strategies_data
+        )
+        st.markdown(f'<a href="{email_link}" target="_blank" style="text-decoration:none;">📧 <b>Send Configuration by Email</b></a>', unsafe_allow_html=True)
+        
+        # Show saved diagram paths if available
+        if st.session_state.get("diagram_path") or st.session_state.get("top5_summary_path"):
+            st.markdown("---")
+            st.markdown("**📁 Saved Diagrams**")
+            if st.session_state.get("diagram_path"):
+                st.caption(f" {st.session_state['diagram_path']}")
+            if st.session_state.get("top5_summary_path"):
+                st.caption(f" {st.session_state['top5_summary_path']}")
+
     # ========================================================================
-    # ZONE PRINCIPALE
+    # MAIN AREA
     # ========================================================================
 
     compare_button = st.button(
-        "🚀 Lancer la Comparaison", type="primary", use_container_width=True
+        "Run Comparison", type="primary", use_container_width=True
     )
 
     # Déterminer quelle source de stratégies utiliser
@@ -66,13 +139,13 @@ def main():
 
     if compare_button:
         # ====================================================================
-        # ÉTAPE 1 : Traitement complet via la fonction main
+        # STEP 1: Full processing via main function
         # ====================================================================
 
         with st.spinner(
-            f"🔄 Génération et comparaison des stratégies (max {params.max_legs} legs)..."
+            f"🔄 Generating and comparing strategies (max {params.max_legs} legs)..."
         ):
-            # Appeler la fonction principale qui fait TOUT
+            # Call main function doing EVERYTHING
             best_strategies, stats, mixture = process_bloomberg_to_strategies(
                 brut_code=params.brut_code,
                 underlying=params.underlying,
@@ -84,30 +157,48 @@ def main():
                 max_legs=params.max_legs,
                 top_n=500,
                 scoring_weights=scoring_weights,
-                scenarios=scenarios,
-                max_loss=params.max_loss,
-                max_premium=params.max_premium,
-                ouvert=params.ouvert
+                scenarios=scenarios, #type: ignore
+                filter=filter
             )
 
-            # Vérifier les résultats
+            # Check results
             if not best_strategies:
-                st.error("❌ Aucune stratégie générée")
+                st.error("❌ No strategy generated")
                 return
 
             display_success_stats(stats)
 
-        # Utiliser best_strategies pour l'affichage
+        # Use best_strategies for display
         all_comparisons = best_strategies
 
         if not all_comparisons:
-            st.error("❌ Aucune stratégie disponible")
+            st.error("❌ No strategy available")
             return
 
-        # Sauvegarder dans session_state (incluant les scénarios)
+        # Save to session_state (including scenarios)
         save_to_session_state(
             all_comparisons, params, best_strategies[0].target_price, scenarios
         )
+        # Also save mixture for diagram export
+        st.session_state["mixture"] = mixture
+        
+        # Auto-save diagrams with generic names (overwrite each run)
+        from myproject.app.payoff_diagram import save_payoff_diagram_png, save_top5_summary_png
+        
+        payoff_path = save_payoff_diagram_png(
+            comparisons=all_comparisons[:5],
+            target_price=best_strategies[0].target_price,
+            mixture=mixture
+        )
+        if payoff_path:
+            st.session_state["diagram_path"] = payoff_path
+        
+        top5_path = save_top5_summary_png(comparisons=all_comparisons)
+        if top5_path:
+            st.session_state["top5_summary_path"] = top5_path
+        
+        if payoff_path or top5_path:
+            st.success(f"📁 Diagrams auto-saved to assets/payoff_diagrams/")
 
     # Si on arrive ici sans stratégies, ne rien afficher
     if not all_comparisons:
@@ -119,17 +210,17 @@ def main():
     )
 
     # ====================================================================
-    # TABS POUR L'AFFICHAGE
+    # TABS FOR DISPLAY
     # ====================================================================
 
-    tab1, tab2 = st.tabs(["Vue d'Ensemble", "Diagramme P&L"])
+    tab1, tab2 = st.tabs(["Overview", "P&L Diagram"])
 
-    # Afficher chaque tab avec son module dédié
+    # Display each tab with its dedicated module
     with tab1:
         display_overview_tab(comparisons)
 
     with tab2:
-        display_payoff_tab(top_5_comparisons, best_target_price, mixture)
+        display_payoff_tab(top_5_comparisons, best_target_price, mixture) #type: ignore
 
 # ============================================================================
 # POINT D'ENTRÉE

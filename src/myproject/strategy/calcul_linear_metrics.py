@@ -8,11 +8,13 @@ from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.strategy.strategy_naming_v2 import generate_strategy_name
 from myproject.option.option_utils_v2 import get_expiration_info
+from myproject.app.filter_widget import FilterData
 import numpy as np
 
 
+
 def create_strategy_fast_with_signs(
-    options: List[Option], signs: np.ndarray, max_loss_params : float, max_premium_params :float, ouvert:bool 
+    options: List[Option], signs: np.ndarray, filter: FilterData
 ) -> Optional[StrategyComparison]:
     """
     Version optimisée qui prend les signes directement (évite les copies d'options).
@@ -67,17 +69,14 @@ def create_strategy_fast_with_signs(
         pnl_stack[i] = opt.pnl_array
 
     #Eliminer la vente d'un put ou d'un call qui ne rapporte rien 
-    useless_sell = int(np.sum((signs < 0) & (premiums < 0.04), dtype=np.int32))
+    useless_sell = int(np.sum((signs < 0) & (premiums < filter.min_premium_sell), dtype=np.int32))
     if useless_sell > 0 :
         return None
     
     # Calculer call_count put_count vectorisé
     long_call_count = int(np.sum((signs > 0) & is_call, dtype=np.int32))
     short_call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32))
-    call_count =  long_call_count - short_call_count
-    if call_count <= -1:
-        return None
-    
+
     # Filtre l'achat et la vente de la même option (même strike + même type)
     for i in range(n_options):
         for j in range(i + 1, n_options):
@@ -93,16 +92,16 @@ def create_strategy_fast_with_signs(
     short_put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32))
     put_count = long_put_count - short_put_count
 
-    if ouvert == False and short_put_count > long_put_count:
+    if short_put_count - long_put_count > filter.ouvert_gauche:
         return None
     
-    if (short_put_count - long_call_count - long_put_count) > 1: 
+    if short_call_count - long_call_count > filter.ouvert_droite:
         return None
     
 
     # Calcul est filtre du premium 
     total_premium = np.sum(signs * premiums)
-    if abs(total_premium) > max_premium_params:
+    if abs(total_premium) > filter.max_premium:
         return None
     
     #Calcul est filtre du delta 
@@ -122,7 +121,7 @@ def create_strategy_fast_with_signs(
 
     total_pnl_array = np.dot(signs, pnl_stack)
     max_profit, max_loss = float(np.max(total_pnl_array)), float(np.min(total_pnl_array))
-    if max_loss < -max_loss_params:
+    if max_loss < - filter.max_loss:
         return None
 
     sign_changes = total_pnl_array[:-1] * total_pnl_array[1:] < 0
@@ -178,7 +177,7 @@ def create_strategy_fast_with_signs(
             premium=float(total_premium),
             all_options=options,
             signs=signs,  # Stocker les signes utilisés
-            call_count=call_count,
+            call_count=0,
             put_count=put_count,
             expiration_day=exp_info.get("expiration_day"),
             expiration_week=exp_info.get("expiration_week"),

@@ -7,7 +7,7 @@ import numpy as np
 
 
 def prepare_options_data(options: List[Option]) -> Dict[str, List[Option]]:
-    """Sépare les calls et puts."""
+    """Separates calls and puts."""
     calls = [opt for opt in options if opt.option_type == "call"]
     puts = [opt for opt in options if opt.option_type == "put"]
 
@@ -28,14 +28,14 @@ def format_percentage(value: float) -> str:
 
 def format_expiration_date(month: str, year: int) -> str:
     """
-    Formate la date d'expiration à partir du mois Bloomberg et de l'année.
+    Formats expiration date from Bloomberg month and year.
 
     Args:
-        month: Code du mois Bloomberg (F, G, H, K, M, N, Q, U, V, X, Z)
-        year: Année (6 = 2026)
+        month: Bloomberg month code (F, G, H, K, M, N, Q, U, V, X, Z)
+        year: Year (6 = 2026)
 
     Returns:
-        Date formatée (ex: "Jun 2026")
+        Formatted date (ex: "Jun 2026")
     """
     month_names = {
         "F": "Jan",
@@ -63,22 +63,22 @@ def create_payoff_diagram(
     mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
 ):
     """
-    Crée un diagramme P&L interactif pour toutes les stratégies avec mixture gaussienne optionnelle
+    Creates an interactive P&L diagram for all strategies with optional Gaussian mixture
 
     Args:
-        comparisons: Liste des stratégies à afficher
-        target_price: Prix cible pour la référence verticale
-        mixture: Tuple (prices, probabilities) pour afficher la distribution gaussienne (optionnel)
+        comparisons: List of strategies to display
+        target_price: Target price for vertical reference
+        mixture: Tuple (prices, probabilities) for displaying Gaussian distribution (optional)
 
     Returns:
-        Figure Plotly avec les courbes P&L et optionnellement la mixture
+        Plotly figure with P&L curves and optionally the mixture
     """
-    # Générer la plage de prix
+    # Generate price range
     price_range = comparisons[0].prices
     if target_price is None:
         target_price = comparisons[0].target_price
 
-    # Créer une figure avec deux axes Y si mixture fournie
+    # Create a figure with two Y axes if mixture provided
     if mixture is not None:
         from plotly.subplots import make_subplots
 
@@ -86,7 +86,7 @@ def create_payoff_diagram(
     else:
         fig = go.Figure()
 
-    # Lignes de référence
+    # Reference lines
     if mixture is not None:
         fig.add_hline(
             y=0, line_dash="dash", line_color="gray", opacity=0.5, secondary_y=False
@@ -359,3 +359,147 @@ def create_single_strategy_payoff(
     )
 
     return fig
+
+
+def save_payoff_diagram_png(
+    comparisons: List[StrategyComparison],
+    target_price: Optional[float] = None,
+    mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    output_dir: Optional[str] = None,
+    filename: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Saves the payoff diagram as a PNG file.
+    
+    Args:
+        comparisons: List of strategies to display
+        target_price: Target price for vertical reference
+        mixture: Tuple (prices, probabilities) for Gaussian distribution
+        output_dir: Directory to save the file (default: assets/payoff_diagrams)
+        filename: Custom filename (default: payoff_diagram.png - overwrites each time)
+    
+    Returns:
+        Path to the saved PNG file, or None if failed
+    """
+    import os
+    
+    # Create the figure
+    fig = create_payoff_diagram(comparisons, target_price, mixture)
+    
+    # Set white background for PNG export
+    fig.update_layout(
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+    )
+    
+    # Determine output directory
+    if output_dir is None:
+        # Get project root (go up from app folder)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        output_dir = os.path.join(project_root, "assets", "payoff_diagrams")
+    
+    # Create directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Use generic filename (overwrites each time)
+    if filename is None:
+        filename = "payoff_diagram.png"
+    filepath = os.path.join(output_dir, filename)
+    
+    try:
+        # Save as PNG (requires kaleido)
+        fig.write_image(filepath, width=1200, height=700, scale=2)
+        return filepath
+    except Exception as e:
+        print(f"Warning: Could not save payoff diagram: {e}")
+        print("Install kaleido with: pip install kaleido")
+        return None
+
+
+def save_top5_summary_png(
+    comparisons: List[StrategyComparison],
+    output_dir: Optional[str] = None,
+    filename: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Saves a summary table of top 5 strategies as a PNG file.
+    
+    Args:
+        comparisons: List of strategies (top 5 will be used)
+        output_dir: Directory to save the file (default: assets/payoff_diagrams)
+        filename: Custom filename (default: top5_summary.png - overwrites each time)
+    
+    Returns:
+        Path to the saved PNG file, or None if failed
+    """
+    import os
+    
+    top5 = comparisons[:5]
+    
+    # Prepare table data
+    headers = ["Rank", "Strategy", "Score", "Premium", "Max Profit", "Avg P&L", "Delta", "Gamma", "IV"]
+    
+    cells_data = [
+        [str(i) for i in range(1, len(top5) + 1)],  # Rank
+        [c.strategy_name[:35] for c in top5],  # Strategy (truncated)
+        [f"{c.score:.4f}" for c in top5],  # Score
+        [f"${c.premium:.4f}" for c in top5],  # Premium
+        [f"${c.max_profit:.4f}" for c in top5],  # Max Profit
+        [f"${c.average_pnl:.4f}" if c.average_pnl else "N/A" for c in top5],  # Avg P&L
+        [f"{c.total_delta:.3f}" for c in top5],  # Delta
+        [f"{c.total_gamma:.3f}" for c in top5],  # Gamma
+        [f"{c.avg_implied_volatility:.1%}" for c in top5],  # IV
+    ]
+    
+    # Create figure with table
+    fig = go.Figure(data=[go.Table(
+        header=dict(
+            values=[f"<b>{h}</b>" for h in headers],
+            fill_color='#1f77b4',
+            font=dict(color='white', size=12),
+            align='center',
+            height=35
+        ),
+        cells=dict(
+            values=cells_data,
+            fill_color=[['#f9f9f9', 'white'] * 3],
+            font=dict(size=11),
+            align=['center', 'left', 'center', 'right', 'right', 'right', 'center', 'center', 'center'],
+            height=30
+        )
+    )])
+    
+    # Highlight best strategy row
+    fig.update_layout(
+        title=dict(
+            text="<b>Top 5 Strategies Summary</b>",
+            font=dict(size=16),
+            x=0.5
+        ),
+        width=1000,
+        height=250,
+        margin=dict(l=20, r=20, t=50, b=20),
+        paper_bgcolor='white'
+    )
+    
+    # Determine output directory
+    if output_dir is None:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        output_dir = os.path.join(project_root, "assets", "payoff_diagrams")
+    
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Use generic filename (overwrites each time)
+    if filename is None:
+        filename = "top5_summary.png"
+    filepath = os.path.join(output_dir, filename)
+    
+    try:
+        fig.write_image(filepath, width=1000, height=250, scale=2)
+        return filepath
+    except Exception as e:
+        print(f"Warning: Could not save top 5 summary: {e}")
+        print("Install kaleido with: pip install kaleido")
+        return None
