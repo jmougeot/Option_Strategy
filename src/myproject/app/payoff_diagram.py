@@ -366,6 +366,7 @@ def save_payoff_diagram_png(
     target_price: Optional[float] = None,
     mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
     output_dir: Optional[str] = None,
+    filename: Optional[str] = None,
 ) -> Optional[str]:
     """
     Saves the payoff diagram as a PNG file.
@@ -375,12 +376,12 @@ def save_payoff_diagram_png(
         target_price: Target price for vertical reference
         mixture: Tuple (prices, probabilities) for Gaussian distribution
         output_dir: Directory to save the file (default: assets/payoff_diagrams)
+        filename: Custom filename (default: payoff_diagram.png - overwrites each time)
     
     Returns:
         Path to the saved PNG file, or None if failed
     """
     import os
-    from datetime import datetime
     
     # Create the figure
     fig = create_payoff_diagram(comparisons, target_price, mixture)
@@ -401,10 +402,9 @@ def save_payoff_diagram_png(
     # Create directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    best_strategy_name = comparisons[0].strategy_name.replace(" ", "_").replace("/", "-")[:30]
-    filename = f"payoff_{best_strategy_name}_{timestamp}.png"
+    # Use generic filename (overwrites each time)
+    if filename is None:
+        filename = "payoff_diagram.png"
     filepath = os.path.join(output_dir, filename)
     
     try:
@@ -420,6 +420,7 @@ def save_payoff_diagram_png(
 def save_top5_summary_png(
     comparisons: List[StrategyComparison],
     output_dir: Optional[str] = None,
+    filename: Optional[str] = None,
 ) -> Optional[str]:
     """
     Saves a summary table of top 5 strategies as a PNG file.
@@ -427,12 +428,12 @@ def save_top5_summary_png(
     Args:
         comparisons: List of strategies (top 5 will be used)
         output_dir: Directory to save the file (default: assets/payoff_diagrams)
+        filename: Custom filename (default: top5_summary.png - overwrites each time)
     
     Returns:
         Path to the saved PNG file, or None if failed
     """
     import os
-    from datetime import datetime
     
     top5 = comparisons[:5]
     
@@ -490,9 +491,9 @@ def save_top5_summary_png(
     
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"top5_summary_{timestamp}.png"
+    # Use generic filename (overwrites each time)
+    if filename is None:
+        filename = "top5_summary.png"
     filepath = os.path.join(output_dir, filename)
     
     try:
