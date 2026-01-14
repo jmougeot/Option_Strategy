@@ -100,7 +100,7 @@ def main():
                 )
             
             best_strategy_data = build_strategy_email_data(comparisons_list[0], diagram_path, top5_summary_path)
-            top_strategies_data = [build_strategy_email_data(c, top5_summary_path=top5_summary_path) for c in comparisons_list[:5]]
+            top_strategies_data = [build_strategy_email_data(c, top5_summary_path=top5_summary_path) for c in comparisons_list[:5]] 
             # First strategy (best) also gets the diagram path
             if top_strategies_data:
                 top_strategies_data[0] = build_strategy_email_data(comparisons_list[0], diagram_path, top5_summary_path)
@@ -120,9 +120,9 @@ def main():
             st.markdown("---")
             st.markdown("**📁 Saved Diagrams**")
             if st.session_state.get("diagram_path"):
-                st.caption(f"📈 {st.session_state['diagram_path']}")
+                st.caption(f" {st.session_state['diagram_path']}")
             if st.session_state.get("top5_summary_path"):
-                st.caption(f"📊 {st.session_state['top5_summary_path']}")
+                st.caption(f" {st.session_state['top5_summary_path']}")
 
     # ========================================================================
     # MAIN AREA
