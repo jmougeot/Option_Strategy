@@ -361,7 +361,8 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("loss_surfaces"),
           py::arg("is_calls"),
           py::arg("pnl_matrix"),
-          py::arg("prices")
+          py::arg("prices"),
+          py::arg("mixture")
     );
     
     m.def("process_combinations_batch", &process_combinations_batch,
