@@ -260,7 +260,9 @@ void StrategyCalculator::calculate_surfaces(
     const std::vector<double>& total_pnl,
     const std::vector<OptionData>& options,
     const std::vector<int>& signs,
+    const std::vector<double>& mixture,
     double dx,
+    double total_average_pnl,
     double& surface_profit,
     double& surface_loss,
     double& total_profit_ponderated,
@@ -285,7 +287,6 @@ void StrategyCalculator::calculate_surfaces(
     // Surfaces pondérées
     total_profit_ponderated = 0.0;
     total_loss_ponderated = 0.0;
-    double sum_sigma_sq = 0.0;
     
     for (size_t i = 0; i < options.size(); ++i) {
         if (signs[i] > 0) {
@@ -295,10 +296,25 @@ void StrategyCalculator::calculate_surfaces(
             total_profit_ponderated -= options[i].loss_surface_ponderated;
             total_loss_ponderated -= options[i].profit_surface_ponderated;
         }
-        sum_sigma_sq += options[i].sigma_pnl * options[i].sigma_pnl;
     }
     
-    total_sigma_pnl = std::sqrt(sum_sigma_sq);
+    // Calcul du sigma avec la mixture (formule exacte)
+    // σ = sqrt( Σ mixture[i] * (pnl[i] - mu)^2 * dx / mass )
+    double mass = 0.0;
+    double var_sum = 0.0;
+    
+    for (size_t i = 0; i < total_pnl.size() && i < mixture.size(); ++i) {
+        mass += mixture[i] * dx;
+        double diff = total_pnl[i] - total_average_pnl;
+        var_sum += mixture[i] * diff * diff * dx;
+    }
+    
+    if (mass > 0.0) {
+        double var = var_sum / mass;
+        total_sigma_pnl = std::sqrt(std::max(var, 0.0));
+    } else {
+        total_sigma_pnl = 0.0;
+    }
 }
 
 
@@ -311,6 +327,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     const std::vector<int>& signs,
     const std::vector<std::vector<double>>& pnl_matrix,
     const std::vector<double>& prices,
+    const std::vector<double>& mixture,
     double max_loss_params,
     double max_premium_params,
     int ouvert_gauche,
@@ -407,7 +424,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     // Surfaces
     double dx = (prices.size() > 1) ? (prices[1] - prices[0]) : 1.0;
     double surface_profit, surface_loss, total_profit_ponderated, total_loss_ponderated, total_sigma_pnl;
-    calculate_surfaces(total_pnl, options, signs, dx, 
+    calculate_surfaces(total_pnl, options, signs, mixture, dx, total_average_pnl,
                       surface_profit, surface_loss, 
                       total_profit_ponderated, total_loss_ponderated, total_sigma_pnl);
     

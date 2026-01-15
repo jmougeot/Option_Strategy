@@ -119,11 +119,17 @@ def init_cpp_cache(options: List[Option]) -> bool:
     
     prices = np.array(options[0].prices, dtype=np.float64)
     
+    # Récupérer la mixture (identique pour toutes les options)
+    if options[0].mixture is None:
+        print("⚠️ Mixture non disponible pour init_cpp_cache")
+        return False
+    mixture = np.asarray(options[0].mixture, dtype=np.float64)
+    
     # Initialiser le cache C++
     strategy_metrics_cpp.init_options_cache(
         premiums, deltas, gammas, vegas, thetas, ivs,
         average_pnls, sigma_pnls, strikes, profit_surfaces, loss_surfaces,
-        is_calls, pnl_matrix, prices) 
+        is_calls, pnl_matrix, prices, mixture) 
     return True
 
 

@@ -20,6 +20,7 @@ struct OptionsCache {
     std::vector<OptionData> options;
     std::vector<std::vector<double>> pnl_matrix;
     std::vector<double> prices;
+    std::vector<double> mixture;  // Distribution de probabilité du sous-jacent
     size_t n_options;
     size_t pnl_length;
     bool valid;
@@ -46,7 +47,8 @@ void init_options_cache(
     py::array_t<double> loss_surfaces,
     py::array_t<bool> is_calls,
     py::array_t<double> pnl_matrix,
-    py::array_t<double> prices
+    py::array_t<double> prices,
+    py::array_t<double> mixture
 ) {
     auto prem_buf = premiums.unchecked<1>();
     auto delta_buf = deltas.unchecked<1>();
@@ -62,6 +64,7 @@ void init_options_cache(
     auto is_call_buf = is_calls.unchecked<1>();
     auto pnl_buf = pnl_matrix.unchecked<2>();
     auto prices_buf = prices.unchecked<1>();
+    auto mixture_buf = mixture.unchecked<1>();
     
     g_cache.n_options = prem_buf.shape(0);
     g_cache.pnl_length = prices_buf.shape(0);
@@ -92,6 +95,12 @@ void init_options_cache(
     
     for (size_t i = 0; i < g_cache.pnl_length; ++i) {
         g_cache.prices[i] = prices_buf(i);
+    }
+    
+    // Copier la mixture
+    g_cache.mixture.resize(g_cache.pnl_length);
+    for (size_t i = 0; i < g_cache.pnl_length; ++i) {
+        g_cache.mixture[i] = mixture_buf(i);
     }
     
     g_cache.valid = true;
@@ -150,7 +159,7 @@ py::list process_combinations_batch(
         
         // Calculer les métriques
         auto result = StrategyCalculator::calculate(
-            combo_options, combo_signs, combo_pnl, g_cache.prices,
+            combo_options, combo_signs, combo_pnl, g_cache.prices, g_cache.mixture,
             max_loss_params, max_premium_params, ouvert_gauche, ouvert_droite, min_premium_sell
         );
         
@@ -223,6 +232,7 @@ py::object calculate_strategy_metrics(
     py::array_t<int> signs,
     py::array_t<double> pnl_matrix,  // 2D array (n_options x pnl_length)
     py::array_t<double> prices,
+    py::array_t<double> mixture,
     double max_loss_params,
     double max_premium_params,
     int ouvert_gauche,
@@ -245,6 +255,7 @@ py::object calculate_strategy_metrics(
     auto signs_buf = signs.unchecked<1>();
     auto pnl_buf = pnl_matrix.unchecked<2>();
     auto prices_buf = prices.unchecked<1>();
+    auto mixture_buf = mixture.unchecked<1>();
     
     const size_t n_options = prem_buf.shape(0);
     const size_t pnl_length = prices_buf.shape(0);
@@ -254,6 +265,7 @@ py::object calculate_strategy_metrics(
     std::vector<int> signs_vec(n_options);
     std::vector<std::vector<double>> pnl_matrix_vec(n_options);
     std::vector<double> prices_vec(pnl_length);
+    std::vector<double> mixture_vec(pnl_length);
     
     for (size_t i = 0; i < n_options; ++i) {
         options[i].premium = prem_buf(i);
@@ -278,11 +290,12 @@ py::object calculate_strategy_metrics(
     
     for (size_t i = 0; i < pnl_length; ++i) {
         prices_vec[i] = prices_buf(i);
+        mixture_vec[i] = mixture_buf(i);
     }
     
     // Appel du calcul C++
     auto result = StrategyCalculator::calculate(
-        options, signs_vec, pnl_matrix_vec, prices_vec,
+        options, signs_vec, pnl_matrix_vec, prices_vec, mixture_vec,
         max_loss_params, max_premium_params, ouvert_gauche, ouvert_droite, min_premium_sell
     );
     
@@ -401,6 +414,7 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
                   signs: Array des signes (+1=long, -1=short)
                   pnl_matrix: Matrice 2D des P&L (n_options x pnl_length)
                   prices: Array des prix du sous-jacent
+                  mixture: Array de la mixture (densité de probabilité)
                   max_loss_params: Perte maximale autorisée
                   max_premium_params: Premium maximum autorisé
                   ouvert_gauche: Nombre de short puts - long puts autorisé
@@ -425,6 +439,7 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("signs"),
           py::arg("pnl_matrix"),
           py::arg("prices"),
+          py::arg("mixture"),
           py::arg("max_loss_params"),
           py::arg("max_premium_params"),
           py::arg("ouvert_gauche"),

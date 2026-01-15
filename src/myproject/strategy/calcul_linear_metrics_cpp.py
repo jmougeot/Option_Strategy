@@ -63,8 +63,12 @@ def create_strategy_fast_with_signs_cpp(
     if options[0].prices is None or options[0].pnl_array is None:
         return None
     
+    if options[0].mixture is None:
+        return None
+    
     n_options = len(options)
     prices = options[0].prices
+    mixture = options[0].mixture  # Mixture est la même pour toutes les options
     pnl_length = len(options[0].pnl_array)
     
     # ========== EXTRACTION VECTORISÉE DES DONNÉES ==========
@@ -104,6 +108,9 @@ def create_strategy_fast_with_signs_cpp(
     # Convertir signs en int32 pour C++
     signs_int = signs.astype(np.int32)
     
+    # S'assurer que mixture est en float64
+    mixture_arr = np.asarray(mixture, dtype=np.float64)
+    
     # ========== APPEL DU MODULE C++ ==========
     # Tous les calculs et filtres sont faits en C++
     
@@ -111,7 +118,7 @@ def create_strategy_fast_with_signs_cpp(
         premiums, deltas, gammas, vegas, thetas, ivs,
         average_pnls, sigma_pnls, strikes, 
         profit_surfaces, loss_surfaces, is_calls,
-        signs_int, pnl_matrix, prices,
+        signs_int, pnl_matrix, prices, mixture_arr,
         max_loss_params, max_premium_params, ouvert_gauche, ouvert_droite, min_premium_sell
     )
     
