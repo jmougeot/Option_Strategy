@@ -100,7 +100,7 @@ def main():
                 )
             
             best_strategy_data = build_strategy_email_data(comparisons_list[0], diagram_path, top5_summary_path)
-            top_strategies_data = [build_strategy_email_data(c, top5_summary_path=top5_summary_path) for c in comparisons_list[:5]] 
+            top_strategies_data = [build_strategy_email_data(c, top5_path=top5_summary_path) for c in comparisons_list[:5]] 
             # First strategy (best) also gets the diagram path
             if top_strategies_data:
                 top_strategies_data[0] = build_strategy_email_data(comparisons_list[0], diagram_path, top5_summary_path)
