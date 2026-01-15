@@ -129,7 +129,6 @@ private:
         const std::vector<OptionData>& options,
         const std::vector<int>& signs,
         int ouvert_gauche,
-        int long_call_count,
         int& put_count
     );
     
