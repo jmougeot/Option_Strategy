@@ -153,7 +153,6 @@ def process_batch_cpp(
         max_loss, max_premium, ouvert_gauche, ouvert_droite, min_premium_sell
     )
 
-
 def batch_to_strategies(
     results: List,
     options: List[Option]
@@ -248,13 +247,12 @@ def generate_all_strategies_batch(
         return []
     
     n_combos = len(combo_sizes)
-    prep_time = time.perf_counter() - start
-    print(f"  • {n_combos:,} combinaisons×signes à tester")
+    print(f"  • {n_combos:,} combinaisons à tester")
     
     # Étape 2: Initialiser le cache C++
     cache_start = time.perf_counter()
     if not init_cpp_cache(options):
-        print("❌ Échec d'initialisation du cache C++")
+        print(" Échec d'initialisation du cache C++")
         return []
     cache_time = time.perf_counter() - cache_start
     print(f"  • Init cache C++: {cache_time:.3f}s")
