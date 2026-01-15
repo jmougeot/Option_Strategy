@@ -163,7 +163,18 @@ def create_strategy_fast_with_signs(
     
     total_profit_surface = np.sum(np.where((signs>0), profit_surfaces_ponderated, -loss_surfaces_ponderated))
     total_loss_surface = np.sum(np.where((signs>0), loss_surfaces_ponderated, -profit_surfaces_ponderated))
-    total_sigma_pnl = np.sqrt(np.sum(sigma_pnls**2))
+    
+    # Calcul du sigma à partir du P&L total de la stratégie
+    mixture = options[0].mixture
+    if mixture is not None:
+        mass = float(np.sum(mixture) * dx)
+        if mass > 0:
+            var = float(np.sum(mixture * (total_pnl_array - total_average_pnl) ** 2 * dx) / mass)
+            total_sigma_pnl = float(np.sqrt(max(var, 0.0)))
+        else:
+            total_sigma_pnl = 0.0
+    else:
+        total_sigma_pnl = 0.0
 
     # Calcul du nom et expiration
     strategy_name = generate_strategy_name(options, signs)
