@@ -102,8 +102,8 @@ def fetch_options_batch(
                 event = conn.next_event(timeout_ms=5000)
 
                 if (
-                    event.eventType() == blpapi.Event.RESPONSE
-                    or event.eventType() == blpapi.Event.PARTIAL_RESPONSE
+                    event.eventType() == blpapi.Event.RESPONSE #type: ignore
+                    or event.eventType() == blpapi.Event.PARTIAL_RESPONSE #type:ignore
                 ):
 
                     for msg in event:
@@ -148,7 +148,7 @@ def fetch_options_batch(
                                     # Stocker dans results
                                     results[ticker] = ticker_data
 
-                if event.eventType() == blpapi.Event.RESPONSE:
+                if event.eventType() == blpapi.Event.RESPONSE: #type: ignore
                     break
 
         return results
@@ -185,7 +185,7 @@ def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:
     elif ask > 0:
         premium = ask / 2
     else:
-        premium = 0.0
+        premium = None 
 
     result["premium"] = premium
     result["bid"] = bid if bid > 0 else 0.0
