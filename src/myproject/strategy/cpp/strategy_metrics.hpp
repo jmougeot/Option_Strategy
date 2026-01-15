@@ -99,14 +99,17 @@ public:
         const std::vector<double>& prices,
         double max_loss_params,
         double max_premium_params,
-        bool ouvert
+        int ouvert_gauche,
+        int ouvert_droite,
+        double min_premium_sell
     );
 
 private:
     // Filtres (retourne false si la stratégie doit être rejetée)
     static bool filter_useless_sell(
         const std::vector<OptionData>& options,
-        const std::vector<int>& signs
+        const std::vector<int>& signs,
+        double min_premium_sell
     );
     
     static bool filter_call_count(
@@ -125,9 +128,17 @@ private:
     static bool filter_put_count(
         const std::vector<OptionData>& options,
         const std::vector<int>& signs,
-        bool ouvert,
+        int ouvert_gauche,
         int long_call_count,
         int& put_count
+    );
+    
+    static bool filter_call_open(
+        const std::vector<OptionData>& options,
+        const std::vector<int>& signs,
+        int ouvert_droite,
+        int long_put_count,
+        int& call_count
     );
     
     static bool filter_premium(

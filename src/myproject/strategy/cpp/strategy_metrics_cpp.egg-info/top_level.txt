@@ -1,1 +1,2 @@
 strategy_metrics_cpp
+test_cpp_module

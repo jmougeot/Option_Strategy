@@ -27,7 +27,9 @@ def create_strategy_fast_with_signs_cpp(
     signs: np.ndarray, 
     max_loss_params: float, 
     max_premium_params: float, 
-    ouvert: bool
+    ouvert_gauche: int,
+    ouvert_droite: int,
+    min_premium_sell: float
 ) -> Optional[StrategyComparison]:
     """
     Version ultra-optimisée avec calculs C++.
@@ -47,7 +49,9 @@ def create_strategy_fast_with_signs_cpp(
         signs: Array NumPy des signes (+1 pour long, -1 pour short)
         max_loss_params: Perte maximale autorisée
         max_premium_params: Premium maximum autorisé
-        ouvert: Si la stratégie peut être ouverte
+        ouvert_gauche: Nombre de short puts - long puts autorisé
+        ouvert_droite: Nombre de short calls - long calls autorisé
+        min_premium_sell: Premium minimum pour vendre une option
         
     Returns:
         StrategyComparison complète ou None si invalide
@@ -108,7 +112,7 @@ def create_strategy_fast_with_signs_cpp(
         average_pnls, sigma_pnls, strikes, 
         profit_surfaces, loss_surfaces, is_calls,
         signs_int, pnl_matrix, prices,
-        max_loss_params, max_premium_params, ouvert
+        max_loss_params, max_premium_params, ouvert_gauche, ouvert_droite, min_premium_sell
     )
     
     # C++ retourne None si stratégie invalide
@@ -173,18 +177,30 @@ def create_strategy_fast_with_signs_cpp(
 def create_strategy_fast_with_signs(
     options: List[Option], 
     signs: np.ndarray, 
-    max_loss_params: float, 
-    max_premium_params: float, 
-    ouvert: bool
+    filter_data
 ) -> Optional[StrategyComparison]:
     """
     Fonction principale avec sélection automatique C++/Python.
     
-    Utilise le module C++ si disponible, sinon fallback sur Python pur.
+    Args:
+        options: Liste d'options
+        signs: Array NumPy des signes (+1 pour long, -1 pour short)
+        filter_data: FilterData avec max_loss, max_premium, ouvert_gauche/droite, min_premium_sell
+        
+    Returns:
+        StrategyComparison complète ou None si invalide
     """
+    # Extraire les paramètres du filtre
+    max_loss_params = filter_data.max_loss
+    max_premium_params = filter_data.max_premium
+    ouvert_gauche = filter_data.ouvert_gauche
+    ouvert_droite = filter_data.ouvert_droite
+    min_premium_sell = filter_data.min_premium_sell
+    
     if CPP_AVAILABLE:
         return create_strategy_fast_with_signs_cpp(
-            options, signs, max_loss_params, max_premium_params, ouvert
+            options, signs, max_loss_params, max_premium_params, 
+            ouvert_gauche, ouvert_droite, min_premium_sell
         )
     else:
         # Fallback sur l'implémentation Python originale
@@ -192,5 +208,6 @@ def create_strategy_fast_with_signs(
             create_strategy_fast_with_signs as python_impl
         )
         return python_impl(
-            options, signs, max_loss_params, max_premium_params, ouvert
+            options, signs, max_loss_params, max_premium_params, 
+            ouvert_gauche, ouvert_droite, min_premium_sell
         )

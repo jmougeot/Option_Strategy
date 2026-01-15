@@ -11,7 +11,6 @@ class StrategyComparison:
 
     strategy_name: str
     strategy: Any  # OptionStrategy-like
-    target_price: float
     premium: float
     all_options: List[Option]  # Toutes les options
     signs: np.ndarray  # Signes (+1 pour long, -1 pour short) correspondant aux options

@@ -108,7 +108,9 @@ py::list process_combinations_batch(
     py::array_t<int> combo_sizes,        // 1D array avec la taille de chaque combo
     double max_loss_params,
     double max_premium_params,
-    bool ouvert
+    int ouvert_gauche,
+    int ouvert_droite,
+    double min_premium_sell
 ) {
     if (!g_cache.valid) {
         throw std::runtime_error("Cache not initialized. Call init_options_cache first.");
@@ -149,7 +151,7 @@ py::list process_combinations_batch(
         // Calculer les métriques
         auto result = StrategyCalculator::calculate(
             combo_options, combo_signs, combo_pnl, g_cache.prices,
-            max_loss_params, max_premium_params, ouvert
+            max_loss_params, max_premium_params, ouvert_gauche, ouvert_droite, min_premium_sell
         );
         
         if (result.has_value()) {
@@ -223,7 +225,9 @@ py::object calculate_strategy_metrics(
     py::array_t<double> prices,
     double max_loss_params,
     double max_premium_params,
-    bool ouvert
+    int ouvert_gauche,
+    int ouvert_droite,
+    double min_premium_sell
 ) {
     // Accès aux buffers
     auto prem_buf = premiums.unchecked<1>();
@@ -279,7 +283,7 @@ py::object calculate_strategy_metrics(
     // Appel du calcul C++
     auto result = StrategyCalculator::calculate(
         options, signs_vec, pnl_matrix_vec, prices_vec,
-        max_loss_params, max_premium_params, ouvert
+        max_loss_params, max_premium_params, ouvert_gauche, ouvert_droite, min_premium_sell
     );
     
     if (!result.has_value()) {
@@ -357,7 +361,9 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
                   combo_sizes: 1D array avec la taille de chaque combo
                   max_loss_params: Perte maximale autorisée
                   max_premium_params: Premium maximum autorisé
-                  ouvert: Si la stratégie peut être ouverte
+                  ouvert_gauche: Nombre de short puts - long puts autorisé
+                  ouvert_droite: Nombre de short calls - long calls autorisé
+                  min_premium_sell: Premium minimum pour vendre une option
                   
               Retourne:
                   Liste de tuples (indices, signs, metrics_dict) pour les stratégies valides
@@ -367,7 +373,9 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("combo_sizes"),
           py::arg("max_loss_params"),
           py::arg("max_premium_params"),
-          py::arg("ouvert")
+          py::arg("ouvert_gauche"),
+          py::arg("ouvert_droite"),
+          py::arg("min_premium_sell")
     );
     
     m.def("calculate_strategy_metrics", &calculate_strategy_metrics,
@@ -395,7 +403,9 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
                   prices: Array des prix du sous-jacent
                   max_loss_params: Perte maximale autorisée
                   max_premium_params: Premium maximum autorisé
-                  ouvert: Si la stratégie peut être ouverte
+                  ouvert_gauche: Nombre de short puts - long puts autorisé
+                  ouvert_droite: Nombre de short calls - long calls autorisé
+                  min_premium_sell: Premium minimum pour vendre une option
                   
               Retourne:
                   None si invalide, dict des métriques sinon
@@ -417,6 +427,8 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("prices"),
           py::arg("max_loss_params"),
           py::arg("max_premium_params"),
-          py::arg("ouvert")
+          py::arg("ouvert_gauche"),
+          py::arg("ouvert_droite"),
+          py::arg("min_premium_sell")
     );
 }
