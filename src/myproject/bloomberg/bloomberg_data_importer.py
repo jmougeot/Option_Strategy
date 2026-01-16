@@ -41,18 +41,10 @@ MONTH_NAMES = {
 
 # Mapping des mois vers les dates d'expiration (3ème mercredi du mois)
 MONTH_EXPIRY_DAY = {
-    "F": 15,
-    "G": 19,
     "H": 19,
-    "J": 16,
-    "K": 21,
     "M": 18,
-    "N": 16,
-    "Q": 20,
     "U": 17,
-    "V": 15,
-    "X": 19,
-    "Z": 17,
+    "Z": 16,
 }
 
 
