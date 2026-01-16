@@ -14,28 +14,20 @@ from myproject.option.option_class import Option
 import numpy as np
 
 # Type pour les mois valides
-MonthCode = Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
+MonthCode = Literal["H", "M", "U", "Z"]
 
 # Mois Bloomberg valides (codes futures standard)
-VALID_MONTHS = {"F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"}
+VALID_MONTHS = {"H", "M", "U", "Z"}
 
 # Liste ordonnée des mois Bloomberg pour calcul de l'échéance précédente
 # F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
-MONTH_ORDER = ["F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"]
+MONTH_ORDER = ["H", "M", "U", "Z"]
 
 # Mapping des mois Bloomberg vers les noms complets
 MONTH_NAMES = {
-    "F": "January",
-    "G": "February",
     "H": "March",
-    "J": "April",
-    "K": "May",
     "M": "June",
-    "N": "July",
-    "Q": "August",
     "U": "September",
-    "V": "October",
-    "X": "November",
     "Z": "December",
 }
 
@@ -53,7 +45,7 @@ def get_previous_expiration(month: str, year: int) -> Tuple[str, int]:
     Calcule l'échéance précédente pour un mois/année donné.
     
     Args:
-        month: Code mois Bloomberg (F, G, H, K, M, N, Q, U, V, X, Z)
+        month: Code mois Bloomberg (F, G, H, J, K, M, N, Q, U, V, X, Z)
         year: Année sur 1 ou 2 chiffres (ex: 6 pour 2026)
         
     Returns:
@@ -72,6 +64,45 @@ def get_previous_expiration(month: str, year: int) -> Tuple[str, int]:
         return (MONTH_ORDER[-1], year - 1)
     else:
         return (MONTH_ORDER[month_idx - 1], year)
+
+
+def get_roll_expiration(current_month: str, current_year: int, 
+                        roll_month: Optional[str] = None, roll_year: Optional[int] = None) -> Tuple[str, int, int]:
+    """
+    Calcule l'échéance pour le roll et le nombre de trimestres de différence.
+    
+    MONTH_ORDER = ["H", "M", "U", "Z"] → 4 trimestres par an
+    
+    Args:
+        current_month: Mois courant (H, M, U, Z)
+        current_year: Année courante
+        roll_month: Mois pour le roll (None = trimestre précédent)
+        roll_year: Année pour le roll (None = même année ou année précédente)
+        
+    Returns:
+        Tuple (roll_month, roll_year, quarters_diff) où quarters_diff est le nombre de trimestres de différence
+    """
+    current_idx = MONTH_ORDER.index(current_month)
+    
+    if roll_month is None:
+        # Par défaut: trimestre précédent
+        prev_month, prev_year = get_previous_expiration(current_month, current_year)
+        return (prev_month, prev_year, 1)
+    else:
+        # Mois spécifié par l'utilisateur
+        roll_idx = MONTH_ORDER.index(roll_month)
+        if roll_year is None:
+            roll_year = current_year
+        
+        # Calculer la différence en trimestres
+        # 4 trimestres par an (H, M, U, Z)
+        if roll_year == current_year:
+            quarters_diff = current_idx - roll_idx
+        else:
+            # Année différente: 4 trimestres par an
+            quarters_diff = (current_year - roll_year) * 4 + (current_idx - roll_idx)
+        
+        return (roll_month, roll_year, abs(quarters_diff))
 
 
 def parse_brut_code(brut_code: str) -> dict:
@@ -141,10 +172,12 @@ def import_euribor_options(
     default_position: Literal["long", "short"] = "long",
     mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
     compute_roll: bool = True,
+    roll_month: Optional[str] = None,
+    roll_year: Optional[int] = None,
 ) -> List[Option]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne directement des objets Option.
-    Calcule le roll (différence de premium avec l'échéance précédente) si compute_roll=True.
+    Calcule le roll (différence de premium avec l'échéance de roll) si compute_roll=True.
 
     Args:
         brut_code: Liste de codes Bloomberg bruts (ex: ["ERF6C", "ERF6P"]) ou None pour mode standard
@@ -155,7 +188,9 @@ def import_euribor_options(
         suffix: Suffixe Bloomberg (ex: "Comdty")
         default_position: Position par défaut ('long' ou 'short')
         mixture: Tuple (prices, probas) pour le calcul des surfaces pondérées
-        compute_roll: Si True, importe aussi l'échéance précédente pour calculer le roll
+        compute_roll: Si True, importe aussi l'échéance de roll pour calculer le roll
+        roll_month: Mois pour le calcul du roll (None = mois précédent automatique)
+        roll_year: Année pour le calcul du roll (None = déduit automatiquement)
 
     Returns:
         Liste d'objets Option directement utilisables
@@ -168,9 +203,12 @@ def import_euribor_options(
     all_tickers = []
     ticker_metadata = {}
     
-    # Tickers pour l'échéance précédente (pour le calcul du roll)
-    prev_tickers = []
-    prev_ticker_metadata = {}
+    # Tickers pour l'échéance de roll
+    roll_tickers = []
+    roll_ticker_metadata = {}
+    
+    # Stockage du nombre de trimestres de différence pour normalisation
+    quarters_diff_map: dict[Tuple[str, int], int] = {}  # (month, year) -> quarters_diff
 
     print("\n🔨 Construction des tickers...")
 
@@ -180,8 +218,9 @@ def import_euribor_options(
             for month in months:
                 month_code = cast(MonthCode, month)
                 
-                # Calculer l'échéance précédente pour le roll
-                prev_month, prev_year = get_previous_expiration(month, year)
+                # Calculer l'échéance pour le roll (précédente ou spécifiée)
+                r_month, r_year, quarters_diff = get_roll_expiration(month, year, roll_month, roll_year)
+                quarters_diff_map[(month, year)] = quarters_diff
                 
                 for strike in strikes:
                     # Ticker pour l'échéance courante - CALL
@@ -198,19 +237,19 @@ def import_euribor_options(
                     }
                     total_attempts += 1
                     
-                    # Ticker pour l'échéance précédente - CALL (pour roll)
+                    # Ticker pour l'échéance de roll - CALL
                     if compute_roll:
-                        prev_ticker = build_option_ticker(
-                            underlying, cast(MonthCode, prev_month), prev_year, "C", strike, suffix
+                        roll_ticker = build_option_ticker(
+                            underlying, cast(MonthCode, r_month), r_year, "C", strike, suffix
                         )
-                        if prev_ticker not in prev_ticker_metadata:
-                            prev_tickers.append(prev_ticker)
-                            prev_ticker_metadata[prev_ticker] = {
+                        if roll_ticker not in roll_ticker_metadata:
+                            roll_tickers.append(roll_ticker)
+                            roll_ticker_metadata[roll_ticker] = {
                                 "underlying": underlying,
                                 "strike": strike,
                                 "option_type": "call",
-                                "month": prev_month,
-                                "year": prev_year,
+                                "month": r_month,
+                                "year": r_year,
                             }
 
                     # Ticker pour l'échéance courante - PUT
@@ -227,27 +266,30 @@ def import_euribor_options(
                     }
                     total_attempts += 1
                     
-                    # Ticker pour l'échéance précédente - PUT (pour roll)
+                    # Ticker pour l'échéance de roll - PUT
                     if compute_roll:
-                        prev_ticker = build_option_ticker(
-                            underlying, cast(MonthCode, prev_month), prev_year, "P", strike, suffix
+                        roll_ticker = build_option_ticker(
+                            underlying, cast(MonthCode, r_month), r_year, "P", strike, suffix
                         )
-                        if prev_ticker not in prev_ticker_metadata:
-                            prev_tickers.append(prev_ticker)
-                            prev_ticker_metadata[prev_ticker] = {
+                        if roll_ticker not in roll_ticker_metadata:
+                            roll_tickers.append(roll_ticker)
+                            roll_ticker_metadata[roll_ticker] = {
                                 "underlying": underlying,
                                 "strike": strike,
                                 "option_type": "put",
-                                "month": prev_month,
-                                "year": prev_year,
+                                "month": r_month,
+                                "year": r_year,
                             }
     else:
         # Mode brut: parser les codes pour extraire les métadonnées
         for code in brut_code:
             meta = parse_brut_code(code)
             
-            # Calculer l'échéance précédente pour le roll
-            prev_month, prev_year = get_previous_expiration(meta["month"], meta["year"])
+            # Calculer l'échéance pour le roll (précédente ou spécifiée)
+            r_month, r_year, quarters_diff = get_roll_expiration(
+                meta["month"], meta["year"], roll_month, roll_year
+            )
+            quarters_diff_map[(meta["month"], meta["year"])] = quarters_diff
             
             for strike in strikes:
                 ticker = build_option_ticker_brut(code, strike, suffix)
@@ -261,47 +303,47 @@ def import_euribor_options(
                 }
                 total_attempts += 1
                 
-                # Ticker pour l'échéance précédente (pour roll)
+                # Ticker pour l'échéance de roll
                 if compute_roll:
-                    # Construire le code brut pour l'échéance précédente
+                    # Construire le code brut pour l'échéance de roll
                     opt_type_char = "C" if meta["option_type"] == "call" else "P"
-                    prev_code = f"{meta['underlying']}{prev_month}{prev_year}{opt_type_char}"
-                    prev_ticker = build_option_ticker_brut(prev_code, strike, suffix)
-                    if prev_ticker not in prev_ticker_metadata:
-                        prev_tickers.append(prev_ticker)
-                        prev_ticker_metadata[prev_ticker] = {
+                    roll_code = f"{meta['underlying']}{r_month}{r_year}{opt_type_char}"
+                    roll_ticker = build_option_ticker_brut(roll_code, strike, suffix)
+                    if roll_ticker not in roll_ticker_metadata:
+                        roll_tickers.append(roll_ticker)
+                        roll_ticker_metadata[roll_ticker] = {
                             "underlying": meta["underlying"],
                             "strike": strike,
                             "option_type": meta["option_type"],
-                            "month": prev_month,
-                            "year": prev_year,
+                            "month": r_month,
+                            "year": r_year,
                         }
 
-    # FETCH EN BATCH - échéances courantes + précédentes
+    # FETCH EN BATCH - échéances courantes + roll
     try:
         # Fetch des échéances courantes
         print(f"\n📡 Fetch des {len(all_tickers)} options courantes...")
         batch_data = fetch_options_batch(all_tickers, use_overrides=True)
         
-        # Fetch des échéances précédentes pour le roll
-        prev_batch_data = {}
-        if compute_roll and prev_tickers:
-            print(f"📡 Fetch des {len(prev_tickers)} options précédentes (pour roll)...")
-            prev_batch_data = fetch_options_batch(prev_tickers, use_overrides=True)
+        # Fetch des échéances de roll
+        roll_batch_data = {}
+        if  roll_tickers:
+            print(f"📡 Fetch des {len(roll_tickers)} options de roll...")
+            roll_batch_data = fetch_options_batch(roll_tickers, use_overrides=True)
         
-        # Construire un dictionnaire des premiums de l'échéance précédente
-        # Clé: (strike, option_type, prev_month, prev_year) → premium
-        prev_premiums: dict[Tuple[float, str, str, int], float] = {}
+        # Construire un dictionnaire des premiums de l'échéance de roll
+        # Clé: (strike, option_type, roll_month, roll_year) → premium
+        roll_premiums: dict[Tuple[float, str, str, int], float] = {}
         
-        for prev_ticker, prev_meta in prev_ticker_metadata.items():
-            raw_data = prev_batch_data.get(prev_ticker, {})
+        for roll_ticker, roll_meta in roll_ticker_metadata.items():
+            raw_data = roll_batch_data.get(roll_ticker, {})
             if raw_data and not all(v is None for v in raw_data.values()):
                 extracted = extract_best_values(raw_data)
                 premium = extracted.get("premium")
                 if premium is not None and premium > 0:
-                    key = (prev_meta["strike"], prev_meta["option_type"], 
-                           prev_meta["month"], prev_meta["year"])
-                    prev_premiums[key] = premium
+                    key = (roll_meta["strike"], roll_meta["option_type"], 
+                           roll_meta["month"], roll_meta["year"])
+                    roll_premiums[key] = premium
 
         # Collecter les mois/années uniques depuis les métadonnées
         if brut_code is not None:
@@ -319,10 +361,10 @@ def import_euribor_options(
             month_options_count = 0
             month_name = MONTH_NAMES.get(month, month)
             
-            # Calculer l'échéance précédente
-            prev_month, prev_year = get_previous_expiration(month, year)
+            # Calculer l'échéance de roll et le nombre de trimestres
+            r_month, r_year, quarters_diff = get_roll_expiration(month, year, roll_month, roll_year)
 
-            print(f"\n📅 {month_name} 20{20+year}")
+            print(f"\n{month_name} 20{20+year} (roll vs {r_month}{r_year}, {quarters_diff} trimestre(s))")
             print("-" * 70)
 
             for ticker in all_tickers:
@@ -353,12 +395,14 @@ def import_euribor_options(
                     )
 
                     # Calculer le roll si possible
-                    if compute_roll and option.premium is not None:
-                        prev_key = (meta["strike"], meta["option_type"], prev_month, prev_year)
-                        prev_premium = prev_premiums.get(prev_key)
-                        if prev_premium is not None:
-                            # Roll = premium courant - premium précédent
-                            option.roll = prev_premium - option.premium 
+                    if option.premium is not None:
+                        roll_key = (meta["strike"], meta["option_type"], r_month, r_year)
+                        roll_premium = roll_premiums.get(roll_key)
+                        if roll_premium is not None:
+                            # Roll = (premium_roll - premium_courant) / nombre_de_trimestres
+                            # Ainsi le roll est normalisé par trimestre
+                            raw_roll = roll_premium - option.premium
+                            option.roll = raw_roll / quarters_diff if quarters_diff > 0 else raw_roll
 
                     # Vérifier que l'option est valide
                     if option.strike > 0:
@@ -368,7 +412,7 @@ def import_euribor_options(
 
                             # Afficher un résumé
                             opt_symbol = "C" if option.option_type == "call" else "P"
-                            roll_str = f", Roll={option.roll:.4f}" if option.roll is not None else ""
+                            roll_str = f", Roll={option.roll:.4f}/Q" if option.roll is not None else ""
 
                             print(
                                 f"✓ {opt_symbol} {option.strike}: "
@@ -394,6 +438,8 @@ def import_euribor_options(
         else "Succès: 0"
     )
     print(f"Échecs: {total_attempts - total_success}")
+    if compute_roll:
+        print(f"Roll calculé vs: {roll_month or 'mois précédent'}{roll_year or ''}")
     print("=" * 70)
 
     return list_option

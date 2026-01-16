@@ -4,6 +4,11 @@ from myproject.app.utils import strike_list
 from typing import Optional,List
 
 
+# Mois Bloomberg disponibles
+MONTH_OPTIONS = ["H", "M", "U", "Z"]
+MONTH_NAMES = {"H": "March", "M": "June","U": "September",  "Z": "December"}
+
+
 @dataclass
 class UIParams:
     underlying: str
@@ -15,6 +20,9 @@ class UIParams:
     max_legs: int
     strikes: list[float]
     brut_code: Optional[List[str]]=None
+    compute_roll: bool = True
+    roll_month: Optional[str] = None
+    roll_year: Optional[int] = None
 
 
 def sidebar_params() -> UIParams:
@@ -47,7 +55,7 @@ def sidebar_params() -> UIParams:
             months_input = st.text_input(
                 "Expiration Month:",
                 value="F",
-                help="F=Jan, G=Feb, H=Mar, K=Apr, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec",
+                help="H=Mar, M=Jun, U=Sep, Z=Dec",
             )
     
         with c2:
@@ -77,7 +85,38 @@ def sidebar_params() -> UIParams:
         price_max = st.number_input(
             "Max Price ($)", value=98.750, step=0.0001, format="%.4f"
             )
+    
+    roll_month: Optional[str] = None
+    roll_year: Optional[int] = None
+    
 
+    custom_roll = st.checkbox(
+        "Custom roll",
+        value=False,
+        help="By default: previous month. Check to specify a custom month."
+    )
+    
+    if custom_roll:
+        c1, c2 = st.columns(2)
+        with c1:
+            roll_month_idx = st.selectbox(
+                "Roll Month",
+                options=range(len(MONTH_OPTIONS)),
+                format_func=lambda i: f"{MONTH_OPTIONS[i]} ({MONTH_NAMES[MONTH_OPTIONS[i]]})",
+                index=0,
+                key="roll_month_select"
+            )
+            roll_month = MONTH_OPTIONS[roll_month_idx]
+        with c2:
+            roll_year = st.number_input(
+                "Roll Year",
+                value=6,
+                min_value=5,
+                max_value=10,
+                step=1,
+                help="Year for roll (6=2026, etc.)",
+                key="roll_year_input"
+            )
 
     strikes = strike_list(price_min, price_max, price_step)
 
@@ -94,5 +133,16 @@ def sidebar_params() -> UIParams:
 
 
     return UIParams(
-        underlying, months, years, price_min, price_max, price_step, max_legs, strikes, brut_code_result,
+        underlying=underlying,
+        months=months,
+        years=years,
+        price_min=price_min,
+        price_max=price_max,
+        price_step=price_step,
+        max_legs=max_legs,
+        strikes=strikes,
+        brut_code=brut_code_result,
+        compute_roll=True,
+        roll_month=roll_month,
+        roll_year=roll_year,
     )

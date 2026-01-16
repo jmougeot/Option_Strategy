@@ -158,7 +158,10 @@ def main():
                 top_n=500,
                 scoring_weights=scoring_weights,
                 scenarios=scenarios, #type: ignore
-                filter=filter
+                filter=filter,
+                compute_roll=params.compute_roll,
+                roll_month=params.roll_month,
+                roll_year=params.roll_year,
             )
 
             # Check results

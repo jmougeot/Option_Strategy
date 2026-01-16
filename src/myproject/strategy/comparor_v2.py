@@ -306,10 +306,12 @@ class StrategyComparerV2:
         
     @staticmethod
     def _score_higher_better(value: float, min_val: float, max_val: float) -> float:
-        """Score normalisé: plus élevé = meilleur."""
-        if max_val <= 0:
-            return 0.0
-        return value / max_val
+        """Score normalisé: plus élevé = meilleur.
+        Fonctionne avec des valeurs négatives en normalisant sur [min, max]."""
+        if max_val <= min_val:
+            return 0.5  # Toutes les valeurs identiques
+        # Normaliser sur l'intervalle [min, max] → [0, 1]
+        return (value - min_val) / (max_val - min_val)
 
     @staticmethod
     def _score_lower_better(value: float, min_val: float, max_val: float) -> float:

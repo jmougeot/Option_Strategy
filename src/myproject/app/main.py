@@ -37,8 +37,10 @@ def process_bloomberg_to_strategies(
     top_n: int = 10,
     scoring_weights: Optional[Dict[str, float]] = None,
     num_points: int = 200,
-
-    brut_code: Optional[List[str]] =None
+    brut_code: Optional[List[str]] = None,
+    compute_roll: bool = True,
+    roll_month: Optional[str] = None,
+    roll_year: Optional[int] = None,
 ) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray]]:
     """
     Fonction principale simplifiée pour Streamlit.
@@ -71,6 +73,9 @@ def process_bloomberg_to_strategies(
         strikes=strikes,
         default_position="long",
         mixture=mixture,
+        compute_roll=compute_roll,
+        roll_month=roll_month,
+        roll_year=roll_year,
     )
 
     stats["nb_options"] = len(options)
