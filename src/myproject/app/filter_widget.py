@@ -21,7 +21,7 @@ STRATEGYTYPE = {
     # CALL Condor: +C1 -C2 -C3 +C4 (achète ailes, vend corps) - strikes croissants  
     "call_condor": {"option_type": "call", "signs": [1, -1, -1, 1]},
     # PUT Ladder: +P1 -P2 -P3 (achète 1, vend 2) - strikes croissants
-    "put_ladder": {"option_type": "put", "signs": [1, -1, -1]},
+    "put_ladder": {"option_type": "put", "signs": [-1, -1, 1]},
     # CALL Ladder: -C1 -C2 +C3 (vend 2, achète 1) - strikes croissants
     "call_ladder": {"option_type": "call", "signs": [-1, -1, 1]},
     # PUT Fly: +P1 -2*P2 +P3 (achète ailes, vend 2x corps) - strikes croissants
