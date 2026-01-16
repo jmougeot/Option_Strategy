@@ -164,7 +164,10 @@ def create_strategy_fast_with_signs(
     
     total_profit_surface = np.sum(np.where((signs>0), profit_surfaces_ponderated, -loss_surfaces_ponderated))
     total_loss_surface = np.sum(np.where((signs>0), loss_surfaces_ponderated, -profit_surfaces_ponderated))
-    total_roll = sum(opt.roll if opt.roll is not None else 0.0 for opt in options)
+    
+    # Calcul du roll total en prenant en compte le signe (long/short)
+    rolls = np.array([opt.roll if opt.roll is not None else 0.0 for opt in options], dtype=np.float64)
+    total_roll = float(np.sum(signs * rolls))
     
     # Calcul du sigma à partir du P&L total de la stratégie
     mixture = options[0].mixture
