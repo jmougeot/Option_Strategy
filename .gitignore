@@ -11,6 +11,7 @@ src/myproject/trade_monitor_data/
 build/
 *.pyc
 assets/
+.egg-info/
 
 # Streamlit
 .streamlit/

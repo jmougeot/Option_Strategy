@@ -8,7 +8,7 @@ from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.strategy.strategy_naming_v2 import generate_strategy_name
 from myproject.option.option_utils_v2 import get_expiration_info
-from myproject.app.filter_widget import FilterData
+from myproject.app.filter_widget import FilterData, StrategyType
 import numpy as np
 
 

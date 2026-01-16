@@ -1,5 +1,34 @@
 from dataclasses import dataclass
-import streamlit as st 
+import streamlit as st
+from typing import Optional
+
+@dataclass
+class StrategyType:
+    put_condor: bool 
+    call_condor: bool
+    put_ladder:bool
+    call_ladder: bool
+    put_fly: bool
+    call_fly: bool
+
+# Patterns de signes par type de stratégie (triés par strike croissant)
+# Format: (type_options, pattern_signes)
+# type_options: "call", "put", ou "mixed"
+# pattern_signes: liste des signes pour chaque leg en ordre de strike croissant
+STRATEGYTYPE = {
+    # PUT Condor: +P1 -P2 -P3 +P4 (achète ailes, vend corps) - strikes croissants
+    "put_condor": {"option_type": "put", "signs": [1, -1, -1, 1]},
+    # CALL Condor: +C1 -C2 -C3 +C4 (achète ailes, vend corps) - strikes croissants  
+    "call_condor": {"option_type": "call", "signs": [1, -1, -1, 1]},
+    # PUT Ladder: +P1 -P2 -P3 (achète 1, vend 2) - strikes croissants
+    "put_ladder": {"option_type": "put", "signs": [1, -1, -1]},
+    # CALL Ladder: -C1 -C2 +C3 (vend 2, achète 1) - strikes croissants
+    "call_ladder": {"option_type": "call", "signs": [-1, -1, 1]},
+    # PUT Fly: +P1 -2*P2 +P3 (achète ailes, vend 2x corps) - strikes croissants
+    "put_fly": {"option_type": "put", "signs": [1, -1, -1, 1]},  # avec 2 options au milieu
+    # CALL Fly: +C1 -2*C2 +C3 (achète ailes, vend 2x corps) - strikes croissants
+    "call_fly": {"option_type": "call", "signs": [1, -1, -1, 1]},  # avec 2 options au milieu
+}
 
 
 @dataclass
@@ -9,6 +38,8 @@ class FilterData:
     ouvert_gauche: int
     ouvert_droite: int
     min_premium_sell:float
+    filter_type: bool
+    strategies_include : Optional[StrategyType]
    
 
 
@@ -66,6 +97,31 @@ def filter_params() -> FilterData:
                                                step=1,
                                                key="filter_ouvert_droite",
                                                help="Number of calls sold - bought")
+        
+    
+    filter_type = st.checkbox(label="Select strategy Type",
+                                    value= False,
+                                    help= "Select the type of strategies you want to compare")
+                        
+    strat_include = None
+
+    if filter_type :
+        with st.expander(label="Select the Strategy you want to compare"):
+            put_condor = st.checkbox(label="Put Condor", value=False)
+            call_condor=st.checkbox(label="Call Condor", value=False)
+            put_ladder=st.checkbox(label="Put ladder", value=False)
+            call_ladder=st.checkbox(label="Call Ladder", value=False)
+            put_fly=st.checkbox(label="Put Fly", value=False)
+            call_fly=st.checkbox(label="Call Fly", value=False)
+
+        strat_include = StrategyType(
+            put_condor=put_condor,
+            call_condor=call_condor,
+            put_ladder=put_ladder,
+            call_ladder=call_ladder,
+            put_fly=put_fly,
+            call_fly=call_fly
+        )
 
     # Save new values in session_state
     st.session_state.filter = {
@@ -74,12 +130,16 @@ def filter_params() -> FilterData:
         "ouvert_gauche": ouvert_gauche,
         "ouvert_droite": ouvert_droite,
         "min_premium_sell": min_premium_sell
+
     }
+
 
     return FilterData(
         max_loss=max_loss,
         max_premium=max_premium,
         ouvert_gauche=ouvert_gauche,
         ouvert_droite=ouvert_droite,
-        min_premium_sell=min_premium_sell
+        min_premium_sell=min_premium_sell,
+        filter_type=filter_type,
+        strategies_include=strat_include
     )

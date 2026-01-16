@@ -2,6 +2,19 @@ from typing import List
 from myproject.option.option_class import Option
 
 
+def sort_options_by_strike(options: List[Option]) -> List[Option]:
+    """
+    Trie les options par strike croissant.
+
+    Args:
+        options: Liste d'objets Option.
+
+    Returns:
+        Liste triée d'objets Option par strike croissant.
+    """
+    return sorted(options, key=lambda opt: opt.strike)
+
+
 def sort_options_by_expiration(options: List[Option]) -> List[Option]:
     """
     Trie les options par date d'expiration (année > mois > semaine > jour).
