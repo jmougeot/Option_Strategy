@@ -167,7 +167,10 @@ def create_strategy_fast_with_signs(
     
     # Calcul du roll total en prenant en compte le signe (long/short)
     rolls = np.array([opt.roll if opt.roll is not None else 0.0 for opt in options], dtype=np.float64)
+    rolls_quarterly = np.array([opt.roll_quarterly if opt.roll_quarterly is not None else 0.0 for opt in options], dtype=np.float64)
     total_roll = float(np.sum(signs * rolls))
+    total_roll_quarterly = float(np.sum(signs * rolls_quarterly))
+    total_roll_sum = float(np.sum(signs * rolls_quarterly))  # Somme = même que quarterly mais non normalisée
     
     # Calcul du sigma à partir du P&L total de la stratégie
     mixture = options[0].mixture
@@ -224,6 +227,8 @@ def create_strategy_fast_with_signs(
             score=0.0,
             rank=0,
             roll=total_roll,
+            roll_quarterly=total_roll_quarterly,
+            roll_sum=total_roll_sum,
         )
         return strategy
     except Exception as e:

@@ -187,10 +187,17 @@ class StrategyComparerV2:
             ),
             MetricConfig(
                 name="roll",
-                weight=0.10,
+                weight=0.05,
                 extractor=lambda s: self._safe_value(s.roll),
                 normalizer=self._normalize_min_max,
                 scorer=self._score_higher_better,  # Plus grand roll = meilleur
+            ),
+            MetricConfig(
+                name="roll_quarterly",
+                weight=0.05,
+                extractor=lambda s: self._safe_value(s.roll_quarterly),
+                normalizer=self._normalize_min_max,
+                scorer=self._score_higher_better,  # Plus grand roll Q-1 = meilleur
             ),
             MetricConfig(
                 name="sigma_pnl",

@@ -35,7 +35,8 @@ class Option:
     ask: Optional[float] = None
     last: Optional[float] = None
     mid: Optional[float] = None
-    roll: Optional[float] = None
+    roll: Optional[float] = None  # Roll moyen (normalisé par nombre de trimestres)
+    roll_quarterly: Optional[float] = None  # Roll Q-1 (trimestre précédent)
 
     # ============ GREEKS ============
     delta: float = 0.0

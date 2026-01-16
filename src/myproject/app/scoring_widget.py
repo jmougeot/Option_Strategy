@@ -5,7 +5,7 @@ from typing import List
 # Definition of scoring categories based on comparor_v2.py
 SCORING_CATEGORIES = {
     "Gaussian Mixture": {
-        "fields": ["average_pnl", "roll", "sigma_pnl"],
+        "fields": ["average_pnl", "roll", "roll_quarterly", "sigma_pnl"],
         "color": "📊",
         "description": "Probability weighted metrics",
     },
@@ -28,7 +28,8 @@ FIELD_LABELS = {
     "vega_low": "Vega Low",
     "theta_positive": "Theta Positive",
     "average_pnl": "Average P&L",
-    "roll": "Roll",
+    "roll": "Roll (Avg)",
+    "roll_quarterly": "Roll (Q-1)",
     "sigma_pnl": "Sigma P&L",
     "implied_vol_moderate": "Moderate IV",
 }
