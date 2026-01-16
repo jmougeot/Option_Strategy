@@ -16,18 +16,20 @@ import numpy as np
 # Type pour les mois valides
 MonthCode = Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
 
-# Mois Bloomberg valides
-VALID_MONTHS = {"F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"}
+# Mois Bloomberg valides (codes futures standard)
+VALID_MONTHS = {"F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"}
 
 # Liste ordonnée des mois Bloomberg pour calcul de l'échéance précédente
-MONTH_ORDER = ["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
+# F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
+MONTH_ORDER = ["F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"]
 
 # Mapping des mois Bloomberg vers les noms complets
 MONTH_NAMES = {
     "F": "January",
     "G": "February",
     "H": "March",
-    "K": "April",
+    "J": "April",
+    "K": "May",
     "M": "June",
     "N": "July",
     "Q": "August",
@@ -42,7 +44,8 @@ MONTH_EXPIRY_DAY = {
     "F": 15,
     "G": 19,
     "H": 19,
-    "K": 16,
+    "J": 16,
+    "K": 21,
     "M": 18,
     "N": 16,
     "Q": 20,
