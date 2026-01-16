@@ -35,6 +35,7 @@ class Option:
     ask: Optional[float] = None
     last: Optional[float] = None
     mid: Optional[float] = None
+    roll: Optional[float] = None
 
     # ============ GREEKS ============
     delta: float = 0.0

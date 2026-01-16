@@ -26,6 +26,7 @@ class StrategyComparison:
     breakeven_points: List[float]
     profit_range: Tuple[float, float]  # Range de prix profitable
     profit_zone_width: float  # Largeur de la zone profitable+
+    roll: Optional[float]
     surface_profit: Optional[float]  # surface of profit btw min price and max price
     surface_loss: Optional[float]  # surface of loss btw min price and max price
     average_pnl: Optional[float]  # Espérance du P&L avec mixture

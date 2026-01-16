@@ -179,7 +179,7 @@ class OptionStrategyGeneratorV2:
 
         # OPTIMISATION: Pré-calculer le type d'options une seule fois
         use_strategy_filter = filter.filter_type and filter.strategies_include is not None
-        valid_patterns = None
+        valid_patterns: set[tuple[float, ...]] = set()
         
         if use_strategy_filter:
             # Calculer le type d'options UNE SEULE FOIS pour cette combinaison
@@ -193,7 +193,7 @@ class OptionStrategyGeneratorV2:
             
             # Obtenir les patterns valides (avec cache)
             valid_patterns = self._get_valid_sign_patterns(
-                n, all_calls, all_puts, filter.strategies_include
+                n, all_calls, all_puts, filter.strategies_include  # type: ignore
             )
             
             # Si aucun pattern valide, retourner vide
@@ -204,7 +204,7 @@ class OptionStrategyGeneratorV2:
         sign_arrays = self.SIGN_ARRAYS_CACHE.get(n)
         sign_tuples = self.SIGN_TUPLES_CACHE.get(n)
         
-        if sign_arrays is None:
+        if sign_arrays is None or sign_tuples is None:
             sign_arrays = [np.array(combo, dtype=np.float64) for combo in product([-1.0, 1.0], repeat=n)]
             sign_tuples = [combo for combo in product((-1.0, 1.0), repeat=n)]
         
@@ -213,9 +213,8 @@ class OptionStrategyGeneratorV2:
         # ===== Génération des stratégies (optimisé) =====
         for i, signs in enumerate(sign_arrays):
             # Filtrage RAPIDE par type de stratégie (lookup O(1) dans un set)
-            if use_strategy_filter:
-                if sign_tuples[i] not in valid_patterns:
-                    continue
+            if use_strategy_filter and sign_tuples[i] not in valid_patterns:
+                continue
             
             strat = create_strategy_fast_with_signs(options, signs, filter)
             if strat is not None:

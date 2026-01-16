@@ -19,6 +19,9 @@ MonthCode = Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
 # Mois Bloomberg valides
 VALID_MONTHS = {"F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"}
 
+# Liste ordonnée des mois Bloomberg pour calcul de l'échéance précédente
+MONTH_ORDER = ["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
+
 # Mapping des mois Bloomberg vers les noms complets
 MONTH_NAMES = {
     "F": "January",
@@ -48,6 +51,32 @@ MONTH_EXPIRY_DAY = {
     "X": 19,
     "Z": 17,
 }
+
+
+def get_previous_expiration(month: str, year: int) -> Tuple[str, int]:
+    """
+    Calcule l'échéance précédente pour un mois/année donné.
+    
+    Args:
+        month: Code mois Bloomberg (F, G, H, K, M, N, Q, U, V, X, Z)
+        year: Année sur 1 ou 2 chiffres (ex: 6 pour 2026)
+        
+    Returns:
+        Tuple (month_prev, year_prev)
+        
+    Examples:
+        >>> get_previous_expiration("H", 6)  # Mars 2026
+        ('G', 6)  # Février 2026
+        >>> get_previous_expiration("F", 6)  # Janvier 2026
+        ('Z', 5)  # Décembre 2025
+    """
+    month_idx = MONTH_ORDER.index(month)
+    
+    if month_idx == 0:
+        # Janvier → Décembre année précédente
+        return (MONTH_ORDER[-1], year - 1)
+    else:
+        return (MONTH_ORDER[month_idx - 1], year)
 
 
 def parse_brut_code(brut_code: str) -> dict:
@@ -116,9 +145,11 @@ def import_euribor_options(
     suffix: str = "Comdty",
     default_position: Literal["long", "short"] = "long",
     mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    compute_roll: bool = True,
 ) -> List[Option]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne directement des objets Option.
+    Calcule le roll (différence de premium avec l'échéance précédente) si compute_roll=True.
 
     Args:
         brut_code: Liste de codes Bloomberg bruts (ex: ["ERF6C", "ERF6P"]) ou None pour mode standard
@@ -129,6 +160,7 @@ def import_euribor_options(
         suffix: Suffixe Bloomberg (ex: "Comdty")
         default_position: Position par défaut ('long' ou 'short')
         mixture: Tuple (prices, probas) pour le calcul des surfaces pondérées
+        compute_roll: Si True, importe aussi l'échéance précédente pour calculer le roll
 
     Returns:
         Liste d'objets Option directement utilisables
@@ -140,6 +172,10 @@ def import_euribor_options(
     # Construire tous les tickers et métadonnées
     all_tickers = []
     ticker_metadata = {}
+    
+    # Tickers pour l'échéance précédente (pour le calcul du roll)
+    prev_tickers = []
+    prev_ticker_metadata = {}
 
     print("\n🔨 Construction des tickers...")
 
@@ -148,7 +184,12 @@ def import_euribor_options(
         for year in years:
             for month in months:
                 month_code = cast(MonthCode, month)
+                
+                # Calculer l'échéance précédente pour le roll
+                prev_month, prev_year = get_previous_expiration(month, year)
+                
                 for strike in strikes:
+                    # Ticker pour l'échéance courante - CALL
                     ticker = build_option_ticker(
                         underlying, month_code, year, "C", strike, suffix
                     )
@@ -161,7 +202,23 @@ def import_euribor_options(
                         "year": year,
                     }
                     total_attempts += 1
+                    
+                    # Ticker pour l'échéance précédente - CALL (pour roll)
+                    if compute_roll:
+                        prev_ticker = build_option_ticker(
+                            underlying, cast(MonthCode, prev_month), prev_year, "C", strike, suffix
+                        )
+                        if prev_ticker not in prev_ticker_metadata:
+                            prev_tickers.append(prev_ticker)
+                            prev_ticker_metadata[prev_ticker] = {
+                                "underlying": underlying,
+                                "strike": strike,
+                                "option_type": "call",
+                                "month": prev_month,
+                                "year": prev_year,
+                            }
 
+                    # Ticker pour l'échéance courante - PUT
                     ticker = build_option_ticker(
                         underlying, month_code, year, "P", strike, suffix
                     )
@@ -174,10 +231,29 @@ def import_euribor_options(
                         "year": year,
                     }
                     total_attempts += 1
+                    
+                    # Ticker pour l'échéance précédente - PUT (pour roll)
+                    if compute_roll:
+                        prev_ticker = build_option_ticker(
+                            underlying, cast(MonthCode, prev_month), prev_year, "P", strike, suffix
+                        )
+                        if prev_ticker not in prev_ticker_metadata:
+                            prev_tickers.append(prev_ticker)
+                            prev_ticker_metadata[prev_ticker] = {
+                                "underlying": underlying,
+                                "strike": strike,
+                                "option_type": "put",
+                                "month": prev_month,
+                                "year": prev_year,
+                            }
     else:
         # Mode brut: parser les codes pour extraire les métadonnées
         for code in brut_code:
             meta = parse_brut_code(code)
+            
+            # Calculer l'échéance précédente pour le roll
+            prev_month, prev_year = get_previous_expiration(meta["month"], meta["year"])
+            
             for strike in strikes:
                 ticker = build_option_ticker_brut(code, strike, suffix)
                 all_tickers.append(ticker)
@@ -189,10 +265,48 @@ def import_euribor_options(
                     "year": meta["year"],
                 }
                 total_attempts += 1
+                
+                # Ticker pour l'échéance précédente (pour roll)
+                if compute_roll:
+                    # Construire le code brut pour l'échéance précédente
+                    opt_type_char = "C" if meta["option_type"] == "call" else "P"
+                    prev_code = f"{meta['underlying']}{prev_month}{prev_year}{opt_type_char}"
+                    prev_ticker = build_option_ticker_brut(prev_code, strike, suffix)
+                    if prev_ticker not in prev_ticker_metadata:
+                        prev_tickers.append(prev_ticker)
+                        prev_ticker_metadata[prev_ticker] = {
+                            "underlying": meta["underlying"],
+                            "strike": strike,
+                            "option_type": meta["option_type"],
+                            "month": prev_month,
+                            "year": prev_year,
+                        }
 
-    # FETCH EN BATCH
+    # FETCH EN BATCH - échéances courantes + précédentes
     try:
+        # Fetch des échéances courantes
+        print(f"\n📡 Fetch des {len(all_tickers)} options courantes...")
         batch_data = fetch_options_batch(all_tickers, use_overrides=True)
+        
+        # Fetch des échéances précédentes pour le roll
+        prev_batch_data = {}
+        if compute_roll and prev_tickers:
+            print(f"📡 Fetch des {len(prev_tickers)} options précédentes (pour roll)...")
+            prev_batch_data = fetch_options_batch(prev_tickers, use_overrides=True)
+        
+        # Construire un dictionnaire des premiums de l'échéance précédente
+        # Clé: (strike, option_type, prev_month, prev_year) → premium
+        prev_premiums: dict[Tuple[float, str, str, int], float] = {}
+        
+        for prev_ticker, prev_meta in prev_ticker_metadata.items():
+            raw_data = prev_batch_data.get(prev_ticker, {})
+            if raw_data and not all(v is None for v in raw_data.values()):
+                extracted = extract_best_values(raw_data)
+                premium = extracted.get("premium")
+                if premium is not None and premium > 0:
+                    key = (prev_meta["strike"], prev_meta["option_type"], 
+                           prev_meta["month"], prev_meta["year"])
+                    prev_premiums[key] = premium
 
         # Collecter les mois/années uniques depuis les métadonnées
         if brut_code is not None:
@@ -209,6 +323,9 @@ def import_euribor_options(
         for year, month in periods:
             month_options_count = 0
             month_name = MONTH_NAMES.get(month, month)
+            
+            # Calculer l'échéance précédente
+            prev_month, prev_year = get_previous_expiration(month, year)
 
             print(f"\n📅 {month_name} 20{20+year}")
             print("-" * 70)
@@ -240,6 +357,14 @@ def import_euribor_options(
                         mixture=mixture,
                     )
 
+                    # Calculer le roll si possible
+                    if compute_roll and option.premium is not None:
+                        prev_key = (meta["strike"], meta["option_type"], prev_month, prev_year)
+                        prev_premium = prev_premiums.get(prev_key)
+                        if prev_premium is not None:
+                            # Roll = premium courant - premium précédent
+                            option.roll = option.premium - prev_premium
+
                     # Vérifier que l'option est valide
                     if option.strike > 0:
                             list_option.append(option)
@@ -248,12 +373,14 @@ def import_euribor_options(
 
                             # Afficher un résumé
                             opt_symbol = "C" if option.option_type == "call" else "P"
+                            roll_str = f", Roll={option.roll:.4f}" if option.roll is not None else ""
 
                             print(
                                 f"✓ {opt_symbol} {option.strike}: "
                                 f"Premium={option.premium}, "
                                 f"Delta={option.delta}, "
                                 f"IV={option.implied_volatility}"
+                                f"{roll_str}"
                             )
 
     except Exception as e:

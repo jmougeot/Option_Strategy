@@ -8,7 +8,7 @@ from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.strategy.strategy_naming_v2 import generate_strategy_name
 from myproject.option.option_utils_v2 import get_expiration_info
-from myproject.app.filter_widget import FilterData, StrategyType
+from myproject.app.filter_widget import FilterData
 import numpy as np
 
 
@@ -49,6 +49,7 @@ def create_strategy_fast_with_signs(
     sigma_pnls = np.empty(n_options, dtype=np.float64)
     is_call = np.empty(n_options, dtype=bool)
     pnl_stack = np.empty((n_options, pnl_length), dtype=np.float64)
+
   
     for i, opt in enumerate(options):
         if opt.pnl_array is None:
@@ -163,6 +164,7 @@ def create_strategy_fast_with_signs(
     
     total_profit_surface = np.sum(np.where((signs>0), profit_surfaces_ponderated, -loss_surfaces_ponderated))
     total_loss_surface = np.sum(np.where((signs>0), loss_surfaces_ponderated, -profit_surfaces_ponderated))
+    total_roll = sum(opt.roll if opt.roll is not None else 0.0 for opt in options)
     
     # Calcul du sigma à partir du P&L total de la stratégie
     mixture = options[0].mixture
@@ -218,6 +220,7 @@ def create_strategy_fast_with_signs(
             profit_at_target_pct=0,
             score=0.0,
             rank=0,
+            roll=total_roll,
         )
         return strategy
     except Exception as e:

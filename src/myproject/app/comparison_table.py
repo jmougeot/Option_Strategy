@@ -17,6 +17,7 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
                 "Expiry": format_expiration_date(
                     comp.expiration_month, comp.expiration_year
                 ),
+                "Roll" : f"{comp.roll:.4f}",
                 "Premium": format_currency(comp.premium),
                 "Max Profit": format_currency(comp.max_profit),
                 "Avg P&L": (
@@ -29,7 +30,7 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
                     if comp.sigma_pnl is not None
                     else "-"
                 ),
-                "Delta": f"{comp.total_delta:.3f}",
+                "Delta": f"{comp.total_delta:.4f}",
                 "Gamma": f"{comp.total_gamma:.3f}",
                 "Vega": f"{comp.total_vega:.3f}",
                 "Theta": f"{comp.total_theta:.3f}",
