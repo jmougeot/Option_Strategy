@@ -186,6 +186,13 @@ class StrategyComparerV2:
                 scorer=self._score_higher_better,
             ),
             MetricConfig(
+                name="roll",
+                weight=0.10,
+                extractor=lambda s: self._safe_value(s.roll),
+                normalizer=self._normalize_min_max,
+                scorer=self._score_higher_better,  # Plus grand roll = meilleur
+            ),
+            MetricConfig(
                 name="sigma_pnl",
                 weight=0.03,
                 extractor=lambda s: self._safe_value(s.sigma_pnl),

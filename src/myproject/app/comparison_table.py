@@ -17,7 +17,7 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
                 "Expiry": format_expiration_date(
                     comp.expiration_month, comp.expiration_year
                 ),
-                "Roll" : f"{comp.roll:.4f}",
+                "Roll": f"{comp.roll:.4f}" if comp.roll is not None else "-",
                 "Premium": format_currency(comp.premium),
                 "Max Profit": format_currency(comp.max_profit),
                 "Avg P&L": (

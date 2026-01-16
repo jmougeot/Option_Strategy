@@ -363,7 +363,7 @@ def import_euribor_options(
                         prev_premium = prev_premiums.get(prev_key)
                         if prev_premium is not None:
                             # Roll = premium courant - premium précédent
-                            option.roll = option.premium - prev_premium
+                            option.roll = prev_premium - option.premium 
 
                     # Vérifier que l'option est valide
                     if option.strike > 0:
