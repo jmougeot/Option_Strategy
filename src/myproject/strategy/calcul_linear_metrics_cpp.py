@@ -136,7 +136,6 @@ def create_strategy_fast_with_signs_cpp(
         strategy = StrategyComparison(
             strategy_name=strategy_name,
             strategy=None,
-            target_price=98,
             premium=result["total_premium"],
             all_options=options,
             signs=signs,

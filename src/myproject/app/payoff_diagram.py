@@ -76,7 +76,8 @@ def create_payoff_diagram(
     # Generate price range
     price_range = comparisons[0].prices
     if target_price is None:
-        target_price = comparisons[0].target_price
+        # Utiliser le milieu de la plage de prix comme target_price
+        target_price = (price_range[0] + price_range[-1]) / 2 if len(price_range) > 0 else 98.0
 
     # Create a figure with two Y axes if mixture provided
     if mixture is not None:
