@@ -14,14 +14,14 @@ from myproject.option.option_class import Option
 import numpy as np
 
 # Type pour les mois valides
-MonthCode = Literal["H", "M", "U", "Z"]
+MonthCode = Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
 
 # Mois Bloomberg valides (codes futures standard)
-VALID_MONTHS = {"H", "M", "U", "Z"}
+VALID_MONTHS = {"F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"}
 
 # Liste ordonnée des mois Bloomberg pour calcul de l'échéance précédente
 # F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
-MONTH_ORDER = ["H", "M", "U", "Z"]
+MONTH_ORDER = ["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
 
 # Mapping des mois Bloomberg vers les noms complets
 MONTH_NAMES = {
@@ -431,66 +431,74 @@ def import_euribor_options(
                 if meta["month"] != month or meta["year"] != year:
                     continue
 
-                # Récupérer les données brutes
-                raw_data = batch_data.get(ticker, {})
+                try:
+                    # Récupérer les données brutes
+                    raw_data = batch_data.get(ticker, {})
 
-                if raw_data and not all(v is None for v in raw_data.values()):
-                    # Extraire les meilleures valeurs
-                    extracted = extract_best_values(raw_data)
+                    if raw_data and not all(v is None for v in raw_data.values()):
+                        # Extraire les meilleures valeurs
+                        extracted = extract_best_values(raw_data)
 
-                    # Créer l'option directement (les surfaces sont calculées dans create_option_from_bloomberg)
-                    option = create_option_from_bloomberg(
-                        ticker=ticker,
-                        underlying=meta["underlying"],
-                        strike=meta["strike"],
-                        month=meta["month"],
-                        year=meta["year"],
-                        option_type_str=meta["option_type"],
-                        bloomberg_data=extracted,
-                        position=default_position,
-                        mixture=mixture,
-                    )
+                        # Créer l'option directement (les surfaces sont calculées dans create_option_from_bloomberg)
+                        option = create_option_from_bloomberg(
+                            ticker=ticker,
+                            underlying=meta["underlying"],
+                            strike=meta["strike"],
+                            month=meta["month"],
+                            year=meta["year"],
+                            option_type_str=meta["option_type"],
+                            bloomberg_data=extracted,
+                            position=default_position,
+                            mixture=mixture,
+                        )
 
-                    # Calculer le roll Q-1 (toujours le trimestre précédent)
-                    # et le roll custom (si différent)
-                    if option.premium is not None:
-                        # Calculer Q-1
-                        q1_month_local, q1_year_local, _ = get_roll_expiration(month, year, None, None)
-                        q1_key = (meta["strike"], meta["option_type"], q1_month_local, q1_year_local)
-                        
-                        # Chercher le premium Q-1 (dans q1_premiums ou roll_premiums si c'est le même)
-                        q1_premium = q1_premiums.get(q1_key) or roll_premiums.get(q1_key)
-                        if q1_premium is not None:
-                            # Roll Q-1 = différence brute (non normalisée)
-                            option.roll_quarterly = q1_premium - option.premium
-                        
-                        # Calculer le roll custom
-                        roll_key = (meta["strike"], meta["option_type"], r_month, r_year)
-                        roll_premium = roll_premiums.get(roll_key)
-                        if roll_premium is not None:
-                            # Roll = (premium_roll - premium_courant) / nombre_de_trimestres
-                            # Ainsi le roll est normalisé par trimestre
-                            raw_roll = roll_premium - option.premium
-                            option.roll = raw_roll / quarters_diff if quarters_diff > 0 else raw_roll
+                        # Calculer le roll Q-1 (toujours le trimestre précédent)
+                        # et le roll custom (si différent)
+                        if option.premium is not None and option.premium != 0:
+                            try:
+                                # Calculer Q-1
+                                q1_month_local, q1_year_local, _ = get_roll_expiration(month, year, None, None)
+                                q1_key = (meta["strike"], meta["option_type"], q1_month_local, q1_year_local)
+                                
+                                # Chercher le premium Q-1 (dans q1_premiums ou roll_premiums si c'est le même)
+                                q1_premium = q1_premiums.get(q1_key) or roll_premiums.get(q1_key)
+                                if q1_premium is not None:
+                                    # Roll Q-1 = différence brute (non normalisée)
+                                    option.roll_quarterly = q1_premium - option.premium
+                                
+                                # Calculer le roll custom
+                                roll_key = (meta["strike"], meta["option_type"], r_month, r_year)
+                                roll_premium = roll_premiums.get(roll_key)
+                                if roll_premium is not None:
+                                    # Roll = (premium_roll - premium_courant) / nombre_de_trimestres
+                                    # Ainsi le roll est normalisé par trimestre
+                                    raw_roll = roll_premium - option.premium
+                                    option.roll = raw_roll / quarters_diff if quarters_diff > 0 else raw_roll
+                            except Exception:
+                                # Erreur de calcul du roll, continuer sans
+                                pass
 
-                    # Vérifier que l'option est valide
-                    if option.strike > 0:
-                            list_option.append(option)
-                            month_options_count += 1
-                            total_success += 1
+                        # Vérifier que l'option est valide
+                        if option.strike > 0:
+                                list_option.append(option)
+                                month_options_count += 1
+                                total_success += 1
 
-                            # Afficher un résumé
-                            opt_symbol = "C" if option.option_type == "call" else "P"
-                            roll_q_str = f", RollQ1={option.roll_quarterly:.4f}" if option.roll_quarterly is not None else ""
-                            roll_str = f", Roll={option.roll:.4f}/Q" if option.roll is not None else ""
+                                # Afficher un résumé
+                                opt_symbol = "C" if option.option_type == "call" else "P"
+                                roll_q_str = f", RollQ1={option.roll_quarterly:.4f}" if option.roll_quarterly is not None else ""
+                                roll_str = f", Roll={option.roll:.4f}/Q" if option.roll is not None else ""
 
-                            print(
-                                f"✓ {opt_symbol} {option.strike}: "
-                                f"Premium={option.premium}, "
-                                f"Delta={option.delta}, "
-                                f"IV={option.implied_volatility}"
-                                f"{roll_q_str}{roll_str}"
-                            )
+                                print(
+                                    f"✓ {opt_symbol} {option.strike}: "
+                                    f"Premium={option.premium}, "
+                                    f"Delta={option.delta}, "
+                                    f"IV={option.implied_volatility}"
+                                    f"{roll_q_str}{roll_str}"
+                                )
+                except Exception:
+                    # Erreur sur cette option, continuer avec les autres
+                    continue
 
     except Exception as e:
         print(f"\n✗ Erreur lors du fetch batch: {e}")

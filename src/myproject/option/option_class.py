@@ -77,7 +77,7 @@ class Option:
     # Calcul des surfaces en foncion des scénarios
     # ============================================================================
 
-    def _pnl_at_expiry_array(self) -> np.ndarray:
+    def _pnl_at_expiry_array(self) -> Optional[np.ndarray]:
         """
         Calcule le P&L à l'expiration pour un array de prix du sous-jacent.
 
@@ -86,26 +86,27 @@ class Option:
           - short -> P&L = premium - intrinsic
 
         Returns:
-            Array numpy du P&L pour chaque prix
+            Array numpy du P&L pour chaque prix, ou None si prices non défini
         """
         if self.prices is None:
-            raise ValueError(
-                "prices doit être défini avant d'appeler _pnl_at_expiry_array"
-            )
+            return None
 
-        if self.option_type.lower() == "call":
-            pnl = np.maximum(self.prices - self.strike, 0.0) - self.premium
-        else:  # put
-            pnl = np.maximum(self.strike - self.prices, 0.0) - self.premium
-        return pnl
+        try:
+            if self.option_type.lower() == "call":
+                pnl = np.maximum(self.prices - self.strike, 0.0) - self.premium
+            else:  # put
+                pnl = np.maximum(self.strike - self.prices, 0.0) - self.premium
+            return pnl
+        except Exception:
+            return None
 
-    def _calculate_pnl_array(self) -> np.ndarray:
+    def _calculate_pnl_array(self) -> Optional[np.ndarray]:
         """
         Calcule le P&L array sur une grille de prix entre price_min et price_max.
         Stocke le résultat dans self.pnl_array.
 
         Returns:
-            Array numpy du P&L pour chaque prix de la grille
+            Array numpy du P&L pour chaque prix de la grille, ou None si erreur
 
         Example:
             >>> option = Option(option_type='call', strike=100, premium=5, position='long')
@@ -114,17 +115,19 @@ class Option:
             >>> # pnl contient le P&L pour 200 points entre 80 et 120
         """
         if self.prices is None:
-            raise ValueError(
-                "prices doit être défini avant d'appeler _calculate_pnl_array"
-            )
+            return None
 
-        # Calculer le P&L pour chaque prix
-        pnl_array = self._pnl_at_expiry_array()
+        try:
+            # Calculer le P&L pour chaque prix
+            pnl_array = self._pnl_at_expiry_array()
+            if pnl_array is None:
+                return None
 
-        # Stocker dans l'attribut de l'instance
-        self.pnl_array = pnl_array
-
-        return pnl_array
+            # Stocker dans l'attribut de l'instance
+            self.pnl_array = pnl_array
+            return pnl_array
+        except Exception:
+            return None
 
     def _pnl_ponderation_array(self):
         """
@@ -217,9 +220,10 @@ class Option:
         # loss is negative (sum of negative contributions), return positive loss
         return -loss, win
 
-    def _calcul_all_surface(self):
+    def _calcul_all_surface(self) -> Tuple[float, float]:
         """
         Calcule toutes les surfaces et métriques associées à la mixture.
+        Robuste: ne lève jamais d'exception, retourne (0, 0) en cas d'erreur.
 
         Ordre d'exécution:
         1. Calcul du P&L array
@@ -231,20 +235,26 @@ class Option:
         Returns:
             Tuple[float, float]: (loss_surface, profit_surface)
         """
-        # 1. Calculer le P&L array (utilise self.prices)
-        self._calculate_pnl_array()
+        try:
+            # 1. Calculer le P&L array (utilise self.prices)
+            pnl = self._calculate_pnl_array()
+            if pnl is None:
+                return 0.0, 0.0
 
-        # 2. Calculer la pondération (mixture × P&L × dx)
-        self._pnl_ponderation_array()
+            # 2. Calculer la pondération (mixture × P&L × dx)
+            self._pnl_ponderation_array()
 
-        # 3. Calculer l'espérance du P&L
-        self._average_pnl()
+            # 3. Calculer l'espérance du P&L
+            self._average_pnl()
 
-        # 4. Calculer l'écart-type du P&L
-        self._sigma_pnl()
+            # 4. Calculer l'écart-type du P&L
+            self._sigma_pnl()
 
-        # 5. Calculer les surfaces de profit et perte
-        return self._calcul_surface_ponderated()
+            # 5. Calculer les surfaces de profit et perte
+            return self._calcul_surface_ponderated()
+        except Exception:
+            # En cas d'erreur, retourner des valeurs par défaut
+            return 0.0, 0.0
 
     # ============================================================================
     # POSITION HELPERS - Méthodes utilitaires pour faciliter les checks de position

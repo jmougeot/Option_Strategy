@@ -40,6 +40,8 @@ class FilterData:
     min_premium_sell:float
     filter_type: bool
     strategies_include : Optional[StrategyType]
+    delta_min: float
+    delta_max: float
    
 
 
@@ -56,7 +58,9 @@ def filter_params() -> FilterData:
             "max_premium": 0.05, 
             "ouvert_gauche": 0, 
             "ouvert_droite": 0, 
-            "min_premium_sell": 0.005
+            "min_premium_sell": 0.005,
+            "delta_min": -0.75,
+            "delta_max": 0.75
         }
 
     # Retrieve current values from session_state
@@ -98,6 +102,20 @@ def filter_params() -> FilterData:
                                                key="filter_ouvert_droite",
                                                help="Number of calls sold - bought")
         
+    delat_min_col, delat_max_col = st.columns([2,2])
+    with delat_min_col:
+        delta_min = st.number_input("Delta Min",
+                                               value=float(current_filter.get("delta_min", -0.75)),
+                                               step=0.01,
+                                               key="delta_min",
+                                               help="Minimum delta for strategy")
+    with delat_max_col:
+        delta_max = st.number_input("Delta Max",
+                                               value=float(current_filter.get("delta_max", 0.75)),
+                                               step=0.01,
+                                               key="delta_max",
+                                               help="Maximum delta for strategy")
+        
     
     filter_type = st.checkbox(label="Select strategy Type",
                                     value= False,
@@ -120,7 +138,7 @@ def filter_params() -> FilterData:
             put_ladder=put_ladder,
             call_ladder=call_ladder,
             put_fly=put_fly,
-            call_fly=call_fly
+            call_fly=call_fly,
         )
 
     # Save new values in session_state
@@ -128,6 +146,8 @@ def filter_params() -> FilterData:
         "max_loss": max_loss,
         "max_premium": max_premium,
         "ouvert_gauche": ouvert_gauche,
+        "delta_min": delta_min,
+        "delta_max": delta_max,
         "ouvert_droite": ouvert_droite,
         "min_premium_sell": min_premium_sell
 
@@ -141,5 +161,7 @@ def filter_params() -> FilterData:
         ouvert_droite=ouvert_droite,
         min_premium_sell=min_premium_sell,
         filter_type=filter_type,
-        strategies_include=strat_include
+        strategies_include=strat_include,
+        delta_min=delta_min,
+        delta_max=delta_max
     )

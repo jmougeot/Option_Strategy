@@ -12,6 +12,9 @@ pandas>=2.1.0
 
 matplotlib
 
+# Accélération des calculs (optionnel mais recommandé)
+numba>=0.58.0
+
 # blpapi>=3.20.0  # Décommentez après installation du Bloomberg Terminal
 
 # Packages standards (normalement déjà inclus)

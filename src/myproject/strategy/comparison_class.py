@@ -29,16 +29,10 @@ class StrategyComparison:
     roll: Optional[float]  # Roll moyen (normalisé par nombre de trimestres)
     roll_quarterly: Optional[float]  # Roll Q-1 (trimestre précédent)
     roll_sum: Optional[float]  # Somme des rolls (non normalisée)
-    surface_profit: Optional[float]  # surface of profit btw min price and max price
-    surface_loss: Optional[float]  # surface of loss btw min price and max price
     average_pnl: Optional[float]  # Espérance du P&L avec mixture
     sigma_pnl: Optional[float]  # Écart-type du P&L avec mixture
-    surface_loss_ponderated: float
-    surface_profit_ponderated: float  # Probabilité de gain
     prices: np.ndarray
     pnl_array: np.ndarray
-    risk_reward_ratio: float  # Max loss / Max profit
-    risk_reward_ratio_ponderated: float
     total_delta: float = 0.0  # Delta de la stratégie
     total_gamma: float = 0.0  # Gamma de la stratégie
     total_vega: float = 0.0  # Vega de la stratégie
@@ -49,13 +43,6 @@ class StrategyComparison:
     score: float = 0.0
     rank: int = 0
 
-    def _risk_reward_ratio(self):
-        self.risk_reward_ratio = self.max_profit / self.max_loss
-
-    def _risk_reward_ratio_ponderated(self):
-        self.risk_reward_ratio_ponderated = (
-            self.surface_profit_ponderated / self.surface_loss_ponderated
-        )
 
     def get_positions(self) -> List[str]:
         """

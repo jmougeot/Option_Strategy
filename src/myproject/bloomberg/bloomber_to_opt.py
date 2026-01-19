@@ -7,6 +7,27 @@ import numpy as np
 MonthCode = Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
 
 
+def _safe_float(value, default: float = 0.0) -> float:
+    """Convertit en float en gérant None/NaN."""
+    if value is None:
+        return default
+    try:
+        result = float(value)
+        return result if np.isfinite(result) else default
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_int(value, default: int = 0) -> int:
+    """Convertit en int en gérant None."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
 # Mapping des mois Bloomberg vers les noms complets
 MONTH_NAMES = {
     "F": "January",
@@ -88,12 +109,31 @@ def create_option_from_bloomberg(
     try:
         month_code, exp_year, exp_day = get_expiration_components(month, year)
 
+        # Extraire les valeurs avec gestion des None
+        premium = _safe_float(bloomberg_data.get("premium"))
+        bid = _safe_float(bloomberg_data.get("bid"))
+        ask = _safe_float(bloomberg_data.get("ask"))
+        delta = _safe_float(bloomberg_data.get("delta"))
+        gamma = _safe_float(bloomberg_data.get("gamma"))
+        vega = _safe_float(bloomberg_data.get("vega"))
+        theta = _safe_float(bloomberg_data.get("theta"))
+        rho = _safe_float(bloomberg_data.get("rho"))
+        iv = _safe_float(bloomberg_data.get("implied_volatility"))
+        oi = _safe_int(bloomberg_data.get("open_interest"))
+        vol = _safe_int(bloomberg_data.get("volume"))
+        underlying_price = _safe_float(bloomberg_data.get("underlying_price"))
+
+        # Vérifier que les données essentielles sont présentes
+        if premium == 0.0 and bid == 0.0 and ask == 0.0:
+            # Option sans prix valide, retourner une option vide
+            return Option.empyOption()
+
         # Créer l'option directement
         option = Option(
             # Obligatoires
             option_type=option_type_str,
             strike=float(strike),
-            premium=float(bloomberg_data["premium"]),
+            premium=premium,
             expiration_month=month_code,
             expiration_year=exp_year,
             expiration_day=exp_day,
@@ -104,21 +144,21 @@ def create_option_from_bloomberg(
             underlying_symbol=underlying,
             bloomberg_ticker=ticker,
             # Prix
-            bid=float(bloomberg_data["bid"]),
-            ask=float(bloomberg_data["ask"]),
+            bid=bid,
+            ask=ask,
             # Greeks
-            delta=float(bloomberg_data["delta"]),
-            gamma=float(bloomberg_data["gamma"]),
-            vega=float(bloomberg_data["vega"]),
-            theta=float(bloomberg_data["theta"]),
-            rho=float(bloomberg_data["rho"]),
+            delta=delta,
+            gamma=gamma,
+            vega=vega,
+            theta=theta,
+            rho=rho,
             # Volatilité
-            implied_volatility=float(bloomberg_data["implied_volatility"]),
+            implied_volatility=iv,
             # Liquidité
-            open_interest=int(bloomberg_data["open_interest"]),
-            volume=int(bloomberg_data["volume"]),
+            open_interest=oi,
+            volume=vol,
             # Sous-jacent
-            underlying_price=float(bloomberg_data["underlying_price"]),
+            underlying_price=underlying_price,
             # Timestamp
         )
 

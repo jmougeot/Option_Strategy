@@ -3,7 +3,7 @@ Calcul Complet et Optimisé des Métriques de Stratégie d'Options
 Version ultra-optimisée avec NumPy vectorization et calcul en une passe
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.strategy.strategy_naming_v2 import generate_strategy_name
@@ -12,132 +12,175 @@ from myproject.app.filter_widget import FilterData
 import numpy as np
 
 
+# Cache global pour les données extraites des options (évite re-extraction)
+_options_data_cache: Dict[int, Tuple[np.ndarray, ...]] = {}
 
-def create_strategy_fast_with_signs(
-    options: List[Option], signs: np.ndarray, filter: FilterData
-) -> Optional[StrategyComparison]:
+
+def _extract_options_data(options: List[Option]) -> Optional[Tuple[np.ndarray, ...]]:
     """
-    Version optimisée qui prend les signes directement (évite les copies d'options).
-
-    Args:
-        options: Liste d'options (positions originales ignorées)
-        signs: Array NumPy des signes (+1 pour long, -1 pour short)
-        target_price: Prix cible pour les calculs
-
-    Returns:
-        StrategyComparison complète ou None si invalide
+    Extrait toutes les données des options en UNE SEULE passe.
+    Retourne un tuple de arrays pour éviter les allocations répétées.
     """
-    if not options or len(options) != len(signs):
-        return None
-
-    # Extraction vectorisée ultra-rapide
-    n_options = len(options)
+    n = len(options)
+    opt0 = options[0]
     
-    # P&L Array - Vérifier d'abord que c'est valide
-    prices = options[0].prices
-    if prices is None or options[0].pnl_array is None:
+    if opt0.prices is None or opt0.pnl_array is None:
         return None
     
-    pnl_length = len(options[0].pnl_array)
-    premiums = np.empty(n_options, dtype=np.float64)
-    deltas = np.empty(n_options, dtype=np.float64)
-    gammas = np.empty(n_options, dtype=np.float64)
-    vegas = np.empty(n_options, dtype=np.float64)
-    thetas = np.empty(n_options, dtype=np.float64)
-    ivs = np.empty(n_options, dtype=np.float64)
-    average_pnls = np.empty(n_options, dtype=np.float64)
-    sigma_pnls = np.empty(n_options, dtype=np.float64)
-    is_call = np.empty(n_options, dtype=bool)
-    pnl_stack = np.empty((n_options, pnl_length), dtype=np.float64)
-
-  
+    pnl_length = len(opt0.pnl_array)
+    
+    # Pré-allouer tous les arrays
+    premiums = np.empty(n, dtype=np.float64)
+    deltas = np.empty(n, dtype=np.float64)
+    gammas = np.empty(n, dtype=np.float64)
+    vegas = np.empty(n, dtype=np.float64)
+    thetas = np.empty(n, dtype=np.float64)
+    ivs = np.empty(n, dtype=np.float64)
+    average_pnls = np.empty(n, dtype=np.float64)
+    is_call = np.empty(n, dtype=bool)
+    pnl_stack = np.empty((n, pnl_length), dtype=np.float64)
+    profit_surfaces = np.empty(n, dtype=np.float64)
+    loss_surfaces = np.empty(n, dtype=np.float64)
+    rolls = np.empty(n, dtype=np.float64)
+    rolls_quarterly = np.empty(n, dtype=np.float64)
+    strikes = np.empty(n, dtype=np.float64)
+    
+    # UNE SEULE boucle pour tout extraire
     for i, opt in enumerate(options):
         if opt.pnl_array is None:
             return None
         premiums[i] = opt.premium
         deltas[i] = opt.delta
-
-    for i, opt in enumerate(options):
-        if opt.pnl_array is None:
-            return None
         gammas[i] = opt.gamma
         vegas[i] = opt.vega
         thetas[i] = opt.theta
         ivs[i] = opt.implied_volatility
         average_pnls[i] = opt.average_pnl
-        sigma_pnls[i] = opt.sigma_pnl
         is_call[i] = opt.option_type.lower() == "call"
         pnl_stack[i] = opt.pnl_array
+        profit_surfaces[i] = opt.profit_surface_ponderated
+        loss_surfaces[i] = opt.loss_surface_ponderated
+        rolls[i] = opt.roll if opt.roll is not None else 0.0
+        rolls_quarterly[i] = opt.roll_quarterly if opt.roll_quarterly is not None else 0.0
+        strikes[i] = opt.strike
+    
+    return (premiums, deltas, gammas, vegas, thetas, ivs, average_pnls, 
+            is_call, pnl_stack, profit_surfaces, loss_surfaces, rolls, rolls_quarterly, strikes)
 
-    #Eliminer la vente d'un put ou d'un call qui ne rapporte rien 
-    useless_sell = int(np.sum((signs < 0) & (premiums < filter.min_premium_sell), dtype=np.int32))
-    if useless_sell > 0 :
+
+def create_strategy_fast_with_signs(
+    options: List[Option], signs: np.ndarray, filter: FilterData
+) -> Optional[StrategyComparison]:
+    """
+    Version ultra-optimisée qui prend les signes directement.
+    - Extraction des données en une seule passe
+    - Filtrage précoce (early return) avant calculs coûteux
+    - Calcul du sigma/roll seulement si nécessaire
+    """
+    n_options = len(options)
+    if n_options == 0 or n_options != len(signs):
+        return None
+
+    # Extraction en une seule passe (ou depuis cache si disponible)
+    opt0 = options[0]
+    prices = opt0.prices
+    if prices is None:
         return None
     
-    # Calculer call_count put_count vectorisé
-    long_call_count = int(np.sum((signs > 0) & is_call, dtype=np.int32))
-    short_call_count = int(np.sum((signs < 0) & is_call, dtype=np.int32))
-
-    # Filtre l'achat et la vente de la même option (même strike + même type)
-    for i in range(n_options):
-        for j in range(i + 1, n_options):
-            # Même type (call/put) et même strike mais signes opposés = inutile
-            if (is_call[i] == is_call[j] and 
-                options[i].strike == options[j].strike and 
-                signs[i] != signs[j]):
-                return None
+    # Créer une clé de cache basée sur les ids des options
+    cache_key = hash(tuple(id(opt) for opt in options))
     
+    if cache_key in _options_data_cache:
+        data = _options_data_cache[cache_key]
+    else:
+        data = _extract_options_data(options)
+        if data is None:
+            return None
+        # Limiter la taille du cache
+        if len(_options_data_cache) > 10000:
+            _options_data_cache.clear()
+        _options_data_cache[cache_key] = data
+    
+    (premiums, deltas, gammas, vegas, thetas, ivs, average_pnls, 
+     is_call, pnl_stack, profit_surfaces, loss_surfaces, rolls, rolls_quarterly, strikes) = data
 
-    # Calculer short_count put_count vectorisé
-    long_put_count = int(np.sum((signs > 0) & (~is_call), dtype=np.int32))
-    short_put_count = int(np.sum((signs < 0) & (~is_call), dtype=np.int32))
-    put_count = long_put_count - short_put_count
+    # ===== FILTRES PRÉCOCES (avant calculs coûteux) =====
+    
+    # Éliminer la vente d'option qui ne rapporte rien
+    short_mask = signs < 0
+    if np.any(short_mask & (premiums < filter.min_premium_sell)):
+        return None
+    
+    # Vérifier doublons (même type + même strike + signes opposés)
+    if n_options > 1:
+        for i in range(n_options - 1):
+            # Trouver les options avec même type et même strike
+            same_type_strike = (is_call[i+1:] == is_call[i]) & (strikes[i+1:] == strikes[i])
+            if np.any(same_type_strike):
+                # Vérifier si signes opposés
+                j_indices = np.where(same_type_strike)[0] + i + 1
+                if np.any(signs[j_indices] != signs[i]):
+                    return None
+    
+    # Calculs rapides des compteurs
+    long_mask = signs > 0
+    long_call_count = np.count_nonzero(long_mask & is_call)
+    short_call_count = np.count_nonzero(short_mask & is_call)
+    long_put_count = np.count_nonzero(long_mask & (~is_call))
+    short_put_count = np.count_nonzero(short_mask & (~is_call))
 
     if short_put_count - long_put_count > filter.ouvert_gauche:
         return None
     
     if short_call_count - long_call_count > filter.ouvert_droite:
         return None
-    
 
-    # Calcul est filtre du premium 
-    total_premium = np.sum(signs * premiums)
+    # Premium (calcul rapide avec dot product)
+    total_premium = float(np.dot(signs, premiums))
     if abs(total_premium) > filter.max_premium:
         return None
     
-    #Calcul est filtre du delta 
-    total_delta = np.sum(signs * deltas)
-    if abs(total_delta) > 0.75:
+    # Delta
+    total_delta = float(np.dot(signs, deltas))
+    if abs(total_delta) > filter.delta_max or total_delta< filter.delta_min:
         return None
 
-    total_gamma = np.sum(signs * gammas)
-    total_vega = np.sum(signs * vegas)
-    total_theta = np.sum(signs * thetas)
-    total_iv = np.sum(signs * ivs)
-
-    
-    total_average_pnl = np.sum(signs * average_pnls)
+    # Average PnL (filtre important)
+    total_average_pnl = float(np.dot(signs, average_pnls))
     if total_average_pnl < 0:
         return None
 
+    # ===== CALCULS P&L (après filtres) =====
     total_pnl_array = np.dot(signs, pnl_stack)
-    max_profit, max_loss = float(np.max(total_pnl_array)), float(np.min(total_pnl_array))
-    if max_loss < - filter.max_loss:
+    max_loss = float(np.min(total_pnl_array))
+    
+    if max_loss < -filter.max_loss:
         return None
+    
+    max_profit = float(np.max(total_pnl_array))
 
+    # ===== CALCULS GRECS (après tous les filtres) =====
+    total_gamma = float(np.dot(signs, gammas))
+    total_vega = float(np.dot(signs, vegas))
+    total_theta = float(np.dot(signs, thetas))
+    total_iv = float(np.dot(signs, ivs))
+
+    # Breakeven points
     sign_changes = total_pnl_array[:-1] * total_pnl_array[1:] < 0
     breakeven_indices = np.where(sign_changes)[0]
 
     if len(breakeven_indices) > 0:
         idx = breakeven_indices
-        t = -total_pnl_array[idx] / (total_pnl_array[idx + 1] - total_pnl_array[idx])
+        denom = total_pnl_array[idx + 1] - total_pnl_array[idx]
+        # Éviter division par zéro
+        safe_denom = np.where(denom != 0, denom, 1.0)
+        t = -total_pnl_array[idx] / safe_denom
         breakeven_points = (prices[idx] + (prices[idx + 1] - prices[idx]) * t).tolist()
     else:
         breakeven_points = []
 
     # Profit zone
-    profitable_mask = total_pnl_array > 0
-    profitable_indices = np.where(profitable_mask)[0]
+    profitable_indices = np.where(total_pnl_array > 0)[0]
 
     if len(profitable_indices) > 0:
         min_profit_price = float(prices[profitable_indices[0]])
@@ -148,43 +191,26 @@ def create_strategy_fast_with_signs(
         profit_range = (0.0, 0.0)
         profit_zone_width = 0.0
 
-
     dx = prices[1] - prices[0]
     
-    positive_pnl = np.maximum(total_pnl_array, 0.0)
-    negative_pnl = np.minimum(total_pnl_array, 0.0)
-    surface_profit_nonponderated = float(np.sum(positive_pnl) * dx)
-    surface_loss_nonponderated = float(np.abs(np.sum(negative_pnl)) * dx)
-    profit_surfaces_ponderated = np.empty(n_options, dtype=np.float64)
-    loss_surfaces_ponderated = np.empty(n_options, dtype=np.float64)
+    # Roll (déjà extrait, simple dot product)
+    total_roll = float(np.dot(signs, rolls))
+    total_roll_quarterly = float(np.dot(signs, rolls_quarterly))
     
-    for i, opt in enumerate(options):
-        profit_surfaces_ponderated[i] = opt.profit_surface_ponderated
-        loss_surfaces_ponderated[i] = opt.loss_surface_ponderated
-    
-    total_profit_surface = np.sum(np.where((signs>0), profit_surfaces_ponderated, -loss_surfaces_ponderated))
-    total_loss_surface = np.sum(np.where((signs>0), loss_surfaces_ponderated, -profit_surfaces_ponderated))
-    
-    # Calcul du roll total en prenant en compte le signe (long/short)
-    rolls = np.array([opt.roll if opt.roll is not None else 0.0 for opt in options], dtype=np.float64)
-    rolls_quarterly = np.array([opt.roll_quarterly if opt.roll_quarterly is not None else 0.0 for opt in options], dtype=np.float64)
-    total_roll = float(np.sum(signs * rolls))
-    total_roll_quarterly = float(np.sum(signs * rolls_quarterly))
-    total_roll_sum = float(np.sum(signs * rolls_quarterly))  # Somme = même que quarterly mais non normalisée
-    
-    # Calcul du sigma à partir du P&L total de la stratégie
-    mixture = options[0].mixture
+    # Sigma (calcul UNIQUEMENT après tous les filtres passés)
+    mixture = opt0.mixture
     if mixture is not None:
-        mass = float(np.sum(mixture) * dx)
+        mass = np.sum(mixture) * dx
         if mass > 0:
-            var = float(np.sum(mixture * (total_pnl_array - total_average_pnl) ** 2 * dx) / mass)
+            diff_sq = (total_pnl_array - total_average_pnl) ** 2
+            var = np.sum(mixture * diff_sq) * dx / mass
             total_sigma_pnl = float(np.sqrt(max(var, 0.0)))
         else:
             total_sigma_pnl = 0.0
     else:
         total_sigma_pnl = 0.0
 
-    # Calcul du nom et expiration
+    # Nom et expiration (après tous les filtres)
     strategy_name = generate_strategy_name(options, signs)
     exp_info = get_expiration_info(options)
 
@@ -197,7 +223,7 @@ def create_strategy_fast_with_signs(
             all_options=options,
             signs=signs,  # Stocker les signes utilisés
             call_count=0,
-            put_count=put_count,
+            put_count=0,
             expiration_day=exp_info.get("expiration_day"),
             expiration_week=exp_info.get("expiration_week"),
             expiration_month=exp_info.get("expiration_month", "F"),
@@ -207,28 +233,21 @@ def create_strategy_fast_with_signs(
             breakeven_points=breakeven_points,
             profit_range=profit_range,
             profit_zone_width=profit_zone_width,
-            surface_profit=surface_profit_nonponderated,
-            surface_loss=surface_loss_nonponderated,
-            surface_profit_ponderated=float(total_profit_surface),
-            surface_loss_ponderated=float(total_loss_surface),
             average_pnl=float(total_average_pnl),
             sigma_pnl=float(total_sigma_pnl),
             pnl_array=total_pnl_array,
             prices=prices,
-            risk_reward_ratio=0,
-            risk_reward_ratio_ponderated=0,
             total_delta=float(total_delta),
             total_gamma=float(total_gamma),
             total_vega=float(total_vega),
             total_theta=float(total_theta),
             avg_implied_volatility=float(total_iv),
             profit_at_target=0,
-            profit_at_target_pct=0,
             score=0.0,
             rank=0,
             roll=total_roll,
             roll_quarterly=total_roll_quarterly,
-            roll_sum=total_roll_sum,
+            roll_sum=total_roll_quarterly,  # Même valeur que quarterly
         )
         return strategy
     except Exception as e:

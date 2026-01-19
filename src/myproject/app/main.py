@@ -14,7 +14,7 @@ Utilise les fonctions optimisées des modules :
 
 from typing import List, Dict, Optional, Tuple
 from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
-from myproject.strategy.comparor_v2 import StrategyComparerV2
+from myproject.strategy.scoring.comparer import StrategyComparerV2
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
 from myproject.app.scenarios_widget import create_mixture_from_scenarios

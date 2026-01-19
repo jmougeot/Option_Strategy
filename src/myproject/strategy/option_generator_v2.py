@@ -13,7 +13,7 @@ from itertools import combinations_with_replacement
 import numpy as np
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
-from myproject.strategy.calcul_linear_metrics import create_strategy_fast_with_signs
+from myproject.strategy.calcul_linear_metrics import create_strategy_fast_with_signs, _options_data_cache
 from myproject.option.option_filter import sort_options_by_expiration, sort_options_by_strike
 from myproject.app.filter_widget import FilterData, StrategyType, STRATEGYTYPE
 
@@ -119,34 +119,54 @@ class OptionStrategyGeneratorV2:
         """
         self.price_min = price_min
         self.price_max = price_max
-        all_strategies = []
+        all_strategies: List[StrategyComparison] = []
         
         # Compteurs pour statistiques
         total_combos_tested = 0
         total_combos_filtered = 0
+        
+        # Vider le cache au début pour éviter les fuites mémoire
+        _options_data_cache.clear()
 
         for n_legs in range(1, max_legs + 1):
             print(f"🔄 Génération des stratégies à {n_legs} leg(s)...")
             combos_this_level = 0
             filtered_this_level = 0
+            strategies_this_level: List[StrategyComparison] = []
 
             # Générer toutes les combinaisons de n_legs options
             for combo in combinations_with_replacement(self.options, n_legs):
                 combos_this_level += 1
                 # Pour chaque combinaison, tester différentes configurations de positions
-                strategies = self._generate_position_variants(list(combo), filter)
+                # Note: combo est déjà un tuple, pas besoin de list()
+                strategies = self._generate_position_variants_fast(combo, filter)
                 if not strategies:
                     filtered_this_level += 1
-                all_strategies.extend(strategies)
+                else:
+                    strategies_this_level.extend(strategies)
             
+            all_strategies.extend(strategies_this_level)
             total_combos_tested += combos_this_level
             total_combos_filtered += filtered_this_level
+        
+        # Vider le cache à la fin pour libérer la mémoire
+        _options_data_cache.clear()
 
         print(f"\n📊 Résumé:")
         print(f"  • Total combos testées: {total_combos_tested:,}")
         print(f"  • Total combos filtrées: {total_combos_filtered:,} ({total_combos_filtered/total_combos_tested*100:.1f}%)")
         print(f"  • Stratégies générées: {len(all_strategies):,}")
         return all_strategies
+    
+    def _generate_position_variants_fast(
+        self,
+        options: tuple,
+        filter: FilterData,
+    ) -> List[StrategyComparison]:
+        """
+        Version optimisée qui accepte un tuple directement.
+        """
+        return self._generate_position_variants(list(options), filter)
 
     def _generate_position_variants(
         self,
@@ -210,14 +230,18 @@ class OptionStrategyGeneratorV2:
         
         strategies: List[StrategyComparison] = []
 
-        # ===== Génération des stratégies (optimisé) =====
+        # ===== Génération des stratégies (optimisé et robuste) =====
         for i, signs in enumerate(sign_arrays):
             # Filtrage RAPIDE par type de stratégie (lookup O(1) dans un set)
             if use_strategy_filter and sign_tuples[i] not in valid_patterns:
                 continue
             
-            strat = create_strategy_fast_with_signs(options, signs, filter)
-            if strat is not None:
-                strategies.append(strat)
+            try:
+                strat = create_strategy_fast_with_signs(options, signs, filter)
+                if strat is not None:
+                    strategies.append(strat)
+            except Exception:
+                # Ignorer les erreurs individuelles, continuer avec les autres
+                continue
         
         return strategies
