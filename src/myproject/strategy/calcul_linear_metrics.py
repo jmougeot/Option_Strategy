@@ -140,9 +140,9 @@ def create_strategy_fast_with_signs(
     if abs(total_premium) > filter.max_premium:
         return None
     
-    # Delta
+    # Delta (vérifier que le delta est dans la plage demandée)
     total_delta = float(np.dot(signs, deltas))
-    if abs(total_delta) > filter.delta_max or total_delta< filter.delta_min:
+    if total_delta < filter.delta_min or total_delta > filter.delta_max:
         return None
 
     # Average PnL (filtre important)
