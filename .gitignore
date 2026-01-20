@@ -62,3 +62,6 @@ htmlcov/
 # Documentation générée
 docs/_build/
 site/
+
+#Build
+dist/

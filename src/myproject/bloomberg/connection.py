@@ -11,7 +11,12 @@ Date: 2025-10-16
 """
 
 import blpapi
+import os
 from typing import Optional
+
+# Configuration par défaut (peut être surchargée par variables d'environnement)
+DEFAULT_BLOOMBERG_HOST = os.environ.get("BLOOMBERG_HOST", "localhost")
+DEFAULT_BLOOMBERG_PORT = int(os.environ.get("BLOOMBERG_PORT", "8194"))
 
 
 class BloombergConnection:
@@ -33,18 +38,22 @@ class BloombergConnection:
     Attributs:
         session: Session blpapi active (None si non connecté)
         service: Service Bloomberg "//blp/refdata" (None si non connecté)
+        
+    Variables d'environnement:
+        BLOOMBERG_HOST: Adresse du Bloomberg Terminal (défaut: localhost)
+        BLOOMBERG_PORT: Port de connexion (défaut: 8194)
     """
 
-    def __init__(self, host: str = "localhost", port: int = 8194):
+    def __init__(self, host: str = None, port: int = None):
         """
         Initialise les paramètres de connexion.
 
         Args:
-            host: Adresse du Bloomberg Terminal (défaut: localhost)
-            port: Port de connexion (défaut: 8194)
+            host: Adresse du Bloomberg Terminal (défaut: BLOOMBERG_HOST ou localhost)
+            port: Port de connexion (défaut: BLOOMBERG_PORT ou 8194)
         """
-        self.host = host
-        self.port = port
+        self.host = host or DEFAULT_BLOOMBERG_HOST
+        self.port = port or DEFAULT_BLOOMBERG_PORT
         self.session: Optional[blpapi.Session] = None
         self.service: Optional[blpapi.Service] = None
 

@@ -41,6 +41,7 @@ def _extract_options_data(options: List[Option]) -> Optional[Tuple[np.ndarray, .
     pnl_stack = np.empty((n, pnl_length), dtype=np.float64)
     rolls = np.empty(n, dtype=np.float64)
     rolls_quarterly = np.empty(n, dtype=np.float64)
+    rolls_sum = np.empty(n, dtype=np.float64)
     strikes = np.empty(n, dtype=np.float64)
     
     # UNE SEULE boucle pour tout extraire
@@ -58,10 +59,11 @@ def _extract_options_data(options: List[Option]) -> Optional[Tuple[np.ndarray, .
         pnl_stack[i] = opt.pnl_array
         rolls[i] = opt.roll if opt.roll is not None else 0.0
         rolls_quarterly[i] = opt.roll_quarterly if opt.roll_quarterly is not None else 0.0
+        rolls_sum[i] = opt.roll_sum if opt.roll_sum is not None else 0.0
         strikes[i] = opt.strike
     
     return (premiums, deltas, gammas, vegas, thetas, ivs, average_pnls, 
-            is_call, pnl_stack, rolls, rolls_quarterly, strikes)
+            is_call, pnl_stack, rolls, rolls_quarterly, rolls_sum, strikes)
 
 
 def create_strategy_fast_with_signs(
@@ -98,7 +100,7 @@ def create_strategy_fast_with_signs(
         _options_data_cache[cache_key] = data
     
     (premiums, deltas, gammas, vegas, thetas, ivs, average_pnls, 
-     is_call, pnl_stack, rolls, rolls_quarterly, strikes) = data
+     is_call, pnl_stack, rolls, rolls_quarterly, rolls_sum, strikes) = data
 
     # ===== FILTRES PRÉCOCES (avant calculs coûteux) =====
     
@@ -203,6 +205,7 @@ def create_strategy_fast_with_signs(
     # Roll (déjà extrait, simple dot product)
     total_roll = float(np.dot(signs, rolls))
     total_roll_quarterly = float(np.dot(signs, rolls_quarterly))
+    total_roll_sum = float(np.dot(signs, rolls_sum))
     
     # Sigma (calcul UNIQUEMENT après tous les filtres passés)
     mixture = opt0.mixture
@@ -254,7 +257,7 @@ def create_strategy_fast_with_signs(
             rank=0,
             roll=total_roll,
             roll_quarterly=total_roll_quarterly,
-            roll_sum=total_roll_quarterly,  # Même valeur que quarterly
+            roll_sum=total_roll_sum,
         )
         return strategy
     except Exception as e:

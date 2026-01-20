@@ -23,6 +23,9 @@ VALID_MONTHS = {"F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"}
 # F=Jan, G=Feb, H=Mar, J=Apr, K=May, M=Jun, N=Jul, Q=Aug, U=Sep, V=Oct, X=Nov, Z=Dec
 MONTH_ORDER = ["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
 
+# Mois trimestriels pour le roll (H=Mar, M=Jun, U=Sep, Z=Dec)
+QUARTERLY_MONTHS = ["H", "M", "U", "Z"]
+
 # Mapping des mois Bloomberg vers les noms complets
 MONTH_NAMES = {
     "H": "March",
@@ -42,7 +45,7 @@ MONTH_EXPIRY_DAY = {
 
 def get_previous_expiration(month: str, year: int) -> Tuple[str, int]:
     """
-    Calcule l'échéance précédente pour un mois/année donné.
+    Calcule l'échéance précédente pour un mois/année donné (tous les mois).
     
     Args:
         month: Code mois Bloomberg (F, G, H, J, K, M, N, Q, U, V, X, Z)
@@ -66,12 +69,41 @@ def get_previous_expiration(month: str, year: int) -> Tuple[str, int]:
         return (MONTH_ORDER[month_idx - 1], year)
 
 
+def get_previous_quarterly_expiration(month: str, year: int) -> Tuple[str, int]:
+    """
+    Calcule le trimestre précédent pour un mois/année donné.
+    
+    Args:
+        month: Code mois trimestriel (H, M, U, Z)
+        year: Année sur 1 ou 2 chiffres (ex: 6 pour 2026)
+        
+    Returns:
+        Tuple (month_prev, year_prev)
+        
+    Examples:
+        >>> get_previous_quarterly_expiration("H", 6)  # Mars 2026
+        ('Z', 5)  # Décembre 2025
+        >>> get_previous_quarterly_expiration("M", 6)  # Juin 2026
+        ('H', 6)  # Mars 2026
+    """
+    if month not in QUARTERLY_MONTHS:
+        raise ValueError(f"Month {month} n'est pas un mois trimestriel (H, M, U, Z)")
+    
+    month_idx = QUARTERLY_MONTHS.index(month)
+    
+    if month_idx == 0:
+        # H (Mars) → Z (Décembre) année précédente
+        return (QUARTERLY_MONTHS[-1], year - 1)
+    else:
+        return (QUARTERLY_MONTHS[month_idx - 1], year)
+
+
 def get_roll_expiration(current_month: str, current_year: int, 
                         roll_month: Optional[str] = None, roll_year: Optional[int] = None) -> Tuple[str, int, int]:
     """
     Calcule l'échéance pour le roll et le nombre de trimestres de différence.
     
-    MONTH_ORDER = ["H", "M", "U", "Z"] → 4 trimestres par an
+    QUARTERLY_MONTHS = ["H", "M", "U", "Z"] → 4 trimestres par an
     
     Args:
         current_month: Mois courant (H, M, U, Z)
@@ -82,25 +114,26 @@ def get_roll_expiration(current_month: str, current_year: int,
     Returns:
         Tuple (roll_month, roll_year, quarters_diff) où quarters_diff est le nombre de trimestres de différence
     """
-    current_idx = MONTH_ORDER.index(current_month)
+    # Utiliser les mois trimestriels pour le calcul
+    current_idx = QUARTERLY_MONTHS.index(current_month) if current_month in QUARTERLY_MONTHS else 0
     
     if roll_month is None:
         # Par défaut: trimestre précédent
-        prev_month, prev_year = get_previous_expiration(current_month, current_year)
+        prev_month, prev_year = get_previous_quarterly_expiration(current_month, current_year)
         return (prev_month, prev_year, 1)
     else:
         # Mois spécifié par l'utilisateur
-        roll_idx = MONTH_ORDER.index(roll_month)
+        if roll_month not in QUARTERLY_MONTHS:
+            raise ValueError(f"Roll month {roll_month} n'est pas un mois trimestriel (H, M, U, Z)")
+        roll_idx = QUARTERLY_MONTHS.index(roll_month)
         if roll_year is None:
             roll_year = current_year
         
         # Calculer la différence en trimestres
         # 4 trimestres par an (H, M, U, Z)
-        if roll_year == current_year:
-            quarters_diff = current_idx - roll_idx
-        else:
-            # Année différente: 4 trimestres par an
-            quarters_diff = (current_year - roll_year) * 4 + (current_idx - roll_idx)
+        current_quarter_abs = current_year * 4 + current_idx
+        roll_quarter_abs = roll_year * 4 + roll_idx
+        quarters_diff = current_quarter_abs - roll_quarter_abs
         
         return (roll_month, roll_year, abs(quarters_diff))
 
@@ -342,6 +375,9 @@ def import_euribor_options(
                 
                 # Ticker pour l'échéance de roll
                 if compute_roll:
+                    # Calculer l'échéance Q-1 (toujours le trimestre précédent)
+                    q1_month, q1_year, _ = get_roll_expiration(meta["month"], meta["year"], None, None)
+                    
                     # Construire le code brut pour l'échéance de roll
                     opt_type_char = "C" if meta["option_type"] == "call" else "P"
                     roll_code = f"{meta['underlying']}{r_month}{r_year}{opt_type_char}"
@@ -355,6 +391,20 @@ def import_euribor_options(
                             "month": r_month,
                             "year": r_year,
                         }
+                    
+                    # Ticker pour Q-1 (si différent du custom)
+                    if (q1_month, q1_year) != (r_month, r_year):
+                        q1_code = f"{meta['underlying']}{q1_month}{q1_year}{opt_type_char}"
+                        q1_ticker = build_option_ticker_brut(q1_code, strike, suffix)
+                        if q1_ticker not in q1_ticker_metadata:
+                            q1_tickers.append(q1_ticker)
+                            q1_ticker_metadata[q1_ticker] = {
+                                "underlying": meta["underlying"],
+                                "strike": strike,
+                                "option_type": meta["option_type"],
+                                "month": q1_month,
+                                "year": q1_year,
+                            }
 
     # FETCH EN BATCH - échéances courantes + roll + Q-1
     try:
@@ -374,6 +424,10 @@ def import_euribor_options(
             print(f"📡 Fetch des {len(q1_tickers)} options Q-1...")
             q1_batch_data = fetch_options_batch(q1_tickers, use_overrides=True)
         
+        # Debug: afficher les tickers roll
+        if roll_tickers:
+            print(f"\n🔍 Debug Roll tickers: {roll_tickers[:3]}...")
+        
         # Construire un dictionnaire des premiums de l'échéance de roll (custom)
         # Clé: (strike, option_type, roll_month, roll_year) → premium
         roll_premiums: dict[Tuple[float, str, str, int], float] = {}
@@ -387,6 +441,9 @@ def import_euribor_options(
                     key = (roll_meta["strike"], roll_meta["option_type"], 
                            roll_meta["month"], roll_meta["year"])
                     roll_premiums[key] = premium
+        
+        # Debug: afficher les premiums roll trouvés
+        print(f"\n🔍 Debug Roll premiums trouvés: {len(roll_premiums)} (clés: {list(roll_premiums.keys())[:3]}...)")
         
         # Construire un dictionnaire des premiums Q-1
         # Clé: (strike, option_type, q1_month, q1_year) → premium
@@ -470,13 +527,18 @@ def import_euribor_options(
                                 roll_key = (meta["strike"], meta["option_type"], r_month, r_year)
                                 roll_premium = roll_premiums.get(roll_key)
                                 if roll_premium is not None:
+                                    # Roll brut (non normalisé)
+                                    raw_roll = roll_premium - option.premium
+                                    option.roll_sum = raw_roll
                                     # Roll = (premium_roll - premium_courant) / nombre_de_trimestres
                                     # Ainsi le roll est normalisé par trimestre
-                                    raw_roll = roll_premium - option.premium
                                     option.roll = raw_roll / quarters_diff if quarters_diff > 0 else raw_roll
-                            except Exception:
-                                # Erreur de calcul du roll, continuer sans
-                                pass
+                                else:
+                                    # Debug: afficher pourquoi le roll n'est pas trouvé
+                                    print(f"  ⚠️ Roll non trouvé pour {roll_key} (clés disponibles: {list(roll_premiums.keys())[:3]}...)")
+                            except Exception as e:
+                                # Erreur de calcul du roll, afficher l'erreur
+                                print(f"  ⚠️ Erreur calcul roll: {e}")
 
                         # Vérifier que l'option est valide
                         if option.strike > 0:

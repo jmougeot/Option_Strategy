@@ -1,5 +1,8 @@
 # Dépendances Python pour le projet Options Strategy Analyzer
 # =============================================================
+# NOTE: Utiliser Python 3.11 (recommandé pour blpapi)
+# Pour installer blpapi:
+#   pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi
 
 # Interface utilisateur web
 streamlit>=1.28.0
@@ -12,13 +15,12 @@ pandas>=2.1.0
 
 matplotlib
 
-# Accélération des calculs (optionnel mais recommandé)
-numba>=0.58.0
+# Application desktop
+pywebview>=4.0.0
+pillow>=10.0.0
 
-# blpapi>=3.20.0  # Décommentez après installation du Bloomberg Terminal
+# Pour créer un exécutable (optionnel)
+# pyinstaller>=6.0.0
 
-# Packages standards (normalement déjà inclus)
-# datetime
-# json
-# dataclasses
-# typing
+# Bloomberg API (installé séparément avec index-url spécial)
+# blpapi>=3.20.0

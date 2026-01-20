@@ -21,6 +21,7 @@ from myproject.app.scenarios_widget import create_mixture_from_scenarios
 from myproject.app.scenarios_widget import ScenarioData
 from myproject.app.utils import filter_same_strategies
 from myproject.app.filter_widget import FilterData
+from myproject.app.progress_tracker import ProgressTracker, ProcessingStep, get_step_for_leg
 import numpy as np
 
 
@@ -41,6 +42,7 @@ def process_bloomberg_to_strategies(
     compute_roll: bool = True,
     roll_month: Optional[str] = None,
     roll_year: Optional[int] = None,
+    progress_tracker: Optional[ProgressTracker] = None,
 ) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray, float]]:
     """
     Fonction principale simplifiée pour Streamlit.
@@ -57,13 +59,21 @@ def process_bloomberg_to_strategies(
         max_legs: Nombre max de legs par stratégie
         top_n: Nombre de meilleures stratégies à retourner
         scoring_weights: Poids personnalisés pour le scoring
-        verbose: Affichage détaillé
+        progress_tracker: Tracker de progression (optionnel)
     """
     stats = {}
+    
+    # Initialiser le tracker si fourni
+    if progress_tracker:
+        progress_tracker.init_ui()
+        progress_tracker.update(ProcessingStep.FETCH_DATA, "Connexion à Bloomberg...")
 
     mixture = create_mixture_from_scenarios(
         scenarios, price_min, price_max, num_points
     )
+
+    if progress_tracker:
+        progress_tracker.update(ProcessingStep.FETCH_DATA, "Import des options...")
 
     options = import_euribor_options(
         brut_code=brut_code,
@@ -79,21 +89,38 @@ def process_bloomberg_to_strategies(
     )
 
     stats["nb_options"] = len(options)
+    
+    if progress_tracker:
+        progress_tracker.update(
+            ProcessingStep.FETCH_DATA, 
+            f"✅ {len(options)} options récupérées",
+            stats
+        )
 
     if not options:
+        if progress_tracker:
+            progress_tracker.error("Aucune option trouvée")
         return [], stats, mixture
 
     generator = OptionStrategyGeneratorV2(options)
 
+    # Générer les stratégies avec suivi de progression
     all_strategies = generator.generate_all_combinations(
         price_min=price_min,
         price_max=price_max,
         max_legs=max_legs,
-        filter=filter
+        filter=filter,
+        progress_tracker=progress_tracker,
     )
 
     stats["nb_strategies_totales"] = len(all_strategies)
 
+    if progress_tracker:
+        progress_tracker.update(
+            ProcessingStep.RANKING, 
+            f"Classement de {len(all_strategies)} stratégies...",
+            stats
+        )
 
     comparer = StrategyComparerV2()
     best_strategies = comparer.compare_and_rank(
@@ -104,5 +131,8 @@ def process_bloomberg_to_strategies(
     best_strategies = filter_same_strategies(best_strategies)
 
     stats["nb_strategies_classees"] = len(best_strategies)
+
+    if progress_tracker:
+        progress_tracker.update(ProcessingStep.DISPLAY, "Préparation de l'affichage...", stats)
 
     return best_strategies, stats, mixture

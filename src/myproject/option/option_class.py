@@ -35,6 +35,7 @@ class Option:
     mid: Optional[float] = None
     roll: Optional[float] = None  # Roll moyen (normalisé par nombre de trimestres)
     roll_quarterly: Optional[float] = None  # Roll Q-1 (trimestre précédent)
+    roll_sum: Optional[float] = None  # Roll brut (prix_roll - prix_courant, non normalisé)
 
     # ============ GREEKS ============
     delta: float = 0.0

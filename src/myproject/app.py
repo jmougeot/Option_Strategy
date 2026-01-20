@@ -16,6 +16,7 @@ from myproject.app.processing import (
     display_success_stats,
 )
 from myproject.app.filter_widget import filter_params
+from myproject.app.progress_tracker import ProgressTracker
 
 
 # ============================================================================
@@ -139,13 +140,14 @@ def main():
 
     if compare_button:
         # ====================================================================
-        # STEP 1: Full processing via main function
+        # STEP 1: Full processing via main function with progress tracking
         # ====================================================================
-
-        with st.spinner(
-            f"🔄 Generating and comparing strategies (max {params.max_legs} legs)..."
-        ):
-            # Call main function doing EVERYTHING
+        
+        # Créer le tracker de progression
+        progress_tracker = ProgressTracker(max_legs=params.max_legs)
+        
+        try:
+            # Call main function doing EVERYTHING with progress tracking
             best_strategies, stats, mixture = process_bloomberg_to_strategies(
                 brut_code=params.brut_code,
                 underlying=params.underlying,
@@ -162,14 +164,22 @@ def main():
                 compute_roll=params.compute_roll,
                 roll_month=params.roll_month,
                 roll_year=params.roll_year,
+                progress_tracker=progress_tracker,
             )
 
             # Check results
             if not best_strategies:
+                progress_tracker.error("Aucune stratégie générée")
                 st.error("❌ No strategy generated")
                 return
 
-            display_success_stats(stats)
+            # Marquer comme terminé
+            progress_tracker.complete(stats)
+            
+        except Exception as e:
+            progress_tracker.error(f"Erreur: {str(e)}")
+            st.error(f"❌ Error during processing: {str(e)}")
+            return
 
         # Use best_strategies for display
         all_comparisons = best_strategies
