@@ -58,9 +58,9 @@ def format_expiration_date(month: str, year: int) -> str:
 
 
 def create_payoff_diagram(
+    mixture: Tuple[np.ndarray, np.ndarray, float],
     comparisons: List[StrategyComparison],
     target_price: Optional[float] = None,
-    mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
 ):
     """
     Creates an interactive P&L diagram for all strategies with optional Gaussian mixture
@@ -195,37 +195,33 @@ def create_payoff_diagram(
                 )
 
     # Ajouter la mixture gaussienne si fournie
-    if mixture is not None:
-        prices_mixture, probabilities = mixture
+    prices_mixture, probabilities, mean_price = mixture
 
-        # Tracer la distribution sur l'axe Y secondaire
-        fig.add_trace(
-            go.Scatter(
-                x=prices_mixture,
-                y=probabilities,
-                mode="lines",
-                name="Distribution Gaussienne",
-                fill="tozeroy",
-                line=dict(color="rgba(128, 128, 128, 0.8)", width=2, dash="dot"),
-                fillcolor="rgba(128, 128, 128, 0.2)",
-                hovertemplate="Prix: $%{x:.2f}<br>Probabilité: %{y:.4f}<extra></extra>",
-                yaxis="y2",
-            ),
-            secondary_y=True,
-        )
+    # Tracer la distribution sur l'axe Y secondaire
+    fig.add_trace(
+        go.Scatter(
+            x=prices_mixture,
+            y=probabilities,
+            mode="lines",
+            name="Distribution Gaussienne",
+            fill="tozeroy",
+            line=dict(color="rgba(128, 128, 128, 0.8)", width=2, dash="dot"),
+            fillcolor="rgba(128, 128, 128, 0.2)",
+            hovertemplate="Prix: $%{x:.2f}<br>Probabilité: %{y:.4f}<extra></extra>",
+            yaxis="y2",
+        ),
+        secondary_y=True,
+    )
 
-        # Calculer les statistiques de la mixture
-        mean_price = np.average(prices_mixture, weights=probabilities)
-
-        # Ajouter ligne de moyenne
-        fig.add_vline(
-            x=mean_price,
-            line_dash="dash",
-            line_color="gray",
-            annotation_text=f"μ = {mean_price:.2f}",
-            annotation_position="top right",
-            opacity=0.5,
-        )
+    # Ajouter ligne de moyenne
+    fig.add_vline(
+        x=mean_price,
+        line_dash="dash",
+        line_color="gray",
+        annotation_text=f"μ = {mean_price:.2f}",
+        annotation_position="top right",
+        opacity=0.5,
+    )
 
     # Configuration du layout
     if mixture is not None:
@@ -363,8 +359,8 @@ def create_single_strategy_payoff(
 
 def save_payoff_diagram_png(
     comparisons: List[StrategyComparison],
+    mixture: Tuple[np.ndarray, np.ndarray, float],
     target_price: Optional[float] = None,
-    mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
     output_dir: Optional[str] = None,
     filename: Optional[str] = None,
 ) -> Optional[str]:
@@ -384,7 +380,7 @@ def save_payoff_diagram_png(
     import os
     
     # Create the figure
-    fig = create_payoff_diagram(comparisons, target_price, mixture)
+    fig = create_payoff_diagram(mixture, comparisons, target_price)
     
     # Set white background for PNG export
     fig.update_layout(
@@ -500,6 +496,4 @@ def save_top5_summary_png(
         fig.write_image(filepath, width=1000, height=250, scale=2)
         return filepath
     except Exception as e:
-        print(f"Warning: Could not save top 5 summary: {e}")
-        print("Install kaleido with: pip install kaleido")
         return None

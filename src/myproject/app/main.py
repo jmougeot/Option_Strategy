@@ -41,7 +41,7 @@ def process_bloomberg_to_strategies(
     compute_roll: bool = True,
     roll_month: Optional[str] = None,
     roll_year: Optional[int] = None,
-) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray]]:
+) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray, float]]:
     """
     Fonction principale simplifiée pour Streamlit.
     Importe les options depuis Bloomberg et retourne les meilleures stratégies + stats.

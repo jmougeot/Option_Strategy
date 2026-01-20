@@ -33,7 +33,8 @@ STRATEGYTYPE = {
 
 @dataclass
 class FilterData:
-    max_loss:float
+    max_loss_left: float
+    max_loss_right: float
     max_premium: float
     ouvert_gauche: int
     ouvert_droite: int
@@ -54,7 +55,8 @@ def filter_params() -> FilterData:
     # Initialize default values in session_state
     if "filter" not in st.session_state:
         st.session_state.filter = {
-            "max_loss": 0.1, 
+            "max_loss_right": 0.1,
+            "max_loss_left":0.1, 
             "max_premium": 0.05, 
             "ouvert_gauche": 0, 
             "ouvert_droite": 0, 
@@ -66,13 +68,21 @@ def filter_params() -> FilterData:
     # Retrieve current values from session_state
     current_filter = st.session_state.filter
 
-    max_loss_col, max_premium_col, min_premium_col = st.columns([2,2,2])
-    with max_loss_col:
-        max_loss = st.number_input("Max loss accepted",
-                                               value=float(current_filter["max_loss"]),
-                                               step=0.01,
-                                               key="filter_max_loss",
-                                               help="Max loss accepted")
+    max_loss_left_col, max_loss_right_col, max_premium_col, min_premium_col = st.columns([1.5, 1.5, 1.5, 1.5])
+    
+    with max_loss_left_col:
+        max_loss_left = st.number_input("Max loss left",
+                                                value=float(current_filter["max_loss_left"]),
+                                                step=0.01,
+                                                key="filter_max_loss",
+                                                help="Max loss left")
+        
+    with max_loss_right_col:
+        max_loss_right= st.number_input("Max loss right",
+                                                value = float(current_filter['max_loss_right']),
+                                                step=0.01,
+                                                key="filter_max_loss_right",
+                                                help= "Choose the max on the right of the target")
     with max_premium_col:
         max_premium = st.number_input("Max premium",
                                                value=float(current_filter["max_premium"]),
@@ -88,7 +98,9 @@ def filter_params() -> FilterData:
                                         key="filter_min_premium_sell",
                                         help="Minimum price to sell an option")
 
+    
     ouvert_gauche_col, ouvert_droite_col = st.columns([2,2])
+    
     with ouvert_gauche_col:
         ouvert_gauche = st.number_input("PUT: Short-Long",
                                                value=int(current_filter["ouvert_gauche"]),
@@ -143,7 +155,8 @@ def filter_params() -> FilterData:
 
     # Save new values in session_state
     st.session_state.filter = {
-        "max_loss": max_loss,
+        "max_loss_right": max_loss_right,
+        "max_loss_left" : max_loss_left,
         "max_premium": max_premium,
         "ouvert_gauche": ouvert_gauche,
         "delta_min": delta_min,
@@ -155,7 +168,8 @@ def filter_params() -> FilterData:
 
 
     return FilterData(
-        max_loss=max_loss,
+        max_loss_left=max_loss_left,
+        max_loss_right=max_loss_right,
         max_premium=max_premium,
         ouvert_gauche=ouvert_gauche,
         ouvert_droite=ouvert_droite,

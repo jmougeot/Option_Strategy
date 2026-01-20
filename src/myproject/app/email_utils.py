@@ -168,7 +168,7 @@ def generate_mailto_link(
     # 4. RISK CONSTRAINTS & EXPOSURES
     # -------------------------------------------------------------------------
     body += "4. Risk Constraints & Exposures\n\n"
-    body += f"   * Max acceptable loss: {filters_data.max_loss:.2f}\n"
+    body += f"   * Max acceptable loss: {filters_data.max_loss_right:.2f}\n"
     body += f"   * Max premium to pay: {filters_data.max_premium:.2f}\n"
     body += f"   * Min premium to receive (if selling): {filters_data.min_premium_sell:.3f}\n"
     body += f"   * Residual exposure (open risk):\n"

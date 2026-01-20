@@ -164,13 +164,13 @@ def parse_brut_code(brut_code: str) -> dict:
 
 def import_euribor_options(
     brut_code: Optional[List[str]],
-    underlying: str = "",
+    mixture: Tuple[np.ndarray, np.ndarray, float],
+    underlying: str,
     months: List[str] = [],
     years: List[int] = [],
     strikes: List[float] = [],
     suffix: str = "Comdty",
     default_position: Literal["long", "short"] = "long",
-    mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
     compute_roll: bool = True,
     roll_month: Optional[str] = None,
     roll_year: Optional[int] = None,

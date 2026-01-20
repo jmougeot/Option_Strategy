@@ -195,7 +195,7 @@ def create_mixture_from_scenarios(
     price_min: float,
     price_max: float,
     num_points: int = 50,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, float]:
     """
     Crée une mixture gaussienne à partir des scénarios définis par l'utilisateur.
     Supporte les gaussiennes symétriques et asymétriques.
@@ -239,5 +239,6 @@ def create_mixture_from_scenarios(
             sigmas=std_devs,
             f=gaussian,
         )
+    average = float(np.average(prices, weights=mix))
     
-    return prices, mix
+    return prices, mix, average

@@ -82,8 +82,8 @@ def create_option_from_bloomberg(
     year: int,
     option_type_str: str,
     bloomberg_data: dict,
+    mixture: Tuple[np.ndarray, np.ndarray, float],
     position: Literal["long", "short"] = "long",
-    mixture: Optional[Tuple[np.ndarray, np.ndarray]] = None,
 ) -> Option:
     """
     Crée un objet Option directement depuis les données Bloomberg.
@@ -165,10 +165,11 @@ def create_option_from_bloomberg(
         # Initialiser la mixture et calculer les surfaces si les paramètres sont fournis
         if mixture is not None:
             # 1. Stocker la mixture et la grille de prix
-            option.prices, option.mixture = mixture
+            option.prices, option.mixture, average_mix = mixture
 
             # 2. Calculer toutes les surfaces et métriques
             option._calcul_all_surface()
+            option.average_mix=average_mix
 
         return option
 

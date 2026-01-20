@@ -14,9 +14,7 @@ class Option:
     # ============ CHAMPS OBLIGATOIRES ============
     expiration_day: Optional[str] = None
     expiration_week: Optional[str] = None
-    expiration_month: Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"] = (
-        "F"
-    )
+    expiration_month: Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"] = ("F")
     expiration_year: int = 6
 
     # ============ STRUCTURE DE POSITION ============
@@ -47,14 +45,13 @@ class Option:
 
     # ============ METRIQUES ============
     prices: Optional[np.ndarray] = None
-    loss_surface_ponderated: float = 0  # La surface est calculée pour être positive
-    profit_surface_ponderated: float = 0
     pnl_array: Optional[np.ndarray] = None
     mixture: Optional[np.ndarray] = None
     pnl_ponderation: Optional[np.ndarray] = None
     average_pnl: float = 0.0
     sigma_pnl: float = 0.0
     dx: Optional[float] = None
+    average_mix: float = 0.0
 
     # ============ VOLATILITÉ ============
     implied_volatility: float = 0.0
@@ -200,27 +197,7 @@ class Option:
         self.sigma_pnl = sigma
         return sigma
 
-    def _calcul_surface_ponderated(self) -> Tuple[float, float]:
-        """
-        Aire de la partie négative de P&L (perte) entre min_price et max_price.
-        On retourne une valeur positive (= intégrale de max(-P&L, 0)).
-        """
-        loss = 0.0
-        win = 0.0
-        if self.pnl_ponderation is None:
-            return 0.0, 0.0
-
-        for xi in self.pnl_ponderation:
-            if xi < 0:
-                loss += xi
-            else:
-                win += xi
-        self.loss_surface_ponderated = -loss
-        self.profit_surface_ponderated = win
-        # loss is negative (sum of negative contributions), return positive loss
-        return -loss, win
-
-    def _calcul_all_surface(self) -> Tuple[float, float]:
+    def _calcul_all_surface(self) -> None:
         """
         Calcule toutes les surfaces et métriques associées à la mixture.
         Robuste: ne lève jamais d'exception, retourne (0, 0) en cas d'erreur.
@@ -235,26 +212,17 @@ class Option:
         Returns:
             Tuple[float, float]: (loss_surface, profit_surface)
         """
-        try:
-            # 1. Calculer le P&L array (utilise self.prices)
-            pnl = self._calculate_pnl_array()
-            if pnl is None:
-                return 0.0, 0.0
+        # 1. Calculer le P&L array (utilise self.prices)
+        self._calculate_pnl_array()
 
-            # 2. Calculer la pondération (mixture × P&L × dx)
-            self._pnl_ponderation_array()
+        # 2. Calculer la pondération (mixture × P&L × dx)
+        self._pnl_ponderation_array()
 
-            # 3. Calculer l'espérance du P&L
-            self._average_pnl()
+        # 3. Calculer l'espérance du P&L
+        self._average_pnl()
 
-            # 4. Calculer l'écart-type du P&L
-            self._sigma_pnl()
-
-            # 5. Calculer les surfaces de profit et perte
-            return self._calcul_surface_ponderated()
-        except Exception:
-            # En cas d'erreur, retourner des valeurs par défaut
-            return 0.0, 0.0
+        # 4. Calculer l'écart-type du P&L
+        self._sigma_pnl()
 
     # ============================================================================
     # POSITION HELPERS - Méthodes utilitaires pour faciliter les checks de position
