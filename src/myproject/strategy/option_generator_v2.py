@@ -5,6 +5,8 @@ Version simplifiée qui prend une liste d'objets Option et génère toutes les
 combinaisons possibles (1 à 4 options) pour créer des StrategyComparison.
 
 Utilise itertools.combinations pour générer efficacement toutes les combinaisons.
+
+OPTIMISATION: Supporte le mode BATCH C++ pour un traitement ultra-rapide.
 """
 
 from itertools import product
@@ -13,7 +15,8 @@ from itertools import combinations_with_replacement
 import numpy as np
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
-from myproject.strategy.calcul_linear_metrics import create_strategy_fast_with_signs, _options_data_cache
+from myproject.strategy.calcul_linear_metrics_cpp import create_strategy_fast_with_signs, _options_data_cache
+from myproject.strategy.calcul_cached import OptionsDataCache, CPP_AVAILABLE
 from myproject.option.option_filter import sort_options_by_expiration, sort_options_by_strike
 from myproject.app.filter_widget import FilterData, StrategyType, STRATEGYTYPE
 
@@ -110,6 +113,20 @@ class OptionStrategyGeneratorV2:
         
         self._valid_sign_patterns_cache[cache_key] = valid_patterns
         return valid_patterns
+        
+        # Déterminer le mode d'exécution
+        if CPP_AVAILABLE:
+            # Pré-extraire toutes les données des options (optimisation majeure)
+            self.mode = "cached"
+            self.cache = OptionsDataCache(self.options)
+            # Créer un mapping option -> index pour recherche rapide
+            self.option_to_index = {id(opt): i for i, opt in enumerate(self.options)}
+            print(f"🚀 Mode C++ avec cache ({len(self.options)} options)")
+        else:
+            self.mode = "python"
+            self.cache = None
+            self.option_to_index = None
+            print("⚠️ Mode Python pur (C++ non disponible)")
 
     def generate_all_combinations(
         self, price_min: float, price_max: float, filter: FilterData, max_legs: int = 4,
@@ -129,15 +146,13 @@ class OptionStrategyGeneratorV2:
         
         self.price_min = price_min
         self.price_max = price_max
+        
         all_strategies: List[StrategyComparison] = []
         
         # Compteurs pour statistiques
         total_combos_tested = 0
         total_combos_filtered = 0
-        stats = {}
-        
-        # Vider le cache au début pour éviter les fuites mémoire
-        _options_data_cache.clear()
+        total_sign_variants = 0
 
         for n_legs in range(1, max_legs + 1):
             print(f"🔄 Génération des stratégies à {n_legs} leg(s)...")
@@ -160,15 +175,6 @@ class OptionStrategyGeneratorV2:
             # Générer toutes les combinaisons de n_legs options
             for combo in combinations_with_replacement(self.options, n_legs):
                 combos_this_level += 1
-                
-                # Mise à jour de la sous-progression toutes les 500 combinaisons
-                if progress_tracker and combos_this_level % 500 == 0 and total_combos_expected > 0:
-                    sub_progress = combos_this_level / total_combos_expected
-                    progress_tracker.update_substep(
-                        sub_progress, 
-                        f"{combos_this_level:,}/{total_combos_expected:,} combinaisons analysées"
-                    )
-                
                 # Pour chaque combinaison, tester différentes configurations de positions
                 # Note: combo est déjà un tuple, pas besoin de list()
                 strategies = self._generate_position_variants_fast(combo, filter)
@@ -180,25 +186,18 @@ class OptionStrategyGeneratorV2:
             all_strategies.extend(strategies_this_level)
             total_combos_tested += combos_this_level
             total_combos_filtered += filtered_this_level
-            
-            # Mettre à jour les stats
-            stats[f"nb_strategies_{n_legs}_leg"] = len(strategies_this_level)
-            stats["nb_strategies_totales"] = len(all_strategies)
-            
-            if progress_tracker:
-                progress_tracker.update(
-                    get_step_for_leg(n_legs), 
-                    f"✅ {len(strategies_this_level):,} stratégies {n_legs} leg(s) générées",
-                    stats
-                )
-        
-        # Vider le cache à la fin pour libérer la mémoire
-        _options_data_cache.clear()
 
-        print(f"\n📊 Résumé:")
+        elapsed = time.perf_counter() - start_time
+        mode = " C++" if (self.cache is not None and self.cache.valid) else "Python"
+        
+        print(f"\n📊 Résumé ({mode}):")
         print(f"  • Total combos testées: {total_combos_tested:,}")
+        print(f"  • Total variantes signes: {total_sign_variants:,}")
+        print(f"  • Total combos filtrées: {total_combos_filtered:,} ({total_combos_filtered/total_combos_tested*100:.1f}%)")
         print(f"  • Total combos filtrées: {total_combos_filtered:,} ({total_combos_filtered/total_combos_tested*100:.1f}%)" if total_combos_tested > 0 else "")
         print(f"  • Stratégies générées: {len(all_strategies):,}")
+        print(f"  • Temps total: {elapsed:.2f}s")
+        print(f"  • Vitesse: {total_sign_variants/elapsed:,.0f} évaluations/sec")
         return all_strategies
     
     def _generate_position_variants_fast(

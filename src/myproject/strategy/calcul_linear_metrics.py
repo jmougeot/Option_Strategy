@@ -39,9 +39,10 @@ def _extract_options_data(options: List[Option]) -> Optional[Tuple[np.ndarray, .
     average_pnls = np.empty(n, dtype=np.float64)
     is_call = np.empty(n, dtype=bool)
     pnl_stack = np.empty((n, pnl_length), dtype=np.float64)
+    profit_surfaces = np.empty(n, dtype=np.float64)
+    loss_surfaces = np.empty(n, dtype=np.float64)
     rolls = np.empty(n, dtype=np.float64)
     rolls_quarterly = np.empty(n, dtype=np.float64)
-    rolls_sum = np.empty(n, dtype=np.float64)
     strikes = np.empty(n, dtype=np.float64)
     
     # UNE SEULE boucle pour tout extraire
@@ -57,13 +58,14 @@ def _extract_options_data(options: List[Option]) -> Optional[Tuple[np.ndarray, .
         average_pnls[i] = opt.average_pnl
         is_call[i] = opt.option_type.lower() == "call"
         pnl_stack[i] = opt.pnl_array
+        profit_surfaces[i] = opt.profit_surface_ponderated
+        loss_surfaces[i] = opt.loss_surface_ponderated
         rolls[i] = opt.roll if opt.roll is not None else 0.0
         rolls_quarterly[i] = opt.roll_quarterly if opt.roll_quarterly is not None else 0.0
-        rolls_sum[i] = opt.roll_sum if opt.roll_sum is not None else 0.0
         strikes[i] = opt.strike
     
     return (premiums, deltas, gammas, vegas, thetas, ivs, average_pnls, 
-            is_call, pnl_stack, rolls, rolls_quarterly, rolls_sum, strikes)
+            is_call, pnl_stack, profit_surfaces, loss_surfaces, rolls, rolls_quarterly, strikes)
 
 
 def create_strategy_fast_with_signs(
@@ -100,7 +102,7 @@ def create_strategy_fast_with_signs(
         _options_data_cache[cache_key] = data
     
     (premiums, deltas, gammas, vegas, thetas, ivs, average_pnls, 
-     is_call, pnl_stack, rolls, rolls_quarterly, rolls_sum, strikes) = data
+     is_call, pnl_stack, profit_surfaces, loss_surfaces, rolls, rolls_quarterly, strikes) = data
 
     # ===== FILTRES PRÉCOCES (avant calculs coûteux) =====
     
@@ -152,19 +154,16 @@ def create_strategy_fast_with_signs(
     total_pnl_array = np.dot(signs, pnl_stack)
     idx = np.searchsorted(prices, options[0].average_mix)
 
-    # Partie gauche = prix bas (avant average_mix)
-    if idx > 0:
-        total_pnl_array_left = total_pnl_array[:idx]
-        max_loss_left = float(np.min(total_pnl_array_left))
-        if max_loss_left < -filter.max_loss_left:
-            return None
-    
-    # Partie droite = prix hauts (après average_mix)
-    if idx < len(total_pnl_array):
-        total_pnl_array_right = total_pnl_array[idx:]
-        max_loss_right = float(np.min(total_pnl_array_right))
-        if max_loss_right < -filter.max_loss_right:
-            return None
+
+    total_pnl_array_right = total_pnl_array[:idx]
+    max_loss_right = float(np.min(total_pnl_array_right))
+    if max_loss_right < -filter.max_loss_right:
+        return None
+
+    total_pnl_array_left= total_pnl_array[idx:]
+    max_loss_left= float(np.min(total_pnl_array_left))
+    if max_loss_left < -filter.max_loss_left:
+        return None
     
     max_profit = float(np.max(total_pnl_array))
 
@@ -205,7 +204,6 @@ def create_strategy_fast_with_signs(
     # Roll (déjà extrait, simple dot product)
     total_roll = float(np.dot(signs, rolls))
     total_roll_quarterly = float(np.dot(signs, rolls_quarterly))
-    total_roll_sum = float(np.dot(signs, rolls_sum))
     
     # Sigma (calcul UNIQUEMENT après tous les filtres passés)
     mixture = opt0.mixture
@@ -228,7 +226,6 @@ def create_strategy_fast_with_signs(
         strategy = StrategyComparison(
             strategy_name=strategy_name,
             strategy=None,
-            target_price=98,
             premium=float(total_premium),
             all_options=options,
             signs=signs,  # Stocker les signes utilisés
@@ -239,7 +236,7 @@ def create_strategy_fast_with_signs(
             expiration_month=exp_info.get("expiration_month", "F"),
             expiration_year=exp_info.get("expiration_year", 6),
             max_profit=max_profit,
-            max_loss=min(max_loss_left, max_loss_right),
+            max_loss=min(max_loss_right, max_loss_left),
             breakeven_points=breakeven_points,
             profit_range=profit_range,
             profit_zone_width=profit_zone_width,
@@ -257,7 +254,7 @@ def create_strategy_fast_with_signs(
             rank=0,
             roll=total_roll,
             roll_quarterly=total_roll_quarterly,
-            roll_sum=total_roll_sum,
+            roll_sum=total_roll_quarterly,  # Même valeur que quarterly
         )
         return strategy
     except Exception as e:

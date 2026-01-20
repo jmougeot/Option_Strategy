@@ -190,7 +190,7 @@ def main():
 
         # Save to session_state (including scenarios)
         save_to_session_state(
-            all_comparisons, params, best_strategies[0].target_price, scenarios
+            all_comparisons, params, None, scenarios
         )
         # Also save mixture for diagram export
         st.session_state["mixture"] = mixture
@@ -198,9 +198,13 @@ def main():
         # Auto-save diagrams with generic names (overwrite each run)
         from myproject.app.payoff_diagram import save_payoff_diagram_png, save_top5_summary_png
         
+        # Calculer target_price comme milieu de la plage de prix
+        first_strat = best_strategies[0]
+        target_price = (first_strat.prices[0] + first_strat.prices[-1]) / 2 if len(first_strat.prices) > 0 else 98.0
+        
         payoff_path = save_payoff_diagram_png(
             comparisons=all_comparisons[:5],
-            target_price=best_strategies[0].target_price,
+            target_price=target_price,
             mixture=mixture
         )
         if payoff_path:

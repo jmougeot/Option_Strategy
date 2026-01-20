@@ -262,8 +262,6 @@ void StrategyCalculator::calculate_surfaces(
     const std::vector<int>& signs,
     double dx,
     double& surface_profit,
-    double& surface_loss,
-    double& total_profit_ponderated,
     double& total_loss_ponderated,
     double& total_sigma_pnl
 ) {
@@ -279,22 +277,11 @@ void StrategyCalculator::calculate_surfaces(
         }
     }
     
-    surface_profit = sum_positive * dx;
-    surface_loss = std::abs(sum_negative * dx);
     
     // Surfaces pondérées
-    total_profit_ponderated = 0.0;
-    total_loss_ponderated = 0.0;
     double sum_signed_sigma = 0.0;
     
     for (size_t i = 0; i < options.size(); ++i) {
-        if (signs[i] > 0) {
-            total_profit_ponderated += options[i].profit_surface_ponderated;
-            total_loss_ponderated += options[i].loss_surface_ponderated;
-        } else {
-            total_profit_ponderated -= options[i].loss_surface_ponderated;
-            total_loss_ponderated -= options[i].profit_surface_ponderated;
-        }
         sum_signed_sigma += signs[i] * options[i].sigma_pnl;
     }
     
@@ -406,10 +393,8 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     
     // Surfaces
     double dx = (prices.size() > 1) ? (prices[1] - prices[0]) : 1.0;
-    double surface_profit, surface_loss, total_profit_ponderated, total_loss_ponderated, total_sigma_pnl;
-    calculate_surfaces(total_pnl, options, signs, dx, 
-                      surface_profit, surface_loss, 
-                      total_profit_ponderated, total_loss_ponderated, total_sigma_pnl);
+    double total_sigma_pnl;
+    calculate_surfaces(total_pnl, options, signs, dx, total_sigma_pnl);
     
     // ========== CONSTRUCTION DU RÉSULTAT ==========
     
@@ -424,10 +409,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     result.max_loss = max_loss;
     result.total_average_pnl = total_average_pnl;
     result.total_sigma_pnl = total_sigma_pnl;
-    result.surface_profit_nonponderated = surface_profit;
-    result.surface_loss_nonponderated = surface_loss;
-    result.total_profit_surface_ponderated = total_profit_ponderated;
-    result.total_loss_surface_ponderated = total_loss_ponderated;
     result.min_profit_price = min_profit_price;
     result.max_profit_price = max_profit_price;
     result.profit_zone_width = profit_zone_width;
