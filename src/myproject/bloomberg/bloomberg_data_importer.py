@@ -195,7 +195,7 @@ def parse_brut_code(brut_code: str) -> dict:
     }
 
 
-def import_euribor_options(
+def import_options(
     brut_code: Optional[List[str]],
     mixture: Tuple[np.ndarray, np.ndarray, float],
     underlying: str,

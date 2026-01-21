@@ -29,6 +29,8 @@ struct StrategyMetrics {
     // P&L metrics
     double max_profit;
     double max_loss;
+    double max_loss_left;   // Max loss à gauche de average_mix
+    double max_loss_right;  // Max loss à droite de average_mix
     double total_average_pnl;
     double total_sigma_pnl;
     
@@ -46,6 +48,11 @@ struct StrategyMetrics {
     // Counts
     int call_count;
     int put_count;
+    
+    // Roll
+    double total_roll;
+    double total_roll_quarterly;
+    double total_roll_sum;
     
     // Breakeven points (max 10 pour éviter allocation dynamique)
     std::vector<double> breakeven_points;
@@ -70,6 +77,9 @@ struct OptionData {
     double strike;
     double profit_surface_ponderated;
     double loss_surface_ponderated;
+    double roll;            // Roll moyen (normalisé)
+    double roll_quarterly;  // Roll Q-1 (trimestre précédent)
+    double roll_sum;        // Roll brut (non normalisé)
     bool is_call;
     // pnl_array sera passé séparément comme matrice
 };
@@ -87,9 +97,16 @@ public:
      * @param signs Signes (+1 long, -1 short)
      * @param pnl_matrix Matrice des P&L (n_options x pnl_length)
      * @param prices Array des prix du sous-jacent
-     * @param max_loss_params Perte max autorisée
+     * @param mixture Distribution de probabilité
+     * @param average_mix Moyenne de la mixture (point de séparation left/right)
+     * @param max_loss_left Perte max autorisée à gauche de average_mix
+     * @param max_loss_right Perte max autorisée à droite de average_mix
      * @param max_premium_params Premium max autorisé
-     * @param ouvert Si la stratégie peut être ouverte
+     * @param ouvert_gauche Nombre de puts shorts non couverts autorisés
+     * @param ouvert_droite Nombre de calls shorts non couverts autorisés
+     * @param min_premium_sell Premium minimum pour une vente
+     * @param delta_min Delta minimum autorisé
+     * @param delta_max Delta maximum autorisé
      * @return std::optional<StrategyMetrics> - nullopt si invalide
      */
     static std::optional<StrategyMetrics> calculate(
@@ -98,11 +115,15 @@ public:
         const std::vector<std::vector<double>>& pnl_matrix,
         const std::vector<double>& prices,
         const std::vector<double>& mixture,
-        double max_loss_params,
+        double average_mix,
+        double max_loss_left,
+        double max_loss_right,
         double max_premium_params,
         int ouvert_gauche,
         int ouvert_droite,
-        double min_premium_sell
+        double min_premium_sell,
+        double delta_min,
+        double delta_max
     );
 
 private:
@@ -151,6 +172,8 @@ private:
     static bool filter_delta(
         const std::vector<OptionData>& options,
         const std::vector<int>& signs,
+        double delta_min,
+        double delta_max,
         double& total_delta
     );
     
@@ -192,13 +215,7 @@ private:
         const std::vector<double>& total_pnl,
         const std::vector<OptionData>& options,
         const std::vector<int>& signs,
-        const std::vector<double>& mixture,
         double dx,
-        double total_average_pnl,
-        double& surface_profit,
-        double& surface_loss,
-        double& total_profit_ponderated,
-        double& total_loss_ponderated,
         double& total_sigma_pnl
     );
 };

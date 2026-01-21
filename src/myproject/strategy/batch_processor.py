@@ -106,9 +106,12 @@ def init_cpp_cache(options: List[Option]) -> bool:
     average_pnls = np.array([opt.average_pnl for opt in options], dtype=np.float64)
     sigma_pnls = np.array([opt.sigma_pnl for opt in options], dtype=np.float64)
     strikes = np.array([opt.strike for opt in options], dtype=np.float64)
-    profit_surfaces = np.array([opt.profit_surface_ponderated for opt in options], dtype=np.float64)
-    loss_surfaces = np.array([opt.loss_surface_ponderated for opt in options], dtype=np.float64)
     is_calls = np.array([opt.option_type.lower() == 'call' for opt in options], dtype=np.bool_)
+    
+    # Nouvelles données: rolls
+    rolls = np.array([opt.roll if opt.roll is not None else 0.0 for opt in options], dtype=np.float64)
+    rolls_quarterly = np.array([opt.roll_quarterly if opt.roll_quarterly is not None else 0.0 for opt in options], dtype=np.float64)
+    rolls_sum = np.array([opt.roll_sum if opt.roll_sum is not None else 0.0 for opt in options], dtype=np.float64)
     
     # Construire la matrice P&L
     pnl_length = len(options[0].pnl_array)
@@ -125,11 +128,15 @@ def init_cpp_cache(options: List[Option]) -> bool:
         return False
     mixture = np.asarray(options[0].mixture, dtype=np.float64)
     
+    # Récupérer average_mix (point de séparation left/right)
+    average_mix = float(options[0].average_mix) if options[0].average_mix else 0.0
+    
     # Initialiser le cache C++
     strategy_metrics_cpp.init_options_cache(
         premiums, deltas, gammas, vegas, thetas, ivs,
-        average_pnls, sigma_pnls, strikes, profit_surfaces, loss_surfaces,
-        is_calls, pnl_matrix, prices, mixture) 
+        average_pnls, sigma_pnls, strikes,
+        is_calls, rolls, rolls_quarterly, rolls_sum,
+        pnl_matrix, prices, mixture, average_mix) 
     return True
 
 
@@ -148,15 +155,21 @@ def process_batch_cpp(
     if not BATCH_CPP_AVAILABLE:
         return []
     
-    max_loss = filter.max_loss
+    # Nouveaux paramètres de filtrage
+    max_loss_left = filter.max_loss_left
+    max_loss_right = filter.max_loss_right
     max_premium = filter.max_premium
     ouvert_gauche = filter.ouvert_gauche
     ouvert_droite = filter.ouvert_droite
     min_premium_sell = filter.min_premium_sell
+    delta_min = filter.delta_min
+    delta_max = filter.delta_max
     
     return strategy_metrics_cpp.process_combinations_batch(
         indices_batch, signs_batch, combo_sizes,
-        max_loss, max_premium, ouvert_gauche, ouvert_droite, min_premium_sell
+        max_loss_left, max_loss_right, max_premium, 
+        ouvert_gauche, ouvert_droite, min_premium_sell,
+        delta_min, delta_max
     )
 
 def batch_to_strategies(
@@ -192,36 +205,32 @@ def batch_to_strategies(
             premium=metrics['total_premium'],
             all_options=opts,
             signs=signs_arr,
-            call_count=metrics['call_count'],
-            put_count=metrics['put_count'],
+            call_count=metrics.get('call_count', 0),
+            put_count=metrics.get('put_count', 0),
             expiration_day=exp_info.get("expiration_day"),
             expiration_week=exp_info.get("expiration_week"),
             expiration_month=exp_info.get("expiration_month", "F"),
             expiration_year=exp_info.get("expiration_year", 6),
             max_profit=metrics['max_profit'],
             max_loss=metrics['max_loss'],
-            breakeven_points=metrics['breakeven_points'],
-            profit_range=(metrics['min_profit_price'], metrics['max_profit_price']),
-            profit_zone_width=metrics['profit_zone_width'],
-            surface_profit=metrics['surface_profit'],
-            surface_loss=metrics['surface_loss'],
-            surface_profit_ponderated=metrics['surface_profit_ponderated'],
-            surface_loss_ponderated=metrics['surface_loss_ponderated'],
+            breakeven_points=metrics.get('breakeven_points', []),
+            profit_range=(metrics.get('min_profit_price', 0), metrics.get('max_profit_price', 0)),
+            profit_zone_width=metrics.get('profit_zone_width', 0),
             average_pnl=metrics['total_average_pnl'],
-            sigma_pnl=metrics['total_sigma_pnl'],
-            pnl_array=metrics['pnl_array'],
+            sigma_pnl=metrics.get('total_sigma_pnl', 0),
+            pnl_array=np.array(metrics.get('pnl_array', []), dtype=np.float64),
             prices=prices,
-            risk_reward_ratio=0,
-            risk_reward_ratio_ponderated=0,
             total_delta=metrics['total_delta'],
             total_gamma=metrics['total_gamma'],
             total_vega=metrics['total_vega'],
             total_theta=metrics['total_theta'],
-            avg_implied_volatility=metrics['total_iv'],
+            avg_implied_volatility=metrics.get('total_iv', 0),
             profit_at_target=0,
-            profit_at_target_pct=0,
             score=0.0,
             rank=0,
+            roll=metrics.get('total_roll', 0),
+            roll_quarterly=metrics.get('total_roll_quarterly', 0),
+            roll_sum=metrics.get('total_roll_sum', 0),
         )
         strategies.append(strat)
     

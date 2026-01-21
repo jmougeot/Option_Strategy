@@ -58,8 +58,6 @@ def _extract_options_data(options: List[Option]) -> Optional[Tuple[np.ndarray, .
         average_pnls[i] = opt.average_pnl
         is_call[i] = opt.option_type.lower() == "call"
         pnl_stack[i] = opt.pnl_array
-        profit_surfaces[i] = opt.profit_surface_ponderated
-        loss_surfaces[i] = opt.loss_surface_ponderated
         rolls[i] = opt.roll if opt.roll is not None else 0.0
         rolls_quarterly[i] = opt.roll_quarterly if opt.roll_quarterly is not None else 0.0
         strikes[i] = opt.strike
@@ -106,9 +104,18 @@ def create_strategy_fast_with_signs(
 
     # ===== FILTRES PRÉCOCES (avant calculs coûteux) =====
     
+    # DEBUG: Compteur global pour voir quel filtre bloque
+    global _debug_filter_stats
+    if '_debug_filter_stats' not in globals():
+        _debug_filter_stats = {"min_premium_sell": 0, "duplicates": 0, "put_count": 0, 
+                               "call_count": 0, "premium": 0, "delta": 0, "avg_pnl": 0,
+                               "loss_left": 0, "loss_right": 0, "total": 0}
+    _debug_filter_stats["total"] += 1
+    
     # Éliminer la vente d'option qui ne rapporte rien
     short_mask = signs < 0
     if np.any(short_mask & (premiums < filter.min_premium_sell)):
+        _debug_filter_stats["min_premium_sell"] += 1
         return None
     
     # Vérifier doublons (même type + même strike + signes opposés)
@@ -120,6 +127,7 @@ def create_strategy_fast_with_signs(
                 # Vérifier si signes opposés
                 j_indices = np.where(same_type_strike)[0] + i + 1
                 if np.any(signs[j_indices] != signs[i]):
+                    _debug_filter_stats["duplicates"] += 1
                     return None
     
     # Calculs rapides des compteurs
@@ -130,39 +138,47 @@ def create_strategy_fast_with_signs(
     short_put_count = np.count_nonzero(short_mask & (~is_call))
 
     if short_put_count - long_put_count > filter.ouvert_gauche:
+        _debug_filter_stats["put_count"] += 1
         return None
     
     if short_call_count - long_call_count > filter.ouvert_droite:
+        _debug_filter_stats["call_count"] += 1
         return None
 
     # Premium (calcul rapide avec dot product)
     total_premium = float(np.dot(signs, premiums))
     if abs(total_premium) > filter.max_premium:
+        _debug_filter_stats["premium"] += 1
         return None
     
     # Delta (vérifier que le delta est dans la plage demandée)
     total_delta = float(np.dot(signs, deltas))
     if total_delta < filter.delta_min or total_delta > filter.delta_max:
+        _debug_filter_stats["delta"] += 1
         return None
 
     # Average PnL (filtre important)
     total_average_pnl = float(np.dot(signs, average_pnls))
     if total_average_pnl < 0:
+        _debug_filter_stats["avg_pnl"] += 1
         return None
 
     # ===== CALCULS P&L (après filtres) =====
     total_pnl_array = np.dot(signs, pnl_stack)
     idx = np.searchsorted(prices, options[0].average_mix)
 
-
-    total_pnl_array_right = total_pnl_array[:idx]
-    max_loss_right = float(np.min(total_pnl_array_right))
-    if max_loss_right < -filter.max_loss_right:
+    # Gauche = indices 0 à idx (avant average_mix)
+    total_pnl_array_left = total_pnl_array[:idx]
+    max_loss_left = float(np.min(total_pnl_array_left)) if len(total_pnl_array_left) > 0 else 0.0
+    if max_loss_left < -filter.max_loss_left:
+        _debug_filter_stats["loss_left"] += 1
         return None
 
-    total_pnl_array_left= total_pnl_array[idx:]
-    max_loss_left= float(np.min(total_pnl_array_left))
-    if max_loss_left < -filter.max_loss_left:
+    # Droite = indices idx à fin (après average_mix)
+    total_pnl_array_right = total_pnl_array[idx:]
+    max_loss_right = float(np.min(total_pnl_array_right)) if len(total_pnl_array_right) > 0 else 0.0
+    if max_loss_right < -filter.max_loss_right:
+        _debug_filter_stats["loss_right"] += 1
         return None
     
     max_profit = float(np.max(total_pnl_array))

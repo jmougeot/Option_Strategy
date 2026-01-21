@@ -191,29 +191,14 @@ def create_strategy_fast_with_signs(
     Args:
         options: Liste d'options
         signs: Array NumPy des signes (+1 pour long, -1 pour short)
-        filter_data: FilterData avec max_loss, max_premium, ouvert_gauche/droite, min_premium_sell
+        filter_data: FilterData avec max_loss_left/right, max_premium, etc.
         
     Returns:
         StrategyComparison complète ou None si invalide
     """
-    # Extraire les paramètres du filtre
-    max_loss_params = filter_data.max_loss
-    max_premium_params = filter_data.max_premium
-    ouvert_gauche = filter_data.ouvert_gauche
-    ouvert_droite = filter_data.ouvert_droite
-    min_premium_sell = filter_data.min_premium_sell
-    
-    if CPP_AVAILABLE:
-        return create_strategy_fast_with_signs_cpp(
-            options, signs, max_loss_params, max_premium_params, 
-            ouvert_gauche, ouvert_droite, min_premium_sell
-        )
-    else:
-        # Fallback sur l'implémentation Python originale
-        from myproject.strategy.calcul_linear_metrics import (
-            create_strategy_fast_with_signs as python_impl
-        )
-        return python_impl(
-            options, signs, max_loss_params, max_premium_params, 
-            ouvert_gauche, ouvert_droite, min_premium_sell
-        )
+    # Toujours utiliser l'implémentation Python (la plus à jour)
+    # Le C++ batch processor est utilisé séparément via batch_processor.py
+    from myproject.strategy.calcul_linear_metrics import (
+        create_strategy_fast_with_signs as python_impl
+    )
+    return python_impl(options, signs, filter_data)

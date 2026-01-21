@@ -15,7 +15,7 @@ from itertools import combinations_with_replacement
 import numpy as np
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
-from myproject.strategy.calcul_linear_metrics_cpp import create_strategy_fast_with_signs, _options_data_cache
+from myproject.strategy.calcul_linear_metrics_cpp import create_strategy_fast_with_signs
 from myproject.strategy.calcul_cached import OptionsDataCache, CPP_AVAILABLE
 from myproject.option.option_filter import sort_options_by_expiration, sort_options_by_strike
 from myproject.app.filter_widget import FilterData, StrategyType, STRATEGYTYPE
@@ -160,7 +160,7 @@ class OptionStrategyGeneratorV2:
             # Mettre à jour la progression
             if progress_tracker:
                 step = get_step_for_leg(n_legs)
-                progress_tracker.update(step, f"Analyse des combinaisons {n_legs} leg(s)...", stats)
+                progress_tracker.update(step, f"Analyse des combinaisons {n_legs} leg(s)...")
             
             combos_this_level = 0
             filtered_this_level = 0
@@ -187,17 +187,33 @@ class OptionStrategyGeneratorV2:
             total_combos_tested += combos_this_level
             total_combos_filtered += filtered_this_level
 
-        elapsed = time.perf_counter() - start_time
-        mode = " C++" if (self.cache is not None and self.cache.valid) else "Python"
+
         
-        print(f"\n📊 Résumé ({mode}):")
         print(f"  • Total combos testées: {total_combos_tested:,}")
         print(f"  • Total variantes signes: {total_sign_variants:,}")
         print(f"  • Total combos filtrées: {total_combos_filtered:,} ({total_combos_filtered/total_combos_tested*100:.1f}%)")
         print(f"  • Total combos filtrées: {total_combos_filtered:,} ({total_combos_filtered/total_combos_tested*100:.1f}%)" if total_combos_tested > 0 else "")
         print(f"  • Stratégies générées: {len(all_strategies):,}")
-        print(f"  • Temps total: {elapsed:.2f}s")
-        print(f"  • Vitesse: {total_sign_variants/elapsed:,.0f} évaluations/sec")
+        
+        # DEBUG: Afficher les stats de filtrage des variants
+        try:
+            print(f"\n  📊 DEBUG VARIANT STATS:")
+            for k, v in _debug_variant_stats.items():
+                if v > 0:
+                    print(f"     - {k}: {v:,}")
+        except:
+            pass
+        
+        # DEBUG: Afficher les stats de filtrage des métriques
+        try:
+            from myproject.strategy.calcul_linear_metrics import _debug_filter_stats
+            print(f"\n  📊 DEBUG FILTER STATS:")
+            for k, v in _debug_filter_stats.items():
+                if v > 0:
+                    print(f"     - {k}: {v:,}")
+        except:
+            pass
+        
         return all_strategies
     
     def _generate_position_variants_fast(
@@ -227,6 +243,13 @@ class OptionStrategyGeneratorV2:
         if n == 0:
             return []
 
+        # DEBUG: Compteur pour voir où ça bloque
+        global _debug_variant_stats
+        if '_debug_variant_stats' not in globals():
+            _debug_variant_stats = {"total": 0, "expiration_mismatch": 0, "no_valid_patterns": 0, 
+                                    "mixed_call_put": 0, "filter_type_skip": 0, "strategies_created": 0}
+        _debug_variant_stats["total"] += 1
+
         # Comme les options sont triées, si première == dernière, toutes sont identiques
         if n > 1:
             first, last = options[0], options[-1]
@@ -237,6 +260,7 @@ class OptionStrategyGeneratorV2:
                 or first.expiration_week != last.expiration_week
                 or first.expiration_day != last.expiration_day
             ):
+                _debug_variant_stats["expiration_mismatch"] += 1
                 return []
 
         # OPTIMISATION: Pré-calculer le type d'options une seule fois
@@ -251,6 +275,7 @@ class OptionStrategyGeneratorV2:
             
             # Si mix call/put, aucune stratégie standard ne correspond
             if not all_calls and not all_puts:
+                _debug_variant_stats["mixed_call_put"] += 1
                 return []
             
             # Obtenir les patterns valides (avec cache)
@@ -260,6 +285,7 @@ class OptionStrategyGeneratorV2:
             
             # Si aucun pattern valide, retourner vide
             if not valid_patterns:
+                _debug_variant_stats["no_valid_patterns"] += 1
                 return []
 
         # OPTIMISATION: Utiliser le cache de signes pré-calculés
@@ -271,19 +297,26 @@ class OptionStrategyGeneratorV2:
             sign_tuples = [combo for combo in product((-1.0, 1.0), repeat=n)]
         
         strategies: List[StrategyComparison] = []
+        signs_tested = 0
 
         # ===== Génération des stratégies (optimisé et robuste) =====
         for i, signs in enumerate(sign_arrays):
             # Filtrage RAPIDE par type de stratégie (lookup O(1) dans un set)
             if use_strategy_filter and sign_tuples[i] not in valid_patterns:
+                _debug_variant_stats["filter_type_skip"] += 1
                 continue
             
+            signs_tested += 1
             try:
                 strat = create_strategy_fast_with_signs(options, signs, filter)
                 if strat is not None:
                     strategies.append(strat)
-            except Exception:
-                # Ignorer les erreurs individuelles, continuer avec les autres
+                    _debug_variant_stats["strategies_created"] += 1
+            except Exception as e:
+                # DEBUG: Afficher les erreurs
+                if _debug_variant_stats.get("errors", 0) < 5:
+                    print(f"  ⚠️ Exception: {e}")
+                _debug_variant_stats["errors"] = _debug_variant_stats.get("errors", 0) + 1
                 continue
         
         return strategies
