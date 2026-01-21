@@ -207,6 +207,15 @@ def create_strategy_fast_with_signs(
     total_roll_quarterly = float(np.dot(signs, rolls_quarterly))
     total_roll_sum = float(np.dot(signs, rolls_sum))
     
+    # Rolls detail: agréger les rolls individuels par expiry
+    total_rolls_detail: Dict[str, float] = {}
+    for i, opt in enumerate(options):
+        if opt.rolls_detail:
+            for label, value in opt.rolls_detail.items():
+                if label not in total_rolls_detail:
+                    total_rolls_detail[label] = 0.0
+                total_rolls_detail[label] += float(signs[i]) * value
+    
     # Sigma (calcul UNIQUEMENT après tous les filtres passés)
     mixture = opt0.mixture
     if mixture is not None:
@@ -258,6 +267,7 @@ def create_strategy_fast_with_signs(
             roll=total_roll,
             roll_quarterly=total_roll_quarterly,
             roll_sum=total_roll_sum,
+            rolls_detail=total_rolls_detail,
         )
         return strategy
     except Exception as e:

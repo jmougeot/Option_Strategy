@@ -1,42 +1,44 @@
 
-from myproject.app.utils import format_currency, format_expiration_date, format_currency
+from myproject.app.utils import format_currency, format_expiration_date
 from myproject.strategy.comparison_class import StrategyComparison
-from typing import List
+from typing import List, Optional
 import pandas as pd 
 
 
-def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFrame:
-    """Creates a DataFrame for displaying comparisons with ALL scoring criteria."""
-
+def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: Optional[List[str]] = None) -> pd.DataFrame:
+    """Creates a DataFrame for displaying comparisons with ALL scoring criteria.
+    
+    Args:
+        comparisons: List of strategy comparisons
+        roll_labels: List of roll expiry labels (ex: ["H6", "M6", "U6"]) to display as columns.
+                    If None or empty, no roll columns are shown.
+    """
     data = []
     for idx, comp in enumerate(comparisons, 1):
-        data.append(
-            {
-                "Rank": idx,
-                "Strategy": comp.strategy_name,
-                "Expiry": format_expiration_date(
-                    comp.expiration_month, comp.expiration_year
-                ),
-                "Premium": f"{comp.premium:3f}",
-                "Max Profit": format_currency(comp.max_profit),
-                "Avg P&L": (
-                    format_currency(comp.average_pnl)
-                    if comp.average_pnl is not None
-                    else "-"
-                ),
-                "σ P&L": (
-                    format_currency(comp.sigma_pnl)
-                    if comp.sigma_pnl is not None
-                    else "-"
-                ),
-                "Delta": f"{comp.total_delta:.4f}",
-                "Gamma": f"{comp.total_gamma:.3f}",
-                "Vega": f"{comp.total_vega:.3f}",
-                "Theta": f"{comp.total_theta:.3f}",
-                "IV": f"{comp.avg_implied_volatility:.2%}",
-                "Roll/(Q-1)": f"{comp.roll_quarterly:.4f}" if comp.roll_quarterly is not None else "-",
-                "Roll Avg": f"{comp.roll:.4f}" if comp.roll is not None else "-",
-                "Roll Sum": f"{comp.roll_sum:.4f}" if comp.roll_sum is not None else "-",
-            }
-        )
+        row = {
+            "Rank": idx,
+            "Strategy": comp.strategy_name,
+            "Expiry": format_expiration_date(comp.expiration_month, comp.expiration_year),
+            "Premium": f"{comp.premium:3f}",
+            "Max Profit": format_currency(comp.max_profit),
+            "Avg P&L": format_currency(comp.average_pnl) if comp.average_pnl is not None else "-",
+            "σ P&L": format_currency(comp.sigma_pnl) if comp.sigma_pnl is not None else "-",
+            "Delta": f"{comp.total_delta:.4f}",
+            "Gamma": f"{comp.total_gamma:.3f}",
+            "Vega": f"{comp.total_vega:.3f}",
+            "Theta": f"{comp.total_theta:.3f}",
+            "IV": f"{comp.avg_implied_volatility:.2%}",
+        }
+        
+        # Colonnes de roll dynamiques basées sur roll_labels
+        if roll_labels:
+            for label in roll_labels:
+                roll_value = comp.rolls_detail.get(label)
+                row[f"Roll {label}"] = f"{roll_value:.4f}" if roll_value is not None else "-"
+            # Ajouter Roll Sum à la fin si plusieurs rolls
+            if len(roll_labels) > 1:
+                row["Roll Sum"] = f"{comp.roll_sum:.4f}" if comp.roll_sum is not None else "-"
+        
+        data.append(row)
+    
     return pd.DataFrame(data)

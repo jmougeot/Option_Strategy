@@ -159,11 +159,9 @@ def main():
                 max_legs=params.max_legs,
                 top_n=500,
                 scoring_weights=scoring_weights,
-                scenarios=scenarios, #type: ignore
+                scenarios=scenarios,  # type: ignore
                 filter=filter,
-                compute_roll=params.compute_roll,
-                roll_month=params.roll_month,
-                roll_year=params.roll_year,
+                roll_expiries=params.roll_expiries,
                 progress_tracker=progress_tracker,
             )
 
@@ -230,7 +228,9 @@ def main():
 
     # Display each tab with its dedicated module
     with tab1:
-        display_overview_tab(comparisons)
+        # Générer les labels de roll dynamiquement (ex: ["H6", "M6", "U6"])
+        roll_labels = [f"{m}{y}" for m, y in params.roll_expiries] if params.roll_expiries else None
+        display_overview_tab(comparisons, roll_labels=roll_labels)
 
     with tab2:
         display_payoff_tab(top_5_comparisons, best_target_price, mixture) #type: ignore

@@ -16,7 +16,7 @@ from typing import List, Dict, Optional, Tuple
 from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.scoring.comparer import StrategyComparerV2
 from myproject.strategy.comparison_class import StrategyComparison
-from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
+from myproject.bloomberg.bloomberg_data_importer import import_options
 from myproject.app.scenarios_widget import create_mixture_from_scenarios
 from myproject.app.scenarios_widget import ScenarioData
 from myproject.app.utils import filter_same_strategies
@@ -39,9 +39,7 @@ def process_bloomberg_to_strategies(
     scoring_weights: Optional[Dict[str, float]] = None,
     num_points: int = 200,
     brut_code: Optional[List[str]] = None,
-    compute_roll: bool = True,
-    roll_month: Optional[str] = None,
-    roll_year: Optional[int] = None,
+    roll_expiries: Optional[List[Tuple[str, int]]] = None,
     progress_tracker: Optional[ProgressTracker] = None,
 ) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray, float]]:
     """
@@ -75,17 +73,15 @@ def process_bloomberg_to_strategies(
     if progress_tracker:
         progress_tracker.update(ProcessingStep.FETCH_DATA, "Import des options...")
 
-    options = import_euribor_options(
-        brut_code=brut_code,
+    options = import_options(
+        mixture=mixture,
         underlying=underlying,
         months=months,
         years=years,
         strikes=strikes,
+        roll_expiries=roll_expiries,
+        brut_code=brut_code,
         default_position="long",
-        mixture=mixture,
-        compute_roll=compute_roll,
-        roll_month=roll_month,
-        roll_year=roll_year,
     )
 
     stats["nb_options"] = len(options)

@@ -12,7 +12,74 @@ Auteur: BGC Trading Desk
 Date: 2025-10-17
 """
 
+import re
 from typing import Literal, Optional
+
+# Type pour les mois valides
+MonthCode = Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
+VALID_MONTHS = {"F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"}
+
+
+def parse_brut_code(brut_code: str) -> dict:
+    """
+    Parse un code brut Bloomberg pour extraire les métadonnées.
+    
+    Exemples de codes bruts:
+    - "ERF6C" → underlying="ER", month="F", year=6, option_type="call"
+    - "RXWF26C2" → underlying="RXW", month="F", year=26, option_type="call"
+    - "RXWF26P2" → underlying="RXW", month="F", year=26, option_type="put"
+    
+    Format: [UNDERLYING][MONTH][YEAR][C/P][SUFFIX?]
+    
+    Returns:
+        Dict avec underlying, month, year, option_type
+    """
+    code = brut_code.upper().strip()
+    
+    # Pattern: lettres + mois (une lettre valide) + année (1-2 chiffres) + C/P + suffix optionnel
+    # Ex: RXW F 26 C 2 ou ER H 6 C
+    pattern = r'^([A-Z]+)([FGHJKMNQUVXZ])(\d{1,2})([CP])(\d*)$'
+    match = re.match(pattern, code)
+    
+    if match:
+        underlying = match.group(1)
+        month = match.group(2)
+        year = int(match.group(3))
+        option_type = "call" if match.group(4) == "C" else "put"
+    else:
+        # Fallback: ancien parsing
+        if "C" in code:
+            option_type = "call"
+            code_without_type = code.replace("C", "", 1)
+        elif "P" in code:
+            option_type = "put"
+            code_without_type = code.replace("P", "", 1)
+        else:
+            option_type = "call"
+            code_without_type = code
+        
+        match_year = re.search(r'(\d{1,2})', code_without_type)
+        if match_year:
+            year = int(match_year.group(1))
+            code_without_year = code_without_type[:match_year.start()]
+        else:
+            year = 6
+            code_without_year = code_without_type
+        
+        month = ""
+        underlying = code_without_year
+        if code_without_year:
+            last_char = code_without_year[-1].upper()
+            if last_char in VALID_MONTHS:
+                month = last_char
+                underlying = code_without_year[:-1]
+    
+    return {
+        "underlying": underlying,
+        "month": month,
+        "year": year,
+        "option_type": option_type,
+    }
 
 
 def build_option_ticker(
