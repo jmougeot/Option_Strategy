@@ -22,12 +22,10 @@ def process_comparison_results(
     if not best_strategies:
         return [], [], None
 
-    # Utiliser le milieu de la plage de prix comme target_price
-    first_strategy = best_strategies[0]
-    best_target_price = (first_strategy.prices[0] + first_strategy.prices[-1]) / 2 if len(first_strategy.prices) > 0 else None
+    best_target_price = best_strategies[0].target_price
 
-    # Toutes les stratégies sont valides
-    comparisons = best_strategies
+    # Filtrer pour le meilleur prix cible
+    comparisons = [c for c in best_strategies if c.target_price == best_target_price]
 
     # Top 5 pour le diagramme
     top_5_comparisons = comparisons[:5]

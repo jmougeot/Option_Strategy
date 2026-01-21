@@ -16,7 +16,7 @@ from typing import List, Dict, Optional, Tuple
 from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.scoring.comparer import StrategyComparerV2
 from myproject.strategy.comparison_class import StrategyComparison
-from myproject.bloomberg.bloomberg_data_importer import import_options
+from myproject.bloomberg.bloomberg_data_importer import import_euribor_options
 from myproject.app.scenarios_widget import create_mixture_from_scenarios
 from myproject.app.scenarios_widget import ScenarioData
 from myproject.app.utils import filter_same_strategies
@@ -75,7 +75,7 @@ def process_bloomberg_to_strategies(
     if progress_tracker:
         progress_tracker.update(ProcessingStep.FETCH_DATA, "Import des options...")
 
-    options = import_options(
+    options = import_euribor_options(
         brut_code=brut_code,
         underlying=underlying,
         months=months,

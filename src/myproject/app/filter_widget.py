@@ -60,7 +60,7 @@ def filter_params() -> FilterData:
             "max_premium": 0.05, 
             "ouvert_gauche": 0, 
             "ouvert_droite": 0, 
-            "min_premium_sell": 0.005,
+            "min_premium_sell": 0.05,
             "delta_min": -0.75,
             "delta_max": 0.75
         }
@@ -73,20 +73,23 @@ def filter_params() -> FilterData:
     with max_loss_left_col:
         max_loss_left = st.number_input("Max loss left",
                                                 value=float(current_filter["max_loss_left"]),
-                                                step=0.01,
+                                                step=0.001,
+                                                format="%.3f",
                                                 key="filter_max_loss",
                                                 help="Max loss left")
         
     with max_loss_right_col:
         max_loss_right= st.number_input("Max loss right",
                                                 value = float(current_filter['max_loss_right']),
-                                                step=0.01,
+                                                step=0.001,
+                                                format="%.3f",
                                                 key="filter_max_loss_right",
                                                 help= "Choose the max on the right of the target")
     with max_premium_col:
         max_premium = st.number_input("Max premium",
                                                value=float(current_filter["max_premium"]),
-                                               step=0.01,
+                                               step=0.0025,
+                                               format="%.4f",
                                                key="filter_max_premium",
                                                help="Max strategy price (absolute value)")
 
