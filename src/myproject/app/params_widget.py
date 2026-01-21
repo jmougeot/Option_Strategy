@@ -1,28 +1,55 @@
 import streamlit as st
+import re
 from dataclasses import dataclass
 from myproject.app.utils import strike_list
-from typing import Optional,List
+from typing import Optional, List, Tuple
 
 
 # Mois Bloomberg disponibles
 MONTH_OPTIONS = ["H", "M", "U", "Z"]
-MONTH_NAMES = {"H": "March", "M": "June","U": "September",  "Z": "December"}
+MONTH_NAMES = {"H": "March", "M": "June", "U": "September", "Z": "December"}
+
+# Type alias
+RollExpiry = Tuple[str, int]
+
+
+def parse_roll_input(roll_input: str) -> Optional[List[RollExpiry]]:
+    """
+    Parse une chaîne de roll expiries au format "H6, Z5" ou "H6,Z5".
+    
+    Retourne une liste de tuples (month, year) ou None si vide.
+    """
+    if not roll_input:
+        return None
+    
+    roll_expiries: List[RollExpiry] = []
+    # Split par virgule ou espace
+    parts = re.split(r'[,\s]+', roll_input.strip())
+    
+    for part in parts:
+        part = part.strip().upper()
+        if len(part) >= 2:
+            # Format: M + Y (ex: H6, Z5, H26)
+            month = part[0]
+            year_str = part[1:]
+            if month.isalpha() and year_str.isdigit():
+                roll_expiries.append((month, int(year_str)))
+    
+    return roll_expiries if roll_expiries else None
 
 
 @dataclass
 class UIParams:
     underlying: str
-    months: list[str]
-    years: list[int]
+    months: List[str]
+    years: List[int]
     price_min: float
     price_max: float
     price_step: float
     max_legs: int
-    strikes: list[float]
-    brut_code: Optional[List[str]]=None
-    compute_roll: bool = True
-    roll_month: Optional[str] = None
-    roll_year: Optional[int] = None
+    strikes: List[float]
+    brut_code: Optional[List[str]] = None
+    roll_expiries: Optional[List[RollExpiry]] = None
 
 
 def sidebar_params() -> UIParams:
@@ -86,37 +113,24 @@ def sidebar_params() -> UIParams:
             "Max Price ($)", value=98.750, step=0.0001, format="%.4f"
             )
     
-    roll_month: Optional[str] = None
-    roll_year: Optional[int] = None
-    
+    roll_expiries: Optional[List[RollExpiry]] = None
 
-    custom_roll = st.checkbox(
-        "Custom roll",
-        value=False,
-        help="By default: previous month. Check to specify a custom month."
-    )
-    
-    if custom_roll:
-        c1, c2 = st.columns(2)
-        with c1:
-            roll_month_idx = st.selectbox(
-                "Roll Month",
-                options=range(len(MONTH_OPTIONS)),
-                format_func=lambda i: f"{MONTH_OPTIONS[i]} ({MONTH_NAMES[MONTH_OPTIONS[i]]})",
-                index=0,
-                key="roll_month_select"
+    # Roll uniquement en mode standard (pas brut_code)
+    if not brut_code_check:
+        custom_roll = st.checkbox(
+            "Custom roll",
+            value=False,
+            help="Check to specify roll expiries."
+        )
+        
+        if custom_roll:
+            roll_input = st.text_input(
+                "Roll months",
+                value="Z5",
+                help="Format: M1Y1, M2Y2 (e.g. Z5 or H6, Z5)"
             )
-            roll_month = MONTH_OPTIONS[roll_month_idx]
-        with c2:
-            roll_year = st.number_input(
-                "Roll Year",
-                value=6,
-                min_value=5,
-                max_value=10,
-                step=1,
-                help="Year for roll (6=2026, etc.)",
-                key="roll_year_input"
-            )
+            if roll_input:
+                roll_expiries = parse_roll_input(roll_input)
 
     strikes = strike_list(price_min, price_max, price_step)
 
@@ -142,7 +156,5 @@ def sidebar_params() -> UIParams:
         max_legs=max_legs,
         strikes=strikes,
         brut_code=brut_code_result,
-        compute_roll=True,
-        roll_month=roll_month,
-        roll_year=roll_year,
+        roll_expiries=roll_expiries,
     )

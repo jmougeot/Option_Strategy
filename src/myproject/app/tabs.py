@@ -4,19 +4,21 @@ Module pour gérer les différents tabs de l'application Streamlit
 
 import streamlit as st
 import numpy as np
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.app.utils import format_currency
 from myproject.app.comparison_table import create_comparison_table
 from myproject.app.payoff_diagram import create_payoff_diagram
 
 
-def display_overview_tab(comparisons: List[StrategyComparison]):
+def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Optional[List[str]] = None):
     """
     Displays the Overview tab with metrics and the comparison table.
 
     Args:
         comparisons: List of strategies to display
+        roll_labels: List of roll expiry labels (ex: ["H6", "M6"]) for dynamic columns.
+                    If None, no roll columns are shown.
     """
     st.header("Strategies Overview")
 
@@ -48,7 +50,7 @@ def display_overview_tab(comparisons: List[StrategyComparison]):
 
     # Comparison Table
     st.subheader("Comparison Table")
-    df = create_comparison_table(comparisons)
+    df = create_comparison_table(comparisons, roll_labels=roll_labels)
 
     st.dataframe(df.style, width="stretch", hide_index=True)
 
