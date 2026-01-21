@@ -17,10 +17,7 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
                 "Expiry": format_expiration_date(
                     comp.expiration_month, comp.expiration_year
                 ),
-                "Roll/Q": f"{comp.roll_quarterly:.4f}" if comp.roll_quarterly is not None else "-",
-                "Roll Avg": f"{comp.roll:.4f}" if comp.roll is not None else "-",
-                "Roll Sum": f"{comp.roll_sum:.4f}" if comp.roll_sum is not None else "-",
-                "Premium": format_currency(comp.premium),
+                "Premium": f"{comp.premium:3f}",
                 "Max Profit": format_currency(comp.max_profit),
                 "Avg P&L": (
                     format_currency(comp.average_pnl)
@@ -37,6 +34,9 @@ def create_comparison_table(comparisons: List[StrategyComparison]) -> pd.DataFra
                 "Vega": f"{comp.total_vega:.3f}",
                 "Theta": f"{comp.total_theta:.3f}",
                 "IV": f"{comp.avg_implied_volatility:.2%}",
+                "Roll/(Q-1)": f"{comp.roll_quarterly:.4f}" if comp.roll_quarterly is not None else "-",
+                "Roll Avg": f"{comp.roll:.4f}" if comp.roll is not None else "-",
+                "Roll Sum": f"{comp.roll_sum:.4f}" if comp.roll_sum is not None else "-",
             }
         )
     return pd.DataFrame(data)
