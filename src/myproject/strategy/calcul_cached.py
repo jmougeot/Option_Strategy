@@ -12,13 +12,40 @@ from myproject.strategy.comparison_class import StrategyComparison
 from myproject.strategy.strategy_naming_v2 import generate_strategy_name
 from myproject.option.option_utils_v2 import get_expiration_info
 import numpy as np
+import sys
+import os
 
-# Import du module C++
+# Import du module C++ avec debug détaillé
+CPP_AVAILABLE = False
+CPP_IMPORT_ERROR = None
+
+def _debug_cpp_import():
+    """Affiche des informations de debug pour l'import C++."""
+    print("[DEBUG C++] Tentative d'import de strategy_metrics_cpp...")
+    print(f"[DEBUG C++] Python: {sys.version}")
+    print(f"[DEBUG C++] Executable: {sys.executable}")
+    print(f"[DEBUG C++] VIRTUAL_ENV: {os.environ.get('VIRTUAL_ENV', 'Non défini')}")
+    
+    # Chercher le fichier .pyd
+    import glob
+    for path in sys.path[:5]:  # Premiers chemins seulement
+        if os.path.isdir(path):
+            matches = glob.glob(os.path.join(path, "strategy_metrics_cpp*.pyd"))
+            if matches:
+                print(f"[DEBUG C++] Fichier trouvé: {matches[0]}")
+                print(f"[DEBUG C++] Taille: {os.path.getsize(matches[0]):,} bytes")
+
 try:
+    _debug_cpp_import()
     import strategy_metrics_cpp
     CPP_AVAILABLE = True
-except ImportError:
+    print(f"[DEBUG C++] ✓ Import réussi! Module: {strategy_metrics_cpp.__file__}")
+except ImportError as e:
     CPP_AVAILABLE = False
+    CPP_IMPORT_ERROR = str(e)
+    print(f"[DEBUG C++] ✗ Échec de l'import: {e}")
+    import traceback
+    traceback.print_exc()
 
 
 class OptionsDataCache:
