@@ -74,8 +74,6 @@ class OptionsDataCache:
             self.average_pnls[i] = opt.average_pnl
             self.sigma_pnls[i] = opt.sigma_pnl
             self.strikes[i] = opt.strike
-            self.profit_surfaces[i] = opt.profit_surface_ponderated
-            self.loss_surfaces[i] = opt.loss_surface_ponderated
             self.is_calls[i] = opt.option_type.lower() == "call"
             self.pnl_matrix[i] = opt.pnl_array
     
@@ -157,21 +155,18 @@ def create_strategy_from_cache(
             breakeven_points=result["breakeven_points"],
             profit_range=(result["min_profit_price"], result["max_profit_price"]),
             profit_zone_width=result["profit_zone_width"],
-            surface_profit=result["surface_profit"],
-            surface_loss=result["surface_loss"],
-            surface_profit_ponderated=result["surface_profit_ponderated"],
-            surface_loss_ponderated=result["surface_loss_ponderated"],
             average_pnl=result["total_average_pnl"],
             sigma_pnl=result["total_sigma_pnl"],
             pnl_array=result["pnl_array"],
             prices=cache.prices,
-            risk_reward_ratio=0,
-            risk_reward_ratio_ponderated=0,
             total_delta=result["total_delta"],
             total_gamma=result["total_gamma"],
             total_vega=result["total_vega"],
             total_theta=result["total_theta"],
             avg_implied_volatility=result["total_iv"],
+            roll=0,
+            roll_quarterly=0,
+            roll_sum=0,
             profit_at_target=0,
             profit_at_target_pct=0,
             score=0.0,

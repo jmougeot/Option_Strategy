@@ -51,7 +51,6 @@ def process_bloomberg_to_strategies(
         months: Liste des mois Bloomberg (ex: ['M', 'U'])
         years: Liste des années (ex: [6, 7])
         strikes: Liste des strikes
-        target_price: Prix cible
         price_min: Prix minimum
         price_max: Prix maximum
         max_legs: Nombre max de legs par stratégie

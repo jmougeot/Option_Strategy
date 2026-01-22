@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Literal, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Dict, Literal, Optional, Tuple
 import numpy as np
 
 
@@ -36,6 +36,7 @@ class Option:
     roll: Optional[float] = None  # Roll moyen (normalisé par nombre de trimestres)
     roll_quarterly: Optional[float] = None  # Roll Q-1 (trimestre précédent)
     roll_sum: Optional[float] = None  # Roll brut (prix_roll - prix_courant, non normalisé)
+    rolls_detail: Dict[str, float] = field(default_factory=dict)  # Rolls par expiry (ex: {"H6": 0.5, "M6": 0.3})
 
     # ============ GREEKS ============
     delta: float = 0.0

@@ -43,6 +43,7 @@ def _extract_options_data(options: List[Option]) -> Optional[Tuple[np.ndarray, .
     loss_surfaces = np.empty(n, dtype=np.float64)
     rolls = np.empty(n, dtype=np.float64)
     rolls_quarterly = np.empty(n, dtype=np.float64)
+    rolls_sum = np.empty(n, dtype=np.float64)
     strikes = np.empty(n, dtype=np.float64)
     
     # UNE SEULE boucle pour tout extraire
@@ -60,11 +61,15 @@ def _extract_options_data(options: List[Option]) -> Optional[Tuple[np.ndarray, .
         pnl_stack[i] = opt.pnl_array
         rolls[i] = opt.roll if opt.roll is not None else 0.0
         rolls_quarterly[i] = opt.roll_quarterly if opt.roll_quarterly is not None else 0.0
+        rolls_sum[i] = opt.roll_sum if opt.roll_sum is not None else 0.0
         strikes[i] = opt.strike
     
     return (premiums, deltas, gammas, vegas, thetas, ivs, average_pnls, 
-            is_call, pnl_stack, profit_surfaces, loss_surfaces, rolls, rolls_quarterly, strikes)
+            is_call, pnl_stack, profit_surfaces, loss_surfaces, rolls, rolls_quarterly, rolls_sum, strikes)
 
+
+# Compteur global pour debug
+_cpp_call_count = 0
 
 def create_strategy_fast_with_signs(
     options: List[Option], signs: np.ndarray, filter: FilterData
@@ -74,7 +79,16 @@ def create_strategy_fast_with_signs(
     - Extraction des données en une seule passe
     - Filtrage précoce (early return) avant calculs coûteux
     - Calcul du sigma/roll seulement si nécessaire
+    
+    NOTE: Cette fonction est appelée en Python pur (pas via batch C++).
     """
+    global _cpp_call_count
+    _cpp_call_count += 1
+    
+    # Debug: afficher le compteur toutes les 10000 appels
+    if _cpp_call_count % 10000 == 0:
+        print(f"  🐍 Python calls: {_cpp_call_count:,}")
+    
     n_options = len(options)
     if n_options == 0 or n_options != len(signs):
         return None
@@ -100,7 +114,7 @@ def create_strategy_fast_with_signs(
         _options_data_cache[cache_key] = data
     
     (premiums, deltas, gammas, vegas, thetas, ivs, average_pnls, 
-     is_call, pnl_stack, profit_surfaces, loss_surfaces, rolls, rolls_quarterly, strikes) = data
+     is_call, pnl_stack, profit_surfaces, loss_surfaces, rolls, rolls_quarterly, rolls_sum, strikes) = data
 
     # ===== FILTRES PRÉCOCES (avant calculs coûteux) =====
     
@@ -220,6 +234,16 @@ def create_strategy_fast_with_signs(
     # Roll (déjà extrait, simple dot product)
     total_roll = float(np.dot(signs, rolls))
     total_roll_quarterly = float(np.dot(signs, rolls_quarterly))
+    total_roll_sum = float(np.dot(signs, rolls_sum))
+    
+    # Rolls detail: agréger les rolls individuels par expiry
+    total_rolls_detail: Dict[str, float] = {}
+    for i, opt in enumerate(options):
+        if opt.rolls_detail:
+            for label, value in opt.rolls_detail.items():
+                if label not in total_rolls_detail:
+                    total_rolls_detail[label] = 0.0
+                total_rolls_detail[label] += float(signs[i]) * value
     
     # Sigma (calcul UNIQUEMENT après tous les filtres passés)
     mixture = opt0.mixture
@@ -270,7 +294,8 @@ def create_strategy_fast_with_signs(
             rank=0,
             roll=total_roll,
             roll_quarterly=total_roll_quarterly,
-            roll_sum=total_roll_quarterly,  # Même valeur que quarterly
+            roll_sum=total_roll_sum,
+            rolls_detail=total_rolls_detail,
         )
         return strategy
     except Exception as e:

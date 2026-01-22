@@ -135,7 +135,6 @@ def main():
 
     # Déterminer quelle source de stratégies utiliser
     all_comparisons = None
-    best_target_price = None
     # Utiliser les stratégies chargées si disponibles
 
     if compare_button:
@@ -188,7 +187,7 @@ def main():
 
         # Save to session_state (including scenarios)
         save_to_session_state(
-            all_comparisons, params, best_strategies[0].target_price, scenarios
+            all_comparisons, params, scenarios
         )
         # Also save mixture for diagram export
         st.session_state["mixture"] = mixture
@@ -198,7 +197,6 @@ def main():
         
         payoff_path = save_payoff_diagram_png(
             comparisons=all_comparisons[:5],
-            target_price=best_strategies[0].target_price,
             mixture=mixture
         )
         if payoff_path:
@@ -216,7 +214,7 @@ def main():
         return
 
     # Traiter et filtrer les résultats
-    comparisons, top_5_comparisons, best_target_price = process_comparison_results(
+    comparisons, top_5_comparisons = process_comparison_results(
         all_comparisons
     )
 
@@ -233,7 +231,7 @@ def main():
         display_overview_tab(comparisons, roll_labels=roll_labels)
 
     with tab2:
-        display_payoff_tab(top_5_comparisons, best_target_price, mixture) #type: ignore
+        display_payoff_tab(top_5_comparisons, mixture) #type: ignore
 
 # ============================================================================
 # POINT D'ENTRÉE

@@ -60,14 +60,12 @@ def format_expiration_date(month: str, year: int) -> str:
 def create_payoff_diagram(
     mixture: Tuple[np.ndarray, np.ndarray, float],
     comparisons: List[StrategyComparison],
-    target_price: Optional[float] = None,
 ):
     """
     Creates an interactive P&L diagram for all strategies with optional Gaussian mixture
 
     Args:
         comparisons: List of strategies to display
-        target_price: Target price for vertical reference
         mixture: Tuple (prices, probabilities) for displaying Gaussian distribution (optional)
 
     Returns:
@@ -75,8 +73,6 @@ def create_payoff_diagram(
     """
     # Generate price range
     price_range = comparisons[0].prices
-    if target_price is None:
-        target_price = comparisons[0].target_price
 
     # Create a figure with two Y axes if mixture provided
     if mixture is not None:
@@ -91,17 +87,9 @@ def create_payoff_diagram(
         fig.add_hline(
             y=0, line_dash="dash", line_color="gray", opacity=0.5, secondary_y=False
         )
-        fig.add_vline(
-            x=target_price,
-            line_dash="dot",
-            line_color="red",
-            annotation_text="Target",
-            opacity=0.7,
-        )
     else:
         fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
         fig.add_vline(
-            x=target_price,
             line_dash="dot",
             line_color="red",
             annotation_text="Target",
@@ -270,14 +258,12 @@ def create_payoff_diagram(
 
 
 def create_single_strategy_payoff(
-    strategy: StrategyComparison, target_price: float
-) -> go.Figure:
+    strategy: StrategyComparison) -> go.Figure:
     """
     Crée un diagramme P&L pour une seule stratégie.
 
     Args:
         strategy: Stratégie à afficher
-        target_price: Prix cible pour la référence verticale
 
     Returns:
         Figure Plotly avec la courbe P&L
@@ -289,13 +275,7 @@ def create_single_strategy_payoff(
 
     # Lignes de référence
     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-    fig.add_vline(
-        x=target_price,
-        line_dash="dot",
-        line_color="red",
-        annotation_text="Target",
-        opacity=0.7,
-    )
+
 
     # Calculer P&L pour toute la plage de prix
     pnl_values = strategy.pnl_array
@@ -332,12 +312,11 @@ def create_single_strategy_payoff(
     profit_at_target = strategy.profit_at_target
     fig.add_trace(
         go.Scatter(
-            x=[target_price],
             y=[profit_at_target],
             mode="markers",
             marker=dict(size=15, color="green", symbol="star"),
             name="Prix Cible",
-            hovertemplate=f"Target: ${target_price:.2f}<br>P&L: ${profit_at_target:.2f}<extra></extra>",
+            hovertemplate=f"Target: P&L: ${profit_at_target:.2f}<extra></extra>",
         )
     )
 
@@ -360,7 +339,6 @@ def create_single_strategy_payoff(
 def save_payoff_diagram_png(
     comparisons: List[StrategyComparison],
     mixture: Tuple[np.ndarray, np.ndarray, float],
-    target_price: Optional[float] = None,
     output_dir: Optional[str] = None,
     filename: Optional[str] = None,
 ) -> Optional[str]:
@@ -369,7 +347,6 @@ def save_payoff_diagram_png(
     
     Args:
         comparisons: List of strategies to display
-        target_price: Target price for vertical reference
         mixture: Tuple (prices, probabilities) for Gaussian distribution
         output_dir: Directory to save the file (default: assets/payoff_diagrams)
         filename: Custom filename (default: payoff_diagram.png - overwrites each time)
@@ -380,7 +357,7 @@ def save_payoff_diagram_png(
     import os
     
     # Create the figure
-    fig = create_payoff_diagram(mixture, comparisons, target_price)
+    fig = create_payoff_diagram(mixture, comparisons)
     
     # Set white background for PNG export
     fig.update_layout(

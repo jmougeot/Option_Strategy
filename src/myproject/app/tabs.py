@@ -57,7 +57,6 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
 
 def display_payoff_tab(
     top_5_comparisons: List[StrategyComparison],
-    best_target_price: float,
     mixture: Tuple[np.ndarray, np.ndarray],
 ):
     """
@@ -65,13 +64,12 @@ def display_payoff_tab(
 
     Args:
         top_5_comparisons: Top 5 strategies for the diagram
-        best_target_price: Target price
         mixture: Tuple (prices, probabilities) for the Gaussian mixture
     """
     st.header("Profit/Loss Diagram at Expiration (Top 5)")
 
     # Create diagram with only top 5 strategies
     fig_payoff = create_payoff_diagram(
-        comparisons=top_5_comparisons, target_price=best_target_price, mixture=mixture
+        comparisons=top_5_comparisons, mixture=mixture
     )
     st.plotly_chart(fig_payoff, use_container_width=True)

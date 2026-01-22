@@ -9,7 +9,7 @@ from myproject.app.scenarios_widget import ScenarioData
 
 def process_comparison_results(
     best_strategies: List[StrategyComparison],
-) -> Tuple[List[StrategyComparison], List[StrategyComparison], Optional[float]]:
+) -> Tuple[List[StrategyComparison], List[StrategyComparison]]:
     """
     Traite les résultats de comparaison et filtre pour le meilleur prix cible.
 
@@ -17,26 +17,24 @@ def process_comparison_results(
         best_strategies: Liste des meilleures stratégies
 
     Returns:
-        Tuple (all_comparisons, top_5_comparisons, best_target_price)
+        Tuple (all_comparisons, top_5_comparisons)
     """
     if not best_strategies:
-        return [], [], None
+        return [], []
 
-    best_target_price = best_strategies[0].target_price
 
     # Filtrer pour le meilleur prix cible
-    comparisons = [c for c in best_strategies if c.target_price == best_target_price]
+    comparisons = [c for c in best_strategies]
 
     # Top 5 pour le diagramme
     top_5_comparisons = comparisons[:5]
 
-    return comparisons, top_5_comparisons, best_target_price
+    return comparisons, top_5_comparisons
 
 
 def save_to_session_state(
     all_comparisons: List[StrategyComparison],
     params: Any,
-    best_target_price: Optional[float],
     scenarios: Optional["ScenarioData"] = None,
 ):
     """
@@ -45,7 +43,6 @@ def save_to_session_state(
     Args:
         all_comparisons: All strategies
         params: Sidebar parameters
-        best_target_price: Optimal target price
         scenarios: Market scenarios (optional)
     """
     import streamlit as st
@@ -54,7 +51,6 @@ def save_to_session_state(
     st.session_state["comparisons"] = all_comparisons  # For email link access
     st.session_state["current_params"] = {
         "underlying": params.underlying,
-        "target_price": best_target_price,
         "months": params.months,
         "years": params.years,
         "strikes": params.strikes,

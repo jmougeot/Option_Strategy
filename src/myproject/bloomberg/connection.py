@@ -1,190 +1,209 @@
 """
-Bloomberg Connection Management
-===============================
-Gestion de la connexion au Bloomberg Terminal API (blpapi).
-
-Ce module centralise toute la logique de connexion/déconnexion,
-permettant de réutiliser la session à travers différents modules.
-
-Auteur: BGC Trading Desk
-Date: 2025-10-16
+Bloomberg Connection - Version Simplifiée
+==========================================
+Connexion au Bloomberg Terminal API (blpapi).
+Supporte les modes synchrone et asynchrone.
 """
 
 import blpapi
-import os
-from typing import Optional
+from blpapi.session import Session
+from blpapi.sessionoptions import SessionOptions
+from blpapi.event import Event
+from blpapi.name import Name
+from blpapi.subscriptionlist import SubscriptionList
+from dataclasses import dataclass
+from typing import Optional, Callable
 
-# Configuration par défaut (peut être surchargée par variables d'environnement)
-DEFAULT_BLOOMBERG_HOST = os.environ.get("BLOOMBERG_HOST", "localhost")
-DEFAULT_BLOOMBERG_PORT = int(os.environ.get("BLOOMBERG_PORT", "8194"))
 
+@dataclass
+class BloombergConfig:
+    """Configuration de connexion Bloomberg."""
+    host: str = "localhost"
+    port: int = 8194
+
+
+# Configuration globale
+config = BloombergConfig()
+
+# Session et service globaux (mode synchrone)
+_session: Optional[Session] = None
+_service: Optional[blpapi.service.Service] = None
+
+
+# =============================================================================
+# MODE SYNCHRONE (pour ReferenceDataRequest)
+# =============================================================================
+
+def get_session() -> Session:
+    """
+    Retourne la session Bloomberg synchrone (la crée si nécessaire).
+    """
+    global _session
+    
+    if _session is None:
+        opts = SessionOptions()
+        opts.setServerHost(config.host)
+        opts.setServerPort(config.port)
+        opts.setAutoRestartOnDisconnection(True)
+        opts.setNumStartAttempts(3)
+        
+        _session = Session(opts)
+        
+        if not _session.start():
+            _session = None
+            raise ConnectionError(
+                f"Impossible de démarrer la session Bloomberg sur {config.host}:{config.port}"
+            )
+    
+    return _session
+
+
+def get_service(service_name: str = "//blp/refdata") -> blpapi.service.Service:
+    """
+    Retourne le service Bloomberg (l'ouvre si nécessaire).
+    """
+    global _service
+    
+    session = get_session()
+    
+    if _service is None:
+        if not session.openService(service_name):
+            raise ConnectionError(f"Impossible d'ouvrir le service {service_name}")
+        _service = session.getService(service_name)
+    
+    return _service
+
+
+def close_session():
+    """Ferme la session Bloomberg."""
+    global _session, _service
+    
+    if _session:
+        _session.stop()
+        _session = None
+        _service = None
+
+
+def is_connected() -> bool:
+    """Vérifie si la connexion est active."""
+    return _session is not None
+
+
+# =============================================================================
+# MODE ASYNCHRONE (pour Market Data / Subscriptions)
+# =============================================================================
+
+def default_event_handler(event: Event, session: Session):
+    """Handler d'événements par défaut."""
+    for msg in event:
+        cid = msg.correlationId().value() if msg.correlationId() else None
+        et = event.eventType()
+        
+        if et == Event.SUBSCRIPTION_DATA:
+            print(f"[DATA] cid={cid} {msg.topicName()}")
+            if msg.hasElement("LAST_PRICE"):
+                last = msg.getElementAsFloat64("LAST_PRICE")
+                print(f"  LAST_PRICE={last}")
+                
+        elif et == Event.SUBSCRIPTION_STATUS:
+            print(f"[SUB_STATUS] {msg.messageType()} cid={cid}")
+            
+        elif et == Event.SESSION_STATUS:
+            print(f"[SESSION] {msg.messageType()}")
+            if msg.messageType() in [Name("SessionTerminated"), Name("SessionStartupFailure")]:
+                if session:
+                    session.stop()
+
+
+def create_async_session(
+    event_handler: Callable[[Event, Session], None] = None
+) -> Session:
+    """
+    Crée une session Bloomberg asynchrone avec un event handler.
+    
+    Args:
+        event_handler: Fonction callback (event, session) -> None
+    
+    Returns:
+        Session Bloomberg asynchrone
+    """
+    opts = SessionOptions()
+    opts.setServerHost(config.host)
+    opts.setServerPort(config.port)
+    
+    handler = event_handler or default_event_handler
+    session = Session(opts, eventHandler=handler)
+    
+    if not session.startAsync():
+        raise ConnectionError("Impossible de démarrer la session async")
+    
+    return session
+
+
+def subscribe_market_data(
+    session: Session,
+    tickers: list[str],
+    fields: str = "BID,ASK,LAST_PRICE"
+) -> SubscriptionList:
+    """
+    Souscrit aux données de marché pour une liste de tickers.
+    
+    Args:
+        session: Session Bloomberg async
+        tickers: Liste des tickers (ex: ["IBM US Equity", "MSFT US Equity"])
+        fields: Champs à souscrire (séparés par virgules)
+    
+    Returns:
+        SubscriptionList
+    """
+    subs = SubscriptionList()
+    for i, ticker in enumerate(tickers, start=1):
+        subs.add(ticker, fields, "", i)
+    
+    session.subscribe(subs)
+    return subs
+
+
+# =============================================================================
+# CONTEXT MANAGER (compatibilité avec l'ancien code)
+# =============================================================================
 
 class BloombergConnection:
-    """
-    Gestionnaire de connexion Bloomberg avec pattern Context Manager.
-
-    Usage basique:
-        conn = BloombergConnection()
-        conn.connect()
-        # ... utiliser conn.session ...
-        conn.disconnect()
-
-    Usage avec context manager (recommandé):
-        with BloombergConnection() as conn:
-            # ... utiliser conn.session ...
-            pass
-        # Déconnexion automatique
-
-    Attributs:
-        session: Session blpapi active (None si non connecté)
-        service: Service Bloomberg "//blp/refdata" (None si non connecté)
-        
-    Variables d'environnement:
-        BLOOMBERG_HOST: Adresse du Bloomberg Terminal (défaut: localhost)
-        BLOOMBERG_PORT: Port de connexion (défaut: 8194)
-    """
-
-    def __init__(self, host: str = None, port: int = None):
-        """
-        Initialise les paramètres de connexion.
-
-        Args:
-            host: Adresse du Bloomberg Terminal (défaut: BLOOMBERG_HOST ou localhost)
-            port: Port de connexion (défaut: BLOOMBERG_PORT ou 8194)
-        """
-        self.host = host or DEFAULT_BLOOMBERG_HOST
-        self.port = port or DEFAULT_BLOOMBERG_PORT
-        self.session: Optional[blpapi.Session] = None
-        self.service: Optional[blpapi.Service] = None
-
-    def connect(self) -> bool:
-        """
-        Établit la connexion au Bloomberg Terminal.
-        """
-        # Créer les options de session
-        sessionOptions = blpapi.SessionOptions()  # type: ignore
-        sessionOptions.setServerHost(self.host)
-        sessionOptions.setServerPort(self.port)
-
-        # Créer et démarrer la session
-        self.session = blpapi.Session(sessionOptions)  # type: ignore
-
-        if not self.session.start():
-            raise ConnectionError(
-                f"Impossible de démarrer la session Bloomberg sur {self.host}:{self.port}. "
-                "Vérifiez que le Bloomberg Terminal est lancé et connecté."
-            )
-
-        # Ouvrir le service de données de référence
-        if not self.session.openService("//blp/refdata"):
-            raise ConnectionError("Impossible d'ouvrir le service //blp/refdata")
-
-        # Récupérer le service pour les requêtes futures
-        self.service = self.session.getService("//blp/refdata")
-
+    """Context manager pour connexion Bloomberg."""
+    
+    def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
+        if host:
+            config.host = host
+        if port:
+            config.port = port
+        self.session = None
+        self.service = None
+    
+    def connect(self):
+        self.session = get_session()
+        self.service = get_service()
         return True
-
+    
     def disconnect(self):
-        """
-        Ferme proprement la connexion Bloomberg.
-        """
-        if self.session:
-            self.session.stop()
-            self.session = None
-            self.service = None
-
+        pass  # On garde la session ouverte pour réutilisation
+    
     def is_connected(self) -> bool:
-        """
-        Vérifie si la connexion est active.
-        """
-        return self.session is not None and self.service is not None
-
+        return is_connected()
+    
     def create_request(self, request_type: str = "ReferenceDataRequest"):
-        """
-        Crée une requête Bloomberg.
-
-        Args:
-            request_type: Type de requête (défaut: "ReferenceDataRequest")
-
-        Returns:
-            Objet Request Bloomberg
-
-        Raises:
-            RuntimeError: Si non connecté
-        """
-        if not self.is_connected():
-            raise RuntimeError("Pas de connexion active. Appelez connect() d'abord.")
-
-        assert self.service is not None, "Service should be available"
-        return self.service.createRequest(request_type)
-
+        return get_service().createRequest(request_type)
+    
     def send_request(self, request):
-        """
-        Envoie une requête Bloomberg.
-
-        Args:
-            request: Requête à envoyer
-
-        Raises:
-            RuntimeError: Si non connecté
-        """
-        if not self.is_connected():
-            raise RuntimeError("Pas de connexion active. Appelez connect() d'abord.")
-
-        assert self.session is not None, "Session should be available"
-        self.session.sendRequest(request)
-
+        get_session().sendRequest(request)
+    
     def next_event(self, timeout_ms: int = 500):
-        """
-        Récupère le prochain événement de la session.
-
-        Args:
-            timeout_ms: Timeout en millisecondes
-
-        Returns:
-            Événement Bloomberg
-
-        Raises:
-            RuntimeError: Si non connecté
-        """
-        if not self.is_connected():
-            raise RuntimeError("Pas de connexion active. Appelez connect() d'abord.")
-
-        assert self.session is not None, "Session should be available"
-        return self.session.nextEvent(timeout_ms)
-
-    # Context Manager Protocol (pour utilisation avec 'with')
+        return get_session().nextEvent(timeout_ms)
+    
     def __enter__(self):
-        """Appelé automatiquement lors du 'with BloombergConnection() as conn:'"""
         self.connect()
         return self
-
+    
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Appelé automatiquement à la sortie du bloc 'with'"""
         self.disconnect()
-        return False  # Ne pas supprimer les exceptions
-
-
-def test_connection(host: str = "localhost", port: int = 8194) -> bool:
-    """
-    Fonction utilitaire pour tester rapidement la connexion Bloomberg.
-
-    Args:
-        host: Adresse du Terminal (défaut: localhost)
-        port: Port (défaut: 8194)
-    """
-    try:
-        with BloombergConnection(host, port) as conn:
-            return conn.is_connected()
-    except Exception as e:
-        print(f"Erreur de connexion: {e}")
         return False
 
-
-if __name__ == "__main__":
-    # Test de connexion rapide
-    print("Test de connexion au Bloomberg Terminal...")
-    if test_connection():
-        print("✓ Connexion réussie!")
-    else:
-        print("✗ Échec de connexion. Assurez-vous que Bloomberg Terminal est ouvert.")

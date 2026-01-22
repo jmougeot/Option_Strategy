@@ -1,7 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
-from typing import List, Tuple, Literal, Optional
-from typing import Any
+from typing import Dict, List, Tuple, Literal, Optional, Any
 from myproject.option.option_class import Option
 
 
@@ -41,6 +40,7 @@ class StrategyComparison:
     profit_at_target_pct: float = 0.0  # % du max profit
     score: float = 0.0
     rank: int = 0
+    rolls_detail: Dict[str, float] = field(default_factory=dict)  # Rolls par expiry (ex: {"H6": 0.5, "M6": 0.3})
 
 
     def get_positions(self) -> List[str]:

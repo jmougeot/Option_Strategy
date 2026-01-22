@@ -17,6 +17,7 @@ from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.strategy.calcul_linear_metrics_cpp import create_strategy_fast_with_signs
 from myproject.strategy.calcul_cached import OptionsDataCache, CPP_AVAILABLE
+from myproject.strategy.batch_processor import generate_all_strategies_batch, BATCH_CPP_AVAILABLE
 from myproject.option.option_filter import sort_options_by_expiration, sort_options_by_strike
 from myproject.app.filter_widget import FilterData, StrategyType, STRATEGYTYPE
 
@@ -147,6 +148,28 @@ class OptionStrategyGeneratorV2:
         self.price_min = price_min
         self.price_max = price_max
         
+        # ================================================================
+        # UTILISER LE BATCH C++ SI DISPONIBLE (UN SEUL APPEL C++)
+        # ================================================================
+        if BATCH_CPP_AVAILABLE:
+            print(f"\n{'='*60}")
+            print(f"🚀 MODE BATCH C++ ACTIVÉ - Un appel C++ par nombre de legs!")
+            print(f"{'='*60}\n")
+            
+            # Le batch C++ gère tout: combinaisons, filtres, calculs
+            # Passe le progress_tracker pour la mise à jour de la progression
+            strategies = generate_all_strategies_batch(
+                self.options, filter, max_legs, progress_tracker
+            )
+            return strategies
+        
+        # ================================================================
+        # FALLBACK PYTHON SI C++ NON DISPONIBLE
+        # ================================================================
+        print(f"\n{'='*60}")
+        print(f"🐍 MODE PYTHON (fallback - C++ non disponible)")
+        print(f"{'='*60}\n")
+        
         all_strategies: List[StrategyComparison] = []
         
         # Compteurs pour statistiques
@@ -165,12 +188,6 @@ class OptionStrategyGeneratorV2:
             combos_this_level = 0
             filtered_this_level = 0
             strategies_this_level: List[StrategyComparison] = []
-
-            # Pré-calculer le nombre total de combinaisons pour ce niveau
-            n_options = len(self.options)
-            # Formule: C(n+r-1, r) pour combinations_with_replacement
-            from math import comb
-            total_combos_expected = comb(n_options + n_legs - 1, n_legs) if n_options > 0 else 0
 
             # Générer toutes les combinaisons de n_legs options
             for combo in combinations_with_replacement(self.options, n_legs):
