@@ -5,6 +5,7 @@ from typing import Tuple
 from dataclasses import dataclass
 import streamlit as st
 from typing import Optional
+import uuid
 
 @dataclass
 class ScenarioData:
@@ -15,6 +16,24 @@ class ScenarioData:
     asymmetric: bool = False
 
 
+def delete_scenario(scenario_id: str):
+    """Delete scenario with given id from session state."""
+    if len(st.session_state.scenarios) > 1:
+        st.session_state.scenarios = [s for s in st.session_state.scenarios if s["id"] != scenario_id]
+
+
+def add_scenario():
+    """Add a new scenario with default values."""
+    last_price = (
+        st.session_state.scenarios[-1]["price"]
+        if st.session_state.scenarios
+        else 98.0
+    )
+    st.session_state.scenarios.append(
+        {"id": str(uuid.uuid4()), "price": last_price + 0.10, "std": 0.10, "std_r": 0.10, "weight": 25.0}
+    )
+
+
 def scenario_params() -> Optional[ScenarioData]:
     """
     Interface to define market scenarios (Gaussian mixture).
@@ -23,17 +42,22 @@ def scenario_params() -> Optional[ScenarioData]:
     """
     if "scenarios" not in st.session_state:
         st.session_state.scenarios = [
-            {"price": 98.0, "std": 0.10, "std_r": 0.10, "weight": 50.0},  # Neutral scenario by default
+            {"id": str(uuid.uuid4()), "price": 98.0, "std": 0.10, "std_r": 0.10, "weight": 50.0},  # Neutral scenario by default
         ]
+    
+    # Migration: ajouter un id aux scénarios existants s'ils n'en ont pas
+    for scenario in st.session_state.scenarios:
+        if "id" not in scenario:
+            scenario["id"] = str(uuid.uuid4())
 
-    scenarios_to_delete = []
     asym_incertitude=st.checkbox(label = "Asymmetric Uncertainty", value = False)
 
     for i, scenario in enumerate(st.session_state.scenarios):
+        scenario_id = scenario["id"]
         with st.container():
             # Ensure std_r exists (backward compatibility)
             if "std_r" not in scenario:
-                st.session_state.scenarios[i]["std_r"] = scenario["std"]
+                scenario["std_r"] = scenario["std"]
             
             if asym_incertitude:
                 # 5 columns for asymmetric mode
@@ -48,10 +72,10 @@ def scenario_params() -> Optional[ScenarioData]:
                         value=float(scenario["price"]),
                         step=0.01,
                         format="%.4f",
-                        key=f"price_{i}",
+                        key=f"price_{scenario_id}",
                         help="Expected price for this scenario",
                     )
-                    st.session_state.scenarios[i]["price"] = price
+                    scenario["price"] = price
                 
                 with col_std_l:
                     std_l = st.number_input(
@@ -60,10 +84,10 @@ def scenario_params() -> Optional[ScenarioData]:
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
-                        key=f"std_l_{i}",
+                        key=f"std_l_{scenario_id}",
                         help="Downside uncertainty",
                     )
-                    st.session_state.scenarios[i]["std"] = std_l
+                    scenario["std"] = std_l
                 
                 with col_std_r:
                     std_r = st.number_input(
@@ -72,10 +96,10 @@ def scenario_params() -> Optional[ScenarioData]:
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
-                        key=f"std_r_{i}",
+                        key=f"std_r_{scenario_id}",
                         help="Upside uncertainty",
                     )
-                    st.session_state.scenarios[i]["std_r"] = std_r
+                    scenario["std_r"] = std_r
                 
                 with col_weight:
                     weight = st.number_input(
@@ -83,22 +107,21 @@ def scenario_params() -> Optional[ScenarioData]:
                         value=float(scenario["weight"]),
                         step=1.0,
                         format="%.1f",
-                        key=f"weight_{i}",
+                        key=f"weight_{scenario_id}",
                         help="Scenario weight (will be normalized)",
                     )
-                    st.session_state.scenarios[i]["weight"] = weight
+                    scenario["weight"] = weight
                 
                 with col_del:
                     st.markdown("")  # Spacing
                     if len(st.session_state.scenarios) > 1:
-                        if st.button("🗑️", key=f"delete_{i}", help="Delete this scenario"):
-                            scenarios_to_delete.append(i)
+                        st.button("🗑️", key=f"delete_{scenario_id}", help="Delete this scenario", on_click=delete_scenario, args=(scenario_id,))
                     else:
                         st.caption("Min: 1")
             
             else:
                 # 4 columns for symmetric mode
-                col_name, col_price, col_std, col_weight, col_del = st.columns([2, 2, 2, 2, 0.5])
+                col_name, col_price, col_std, col_weight, col_del = st.columns([2, 2, 2, 1.4, 0.7])
                 
                 with col_name:
                     st.markdown(f"**Scenario {i+1}**")
@@ -109,10 +132,10 @@ def scenario_params() -> Optional[ScenarioData]:
                         value=float(scenario["price"]),
                         step=0.01,
                         format="%.4f",
-                        key=f"price_{i}",
+                        key=f"price_{scenario_id}",
                         help="Expected price for this scenario",
                     )
-                    st.session_state.scenarios[i]["price"] = price
+                    scenario["price"] = price
                 
                 with col_std:
                     std = st.number_input(
@@ -121,11 +144,11 @@ def scenario_params() -> Optional[ScenarioData]:
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
-                        key=f"std_{i}",
+                        key=f"std_{scenario_id}",
                         help="Standard deviation: larger means more uncertain",
                     )
-                    st.session_state.scenarios[i]["std"] = std
-                    st.session_state.scenarios[i]["std_r"] = std
+                    scenario["std"] = std
+                    scenario["std_r"] = std
                 
                 with col_weight:
                     weight = st.number_input(
@@ -134,42 +157,19 @@ def scenario_params() -> Optional[ScenarioData]:
                         max_value=100.0,
                         step=1.0,
                         format="%.1f",
-                        key=f"weight_{i}",
+                        key=f"weight_{scenario_id}",
                         help="Scenario weight (will be normalized)",
                     )
-                    st.session_state.scenarios[i]["weight"] = weight
+                    scenario["weight"] = weight
                 
                 with col_del:
-                    st.markdown("")  # Spacing
                     if len(st.session_state.scenarios) > 1:
-                        if st.button("🗑️", key=f"delete_{i}", help="Delete this scenario"):
-                            scenarios_to_delete.append(i)
-                    else:
-                        st.caption("Min: 1")
+                        st.button("🗑️", key=f"delete_{scenario_id}", help="Delete this scenario", on_click=delete_scenario, args=(scenario_id,))
 
+    # Bouton pour ajouter un nouveau scénario
+    st.button("➕ Add Scenario", on_click=add_scenario)
 
-    if (
-        scenarios_to_delete
-        and len(st.session_state.scenarios) - len(scenarios_to_delete) >= 1
-    ):
-        for idx in sorted(scenarios_to_delete, reverse=True):
-            st.session_state.scenarios.pop(idx)
-        st.rerun()
-    elif scenarios_to_delete:
-        st.warning("⚠️ You must keep at least 1 scenario")
-
-    if st.button("➕ Add a scenario", use_container_width=True):
-        # Add a new scenario with default values
-        last_price = (
-            st.session_state.scenarios[-1]["price"]
-            if st.session_state.scenarios
-            else 98.0
-        )
-        st.session_state.scenarios.append(
-            {"price": last_price + 0.10, "std": 0.10, "std_r": 0.10, "weight": 25.0}
-        )
-        st.rerun()
-
+    # Calculer les poids normalisés
     total_weight = sum(s["weight"] for s in st.session_state.scenarios)
     normalized_weights = [
         s["weight"] / total_weight for s in st.session_state.scenarios

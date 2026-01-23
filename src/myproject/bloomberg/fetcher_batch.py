@@ -39,19 +39,24 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True) -> dict[
 
         # Créer la requête
         request = service.createRequest("ReferenceDataRequest")
+        securities = blpapi.name.Name("securities")
+        fields = blpapi.name.Name("fields")
+        overrid = blpapi.name.Name("overrides")
+        fieldId = blpapi.name.Name("fieldId")
+        value = blpapi.name.Name("value")
 
         for ticker in tickers:
-            request.append("securities", ticker)
+            request.append(securities, ticker)
 
         for field in OPTION_FIELDS:
-            request.append("fields", field)
+            request.append(fields, field)
 
         # Ajouter les overrides si demandé
         if use_overrides:
-            overrides = request.getElement("overrides")
+            overrides = request.getElement(overrid)
             override1 = overrides.appendElement()
-            override1.setElement("fieldId", "PRICING_SOURCE")
-            override1.setElement("value", "BGNE")
+            override1.setElement(fieldId, "PRICING_SOURCE")
+            override1.setElement(value, "BGNE")
 
         # Envoyer
         session.sendRequest(request)

@@ -116,7 +116,7 @@ def default_event_handler(event: Event, session: Session):
 
 
 def create_async_session(
-    event_handler: Callable[[Event, Session], None] = None
+    event_handler: Optional[Callable[[Event, Session], None]] = None
 ) -> Session:
     """
     Crée une session Bloomberg asynchrone avec un event handler.
@@ -158,7 +158,7 @@ def subscribe_market_data(
     """
     subs = SubscriptionList()
     for i, ticker in enumerate(tickers, start=1):
-        subs.add(ticker, fields, "", i)
+        subs.add(ticker, fields)
     
     session.subscribe(subs)
     return subs

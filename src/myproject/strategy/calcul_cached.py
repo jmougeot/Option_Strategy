@@ -36,7 +36,6 @@ def _debug_cpp_import():
                 print(f"[DEBUG C++] Taille: {os.path.getsize(matches[0]):,} bytes")
 
 try:
-    _debug_cpp_import()
     import strategy_metrics_cpp
     CPP_AVAILABLE = True
     print(f"[DEBUG C++] ✓ Import réussi! Module: {strategy_metrics_cpp.__file__}")
@@ -147,7 +146,7 @@ def create_strategy_from_cache(
     signs_int = signs.astype(np.int32)
     
     # Appel C++
-    result = strategy_metrics_cpp.calculate_strategy_metrics(
+    result = strategy_metrics_cpp.calculate_strategy_metrics( #type: ignore
         premiums, deltas, gammas, vegas, thetas, ivs,
         average_pnls, sigma_pnls, strikes,
         profit_surfaces, loss_surfaces, is_calls,

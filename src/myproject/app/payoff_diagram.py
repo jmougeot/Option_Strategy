@@ -221,7 +221,13 @@ def create_payoff_diagram(
             height=600,
             hovermode="x unified",
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                orientation="h", 
+                yanchor="bottom", 
+                y=1.02, 
+                xanchor="right", 
+                x=1,
+                font=dict(size=9),
+                itemwidth=30,
             ),
             plot_bgcolor="rgba(0,0,0,0)",  # Fond transparent
             paper_bgcolor="rgba(0,0,0,0)",  # Papier transparent
@@ -243,7 +249,13 @@ def create_payoff_diagram(
             height=500,
             hovermode="x unified",
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+                orientation="h", 
+                yanchor="bottom", 
+                y=1.02, 
+                xanchor="right", 
+                x=1,
+                font=dict(size=9),
+                itemwidth=30,
             ),
             plot_bgcolor="rgba(0,0,0,0)",  # Fond transparent
             paper_bgcolor="rgba(0,0,0,0)",  # Papier transparent
@@ -256,139 +268,7 @@ def create_payoff_diagram(
         )
     return fig
 
-
-def create_single_strategy_payoff(
-    strategy: StrategyComparison) -> go.Figure:
-    """
-    Crée un diagramme P&L pour une seule stratégie.
-
-    Args:
-        strategy: Stratégie à afficher
-
-    Returns:
-        Figure Plotly avec la courbe P&L
-    """
-    # Générer la plage de prix (±20% autour du prix cible)
-    price_range = strategy.prices
-
-    fig = go.Figure()
-
-    # Lignes de référence
-    fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-
-
-    # Calculer P&L pour toute la plage de prix
-    pnl_values = strategy.pnl_array
-    # Courbe P&L
-    fig.add_trace(
-        go.Scatter(
-            x=price_range,
-            y=pnl_values,
-            mode="lines",
-            name=strategy.strategy_name,
-            line=dict(color="#1f77b4", width=3),
-            fill="tozeroy",
-            fillcolor="rgba(31, 119, 180, 0.1)",
-            hovertemplate="Prix: $%{x:.2f}<br>P&L: $%{y:.2f}<extra></extra>",
-        )
-    )
-
-    # Markers de breakeven (si disponibles)
-    if strategy.breakeven_points:
-        fig.add_trace(
-            go.Scatter(
-                x=strategy.breakeven_points,
-                y=[0] * len(strategy.breakeven_points),
-                mode="markers",
-                marker=dict(
-                    size=12, color="red", symbol="circle-open", line=dict(width=3)
-                ),
-                name="Breakeven",
-                hovertemplate="Breakeven: $%{x:.2f}<extra></extra>",
-            )
-        )
-
-    # Marker au prix cible
-    profit_at_target = strategy.profit_at_target
-    fig.add_trace(
-        go.Scatter(
-            y=[profit_at_target],
-            mode="markers",
-            marker=dict(size=15, color="green", symbol="star"),
-            name="Prix Cible",
-            hovertemplate=f"Target: P&L: ${profit_at_target:.2f}<extra></extra>",
-        )
-    )
-
-    # Configuration du layout
-    fig.update_layout(
-        title=f"P&L - {strategy.strategy_name}",
-        xaxis_title="Prix du Sous-Jacent ($)",
-        yaxis_title="Profit / Perte ($)",
-        height=400,
-        hovermode="x unified",
-        showlegend=True,
-        plot_bgcolor="white",
-        xaxis=dict(gridcolor="lightgray"),
-        yaxis=dict(gridcolor="lightgray", zeroline=True, zerolinecolor="gray"),
-    )
-
-    return fig
-
-
-def save_payoff_diagram_png(
-    comparisons: List[StrategyComparison],
-    mixture: Tuple[np.ndarray, np.ndarray, float],
-    output_dir: Optional[str] = None,
-    filename: Optional[str] = None,
-) -> Optional[str]:
-    """
-    Saves the payoff diagram as a PNG file.
-    
-    Args:
-        comparisons: List of strategies to display
-        mixture: Tuple (prices, probabilities) for Gaussian distribution
-        output_dir: Directory to save the file (default: assets/payoff_diagrams)
-        filename: Custom filename (default: payoff_diagram.png - overwrites each time)
-    
-    Returns:
-        Path to the saved PNG file, or None if failed
-    """
-    import os
-    
-    # Create the figure
-    fig = create_payoff_diagram(mixture, comparisons)
-    
-    # Set white background for PNG export
-    fig.update_layout(
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-    )
-    
-    # Determine output directory
-    if output_dir is None:
-        # Get project root (go up from app folder)
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-        output_dir = os.path.join(project_root, "assets", "payoff_diagrams")
-    
-    # Create directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Use generic filename (overwrites each time)
-    if filename is None:
-        filename = "payoff_diagram.png"
-    filepath = os.path.join(output_dir, filename)
-    
-    try:
-        # Save as PNG (requires kaleido)
-        fig.write_image(filepath, width=1200, height=700, scale=2)
-        return filepath
-    except Exception as e:
-        print(f"Warning: Could not save payoff diagram: {e}")
-        print("Install kaleido with: pip install kaleido")
-        return None
-
+   
 
 def save_top5_summary_png(
     comparisons: List[StrategyComparison],
@@ -397,80 +277,73 @@ def save_top5_summary_png(
 ) -> Optional[str]:
     """
     Saves a summary table of top 5 strategies as a PNG file.
+    Utilise le module image_saver pour une sauvegarde robuste.
     
     Args:
         comparisons: List of strategies (top 5 will be used)
-        output_dir: Directory to save the file (default: assets/payoff_diagrams)
-        filename: Custom filename (default: top5_summary.png - overwrites each time)
+        output_dir: Directory to save the file (ignoré, utilise image_saver)
+        filename: Custom filename (default: top5_summary.png)
     
     Returns:
         Path to the saved PNG file, or None if failed
     """
-    import os
-    
-    top5 = comparisons[:5]
-    
-    # Prepare table data
-    headers = ["Rank", "Strategy", "Score", "Premium", "Max Profit", "Avg P&L", "Delta", "Gamma", "IV"]
-    
-    cells_data = [
-        [str(i) for i in range(1, len(top5) + 1)],  # Rank
-        [c.strategy_name[:35] for c in top5],  # Strategy (truncated)
-        [f"{c.score:.4f}" for c in top5],  # Score
-        [f"${c.premium:.4f}" for c in top5],  # Premium
-        [f"${c.max_profit:.4f}" for c in top5],  # Max Profit
-        [f"${c.average_pnl:.4f}" if c.average_pnl else "N/A" for c in top5],  # Avg P&L
-        [f"{c.total_delta:.3f}" for c in top5],  # Delta
-        [f"{c.total_gamma:.3f}" for c in top5],  # Gamma
-        [f"{c.avg_implied_volatility:.1%}" for c in top5],  # IV
-    ]
-    
-    # Create figure with table
-    fig = go.Figure(data=[go.Table(
-        header=dict(
-            values=[f"<b>{h}</b>" for h in headers],
-            fill_color='#1f77b4',
-            font=dict(color='white', size=12),
-            align='center',
-            height=35
-        ),
-        cells=dict(
-            values=cells_data,
-            fill_color=[['#f9f9f9', 'white'] * 3],
-            font=dict(size=11),
-            align=['center', 'left', 'center', 'right', 'right', 'right', 'center', 'center', 'center'],
-            height=30
-        )
-    )])
-    
-    # Highlight best strategy row
-    fig.update_layout(
-        title=dict(
-            text="<b>Top 5 Strategies Summary</b>",
-            font=dict(size=16),
-            x=0.5
-        ),
-        width=1000,
-        height=250,
-        margin=dict(l=20, r=20, t=50, b=20),
-        paper_bgcolor='white'
-    )
-    
-    # Determine output directory
-    if output_dir is None:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-        output_dir = os.path.join(project_root, "assets", "payoff_diagrams")
-    
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Use generic filename (overwrites each time)
-    if filename is None:
-        filename = "top5_summary.png"
-    filepath = os.path.join(output_dir, filename)
-    
     try:
-        fig.write_image(filepath, width=1000, height=250, scale=2)
-        return filepath
-    except Exception as e:
-        return None
+        from myproject.app.image_saver import save_top10_summary
+        return save_top10_summary(comparisons, filename or "top5_summary.png")
+    except ImportError:
+        # Fallback si image_saver n'est pas disponible
+        import os
+        
+        top5 = comparisons[:5]
+        
+        headers = ["Rank", "Strategy", "Premium", "Max Profit", "Avg P&L", "Delta", "Gamma", "IV"]
+        
+        cells_data = [
+            [str(i) for i in range(1, len(top5) + 1)],
+            [c.strategy_name[:35] for c in top5],
+            [f"${c.premium:.4f}" for c in top5],
+            [f"${c.max_profit:.4f}" for c in top5],
+            [f"${c.average_pnl:.4f}" if c.average_pnl else "N/A" for c in top5],
+            [f"{c.total_delta:.3f}" for c in top5],
+            [f"{c.total_gamma:.3f}" for c in top5],
+            [f"{c.avg_implied_volatility:.1%}" for c in top5],
+        ]
+        
+        fig = go.Figure(data=[go.Table(
+            header=dict(
+                values=[f"<b>{h}</b>" for h in headers],
+                fill_color='#1f77b4',
+                font=dict(color='white', size=12),
+                align='center',
+                height=35
+            ),
+            cells=dict(
+                values=cells_data,
+                fill_color=[['#f9f9f9', 'white'] * 3],
+                font=dict(size=11),
+                align=['center', 'left', 'center', 'right', 'right', 'right', 'center', 'center', 'center'],
+                height=30
+            )
+        )])
+        
+        fig.update_layout(
+            title=dict(text="<b>Top 5 Strategies Summary</b>", font=dict(size=16), x=0.5),
+            width=1000,
+            height=250,
+            margin=dict(l=20, r=20, t=50, b=20),
+            paper_bgcolor='white'
+        )
+        
+        if output_dir is None:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+            output_dir = os.path.join(project_root, "assets", "payoff_diagrams")
+        
+        os.makedirs(output_dir, exist_ok=True)
+        filepath = os.path.join(output_dir, filename or "top5_summary.png")
+        
+        try:
+            fig.write_image(filepath, width=1000, height=250, scale=2)
+            return filepath
+        except Exception:
+            return None

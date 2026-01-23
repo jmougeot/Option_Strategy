@@ -28,6 +28,7 @@ import numpy as np
 def process_bloomberg_to_strategies(
     filter: FilterData,
     scenarios: ScenarioData,
+    progress_tracker: ProgressTracker,
     underlying: str = "ER",
     months: List[str] = [],
     years: List[int] = [],
@@ -40,7 +41,6 @@ def process_bloomberg_to_strategies(
     num_points: int = 200,
     brut_code: Optional[List[str]] = None,
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
-    progress_tracker: Optional[ProgressTracker] = None,
 ) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray, float]]:
     """
     Fonction principale simplifiée pour Streamlit.
@@ -61,16 +61,16 @@ def process_bloomberg_to_strategies(
     stats = {}
     
     # Initialiser le tracker si fourni
-    if progress_tracker:
-        progress_tracker.init_ui()
-        progress_tracker.update(ProcessingStep.FETCH_DATA, "Connexion à Bloomberg...")
+    progress_tracker.init_ui()
+    progress_tracker.update(ProcessingStep.FETCH_DATA, "Connexion à Bloomberg...")
 
     mixture = create_mixture_from_scenarios(
         scenarios, price_min, price_max, num_points
     )
 
-    if progress_tracker:
-        progress_tracker.update(ProcessingStep.FETCH_DATA, "Import des options...")
+
+    progress_tracker.update(ProcessingStep.FETCH_DATA,
+                            "Import des options...")
 
     options = import_options(
         mixture=mixture,
@@ -85,16 +85,12 @@ def process_bloomberg_to_strategies(
 
     stats["nb_options"] = len(options)
     
-    if progress_tracker:
-        progress_tracker.update(
-            ProcessingStep.FETCH_DATA, 
-            f"✅ {len(options)} options récupérées",
-            stats
-        )
+
+    progress_tracker.update(ProcessingStep.FETCH_DATA,
+                            f"✅ {len(options)} options récupérées",stats)
 
     if not options:
-        if progress_tracker:
-            progress_tracker.error("Aucune option trouvée")
+        progress_tracker.error("Aucune option trouvée")
         return [], stats, mixture
 
     generator = OptionStrategyGeneratorV2(options)
@@ -110,24 +106,22 @@ def process_bloomberg_to_strategies(
 
     stats["nb_strategies_totales"] = len(all_strategies)
 
-    if progress_tracker:
-        progress_tracker.update(
-            ProcessingStep.RANKING, 
-            f"Classement de {len(all_strategies)} stratégies...",
-            stats
-        )
+
+    progress_tracker.update(
+        ProcessingStep.RANKING, 
+        f"Classement de {len(all_strategies)} stratégies...",
+        stats
+    )
 
     comparer = StrategyComparerV2()
     best_strategies = comparer.compare_and_rank(
-        strategies=all_strategies, top_n=top_n, weights=scoring_weights
-    )
+        strategies=all_strategies, top_n=top_n, weights=scoring_weights)
 
     # Remove duplicate strategies with identical P&L profiles
     best_strategies = filter_same_strategies(best_strategies)
 
     stats["nb_strategies_classees"] = len(best_strategies)
 
-    if progress_tracker:
-        progress_tracker.update(ProcessingStep.DISPLAY, "Préparation de l'affichage...", stats)
+    progress_tracker.update(ProcessingStep.DISPLAY, "Préparation de l'affichage...", stats)
 
     return best_strategies, stats, mixture

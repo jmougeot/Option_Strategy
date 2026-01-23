@@ -72,4 +72,4 @@ def display_payoff_tab(
     fig_payoff = create_payoff_diagram(
         comparisons=top_5_comparisons, mixture=mixture
     )
-    st.plotly_chart(fig_payoff, use_container_width=True)
+    st.plotly_chart(fig_payoff, width="stretch")
