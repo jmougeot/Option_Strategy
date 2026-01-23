@@ -19,6 +19,7 @@ matplotlib
 pywebview>=4.0.0
 pillow>=10.0.0
 reportlab
+pywind32
 
 # Pour créer un exécutable (optionnel)
 # pyinstaller>=6.0.0

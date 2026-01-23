@@ -5,20 +5,16 @@ Déplace toute la boucle de génération en C++ pour éliminer l'overhead Python
 """
 
 import numpy as np
-from typing import Dict, List, Optional
+from typing import Dict, List
 from itertools import product, combinations_with_replacement
-
+from myproject.strategy.strategy_naming_v2 import generate_strategy_name
+from myproject.option.option_utils_v2 import get_expiration_info
 from myproject.option.option_class import Option
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.app.filter_widget import FilterData
-
-# Import du module C++
-try:
-    import strategy_metrics_cpp
-    BATCH_CPP_AVAILABLE = True
-except ImportError:
-    BATCH_CPP_AVAILABLE = False
-    print("⚠️ Module C++ non disponible pour le batch processing")
+from math import comb
+from myproject.app.progress_tracker import get_step_for_leg
+import strategy_metrics_cpp
 
 
 def prepare_batch_data_by_legs(options: List[Option], n_legs: int, max_legs: int = 4):
@@ -33,7 +29,6 @@ def prepare_batch_data_by_legs(options: List[Option], n_legs: int, max_legs: int
     Returns:
         Tuple (indices_batch, signs_batch, combo_sizes, n_combos)
     """
-    n_options: int = len(options)
     option_to_idx = {id(opt): i for i, opt in enumerate(options)}
     
     all_combos = []
@@ -89,8 +84,6 @@ def prepare_batch_data(options: List[Option], max_legs: int = 4):
     Returns:
         Tuple (indices_batch, signs_batch, combo_sizes, n_options)
     """
-    n_options: int = len(options)
-    
     # Créer un mapping option -> index
     option_to_idx = {id(opt): i for i, opt in enumerate(options)}
     
@@ -127,7 +120,7 @@ def prepare_batch_data(options: List[Option], max_legs: int = 4):
     
     # Convertir en arrays numpy avec padding
     n_combos = len(all_combos)
-    
+
     indices_batch = np.full((n_combos, max_legs), -1, dtype=np.int32)
     signs_batch = np.zeros((n_combos, max_legs), dtype=np.int32)
     combo_sizes = np.array(all_sizes, dtype=np.int32)
@@ -144,8 +137,6 @@ def init_cpp_cache(options: List[Option]) -> bool:
     """
     Initialise le cache C++ avec toutes les données des options.
     """
-    if not BATCH_CPP_AVAILABLE:
-        return False
     
     n = len(options)
     
@@ -178,18 +169,11 @@ def init_cpp_cache(options: List[Option]) -> bool:
             pnl_matrix[i] = opt.pnl_array
     
     prices = np.array(options[0].prices, dtype=np.float64)
-    
-    # Récupérer la mixture (identique pour toutes les options)
-    if options[0].mixture is None:
-        print("⚠️ Mixture non disponible pour init_cpp_cache")
-        return False
     mixture = np.asarray(options[0].mixture, dtype=np.float64)
-    
-    # Récupérer average_mix (point de séparation left/right)
     average_mix = float(options[0].average_mix) if options[0].average_mix else 0.0
     
     # Initialiser le cache C++
-    strategy_metrics_cpp.init_options_cache(
+    strategy_metrics_cpp.init_options_cache( #type:ignore
         premiums, deltas, gammas, vegas, thetas, ivs,
         average_pnls, sigma_pnls, strikes,
         is_calls, rolls, rolls_quarterly, rolls_sum,
@@ -209,9 +193,6 @@ def process_batch_cpp(
     Returns:
         Liste de tuples (indices, signs, metrics_dict)
     """
-    if not BATCH_CPP_AVAILABLE:
-        return []
-    
     # Nouveaux paramètres de filtrage
     max_loss_left = filter.max_loss_left
     max_loss_right = filter.max_loss_right
@@ -221,12 +202,15 @@ def process_batch_cpp(
     min_premium_sell = filter.min_premium_sell
     delta_min = filter.delta_min
     delta_max = filter.delta_max
+    limit_left = filter.limit_left
+    limit_right = filter.limit_right
+
     
-    return strategy_metrics_cpp.process_combinations_batch(
+    return strategy_metrics_cpp.process_combinations_batch( 
         indices_batch, signs_batch, combo_sizes,
         max_loss_left, max_loss_right, max_premium, 
         ouvert_gauche, ouvert_droite, min_premium_sell,
-        delta_min, delta_max
+        delta_min, delta_max, limit_left, limit_right
     )
 
 def batch_to_strategies(
@@ -236,8 +220,6 @@ def batch_to_strategies(
     """
     Convertit les résultats du batch C++ en objets StrategyComparison.
     """
-    from myproject.strategy.strategy_naming_v2 import generate_strategy_name
-    from myproject.option.option_utils_v2 import get_expiration_info
     
     strategies = []
     
@@ -305,10 +287,10 @@ def batch_to_strategies(
 
 
 def generate_all_strategies_batch(
+    progress_tracker,
     options: List[Option],
     filter: FilterData,
     max_legs: int = 4,
-    progress_tracker=None
 ) -> List[StrategyComparison]:
     """
     Génère toutes les stratégies en mode batch C++.
@@ -321,31 +303,14 @@ def generate_all_strategies_batch(
         max_legs: Nombre maximum de legs
         progress_tracker: Tracker de progression optionnel (ProgressTracker)
     """
-    import time
-    from myproject.app.progress_tracker import ProcessingStep, get_step_for_leg
     
-    start = time.perf_counter()
-    
-    print(f"\n{'='*60}")
     print(f"🚀 MODE BATCH C++ ACTIVÉ")
-    print(f"   Un appel C++ par nombre de legs (avec progression)")
-    print(f"{'='*60}\n")
-    
-    if not BATCH_CPP_AVAILABLE:
-        print("❌ Batch C++ non disponible")
-        return []
-    
+
     # Initialiser le cache C++ (une seule fois)
-    print(f"🔄 Initialisation du cache C++ pour {len(options)} options...")
-    cache_start = time.perf_counter()
     if not init_cpp_cache(options):
-        print("❌ Échec d'initialisation du cache C++")
         return []
-    cache_time = time.perf_counter() - cache_start
-    print(f"  • Init cache C++: {cache_time:.3f}s")
     
     # Pré-calculer le nombre total de combinaisons (très rapide, juste de la combinatoire)
-    from math import comb
     n_options = len(options)
     combos_per_leg = {}
     grand_total = 0
@@ -355,37 +320,27 @@ def generate_all_strategies_batch(
         combos_per_leg[n_legs] = n_combos_raw
         grand_total += n_combos_raw
     
-    print(f"  • Total à analyser: {grand_total:,} combinaisons")
-    
     all_strategies: List[StrategyComparison] = []
     total_combos_done = 0
     total_valid = 0
     
     # Traiter chaque nombre de legs séparément
     for n_legs in range(1, max_legs + 1):
-        leg_start = time.perf_counter()
         
         # Mettre à jour la progression avec compteur
-        if progress_tracker:
-            step = get_step_for_leg(n_legs)
-            pct = total_combos_done / grand_total * 100 if grand_total > 0 else 0
-            progress_tracker.update(
-                step, 
-                f"[{total_combos_done:,} / {grand_total:,}] Traitement {n_legs} leg(s)... ({pct:.0f}%)"
-            )
+        step = get_step_for_leg(n_legs)
+        pct = total_combos_done / grand_total * 100 if grand_total > 0 else 0
+        progress_tracker.update( step, 
+            f"[{total_combos_done:,} / {grand_total:,}] Traitement {n_legs} leg(s)... ({pct:.0f}%)"
+        )
         
         # Préparer les données pour ce nombre de legs
         indices_batch, signs_batch, combo_sizes, n_combos = prepare_batch_data_by_legs(
             options, n_legs, max_legs
         )
         
-        if indices_batch is None or n_combos == 0:
-            print(f"  • {n_legs} leg(s): 0 combinaisons (filtrées par expiration)")
-            total_combos_done += combos_per_leg.get(n_legs, 0)
-            continue
-        
         # Traiter en batch C++
-        results = process_batch_cpp(indices_batch, signs_batch, combo_sizes, filter)
+        results = process_batch_cpp(indices_batch, signs_batch, combo_sizes, filter) 
         n_valid = len(results)
         total_valid += n_valid
         total_combos_done += n_combos
@@ -394,7 +349,6 @@ def generate_all_strategies_batch(
         strategies = batch_to_strategies(results, options)
         all_strategies.extend(strategies)
         
-        leg_time = time.perf_counter() - leg_start
         pct_done = total_combos_done / grand_total * 100 if grand_total > 0 else 0
         print(f"  • {n_legs} leg(s): {n_combos:,} → {n_valid:,} valides | Cumul: {total_combos_done:,}/{grand_total:,} ({pct_done:.0f}%)")
         
@@ -404,14 +358,5 @@ def generate_all_strategies_batch(
                 1.0,
                 f"[{total_combos_done:,} / {grand_total:,}] {total_valid:,} stratégies valides"
             )
-    
-    total_time = time.perf_counter() - start
-    
-    print(f"\n{'='*60}")
-    print(f"✅ BATCH C++ TERMINÉ")
-    print(f"   Total: {total_combos_done:,} combinaisons testées")
-    print(f"   Valides: {total_valid:,} stratégies ({total_valid/total_combos_done*100:.1f}%)" if total_combos_done > 0 else "   Valides: 0")
-    print(f"   Temps: {total_time:.2f}s ({total_combos_done/total_time:,.0f} évals/sec)" if total_time > 0 else "")
-    print(f"{'='*60}\n")
     
     return all_strategies

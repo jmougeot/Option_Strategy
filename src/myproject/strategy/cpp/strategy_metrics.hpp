@@ -1,5 +1,5 @@
 /**
- * Calculs Optimisés des Métriques de Stratégies d'Options
+ * Calculs Optimisés des Métriques de Stratégies d'Option
  * Header C++ pour les calculs "hot path"
  */
 
@@ -107,6 +107,8 @@ public:
      * @param min_premium_sell Premium minimum pour une vente
      * @param delta_min Delta minimum autorisé
      * @param delta_max Delta maximum autorisé
+     * @param limit_left Left limit we accept to loose max loss left
+     * @param limit_right Right limit where we accept to loose max loss right
      * @return std::optional<StrategyMetrics> - nullopt si invalide
      */
     static std::optional<StrategyMetrics> calculate(
@@ -123,11 +125,14 @@ public:
         int ouvert_droite,
         double min_premium_sell,
         double delta_min,
-        double delta_max
+        double delta_max,
+        double limit_left,
+        double limit_right
     );
 
 private:
     // Filtres (retourne false si la stratégie doit être rejetée)
+
     static bool filter_useless_sell(
         const std::vector<OptionData>& options,
         const std::vector<int>& signs,

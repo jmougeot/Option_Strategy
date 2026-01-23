@@ -43,8 +43,8 @@ class FilterData:
     strategies_include : Optional[StrategyType]
     delta_min: float
     delta_max: float
-   
-
+    limit_left: float
+    limit_right: float
 
 def filter_params() -> FilterData:
     """
@@ -62,29 +62,47 @@ def filter_params() -> FilterData:
             "ouvert_droite": 0, 
             "min_premium_sell": 0.05,
             "delta_min": -0.75,
-            "delta_max": 0.75
+            "delta_max": 0.75,
+            "limit_left_filter": 98.5,
+            "limit_right_filter": 98
         }
 
+    
     # Retrieve current values from session_state
     current_filter = st.session_state.filter
 
-    max_loss_left_col, max_loss_right_col, max_premium_col, min_premium_col = st.columns([1.5, 1.5, 1.5, 1.5])
-    
+    max_loss_left_col, max_loss_right_col, limit_left_col, limit_right_col = st.columns([1.5, 1.5, 1.5, 1.5])
     with max_loss_left_col:
         max_loss_left = st.number_input("Max loss left",
                                                 value=float(current_filter["max_loss_left"]),
                                                 step=0.001,
                                                 format="%.3f",
                                                 key="filter_max_loss",
-                                                help="Max loss left")
-        
+                                                help="Max loss left")       
     with max_loss_right_col:
         max_loss_right= st.number_input("Max loss right",
-                                                value = float(current_filter['max_loss_right']),
+                                                value = float(current_filter["max_loss_right"]),
                                                 step=0.001,
                                                 format="%.3f",
                                                 key="filter_max_loss_right",
                                                 help= "Choose the max on the right of the target")
+    with limit_left_col:
+        limit_left = st.number_input("Limit left",
+                                                value=float(current_filter["limit_left_filter"]),
+                                                step=0.001,
+                                                format="%.3f",
+                                                key="limit_left_filter_key",
+                                                help="imit to filter_max_loss_right where the max on the left is applied") 
+    with limit_right_col:
+        limit_right= st.number_input("Limit right",
+                                                value = float(current_filter["limit_right_filter"]),
+                                                step=0.001,
+                                                format="%.3f",
+                                                key="limit_right_filter_key",
+                                                help= "limit to filter_max_loss_right where the max on the right is applied")
+
+        
+    max_premium_col, min_premium_col = st.columns([1.5, 1.5])
     with max_premium_col:
         max_premium = st.number_input("Max premium",
                                                value=float(current_filter["max_premium"]),
@@ -103,7 +121,6 @@ def filter_params() -> FilterData:
 
     
     ouvert_gauche_col, ouvert_droite_col = st.columns([2,2])
-    
     with ouvert_gauche_col:
         ouvert_gauche = st.number_input("PUT: Short-Long",
                                                value=int(current_filter["ouvert_gauche"]),
@@ -165,8 +182,9 @@ def filter_params() -> FilterData:
         "delta_min": delta_min,
         "delta_max": delta_max,
         "ouvert_droite": ouvert_droite,
-        "min_premium_sell": min_premium_sell
-
+        "min_premium_sell": min_premium_sell,
+        "limit_left_filter": limit_left,
+        "limit_right_filter": limit_right
     }
 
 
@@ -180,5 +198,7 @@ def filter_params() -> FilterData:
         filter_type=filter_type,
         strategies_include=strat_include,
         delta_min=delta_min,
-        delta_max=delta_max
+        delta_max=delta_max,
+        limit_left=limit_left,
+        limit_right=limit_right
     )

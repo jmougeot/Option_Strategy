@@ -131,7 +131,9 @@ py::list process_combinations_batch(
     int ouvert_droite,
     double min_premium_sell,
     double delta_min,
-    double delta_max
+    double delta_max,
+    double limit_left,
+    double limit_right
 ) {
     if (!g_cache.valid) {
         throw std::runtime_error("Cache not initialized. Call init_options_cache first.");
@@ -173,7 +175,7 @@ py::list process_combinations_batch(
         auto result = StrategyCalculator::calculate(
             combo_options, combo_signs, combo_pnl, g_cache.prices, g_cache.mixture,
             g_cache.average_mix, max_loss_left, max_loss_right, max_premium_params,
-            ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max
+            ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max, limit_left, limit_right
         );
         
         if (result.has_value()) {
@@ -261,7 +263,9 @@ py::object calculate_strategy_metrics(
     int ouvert_droite,
     double min_premium_sell,
     double delta_min,
-    double delta_max
+    double delta_max,
+    double limit_left,
+    double limit_right
 ) {
     // Accès aux buffers
     auto prem_buf = premiums.unchecked<1>();
@@ -302,8 +306,6 @@ py::object calculate_strategy_metrics(
         options[i].average_pnl = avg_pnl_buf(i);
         options[i].sigma_pnl = sigma_buf(i);
         options[i].strike = strike_buf(i);
-        options[i].profit_surface_ponderated = 0.0;  // Calculé dynamiquement
-        options[i].loss_surface_ponderated = 0.0;    // Calculé dynamiquement
         options[i].is_call = is_call_buf(i);
         options[i].roll = rolls_buf(i);
         options[i].roll_quarterly = rolls_q_buf(i);
@@ -321,11 +323,10 @@ py::object calculate_strategy_metrics(
         mixture_vec[i] = mixture_buf(i);
     }
     
-    // Appel du calcul C++ avec les nouveaux paramètres
     auto result = StrategyCalculator::calculate(
         options, signs_vec, pnl_matrix_vec, prices_vec, mixture_vec,
         average_mix, max_loss_left, max_loss_right, max_premium_params,
-        ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max
+        ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max, limit_left, limit_right
     );
     
     if (!result.has_value()) {
@@ -417,6 +418,8 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
                   min_premium_sell: Premium minimum pour vendre une option
                   delta_min: Delta minimum autorisé
                   delta_max: Delta maximum autorisé
+                  limit_left: Prix limite gauche pour appliquer max_loss_left
+                  limit_right: Prix limite droite pour appliquer max_loss_right
                   
               Retourne:
                   Liste de tuples (indices, signs, metrics_dict) pour les stratégies valides
@@ -431,7 +434,9 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("ouvert_droite"),
           py::arg("min_premium_sell"),
           py::arg("delta_min"),
-          py::arg("delta_max")
+          py::arg("delta_max"),
+          py::arg("limit_left"),
+          py::arg("limit_right")
     );
     
     m.def("calculate_strategy_metrics", &calculate_strategy_metrics,
@@ -497,6 +502,8 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("ouvert_droite"),
           py::arg("min_premium_sell"),
           py::arg("delta_min"),
-          py::arg("delta_max")
+          py::arg("delta_max"),
+          py::arg("limit_left"),
+          py::arg("limit_right")
     );
 }

@@ -127,8 +127,6 @@ def create_strategy_fast_with_signs_cpp(
         average_pnls[i] = opt.average_pnl
         sigma_pnls[i] = opt.sigma_pnl
         strikes[i] = opt.strike
-        profit_surfaces[i] = opt.profit_surface_ponderated
-        loss_surfaces[i] = opt.loss_surface_ponderated
         is_calls[i] = opt.option_type.lower() == "call"
         pnl_matrix[i] = opt.pnl_array
     
@@ -179,8 +177,6 @@ def create_strategy_fast_with_signs_cpp(
             profit_zone_width=result["profit_zone_width"],
             surface_profit=result["surface_profit"],
             surface_loss=result["surface_loss"],
-            surface_profit_ponderated=result["surface_profit_ponderated"],
-            surface_loss_ponderated=result["surface_loss_ponderated"],
             average_pnl=result["total_average_pnl"],
             sigma_pnl=result["total_sigma_pnl"],
             pnl_array=result["pnl_array"],
@@ -194,6 +190,7 @@ def create_strategy_fast_with_signs_cpp(
             avg_implied_volatility=result["total_iv"],
             profit_at_target=0,
             profit_at_target_pct=0,
+            rolls_detail= 0,
             score=0.0,
             rank=0,
         )

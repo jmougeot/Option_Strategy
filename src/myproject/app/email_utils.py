@@ -4,7 +4,6 @@ from datetime import datetime
 from dataclasses import dataclass
 import os
 import sys
-import tempfile
 
 
 @dataclass
@@ -101,7 +100,6 @@ def generate_html_email(
     filters_data: Any,
     scoring_weights: Dict[str, float],
     best_strategy: Optional[StrategyEmailData] = None,
-    top_strategies: Optional[List[StrategyEmailData]] = None,
 ) -> tuple:
     """
     Génère le sujet et le corps HTML d'un email professionnel.

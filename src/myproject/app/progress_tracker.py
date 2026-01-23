@@ -95,14 +95,14 @@ class ProgressTracker:
             
         self._initialized = True
     
-    def update(self, step: ProcessingStep, detail: str = "", stats: dict = None):
+    def update(self, step: ProcessingStep, detail: str, stats: dict = None):
         """
         Met à jour la progression.
         
         Args:
             step: Étape actuelle
             detail: Détail supplémentaire à afficher
-            stats: Statistiques à afficher
+            stats: Statistiques à afficher (optionnel)
         """
         if not self._initialized:
             self.init_ui()
@@ -179,7 +179,7 @@ class ProgressTracker:
     
     def complete(self, stats: dict = None):
         """Marque le traitement comme terminé."""
-        self.update(ProcessingStep.COMPLETE, stats=stats)
+        self.update(ProcessingStep.COMPLETE, "Traitement terminé", stats=stats)
         
         # Afficher un message de succès
         if stats:
