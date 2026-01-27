@@ -199,6 +199,18 @@ echo.
 
 REM Verifier si un compilateur C++ est disponible (g++ ou cl.exe)
 set CPP_COMPILER=
+
+REM D'abord chercher g++ dans les chemins MSYS2/MinGW courants
+for %%p in ("C:\msys64\mingw64\bin" "C:\mingw64\bin" "C:\Program Files\mingw64\bin" "C:\msys64\ucrt64\bin") do (
+    if exist "%%~p\g++.exe" (
+        echo Compilateur trouve: %%~p\g++.exe
+        set "PATH=%%~p;!PATH!"
+        set CPP_COMPILER=g++
+        goto :compile_cpp
+    )
+)
+
+REM Ensuite chercher g++ dans le PATH
 where g++.exe >nul 2>&1
 if %errorlevel% equ 0 (
     set CPP_COMPILER=g++

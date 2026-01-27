@@ -34,9 +34,6 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
             for label in roll_labels:
                 roll_value = comp.rolls_detail.get(label)
                 row[f"Roll {label}"] = f"{roll_value:.4f}" if roll_value is not None else "-"
-            # Ajouter Roll Sum à la fin si plusieurs rolls
-            if len(roll_labels) > 1:
-                row["Roll Sum"] = f"{comp.roll_sum:.4f}" if comp.roll_sum is not None else "-"
         
         data.append(row)
     

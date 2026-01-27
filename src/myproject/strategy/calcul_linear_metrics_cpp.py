@@ -21,10 +21,6 @@ CPP_IMPORT_ERROR = None
 
 def _debug_cpp_import():
     """Affiche des informations de debug pour l'import C++."""
-    print("[DEBUG C++ linear] Tentative d'import de strategy_metrics_cpp...")
-    print(f"[DEBUG C++ linear] Python: {sys.version}")
-    print(f"[DEBUG C++ linear] Executable: {sys.executable}")
-    print(f"[DEBUG C++ linear] VIRTUAL_ENV: {os.environ.get('VIRTUAL_ENV', 'Non défini')}")
     
     # Chercher le fichier .pyd
     import glob
@@ -34,7 +30,6 @@ def _debug_cpp_import():
             if matches:
                 print(f"[DEBUG C++ linear] Fichier trouvé: {matches[0]}")
                 print(f"[DEBUG C++ linear] Taille: {os.path.getsize(matches[0]):,} bytes")
-
 try:
     _debug_cpp_import()
     import strategy_metrics_cpp
@@ -44,7 +39,6 @@ except ImportError as e:
     CPP_AVAILABLE = False
     CPP_IMPORT_ERROR = str(e)
     print(f"[DEBUG C++ linear] ✗ Échec de l'import: {e}")
-    print("⚠️ Module C++ non disponible, utilisation du fallback Python")
     import traceback
     traceback.print_exc()
 

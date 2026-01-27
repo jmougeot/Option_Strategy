@@ -21,7 +21,7 @@ from myproject.app.scenarios_widget import create_mixture_from_scenarios
 from myproject.app.scenarios_widget import ScenarioData
 from myproject.app.utils import filter_same_strategies
 from myproject.app.filter_widget import FilterData
-from myproject.app.progress_tracker import ProgressTracker, ProcessingStep, get_step_for_leg
+from myproject.app.progress_tracker import ProgressTracker, ProcessingStep
 import numpy as np
 
 
@@ -41,22 +41,10 @@ def process_bloomberg_to_strategies(
     num_points: int = 200,
     brut_code: Optional[List[str]] = None,
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
-) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray, float]]:
+) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray, float], float]:
     """
     Fonction principale simplifiée pour Streamlit.
     Importe les options depuis Bloomberg et retourne les meilleures stratégies + stats.
-
-    Args:
-        underlying: Symbole du sous-jacent (ex: "ER")
-        months: Liste des mois Bloomberg (ex: ['M', 'U'])
-        years: Liste des années (ex: [6, 7])
-        strikes: Liste des strikes
-        price_min: Prix minimum
-        price_max: Prix maximum
-        max_legs: Nombre max de legs par stratégie
-        top_n: Nombre de meilleures stratégies à retourner
-        scoring_weights: Poids personnalisés pour le scoring
-        progress_tracker: Tracker de progression (optionnel)
     """
     stats = {}
     
@@ -92,7 +80,7 @@ def process_bloomberg_to_strategies(
 
     if not options:
         progress_tracker.error("Aucune option trouvée")
-        return [], stats, mixture
+        return [], stats, mixture, 0
 
     generator = OptionStrategyGeneratorV2(options)
 
@@ -126,4 +114,4 @@ def process_bloomberg_to_strategies(
 
     progress_tracker.update(ProcessingStep.DISPLAY, "Préparation de l'affichage...", stats)
 
-    return best_strategies, stats, mixture
+    return best_strategies, stats, mixture, underlying_price

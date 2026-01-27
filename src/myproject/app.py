@@ -10,7 +10,8 @@ from myproject.app.styles import inject_css
 from myproject.app.params_widget import sidebar_params
 from myproject.app.scenarios_widget import scenario_params
 from myproject.app.scoring_widget import scoring_weights_block
-from myproject.app.tabs import display_overview_tab, display_payoff_tab
+from myproject.app.tabs import display_overview_tab
+from myproject.app.payoff_diagram import create_payoff_diagram
 from myproject.app.processing import (
     process_comparison_results,
     save_to_session_state,
@@ -158,7 +159,7 @@ def main():
         
         try:
             # Call main function doing EVERYTHING with progress tracking
-            best_strategies, stats, mixture = process_bloomberg_to_strategies(
+            best_strategies, stats, mixture, underlying_price= process_bloomberg_to_strategies(
                 brut_code=params.brut_code,
                 underlying=params.underlying,
                 months=params.months,
@@ -202,10 +203,6 @@ def main():
         # Also save mixture for diagram export
         st.session_state["mixture"] = mixture
         
-        # Note: Les images ne sont générées que lors de la création d'email/PDF
-        # pour éviter des écritures disque inutiles
-
-    # Si on arrive ici sans stratégies, ne rien afficher
     if not all_comparisons:
         return
 
@@ -227,7 +224,7 @@ def main():
         display_overview_tab(comparisons, roll_labels=roll_labels)
 
     with tab2:
-        display_payoff_tab(top_5_comparisons, mixture) #type: ignore
+        create_payoff_diagram(top_5_comparisons, mixture, underlying_price) #type:ignore
 
 # ============================================================================
 # POINT D'ENTRÉE

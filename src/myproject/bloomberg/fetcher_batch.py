@@ -67,7 +67,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
 
         # Envoyer
         session.sendRequest(request)
-
+        underlying_price : float = 98.0
         # Lire la réponse
         while True:
             event = session.nextEvent(5000)
@@ -123,7 +123,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         print(f"✗ Erreur fetch: {e}")
         import traceback
         traceback.print_exc()
-        return results, None
+        return results, 98
 
 
 def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:

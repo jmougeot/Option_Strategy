@@ -1,8 +1,11 @@
 import plotly.graph_objects as go
+import streamlit as st
 
 from typing import Dict, List, Optional, Tuple
 from myproject.strategy.comparison_class import StrategyComparison
 from myproject.option.option_class import Option
+from myproject.app.image_saver import save_top10_summary
+from plotly.subplots import make_subplots
 import numpy as np
 
 
@@ -58,15 +61,17 @@ def format_expiration_date(month: str, year: int) -> str:
 
 
 def create_payoff_diagram(
-    mixture: Tuple[np.ndarray, np.ndarray, float],
     comparisons: List[StrategyComparison],
+    mixture: Tuple[np.ndarray, np.ndarray, float],
+    underlying_price: Optional[float] = None,
 ):
     """
     Creates an interactive P&L diagram for all strategies with optional Gaussian mixture
 
     Args:
         comparisons: List of strategies to display
-        mixture: Tuple (prices, probabilities) for displaying Gaussian distribution (optional)
+        mixture: Tuple (prices, probabilities, mean) for displaying Gaussian distribution
+        underlying_price: Current price of the underlying asset (optional)
 
     Returns:
         Plotly figure with P&L curves and optionally the mixture
@@ -76,8 +81,6 @@ def create_payoff_diagram(
 
     # Create a figure with two Y axes if mixture provided
     if mixture is not None:
-        from plotly.subplots import make_subplots
-
         fig = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
     else:
         fig = go.Figure()
@@ -211,6 +214,17 @@ def create_payoff_diagram(
         opacity=0.5,
     )
 
+    # Ajouter ligne du prix actuel du sous-jacent
+    if underlying_price is not None:
+        fig.add_vline(
+            x=underlying_price,
+            line_dash="solid",
+            line_color="red",
+            annotation_text=f"Spot = {underlying_price:.4f}",
+            annotation_position="bottom right",
+            opacity=0.7,
+        )
+
     # Récupérer l'underlying depuis la première stratégie si disponible
     underlying_label = ""
     if comparisons and len(comparisons) > 0:
@@ -275,6 +289,8 @@ def create_payoff_diagram(
                 zerolinecolor="rgba(128,128,128,0.3)",
             ),
         )
+    
+    st.plotly_chart(fig, width="stretch")
     return fig
 
    
@@ -297,7 +313,6 @@ def save_top5_summary_png(
         Path to the saved PNG file, or None if failed
     """
     try:
-        from myproject.app.image_saver import save_top10_summary
         return save_top10_summary(comparisons, filename or "top5_summary.png")
     except ImportError:
         # Fallback si image_saver n'est pas disponible

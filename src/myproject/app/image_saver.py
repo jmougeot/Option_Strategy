@@ -5,9 +5,7 @@ Gère la création des répertoires, les fallbacks et les erreurs.
 from pathlib import Path
 from typing import List, Optional, Tuple
 import numpy as np
-from myproject.app.payoff_diagram import create_payoff_diagram
 import plotly.graph_objects as go
-import traceback
 
 
 
@@ -141,6 +139,8 @@ def save_payoff_diagram_png(
     """
   
     limited_comparisons = comparisons[:max_strategies]
+    # Import local pour éviter l'import circulaire
+    from myproject.app.payoff_diagram import create_payoff_diagram
     fig = create_payoff_diagram(mixture, limited_comparisons)
     return save_figure_to_png(fig, filename, width=500, height=250)
 

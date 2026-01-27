@@ -5,6 +5,7 @@ Importe les données d'options depuis Bloomberg et les convertit en objets Optio
 """
 
 from typing import Any, Dict, List, Literal, Optional, Tuple, cast
+from git import Reference
 import numpy as np
 
 from myproject.bloomberg.expiry_utils import MONTH_NAMES
@@ -13,6 +14,7 @@ from myproject.bloomberg.ticker_builder import (
     build_option_ticker, build_option_ticker_brut, parse_brut_code, MonthCode)
 from myproject.bloomberg.bloomber_to_opt import create_option_from_bloomberg
 from myproject.option.option_class import Option
+
 
 # ============================================================================
 # TYPES ET ALIASES
@@ -115,7 +117,7 @@ class PremiumFetcher:
         self.builder = builder
         self.main_data: Dict[str, Any] = {}
         self.roll_premiums: Dict[PremiumKey, float] = {}
-        self.underlying_price: Optional[float] = None
+        self.underlying_price: float = 0
     
     def fetch_all(self):
         """Fetch toutes les données en batch."""
@@ -259,23 +261,11 @@ def import_options(
     brut_code: Optional[List[str]] = None,
     suffix: str = "Comdty",
     default_position: PositionType = "long",
-) -> Tuple[List[Option], Optional[float]]:
+) -> Tuple[List[Option], float]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne des objets Option.
-    
-    Args:
-        mixture: Tuple (prices, probas, forward) pour le calcul des surfaces
-        underlying: Symbole du sous-jacent (ignoré si brut_code)
-        months: Liste des mois Bloomberg (ignoré si brut_code)
-        years: Liste des années (ignoré si brut_code)
-        strikes: Liste des strikes à importer
-        roll_expiries: Liste de (month, year) pour calculer les rolls
-        brut_code: Liste de codes Bloomberg bruts ou None pour mode standard
-        suffix: Suffixe Bloomberg
-        default_position: Position par défaut
-    
     Returns:
-        Tuple (liste d'objets Option, prix du sous-jacent ou None)
+        Tuple (liste d'objets Option, prix du sous-jacent )
     """
     print("\n🔨 Construction des tickers...")
     
@@ -288,11 +278,10 @@ def import_options(
         builder.build_from_standard(underlying, months, years, strikes)
     else:
         builder.build_from_brut(brut_code, strikes)
-    
-    total_attempts = len(builder.main_tickers)
-    
+
+
     # 2. Fetch des données
-    underlying_price: Optional[float] = None
+    underlying_price: float = 98
     options: List[Option] = []
     
     try:
@@ -304,25 +293,15 @@ def import_options(
         options = processor.process_all()
         underlying_price = fetcher.underlying_price
         
+        if underlying_price is not None:
+            print(f"here is the {underlying_price}")
+        else:
+            print("No underlying ref")
+        
     except Exception as e:
         print(f"\n✗ Erreur lors du fetch batch: {e}")
         import traceback
         traceback.print_exc()
 
-    # 4. Résumé
-    total_success = len(options)
-    print("\n" + "=" * 70)
-    print("RÉSUMÉ DE L'IMPORT")
-    print("=" * 70)
 
-    if total_attempts > 0:
-        print(f"Succès: {total_success} ({total_success/total_attempts*100:.1f}%)")
-    else:
-        print("Succès: 0")
-        print(f"Échecs: {total_attempts - total_success}")
-    if roll_expiries:
-        roll_str = ", ".join(f"{m}{y}" for m, y in roll_expiries)
-        print(f"Roll calculé vs: [{roll_str}]")
-    print("=" * 70)
-    
     return options, underlying_price
