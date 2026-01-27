@@ -206,6 +206,36 @@ if %errorlevel% equ 0 (
     goto :compile_cpp
 )
 
+REM Chercher Visual Studio et configurer l'environnement
+where cl.exe >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Recherche de Visual Studio Build Tools...
+    set VSWHERE="%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+    
+    if exist !VSWHERE! (
+        for /f "usebackq tokens=*" %%i in (`!VSWHERE! -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2^>nul`) do (
+            set VS_PATH=%%i
+        )
+        
+        if defined VS_PATH (
+            echo Visual Studio trouve: !VS_PATH!
+            
+            REM Charger l'environnement de compilation selon l'architecture
+            if "!ARCH!"=="x64" (
+                if exist "!VS_PATH!\VC\Auxiliary\Build\vcvars64.bat" (
+                    call "!VS_PATH!\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
+                    echo Environnement MSVC x64 active
+                )
+            ) else (
+                if exist "!VS_PATH!\VC\Auxiliary\Build\vcvars32.bat" (
+                    call "!VS_PATH!\VC\Auxiliary\Build\vcvars32.bat" >nul 2>&1
+                    echo Environnement MSVC x86 active
+                )
+            )
+        )
+    )
+)
+
 where cl.exe >nul 2>&1
 if %errorlevel% equ 0 (
     set CPP_COMPILER=cl
@@ -302,18 +332,26 @@ if exist build rmdir /s /q build 2>nul
 if exist strategy_metrics_cpp.egg-info rmdir /s /q strategy_metrics_cpp.egg-info 2>nul
 
 REM Desinstaller l'ancienne version si elle existe
-pip uninstall strategy_metrics_cpp -y 2>nul
+pip uninstall strategy_metrics_cpp -y >nul 2>&1
 
-REM Compiler et installer
-pip install . --quiet 2>nul
+REM Compiler et installer (avec affichage des erreurs)
+echo.
+pip install . --verbose
+set CPP_BUILD_RESULT=%errorlevel%
 
 popd
 
 REM Verifier l'installation
-python -c "import strategy_metrics_cpp; print('OK: Module C++ installe avec succes')" 2>nul
-if %errorlevel% neq 0 (
-    echo ATTENTION: La compilation C++ a echoue, mode Python pur sera utilise
-    echo            ^(L'application fonctionnera, mais sera plus lente^)
+if %CPP_BUILD_RESULT% equ 0 (
+    python -c "import strategy_metrics_cpp; print('OK: Module C++ installe avec succes')" 2>nul
+    if %errorlevel% neq 0 (
+        echo ATTENTION: Module compile mais import echoue
+        echo            Mode Python pur sera utilise
+    )
+) else (
+    echo.
+    echo ATTENTION: La compilation C++ a echoue ^(code %CPP_BUILD_RESULT%^)
+    echo            Mode Python pur sera utilise ^(plus lent mais fonctionnel^)
 )
 
 :skip_cpp
