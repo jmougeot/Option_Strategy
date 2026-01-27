@@ -42,22 +42,19 @@ jobs:
       - name: Build C++ module
         run: |
           cd src/myproject/strategy/cpp
-          pip install .
-        continue-on-error: true
+          pip install . -v 2>&1 || echo "C++ build failed - see logs above"
+          
+      - name: Verify C++ module
+        run: |
+          python -c "import strategy_metrics_cpp; print('✓ C++ module loaded:', strategy_metrics_cpp.__file__)" || echo "⚠ C++ module not available"
 
       - name: Lint with flake8
         run: |
           pip install flake8
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        continue-on-error: true
-
       - name: Test imports
         run: |
           python -c "import streamlit; print('✓ streamlit')"
           python -c "import plotly; print('✓ plotly')"
           python -c "import pandas; print('✓ pandas')"
           python -c "import numpy; print('✓ numpy')"
-
-      - name: Test C++ module import
-        run: |
-          python -c "import strategy_metrics_cpp; print('✓ C++ module')" || echo "⚠ C++ module not available (optional)"
