@@ -101,16 +101,77 @@ echo Installation des dependances...
 echo   - streamlit
 echo   - plotly
 echo   - pandas
-pip install -r requirements.txt
-echo.
-echo Installation de Bloomberg API (blpapi)...
-pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi --quiet
+pip install -r requirements.txt --quiet
 if %errorlevel% neq 0 (
-    echo ERREUR: Echec de l'installation des dependances
+    echo ERREUR: Echec de l'installation des dependances Python
     pause
     exit /b 1
 )
-echo OK: Dependances installees
+echo OK: Dependances Python installees
+echo.
+
+REM Étape 5b: Installer Bloomberg API (blpapi)
+echo ========================================================================
+echo   Installation de Bloomberg API (blpapi)
+echo ========================================================================
+echo.
+
+REM Detecter le SDK Bloomberg (DAPI)
+set BLPAPI_FOUND=0
+set BLPAPI_SDK_PATH=
+
+REM Chercher dans les emplacements standards
+for %%p in ("C:\blp\DAPI" "C:\Bloomberg\DAPI" "C:\blp\API" "%LOCALAPPDATA%\Bloomberg\DAPI") do (
+    if exist "%%~p\lib\blpapi3_64.dll" (
+        set BLPAPI_SDK_PATH=%%~p
+        set BLPAPI_FOUND=1
+        echo SDK Bloomberg trouve: %%~p
+        goto :install_blpapi
+    )
+    if exist "%%~p\blpapi3_64.dll" (
+        set BLPAPI_SDK_PATH=%%~p
+        set BLPAPI_FOUND=1
+        echo SDK Bloomberg trouve: %%~p
+        goto :install_blpapi
+    )
+)
+
+REM Verifier si BLPAPI_ROOT est deja defini
+if defined BLPAPI_ROOT (
+    set BLPAPI_SDK_PATH=!BLPAPI_ROOT!
+    set BLPAPI_FOUND=1
+    echo Variable BLPAPI_ROOT detectee: !BLPAPI_ROOT!
+    goto :install_blpapi
+)
+
+:install_blpapi
+if !BLPAPI_FOUND! equ 1 (
+    echo.
+    echo Configuration de l'environnement Bloomberg...
+    set "BLPAPI_ROOT=!BLPAPI_SDK_PATH!"
+    
+    echo Installation de blpapi depuis le repository Bloomberg...
+    pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi --quiet
+    
+    if %errorlevel% equ 0 (
+        echo OK: Bloomberg API installe avec succes
+        python -c "import blpapi; print('   Version:', blpapi.VERSION_MAJOR, '.', blpapi.VERSION_MINOR, '.', blpapi.VERSION_PATCH)" 2>nul
+    ) else (
+        echo ATTENTION: Installation de blpapi echouee
+        echo            Verifiez que Bloomberg Terminal est installe
+    )
+) else (
+    echo.
+    echo ATTENTION: SDK Bloomberg non trouve sur cette machine
+    echo.
+    echo            Bloomberg Terminal doit etre installe pour utiliser blpapi.
+    echo            L'application fonctionnera mais sans les fonctionnalites Bloomberg.
+    echo.
+    echo            Emplacements recherches:
+    echo            - C:\blp\DAPI
+    echo            - C:\Bloomberg\DAPI  
+    echo            - %%LOCALAPPDATA%%\Bloomberg\DAPI
+)
 echo.
 
 REM Étape 6: Compilation du module C++ (acceleration des calculs)
