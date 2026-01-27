@@ -185,8 +185,6 @@ class OptionStrategyGeneratorV2:
             if (
                 first.expiration_year != last.expiration_year
                 or first.expiration_month != last.expiration_month
-                or first.expiration_week != last.expiration_week
-                or first.expiration_day != last.expiration_day
             ):
                 _debug_variant_stats["expiration_mismatch"] += 1
                 return []

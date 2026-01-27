@@ -59,7 +59,7 @@ MONTH_EXPIRY_DAY = {
 }
 
 
-def get_expiration_components(month: str, year: int) -> tuple[MonthCode, int, str]:
+def get_expiration_components(month: str, year: int) -> tuple[MonthCode, int]:
     """
     Calcule les composants d'expiration pour une option.
 
@@ -68,10 +68,9 @@ def get_expiration_components(month: str, year: int) -> tuple[MonthCode, int, st
         year: Année sur 1 chiffre (6 = 2026)
 
     Returns:
-        (month_code, year, day_str)
+        (month_code, year)
     """
-    day = MONTH_EXPIRY_DAY.get(month, 18)
-    return cast(MonthCode, month), year, str(day)
+    return cast(MonthCode, month), year
 
 
 def create_option_from_bloomberg(
@@ -107,7 +106,7 @@ def create_option_from_bloomberg(
         Objet Option
     """
     try:
-        month_code, exp_year, exp_day = get_expiration_components(month, year)
+        month_code, exp_year = get_expiration_components(month, year)
 
         # Extraire les valeurs avec gestion des None
         premium = _safe_float(bloomberg_data.get("premium"))
@@ -136,7 +135,6 @@ def create_option_from_bloomberg(
             premium=premium,
             expiration_month=month_code,
             expiration_year=exp_year,
-            expiration_day=exp_day,
             # Position
             position=position,
             # Identification

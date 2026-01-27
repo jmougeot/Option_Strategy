@@ -139,7 +139,7 @@ def create_strategy_fast_with_signs_cpp(
     # ========== APPEL DU MODULE C++ ==========
     # Tous les calculs et filtres sont faits en C++
     
-    result = strategy_metrics_cpp.calculate_strategy_metrics(
+    result = strategy_metrics_cpp.calculate_strategy_metrics( #type: ignore
         premiums, deltas, gammas, vegas, thetas, ivs,
         average_pnls, sigma_pnls, strikes, 
         profit_surfaces, loss_surfaces, is_calls,
@@ -157,9 +157,6 @@ def create_strategy_fast_with_signs_cpp(
     strategy_name = generate_strategy_name(options, signs)
     exp_info = get_expiration_info(options)
     
-    # Récupérer l'underlying depuis la première option
-    underlying_sym = options[0].underlying_symbol if options else None
-    
     try:
         strategy = StrategyComparison(
             strategy_name=strategy_name,
@@ -169,9 +166,6 @@ def create_strategy_fast_with_signs_cpp(
             signs=signs,
             call_count=result["call_count"],
             put_count=result["put_count"],
-            underlying_symbol=underlying_sym,
-            expiration_day=exp_info.get("expiration_day"),
-            expiration_week=exp_info.get("expiration_week"),
             expiration_month=exp_info.get("expiration_month", "F"),
             expiration_year=exp_info.get("expiration_year", 6),
             max_profit=result["max_profit"],
@@ -179,14 +173,10 @@ def create_strategy_fast_with_signs_cpp(
             breakeven_points=result["breakeven_points"],
             profit_range=(result["min_profit_price"], result["max_profit_price"]),
             profit_zone_width=result["profit_zone_width"],
-            surface_profit=result["surface_profit"],
-            surface_loss=result["surface_loss"],
             average_pnl=result["total_average_pnl"],
             sigma_pnl=result["total_sigma_pnl"],
             pnl_array=result["pnl_array"],
             prices=prices,
-            risk_reward_ratio=0,
-            risk_reward_ratio_ponderated=0,
             total_delta=result["total_delta"],
             total_gamma=result["total_gamma"],
             total_vega=result["total_vega"],
@@ -194,7 +184,7 @@ def create_strategy_fast_with_signs_cpp(
             avg_implied_volatility=result["total_iv"],
             profit_at_target=0,
             profit_at_target_pct=0,
-            rolls_detail= 0,
+            rolls_detail= {},
             score=0.0,
             rank=0,
         )

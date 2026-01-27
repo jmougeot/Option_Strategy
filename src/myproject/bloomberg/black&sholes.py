@@ -57,8 +57,6 @@ def create_heatmap_option_prices(
         option_type: "call" ou "put"
         vol_range: Tuple (min_vol, max_vol) pour la plage de volatilité
         vol_steps: Nombre de steps de volatilité à tester
-        days_to_expiry_range: Tuple (min_days, max_days) pour l'expiration
-        days_steps: Nombre de steps temporels à tester
         
     Returns:
         Figure Plotly avec la heatmap interactive

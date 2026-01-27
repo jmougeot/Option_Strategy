@@ -9,7 +9,7 @@ from typing import Any, Optional, Tuple
 from myproject.bloomberg.connection import get_session, get_service
 
 
-# Champs à récupérer
+# Champs à récupérer (PX_LAST utilisé aussi pour le sous-jacent)
 OPTION_FIELDS = [
     "PX_BID", "PX_ASK", "PX_MID", "PX_LAST",
     "OPT_DELTA", "OPT_GAMMA", "OPT_VEGA", "OPT_THETA", "OPT_RHO",
@@ -19,19 +19,20 @@ OPTION_FIELDS = [
 ]
 
 
-def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyings: Optional[str] = None) -> Tuple[dict[str, dict[str, Any]], Optional[dict]]:
+def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyings: Optional[str] = None) -> Tuple[dict[str, dict[str, Any]], Optional[float]]:
     """
     Récupère les données pour plusieurs tickers Bloomberg.
 
     Args:
         tickers: Liste des tickers Bloomberg (ex: ["SPX 12/20/24 C5000 Equity"])
         use_overrides: Si True, ajoute les overrides pour forcer les Greeks
+        underlyings: Ticker du sous-jacent pour récupérer son prix (optionnel)
 
     Returns:
-        Dictionnaire {ticker: {field: value}}
+        Tuple (résultats options, prix du sous-jacent ou None)
     """
     results = {ticker: {} for ticker in tickers}
-    underlying_ref = {}
+    underlying_price: Optional[float] = None
 
     try:
         session = get_session()
@@ -44,10 +45,10 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         overrid = blpapi.name.Name("overrides")
         fieldId = blpapi.name.Name("fieldId")
         value = blpapi.name.Name("value")
-        underlying= blpapi.name.Name("underlying")
 
+        # Ajouter le sous-jacent en premier si fourni
         if underlyings is not None:
-            request.append(underlying, underlyings)
+            request.append(securities, underlyings)
 
         for ticker in tickers:
             request.append(securities, ticker)
@@ -81,10 +82,11 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
                             ticker = security.getElementAsString("security")
 
                             if security.hasElement("securityError"):
-                                print(f"⚠️ Erreur pour {ticker}")
+                                err = security.getElement("securityError")
+                                err_msg = err.getElementAsString("message") if err.hasElement("message") else "Unknown"
+                                print(f"⚠️ Erreur pour {ticker}: {err_msg}")
                                 continue
-                            if security.hasElement("underlying"):
-                                underlying_ref= security.getElement("underlying")
+                            
                             if security.hasElement("fieldData"):
                                 field_data = security.getElement("fieldData")
                                 ticker_data = {}
@@ -98,14 +100,29 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
                                     else:
                                         ticker_data[field] = None
 
-                                results[ticker] = ticker_data
+                                # Si c'est le sous-jacent, extraire son prix
+                                if underlyings is not None and ticker == underlyings:
+                                    if field_data.hasElement("PX_LAST"):
+                                        try:
+                                            underlying_price = field_data.getElement("PX_LAST").getValue()
+                                        except:
+                                            pass
+                                    elif field_data.hasElement("PX_MID"):
+                                        try:
+                                            underlying_price = field_data.getElement("PX_MID").getValue()
+                                        except:
+                                            pass
+                                else:
+                                    results[ticker] = ticker_data
 
             if event.eventType() == blpapi.event.Event.RESPONSE:
                 break
-        return results, underlying_ref
+        return results, underlying_price
 
     except Exception as e:
         print(f"✗ Erreur fetch: {e}")
+        import traceback
+        traceback.print_exc()
         return results, None
 
 

@@ -12,8 +12,6 @@ class Option:
     timestamp: Optional[float] = None
 
     # ============ CHAMPS OBLIGATOIRES ============
-    expiration_day: Optional[str] = None
-    expiration_week: Optional[str] = None
     expiration_month: Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"] = ("F")
     expiration_year: int = 6
 

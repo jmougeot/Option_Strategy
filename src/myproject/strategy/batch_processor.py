@@ -44,8 +44,6 @@ def prepare_batch_data_by_legs(options: List[Option], n_legs: int, max_legs: int
             if (
                 first.expiration_year != last.expiration_year
                 or first.expiration_month != last.expiration_month
-                or first.expiration_week != last.expiration_week
-                or first.expiration_day != last.expiration_day
             ):
                 continue
         
@@ -102,8 +100,6 @@ def prepare_batch_data(options: List[Option], max_legs: int = 4):
                 if (
                     first.expiration_year != last.expiration_year
                     or first.expiration_month != last.expiration_month
-                    or first.expiration_week != last.expiration_week
-                    or first.expiration_day != last.expiration_day
                 ):
                     continue
             
@@ -246,9 +242,6 @@ def batch_to_strategies(
                         total_rolls_detail[label] = 0.0
                     total_rolls_detail[label] += float(signs_arr[i]) * value
         
-        # Récupérer l'underlying depuis la première option
-        underlying_sym = opts[0].underlying_symbol if opts else None
-        
         # Créer la StrategyComparison
         strat = StrategyComparison(
             strategy_name=strategy_name,
@@ -258,9 +251,6 @@ def batch_to_strategies(
             signs=signs_arr,
             call_count=metrics.get('call_count', 0),
             put_count=metrics.get('put_count', 0),
-            underlying_symbol=underlying_sym,
-            expiration_day=exp_info.get("expiration_day"),
-            expiration_week=exp_info.get("expiration_week"),
             expiration_month=exp_info.get("expiration_month", "F"),
             expiration_year=exp_info.get("expiration_year", 6),
             max_profit=metrics['max_profit'],
@@ -280,9 +270,6 @@ def batch_to_strategies(
             profit_at_target=0,
             score=0.0,
             rank=0,
-            roll=metrics.get('total_roll', 0),
-            roll_quarterly=metrics.get('total_roll_quarterly', 0),
-            roll_sum=metrics.get('total_roll_sum', 0),
             rolls_detail=total_rolls_detail,
         )
         strategies.append(strat)

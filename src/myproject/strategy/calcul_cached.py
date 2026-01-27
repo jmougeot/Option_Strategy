@@ -163,9 +163,6 @@ def create_strategy_from_cache(
     strategy_name = generate_strategy_name(options, signs)
     exp_info = get_expiration_info(options)
     
-    # Récupérer l'underlying depuis la première option
-    underlying_sym = options[0].underlying_symbol if options else None
-    
     try:
         return StrategyComparison(
             strategy_name=strategy_name,
@@ -175,9 +172,6 @@ def create_strategy_from_cache(
             signs=signs,
             call_count=result["call_count"],
             put_count=result["put_count"],
-            underlying_symbol=underlying_sym,
-            expiration_day=exp_info.get("expiration_day"),
-            expiration_week=exp_info.get("expiration_week"),
             expiration_month=exp_info.get("expiration_month", "F"),
             expiration_year=exp_info.get("expiration_year", 6),
             max_profit=result["max_profit"],
@@ -194,9 +188,6 @@ def create_strategy_from_cache(
             total_vega=result["total_vega"],
             total_theta=result["total_theta"],
             avg_implied_volatility=result["total_iv"],
-            roll=0,
-            roll_quarterly=0,
-            roll_sum=0,
             profit_at_target=0,
             profit_at_target_pct=0,
             score=0.0,

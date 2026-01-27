@@ -15,9 +15,6 @@ class StrategyComparison:
     signs: np.ndarray  # Signes (+1 pour long, -1 pour short) correspondant aux options
     call_count: int
     put_count : int 
-    underlying_symbol: Optional[str]  # Symbole du sous-jacent (ex: "ER", "RXW")
-    expiration_day: Optional[str]
-    expiration_week: Optional[str]
     expiration_month: Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"]
     expiration_year: int
     max_profit: float
@@ -25,9 +22,6 @@ class StrategyComparison:
     breakeven_points: List[float]
     profit_range: Tuple[float, float]  # Range de prix profitable
     profit_zone_width: float  # Largeur de la zone profitable+
-    roll: Optional[float]  # Roll moyen (normalisé par nombre de trimestres)
-    roll_quarterly: Optional[float]  # Roll Q-1 (trimestre précédent)
-    roll_sum: Optional[float]  # Somme des rolls (non normalisée)
     average_pnl: Optional[float]  # Espérance du P&L avec mixture
     sigma_pnl: Optional[float]  # Écart-type du P&L avec mixture
     prices: np.ndarray

@@ -41,6 +41,13 @@ class TickerBuilder:
         self.main_metadata: Dict[str, TickerMeta] = {}
         self.roll_tickers: List[str] = []
         self.roll_metadata: Dict[str, TickerMeta] = {}
+        self.underlying_ticker: str =""
+
+    def _build_underlying(self, underlying, months, years):
+        month=months[0]
+        year=years[0]
+        self.underlying_ticker = f"{underlying}{month}{year} {self.suffix}"
+
     
     def _add_roll_tickers(self, underlying: str, strike: float, 
                           option_type: str, opt_char: OptionTypeChar):
@@ -108,15 +115,17 @@ class PremiumFetcher:
         self.builder = builder
         self.main_data: Dict[str, Any] = {}
         self.roll_premiums: Dict[PremiumKey, float] = {}
+        self.underlying_price: Optional[float] = None
     
     def fetch_all(self):
         """Fetch toutes les données en batch."""
-        print(f"\n📡 Fetch des {len(self.builder.main_tickers)} options courantes...")
-        self.main_data = fetch_options_batch(self.builder.main_tickers, use_overrides=True)
+        self.main_data, self.underlying_price = fetch_options_batch(
+            self.builder.main_tickers, 
+            underlyings=self.builder.underlying_ticker
+        )
         
         if self.builder.roll_tickers:
-            print(f"📡 Fetch des {len(self.builder.roll_tickers)} options de roll...")
-            roll_data = fetch_options_batch(self.builder.roll_tickers, use_overrides=True)
+            roll_data, _ = fetch_options_batch(self.builder.roll_tickers, use_overrides=True)
             self._extract_premiums(roll_data, self.builder.roll_metadata)
     
     def _extract_premiums(self, batch_data: Dict, metadata: Dict[str, TickerMeta]):
@@ -250,7 +259,7 @@ def import_options(
     brut_code: Optional[List[str]] = None,
     suffix: str = "Comdty",
     default_position: PositionType = "long",
-) -> List[Option]:
+) -> Tuple[List[Option], Optional[float]]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne des objets Option.
     
@@ -266,12 +275,15 @@ def import_options(
         default_position: Position par défaut
     
     Returns:
-        Liste d'objets Option
+        Tuple (liste d'objets Option, prix du sous-jacent ou None)
     """
     print("\n🔨 Construction des tickers...")
     
     # 1. Construction des tickers
     builder = TickerBuilder(suffix, roll_expiries)
+
+    builder._build_underlying(underlying, months, years)
+
     if brut_code is None:
         builder.build_from_standard(underlying, months, years, strikes)
     else:
@@ -280,6 +292,9 @@ def import_options(
     total_attempts = len(builder.main_tickers)
     
     # 2. Fetch des données
+    underlying_price: Optional[float] = None
+    options: List[Option] = []
+    
     try:
         fetcher = PremiumFetcher(builder)
         fetcher.fetch_all()
@@ -287,12 +302,12 @@ def import_options(
         # 3. Traitement des options
         processor = OptionProcessor(builder, fetcher, mixture, default_position)
         options = processor.process_all()
+        underlying_price = fetcher.underlying_price
         
     except Exception as e:
         print(f"\n✗ Erreur lors du fetch batch: {e}")
         import traceback
         traceback.print_exc()
-        options = []
 
     # 4. Résumé
     total_success = len(options)
@@ -310,4 +325,4 @@ def import_options(
         print(f"Roll calculé vs: [{roll_str}]")
     print("=" * 70)
     
-    return options
+    return options, underlying_price
