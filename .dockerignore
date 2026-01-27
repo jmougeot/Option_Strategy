@@ -1,0 +1,62 @@
+# =============================================================================
+# Docker ignore file - Fichiers exclus du build Docker
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# Environnements virtuels Python
+.venv/
+venv/
+env/
+.env
+
+# Cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+*.spec
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+app.log
+
+# Fichiers temporaires
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Documentation (optionnel)
+docs/
+
+# Tests
+tests/
+*_test.py
+test_*.py
+
+# Scripts Windows (non nécessaires dans Docker)
+*.bat
+
+# GitHub
+.github/
+
+# C++ build artifacts (seront recompilés dans Docker)
+src/myproject/strategy/cpp/build/
+src/myproject/strategy/cpp/*.egg-info/
