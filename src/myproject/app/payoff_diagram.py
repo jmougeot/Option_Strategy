@@ -211,10 +211,19 @@ def create_payoff_diagram(
         opacity=0.5,
     )
 
+    # Récupérer l'underlying depuis la première stratégie si disponible
+    underlying_label = ""
+    if comparisons and len(comparisons) > 0:
+        first_comp = comparisons[0]
+        if first_comp.underlying_symbol:
+            underlying_label = f" - {first_comp.underlying_symbol}"
+        elif first_comp.all_options and first_comp.all_options[0].underlying_symbol:
+            underlying_label = f" - {first_comp.all_options[0].underlying_symbol}"
+
     # Configuration du layout
     if mixture is not None:
         fig.update_layout(
-            title="Diagramme de P&L à l'Expiration avec Distribution Gaussienne",
+            title=f"Diagramme de P&L à l'Expiration{underlying_label} avec Distribution Gaussienne",
             xaxis_title="Prix du Sous-Jacent ($)",
             yaxis_title="Profit / Perte ($)",
             yaxis2_title="Densité de Probabilité",
@@ -243,7 +252,7 @@ def create_payoff_diagram(
         )
     else:
         fig.update_layout(
-            title="Diagramme de P&L à l'Expiration",
+            title=f"Diagramme de P&L à l'Expiration{underlying_label}",
             xaxis_title="Prix du Sous-Jacent ($)",
             yaxis_title="Profit / Perte ($)",
             height=500,

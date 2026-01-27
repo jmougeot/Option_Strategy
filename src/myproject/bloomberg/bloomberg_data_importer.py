@@ -186,11 +186,6 @@ class OptionProcessor:
         periods = sorted({(m["year"], m["month"]) for m in self.builder.main_metadata.values()})
         
         for year, month in periods:
-            month_name = MONTH_NAMES.get(month, month)
-            roll_info = ", ".join(f"{m}{y}" for m, y in (self.builder.roll_expiries or []))
-            print(f"\n{month_name} 20{20+year} (roll vs [{roll_info}])")
-            print("-" * 70)
-            
             for ticker in self.builder.main_tickers:
                 meta = self.builder.main_metadata[ticker]
                 if meta["month"] != month or meta["year"] != year:
@@ -304,7 +299,6 @@ def import_options(
     print("\n" + "=" * 70)
     print("RÉSUMÉ DE L'IMPORT")
     print("=" * 70)
-    print(f"Total tentatives: {total_attempts}")
 
     if total_attempts > 0:
         print(f"Succès: {total_success} ({total_success/total_attempts*100:.1f}%)")

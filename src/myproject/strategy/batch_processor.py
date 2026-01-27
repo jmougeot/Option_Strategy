@@ -246,6 +246,9 @@ def batch_to_strategies(
                         total_rolls_detail[label] = 0.0
                     total_rolls_detail[label] += float(signs_arr[i]) * value
         
+        # Récupérer l'underlying depuis la première option
+        underlying_sym = opts[0].underlying_symbol if opts else None
+        
         # Créer la StrategyComparison
         strat = StrategyComparison(
             strategy_name=strategy_name,
@@ -255,6 +258,7 @@ def batch_to_strategies(
             signs=signs_arr,
             call_count=metrics.get('call_count', 0),
             put_count=metrics.get('put_count', 0),
+            underlying_symbol=underlying_sym,
             expiration_day=exp_info.get("expiration_day"),
             expiration_week=exp_info.get("expiration_week"),
             expiration_month=exp_info.get("expiration_month", "F"),

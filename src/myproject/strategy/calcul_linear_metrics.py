@@ -261,6 +261,9 @@ def create_strategy_fast_with_signs(
     # Nom et expiration (après tous les filtres)
     strategy_name = generate_strategy_name(options, signs)
     exp_info = get_expiration_info(options)
+    
+    # Récupérer l'underlying depuis la première option
+    underlying_sym = options[0].underlying_symbol if options else None
 
     try:
         strategy = StrategyComparison(
@@ -271,6 +274,7 @@ def create_strategy_fast_with_signs(
             signs=signs,  # Stocker les signes utilisés
             call_count=0,
             put_count=0,
+            underlying_symbol=underlying_sym,
             expiration_day=exp_info.get("expiration_day"),
             expiration_week=exp_info.get("expiration_week"),
             expiration_month=exp_info.get("expiration_month", "F"),

@@ -5,8 +5,7 @@ Récupère les données d'options depuis Bloomberg.
 """
 
 import blpapi
-from typing import Any
-
+from typing import Any, Optional, Tuple
 from myproject.bloomberg.connection import get_session, get_service
 
 
@@ -20,7 +19,7 @@ OPTION_FIELDS = [
 ]
 
 
-def fetch_options_batch(tickers: list[str], use_overrides: bool = True) -> dict[str, dict[str, Any]]:
+def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyings: Optional[str] = None) -> Tuple[dict[str, dict[str, Any]], Optional[dict]]:
     """
     Récupère les données pour plusieurs tickers Bloomberg.
 
@@ -32,6 +31,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True) -> dict[
         Dictionnaire {ticker: {field: value}}
     """
     results = {ticker: {} for ticker in tickers}
+    underlying_ref = {}
 
     try:
         session = get_session()
@@ -44,12 +44,18 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True) -> dict[
         overrid = blpapi.name.Name("overrides")
         fieldId = blpapi.name.Name("fieldId")
         value = blpapi.name.Name("value")
+        underlying= blpapi.name.Name("underlying")
+
+        if underlyings is not None:
+            request.append(underlying, underlyings)
 
         for ticker in tickers:
             request.append(securities, ticker)
 
         for field in OPTION_FIELDS:
             request.append(fields, field)
+        
+
 
         # Ajouter les overrides si demandé
         if use_overrides:
@@ -68,7 +74,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True) -> dict[
             if event.eventType() in [blpapi.event.Event.RESPONSE, blpapi.event.Event.PARTIAL_RESPONSE]:
                 for msg in event:
                     if msg.hasElement("securityData"):
-                        security_data = msg.getElement("securityData")
+                        security_data = msg.getElement("securityData")                            
 
                         for i in range(security_data.numValues()):
                             security = security_data.getValueAsElement(i)
@@ -77,7 +83,8 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True) -> dict[
                             if security.hasElement("securityError"):
                                 print(f"⚠️ Erreur pour {ticker}")
                                 continue
-
+                            if security.hasElement("underlying"):
+                                underlying_ref= security.getElement("underlying")
                             if security.hasElement("fieldData"):
                                 field_data = security.getElement("fieldData")
                                 ticker_data = {}
@@ -95,12 +102,11 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True) -> dict[
 
             if event.eventType() == blpapi.event.Event.RESPONSE:
                 break
-
-        return results
+        return results, underlying_ref
 
     except Exception as e:
         print(f"✗ Erreur fetch: {e}")
-        return results
+        return results, None
 
 
 def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:
