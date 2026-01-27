@@ -10,11 +10,9 @@ import numpy as np
 from myproject.bloomberg.expiry_utils import MONTH_NAMES
 from myproject.bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
 from myproject.bloomberg.ticker_builder import (
-    build_option_ticker, build_option_ticker_brut, parse_brut_code, MonthCode
-)
+    build_option_ticker, build_option_ticker_brut, parse_brut_code, MonthCode)
 from myproject.bloomberg.bloomber_to_opt import create_option_from_bloomberg
 from myproject.option.option_class import Option
-
 
 # ============================================================================
 # TYPES ET ALIASES
@@ -300,18 +298,19 @@ def import_options(
         import traceback
         traceback.print_exc()
         options = []
-    
+
     # 4. Résumé
     total_success = len(options)
     print("\n" + "=" * 70)
     print("RÉSUMÉ DE L'IMPORT")
     print("=" * 70)
     print(f"Total tentatives: {total_attempts}")
+
     if total_attempts > 0:
         print(f"Succès: {total_success} ({total_success/total_attempts*100:.1f}%)")
     else:
         print("Succès: 0")
-    print(f"Échecs: {total_attempts - total_success}")
+        print(f"Échecs: {total_attempts - total_success}")
     if roll_expiries:
         roll_str = ", ".join(f"{m}{y}" for m, y in roll_expiries)
         print(f"Roll calculé vs: [{roll_str}]")

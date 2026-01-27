@@ -72,6 +72,7 @@ def process_bloomberg_to_strategies(
     progress_tracker.update(ProcessingStep.FETCH_DATA,
                             "Import des options...")
 
+    # Fetch option from blommberg and return List[Option] with all the calculs done
     options = import_options(
         mixture=mixture,
         underlying=underlying,
@@ -83,9 +84,8 @@ def process_bloomberg_to_strategies(
         default_position="long",
     )
 
+    # tracker of the fecther 
     stats["nb_options"] = len(options)
-    
-
     progress_tracker.update(ProcessingStep.FETCH_DATA,
                             f"✅ {len(options)} options récupérées",stats)
 
@@ -96,7 +96,7 @@ def process_bloomberg_to_strategies(
     generator = OptionStrategyGeneratorV2(options)
 
     # Générer les stratégies avec suivi de progression
-    all_strategies = generator.generate_all_combinations(
+    all_strategies, nb_strategies_possibles = generator.generate_all_combinations(
         price_min=price_min,
         price_max=price_max,
         max_legs=max_legs,
@@ -105,6 +105,7 @@ def process_bloomberg_to_strategies(
     )
 
     stats["nb_strategies_totales"] = len(all_strategies)
+    stats["nb_strategies_possibles"] = nb_strategies_possibles
 
 
     progress_tracker.update(

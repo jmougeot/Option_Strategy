@@ -10,7 +10,7 @@ OPTIMISATION: Supporte le mode BATCH C++ pour un traitement ultra-rapide.
 """
 
 from itertools import product
-from typing import List
+from typing import List, Tuple
 from itertools import combinations_with_replacement
 import numpy as np
 from myproject.option.option_class import Option
@@ -118,7 +118,7 @@ class OptionStrategyGeneratorV2:
     def generate_all_combinations(
         self, price_min: float, price_max: float, filter: FilterData, max_legs: int = 4,
         progress_tracker=None,
-    ) -> List[StrategyComparison]:
+    ) -> Tuple[List[StrategyComparison], int]:
         """
         Génère toutes les combinaisons possibles d'options (1 à max_legs).
         
@@ -128,6 +128,9 @@ class OptionStrategyGeneratorV2:
             filter: Filtres à appliquer
             max_legs: Nombre maximum de legs par stratégie
             progress_tracker: Tracker de progression optionnel
+            
+        Returns:
+            Tuple[List[StrategyComparison], int]: (stratégies, nombre total de combinaisons possibles)
         """        
         self.price_min = price_min
         self.price_max = price_max
@@ -135,9 +138,9 @@ class OptionStrategyGeneratorV2:
         # ================================================================
         # UTILISER LE BATCH C++ SI DISPONIBLE (UN SEUL APPEL C++)
         # ================================================================
-        strategies = generate_all_strategies_batch(progress_tracker,
+        strategies, grand_total = generate_all_strategies_batch(progress_tracker,
             self.options, filter, max_legs)
-        return strategies
+        return strategies, grand_total
         
         
     

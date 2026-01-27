@@ -93,7 +93,6 @@ def _describe_scoring_weights(scoring_weights: Dict[str, float]) -> str:
     
     return " | ".join(parts)
 
-
 def generate_html_email(
     ui_params: Any,
     scenarios: List[Dict[str, float]],

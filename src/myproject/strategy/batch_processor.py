@@ -5,7 +5,7 @@ Déplace toute la boucle de génération en C++ pour éliminer l'overhead Python
 """
 
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from itertools import product, combinations_with_replacement
 from myproject.strategy.strategy_naming_v2 import generate_strategy_name
 from myproject.option.option_utils_v2 import get_expiration_info
@@ -291,7 +291,7 @@ def generate_all_strategies_batch(
     options: List[Option],
     filter: FilterData,
     max_legs: int = 4,
-) -> List[StrategyComparison]:
+) -> Tuple[List[StrategyComparison], int]:
     """
     Génère toutes les stratégies en mode batch C++.
     
@@ -359,4 +359,4 @@ def generate_all_strategies_batch(
                 f"[{total_combos_done:,} / {grand_total:,}] {total_valid:,} stratégies valides"
             )
     
-    return all_strategies
+    return all_strategies, grand_total

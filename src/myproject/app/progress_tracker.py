@@ -127,13 +127,15 @@ class ProgressTracker:
             stats_md = self._format_stats(stats)
             self.stats_container.markdown(stats_md)
     
-    def update_substep(self, progress: float, detail: str = ""):
+    def update_substep(self, progress: float, detail: str = "", current: int = None, total: int = None):
         """
         Met à jour la sous-progression dans une étape.
         
         Args:
             progress: Progression dans l'étape actuelle (0.0 à 1.0)
             detail: Détail à afficher
+            current: Nombre actuel de stratégies traitées (optionnel)
+            total: Nombre total de stratégies à traiter (optionnel)
         """
         if not self._initialized:
             return
@@ -154,14 +156,20 @@ class ProgressTracker:
             self.progress_bar.progress(min(global_progress, 1.0))
         
         if detail:
-            self.detail_text.markdown(f"*{detail}*")
+            # Format avec compteur [current / total] si fourni
+            if current is not None and total is not None:
+                pct = int(progress * 100)
+                detail_formatted = f"[{current:,} / {total:,}] {detail} ({pct}%)"
+            else:
+                detail_formatted = detail
+            self.detail_text.markdown(f"*{detail_formatted}*")
     
     def _format_stats(self, stats: dict) -> str:
         """Formate les statistiques en markdown."""
         lines = ["📈 **Statistiques:**"]
         
         if "nb_options" in stats:
-            lines.append(f"- Options: **{stats['nb_options']}**")
+            lines.append(f"- Options analyzed: **{stats['nb_options']}**")
         if "nb_strategies_1_leg" in stats:
             lines.append(f"- Stratégies 1 leg: **{stats['nb_strategies_1_leg']}**")
         if "nb_strategies_2_leg" in stats:
@@ -171,26 +179,16 @@ class ProgressTracker:
         if "nb_strategies_4_leg" in stats:
             lines.append(f"- Stratégies 4 legs: **{stats['nb_strategies_4_leg']}**")
         if "nb_strategies_totales" in stats:
-            lines.append(f"- **Total: {stats['nb_strategies_totales']} stratégies**")
+            lines.append(f"- Distinct combinations generated: {stats['nb_strategies_possibles']:,}")
+        if "nb_strategies_totales" in stats:
+            lines.append(f"- Strategies ranked: {stats['nb_strategies_totales']:,}")
         if "nb_strategies_classees" in stats:
-            lines.append(f"- Classées: **{stats['nb_strategies_classees']}**")
-            
+            lines.append(f"- Top-ranked strategies: **{stats['nb_strategies_classees']}**")
         return "\n".join(lines)
     
     def complete(self, stats: dict = None):
         """Marque le traitement comme terminé."""
-        self.update(ProcessingStep.COMPLETE, "Traitement terminé", stats=stats)
-        
-        # Afficher un message de succès
-        if stats:
-            with self.progress_container:
-                st.success(
-                    f"""✅ Traitement terminé avec succès!
-- **{stats.get('nb_options', 0)}** options analysées
-- **{stats.get('nb_strategies_totales', 0)}** stratégies générées
-- **{stats.get('nb_strategies_classees', 0)}** meilleures stratégies identifiées
-                    """
-                )
+        self.update(ProcessingStep.COMPLETE, "", stats=stats)
     
     def error(self, message: str):
         """Affiche une erreur."""

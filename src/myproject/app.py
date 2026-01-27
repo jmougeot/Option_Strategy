@@ -17,9 +17,7 @@ from myproject.app.processing import (
 )
 from myproject.app.filter_widget import filter_params
 from myproject.app.progress_tracker import ProgressTracker
-from myproject.app.image_saver import save_all_diagrams
-from myproject.app.email_utils import StrategyEmailData, create_email_with_images, create_pdf_report
-
+from myproject.share_result.email_utils import StrategyEmailData, create_email_with_images, create_pdf_report
 
 
 # ============================================================================
@@ -66,14 +64,12 @@ def main():
         # Get best strategy info from session state if available
         best_strategy_data = None
         top_strategies_data = None
-        diagram_path = st.session_state.get("diagram_path", None)
-        top5_summary_path = st.session_state.get("top5_summary_path", None)
         
         if "comparisons" in st.session_state and st.session_state.comparisons:
             comparisons_list = st.session_state.comparisons
             
-            # Build detailed strategy data for email
-            def build_strategy_email_data(comp, diag_path=None, top5_path=None) -> StrategyEmailData:
+            # Build detailed strategy data for email/PDF
+            def build_strategy_email_data(comp) -> StrategyEmailData:
                 # Build legs description
                 legs_desc = []
                 for opt, sign in zip(comp.all_options, comp.signs):
@@ -98,19 +94,13 @@ def main():
                     avg_implied_volatility=comp.avg_implied_volatility,
                     breakeven_points=comp.breakeven_points,
                     legs_description=legs_desc,
-                    diagram_path=diag_path,
-                    top5_summary_path=top5_path
                 )
             
-            best_strategy_data = build_strategy_email_data(comparisons_list[0], diagram_path, top5_summary_path)
-            top_strategies_data = [build_strategy_email_data(c, top5_path=top5_summary_path) for c in comparisons_list[:10]] 
-            # First strategy (best) also gets the diagram path
-            if top_strategies_data:
-                top_strategies_data[0] = build_strategy_email_data(comparisons_list[0], diagram_path, top5_summary_path)
+            best_strategy_data = build_strategy_email_data(comparisons_list[0])
+            top_strategies_data = [build_strategy_email_data(c) for c in comparisons_list[:10]]
         
         # Bouton pour envoyer l'email avec images intégrées via Outlook
         if st.button("📧 Send Email with Images (Outlook)"):
-            # Récupérer les comparisons pour générer les images
             comparisons_for_email = st.session_state.get("comparisons", None)
             mixture_for_email = st.session_state.get("mixture", None)
             
@@ -153,15 +143,6 @@ def main():
                     file_name=filename,
                     mime="application/pdf"
                 )
-        
-        # Show saved diagram paths if available
-        if st.session_state.get("diagram_path") or st.session_state.get("top5_summary_path"):
-            st.markdown("---")
-            st.markdown("**📁 Saved Diagrams**")
-            if st.session_state.get("diagram_path"):
-                st.caption(f" {st.session_state['diagram_path']}")
-            if st.session_state.get("top5_summary_path"):
-                st.caption(f" {st.session_state['top5_summary_path']}")
 
     # ========================================================================
     # MAIN AREA
@@ -217,12 +198,9 @@ def main():
 
         # Also save mixture for diagram export
         st.session_state["mixture"] = mixture
-                
-        payoff_path = save_all_diagrams(all_comparisons[:5], mixture)
-        if payoff_path:
-            st.session_state["diagram_path"] = payoff_path.get("payoff")
-            st.session_state["top5_summary_path"] = payoff_path.get("summary")
-            st.success(f"📁 Diagrams auto-saved to assets/payoff_diagrams/")
+        
+        # Note: Les images ne sont générées que lors de la création d'email/PDF
+        # pour éviter des écritures disque inutiles
 
     # Si on arrive ici sans stratégies, ne rien afficher
     if not all_comparisons:

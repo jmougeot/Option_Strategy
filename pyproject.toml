@@ -3,10 +3,11 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "option-strategy"              # 👈 nom de ton package (libre)
+name = "option-strategy"            
 version = "0.1.0"
 description = "Option strategy Streamlit app"
-dependencies = []                     # ou laisse vide si tout est dans requirements.txt
-
+dependencies = []       
+             
 [tool.setuptools.packages.find]
 where = ["src"]
+
