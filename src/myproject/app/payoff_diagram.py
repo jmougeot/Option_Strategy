@@ -215,10 +215,10 @@ def create_payoff_diagram(
     underlying_label = ""
     if comparisons and len(comparisons) > 0:
         first_comp = comparisons[0]
-        if first_comp.underlying_symbol:
-            underlying_label = f" - {first_comp.underlying_symbol}"
-        elif first_comp.all_options and first_comp.all_options[0].underlying_symbol:
-            underlying_label = f" - {first_comp.all_options[0].underlying_symbol}"
+        if first_comp.all_options and len(first_comp.all_options) > 0:
+            first_opt = first_comp.all_options[0]
+            if hasattr(first_opt, 'underlying_symbol') and first_opt.underlying_symbol:
+                underlying_label = f" - {first_opt.underlying_symbol}"
 
     # Configuration du layout
     if mixture is not None:

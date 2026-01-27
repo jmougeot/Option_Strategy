@@ -17,6 +17,7 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
     for idx, comp in enumerate(comparisons, 1):
         row = {
             "Rank": idx,
+            "Weighted Score": comp.score,
             "Strategy": comp.strategy_name,
             "Expiry": format_expiration_date(comp.expiration_month, comp.expiration_year),
             "Premium": f"{comp.premium:3f}",
@@ -26,8 +27,6 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
             "Delta": f"{comp.total_delta:.4f}",
             "Gamma": f"{comp.total_gamma:.3f}",
             "Vega": f"{comp.total_vega:.3f}",
-            "Theta": f"{comp.total_theta:.3f}",
-            "IV": f"{comp.avg_implied_volatility:.2%}",
         }
         
         # Colonnes de roll dynamiques basées sur roll_labels

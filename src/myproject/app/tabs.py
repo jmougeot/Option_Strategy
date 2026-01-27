@@ -25,7 +25,7 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
     # Winner card
     winner = comparisons[0]
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4 = st.columns([10, 4, 4, 4])
     with col1:
         st.metric(
             "🥇 Best Strategy", winner.strategy_name, f"Score: {winner.score:.3f}"
@@ -41,7 +41,7 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
         st.metric("⚠️ Max Loss", max_loss_str, "")
     with col4:
         st.metric(
-            "🎯 P&L at Target Price",
+            "🎯 Futures Reference",
             format_currency(winner.profit_at_target),
             f"{winner.profit_at_target_pct:.1f}% of max",
         )

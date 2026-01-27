@@ -73,7 +73,7 @@ def process_bloomberg_to_strategies(
                             "Import des options...")
 
     # Fetch option from blommberg and return List[Option] with all the calculs done
-    options = import_options(
+    options, underlying_price = import_options(
         mixture=mixture,
         underlying=underlying,
         months=months,
@@ -86,6 +86,7 @@ def process_bloomberg_to_strategies(
 
     # tracker of the fecther 
     stats["nb_options"] = len(options)
+    stats["underlying_price"] = underlying_price
     progress_tracker.update(ProcessingStep.FETCH_DATA,
                             f"✅ {len(options)} options récupérées",stats)
 

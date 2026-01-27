@@ -182,8 +182,11 @@ def main():
             progress_tracker.complete(stats)
             
         except Exception as e:
+            import traceback
+            full_traceback = traceback.format_exc()
             progress_tracker.error(f"Erreur: {str(e)}")
             st.error(f" Error during processing: {str(e)}")
+            st.code(full_traceback, language="python")
             return
 
         # Use best_strategies for display
