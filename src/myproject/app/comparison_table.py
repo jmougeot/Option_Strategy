@@ -1,6 +1,6 @@
-
+﻿
 from myproject.app.utils import format_currency, format_expiration_date
-from myproject.strategy.comparison_class import StrategyComparison
+from myproject.strategy.strategy_class import StrategyComparison
 from typing import List, Optional
 import pandas as pd 
 
@@ -23,13 +23,13 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
             "Premium": f"{comp.premium:3f}",
             "Max Profit": format_currency(comp.max_profit),
             "Avg P&L": format_currency(comp.average_pnl) if comp.average_pnl is not None else "-",
-            "σ P&L": format_currency(comp.sigma_pnl) if comp.sigma_pnl is not None else "-",
+            "Ïƒ P&L": format_currency(comp.sigma_pnl) if comp.sigma_pnl is not None else "-",
             "Delta": f"{comp.total_delta:.4f}",
             "Gamma": f"{comp.total_gamma:.3f}",
             "Vega": f"{comp.total_vega:.3f}",
         }
         
-        # Colonnes de roll dynamiques basées sur roll_labels
+        # Colonnes de roll dynamiques basÃ©es sur roll_labels
         if roll_labels:
             for label in roll_labels:
                 roll_value = comp.rolls_detail.get(label)
@@ -38,3 +38,4 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
         data.append(row)
     
     return pd.DataFrame(data)
+

@@ -1,13 +1,13 @@
-"""
+﻿"""
 Workflow Principal - Bloomberg to Strategy Comparison
 ======================================================
-Ce module implémente le workflow complet :
-1. Import des données Bloomberg
+Ce module implÃ©mente le workflow complet :
+1. Import des donnÃ©es Bloomberg
 2. Conversion en objets Option
-3. Génération de toutes les stratégies possibles
-4. Comparaison et ranking des stratégies
+3. GÃ©nÃ©ration de toutes les stratÃ©gies possibles
+4. Comparaison et ranking des stratÃ©gies
 
-Utilise les fonctions optimisées des modules :
+Utilise les fonctions optimisÃ©es des modules :
 - option_generator_v2.OptionStrategyGeneratorV2
 - comparor_v2.StrategyComparerV2
 """
@@ -15,7 +15,7 @@ Utilise les fonctions optimisées des modules :
 from typing import List, Dict, Optional, Tuple
 from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.scoring.comparer import StrategyComparerV2
-from myproject.strategy.comparison_class import StrategyComparison
+from myproject.strategy.strategy_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_options
 from myproject.app.scenarios_widget import create_mixture_from_scenarios
 from myproject.app.scenarios_widget import ScenarioData
@@ -43,14 +43,14 @@ def process_bloomberg_to_strategies(
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
 ) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray, float], float]:
     """
-    Fonction principale simplifiée pour Streamlit.
-    Importe les options depuis Bloomberg et retourne les meilleures stratégies + stats.
+    Fonction principale simplifiÃ©e pour Streamlit.
+    Importe les options depuis Bloomberg et retourne les meilleures stratÃ©gies + stats.
     """
     stats = {}
     
     # Initialiser le tracker si fourni
     progress_tracker.init_ui()
-    progress_tracker.update(ProcessingStep.FETCH_DATA, "Connexion à Bloomberg...")
+    progress_tracker.update(ProcessingStep.FETCH_DATA, "Connexion Ã  Bloomberg...")
 
     mixture = create_mixture_from_scenarios(
         scenarios, price_min, price_max, num_points
@@ -76,15 +76,15 @@ def process_bloomberg_to_strategies(
     stats["nb_options"] = len(options)
     stats["underlying_price"] = underlying_price
     progress_tracker.update(ProcessingStep.FETCH_DATA,
-                            f"✅ {len(options)} options récupérées",stats)
+                            f"âœ… {len(options)} options rÃ©cupÃ©rÃ©es",stats)
 
     if not options:
-        progress_tracker.error("Aucune option trouvée")
+        progress_tracker.error("Aucune option trouvÃ©e")
         return [], stats, mixture, 0
 
     generator = OptionStrategyGeneratorV2(options)
 
-    # Générer les stratégies avec suivi de progression
+    # GÃ©nÃ©rer les stratÃ©gies avec suivi de progression
     all_strategies, nb_strategies_possibles = generator.generate_all_combinations(
         price_min=price_min,
         price_max=price_max,
@@ -99,7 +99,7 @@ def process_bloomberg_to_strategies(
 
     progress_tracker.update(
         ProcessingStep.RANKING, 
-        f"Classement de {len(all_strategies)} stratégies...",
+        f"Classement de {len(all_strategies)} stratÃ©gies...",
         stats
     )
 
@@ -112,6 +112,7 @@ def process_bloomberg_to_strategies(
 
     stats["nb_strategies_classees"] = len(best_strategies)
 
-    progress_tracker.update(ProcessingStep.DISPLAY, "Préparation de l'affichage...", stats)
+    progress_tracker.update(ProcessingStep.DISPLAY, "PrÃ©paration de l'affichage...", stats)
 
     return best_strategies, stats, mixture, underlying_price
+

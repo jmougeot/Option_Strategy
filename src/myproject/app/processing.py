@@ -1,9 +1,9 @@
-"""
-Module pour la logique de traitement et de filtrage des stratégies
+﻿"""
+Module pour la logique de traitement et de filtrage des stratÃ©gies
 """
 
 from typing import List, Tuple, Optional, Dict, Any, TYPE_CHECKING
-from myproject.strategy.comparison_class import StrategyComparison
+from myproject.strategy.strategy_class import StrategyComparison
 from myproject.app.scenarios_widget import ScenarioData
 
 
@@ -11,10 +11,10 @@ def process_comparison_results(
     best_strategies: List[StrategyComparison],
 ) -> Tuple[List[StrategyComparison], List[StrategyComparison]]:
     """
-    Traite les résultats de comparaison et filtre pour le meilleur prix cible.
+    Traite les rÃ©sultats de comparaison et filtre pour le meilleur prix cible.
 
     Args:
-        best_strategies: Liste des meilleures stratégies
+        best_strategies: Liste des meilleures stratÃ©gies
 
     Returns:
         Tuple (all_comparisons, top_5_comparisons)
@@ -78,9 +78,10 @@ def display_success_stats(stats: Dict[str, Any]):
     import streamlit as st
 
     st.success(
-        f"""✅ Processing completed successfully!
-    • {stats.get('nb_options', 0)} options converted
-    • {stats.get('nb_strategies_totales', 0)} strategies generated
-    • {stats.get('nb_strategies_classees', 0)} best strategies identified
+        f"""âœ… Processing completed successfully!
+    â€¢ {stats.get('nb_options', 0)} options converted
+    â€¢ {stats.get('nb_strategies_totales', 0)} strategies generated
+    â€¢ {stats.get('nb_strategies_classees', 0)} best strategies identified
     """
     )
+

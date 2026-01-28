@@ -11,13 +11,9 @@ SCORING_CATEGORIES = {
     },
     "Greeks": {
         "fields": ["delta_neutral", "gamma_low", "vega_low", "theta_positive"],
-        "color": "🔢",
-        "description": "Market factor sensitivities",
     },
     "Volatility & Cost": {
         "fields": ["implied_vol_moderate"],
-        "color": "🌊",
-        "description": "Implied volatility and cost/credit",
     },
 }
 
@@ -27,10 +23,10 @@ FIELD_LABELS = {
     "gamma_low": "Gamma Low",
     "vega_low": "Vega Low",
     "theta_positive": "Theta Positive",
-    "average_pnl": "Average P&L",
-    "roll": "Roll (Avg)",
-    "roll_quarterly": "Roll (Q-1)",
-    "sigma_pnl": "Sigma P&L",
+    "average_pnl": "Expected gain at expiry",
+    "roll": "Sum of quarterly rolls",
+    "roll_quarterly": "Roll into next quarter",
+    "sigma_pnl": "Standart deviation",
     "implied_vol_moderate": "Moderate IV",
 }
 
@@ -61,7 +57,7 @@ def scoring_weights_block() -> dict:
                 default_value = 100 if field_name == "average_pnl" else 0
                 weight = (
                     st.slider(
-                        str(label),  # Ensure it is a str
+                        str(label),
                         min_value=0,
                         max_value=100,
                         value=default_value,

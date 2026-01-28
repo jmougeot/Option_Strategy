@@ -1,15 +1,15 @@
-# ============================================================================
+﻿# ============================================================================
 # FONCTIONS UTILITAIRES
 # ============================================================================
 
 import pandas as pd
 from typing import Dict, List
-from myproject.strategy.comparison_class import StrategyComparison
+from myproject.strategy.strategy_class import StrategyComparison
 from myproject.option.option_class import Option
 
 
 def prepare_options_data(options: List[Option]) -> Dict[str, List[Option]]:
-    """Sépare les calls et puts."""
+    """SÃ©pare les calls et puts."""
     calls = [opt for opt in options if opt.option_type == "call"]
     puts = [opt for opt in options if opt.option_type == "put"]
 
@@ -30,14 +30,14 @@ def format_percentage(value: float) -> str:
 
 def format_expiration_date(month: str, year: int) -> str:
     """
-    Formate la date d'expiration à partir du mois Bloomberg et de l'année.
+    Formate la date d'expiration Ã  partir du mois Bloomberg et de l'annÃ©e.
 
     Args:
         month: Code du mois Bloomberg (F, G, H, K, M, N, Q, U, V, X, Z)
-        year: Année (6 = 2026)
+        year: AnnÃ©e (6 = 2026)
 
     Returns:
-        Date formatée (ex: "Jun 2026")
+        Date formatÃ©e (ex: "Jun 2026")
     """
     month_names = {
         "F": "Jan",
@@ -60,26 +60,26 @@ def format_expiration_date(month: str, year: int) -> str:
 
 def strike_list(strike_min: float, strike_max: float, step: float) -> List[float]:
     """
-    Génère une liste de strikes avec un step défini
+    GÃ©nÃ¨re une liste de strikes avec un step dÃ©fini
     """
-    # Calculer le nombre de steps nécessaires
+    # Calculer le nombre de steps nÃ©cessaires
     num_steps = int(round((strike_max - strike_min) / step)) + 1
     
-    # Générer les strikes par multiplication pour éviter l'accumulation d'erreurs
+    # GÃ©nÃ©rer les strikes par multiplication pour Ã©viter l'accumulation d'erreurs
     strike_list = [round(strike_min + i * step, 10) for i in range(num_steps)]
     
     return strike_list
 
 def filter_same_strategies(comparisons: List[StrategyComparison], decimals: int = 4) -> List[StrategyComparison]:
     """
-    Filtre les stratégies ayant le même profil P&L.
+    Filtre les stratÃ©gies ayant le mÃªme profil P&L.
     
     Args:
-        comparisons: Liste de StrategyComparison à filtrer
-        decimals: Nombre de décimales pour l'arrondi (4 = tolérance 0.0001)
+        comparisons: Liste de StrategyComparison Ã  filtrer
+        decimals: Nombre de dÃ©cimales pour l'arrondi (4 = tolÃ©rance 0.0001)
         
     Returns:
-        Liste sans doublons (conserve la première occurrence)
+        Liste sans doublons (conserve la premiÃ¨re occurrence)
     """
     import numpy as np
     
@@ -95,9 +95,10 @@ def filter_same_strategies(comparisons: List[StrategyComparison], decimals: int 
     
     n = len(comparisons) - len(uniques)
     if n > 0:
-        print(f"  🔍 {n} doublons éliminés")
+        print(f"  ðŸ” {n} doublons Ã©liminÃ©s")
     
     return uniques
+
 
 
 

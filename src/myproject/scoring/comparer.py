@@ -1,21 +1,21 @@
-"""
+﻿"""
 Comparateur Multi-Structures - Version 2
 =========================================
-Comparateur simplifié et optimisé pour les stratégies.
+Comparateur simplifiÃ© et optimisÃ© pour les stratÃ©gies.
 """
 
 from typing import List, Dict, Optional
 from copy import deepcopy
 import numpy as np
 
-from myproject.strategy.comparison_class import StrategyComparison
+from myproject.strategy.strategy_class import StrategyComparison
 from myproject.strategy.scoring.metrics_config import MetricConfig, create_metrics_config
 
 
 
 class StrategyComparerV2:
     """
-    Comparateur simplifié pour stratégies provenant de generate_all_combinations.
+    Comparateur simplifiÃ© pour stratÃ©gies provenant de generate_all_combinations.
 
     Usage:
         comparer = StrategyComparerV2()
@@ -27,7 +27,7 @@ class StrategyComparerV2:
     """
 
     def __init__(self):
-        """Initialise le comparateur avec les configurations de métriques."""
+        """Initialise le comparateur avec les configurations de mÃ©triques."""
         self._base_metrics_config = create_metrics_config()
 
     def compare_and_rank(
@@ -37,26 +37,26 @@ class StrategyComparerV2:
         weights: Optional[Dict[str, float]] = None,
     ) -> List[StrategyComparison]:
         """
-        Compare et classe les stratégies selon un système de scoring multi-critères.
+        Compare et classe les stratÃ©gies selon un systÃ¨me de scoring multi-critÃ¨res.
 
         Args:
-            strategies: Liste des stratégies à comparer
-            top_n: Nombre de meilleures stratégies à retourner
-            weights: Poids personnalisés partiels (les autres gardent leur valeur par défaut)
+            strategies: Liste des stratÃ©gies Ã  comparer
+            top_n: Nombre de meilleures stratÃ©gies Ã  retourner
+            weights: Poids personnalisÃ©s partiels (les autres gardent leur valeur par dÃ©faut)
         """
         if not strategies:
-            print("⚠️ Aucune stratégie à comparer")
+            print("âš ï¸ Aucune stratÃ©gie Ã  comparer")
             return []
 
         metrics_config = deepcopy(self._base_metrics_config)
 
-        # Appliquer les poids personnalisés si fournis
+        # Appliquer les poids personnalisÃ©s si fournis
         if weights:
             for metric in metrics_config:
                 if metric.name in weights:
                     metric.weight = weights[metric.name]
 
-        # Normaliser les poids à 1.0
+        # Normaliser les poids Ã  1.0
         total_weight = sum(m.weight for m in metrics_config)
         if total_weight > 0:
             for metric in metrics_config:
@@ -65,7 +65,7 @@ class StrategyComparerV2:
         # Calculer les scores
         strategies = self._calculate_scores(strategies, metrics_config)
 
-        # Trier par score décroissant
+        # Trier par score dÃ©croissant
         strategies.sort(key=lambda x: x.score, reverse=True)
 
         # Limiter au top_n et assigner les rangs
@@ -73,7 +73,7 @@ class StrategyComparerV2:
         for i, strat in enumerate(strategies, 1):
             strat.rank = i
 
-        print(f"\n✅ {len(strategies)} stratégies classées (top {top_n})")
+        print(f"\nâœ… {len(strategies)} stratÃ©gies classÃ©es (top {top_n})")
 
         return strategies
 
@@ -81,7 +81,7 @@ class StrategyComparerV2:
         self, strategies: List[StrategyComparison], metrics_config: List[MetricConfig]
     ) -> List[StrategyComparison]:
         """
-        Calcule les scores composites pour chaque stratégie avec numpy (optimisé).
+        Calcule les scores composites pour chaque stratÃ©gie avec numpy (optimisÃ©).
         """
         if not strategies:
             return strategies
@@ -89,7 +89,7 @@ class StrategyComparerV2:
         n_strategies = len(strategies)
         n_metrics = len(metrics_config)
 
-        # ============ ÉTAPE 1: EXTRACTION EN ARRAY NUMPY ============
+        # ============ Ã‰TAPE 1: EXTRACTION EN ARRAY NUMPY ============
         metric_matrix = np.zeros((n_strategies, n_metrics))
         weights = np.zeros(n_metrics)
 
@@ -105,7 +105,7 @@ class StrategyComparerV2:
             metric_matrix[:, j] = extracted
             weights[j] = metric.weight
 
-        # ============ ÉTAPE 2: NORMALISATION VECTORISÉE ============
+        # ============ Ã‰TAPE 2: NORMALISATION VECTORISÃ‰E ============
         scores_matrix = np.zeros_like(metric_matrix)
 
         for j, metric in enumerate(metrics_config):
@@ -139,10 +139,11 @@ class StrategyComparerV2:
                             0.0,
                         )
 
-        # ============ ÉTAPE 3: CALCUL DU SCORE FINAL (vectorisé) ============
+        # ============ Ã‰TAPE 3: CALCUL DU SCORE FINAL (vectorisÃ©) ============
         final_scores = scores_matrix @ weights
 
         for idx, strat in enumerate(strategies):
             strat.score = float(final_scores[idx])
 
         return strategies
+

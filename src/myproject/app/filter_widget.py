@@ -70,36 +70,42 @@ def filter_params() -> FilterData:
     
     # Retrieve current values from session_state
     current_filter = st.session_state.filter
-
-    max_loss_left_col, max_loss_right_col, limit_left_col, limit_right_col = st.columns([1.5, 1.5, 1.5, 1.5])
-    with max_loss_left_col:
-        max_loss_left = st.number_input("Max loss left",
-                                                value=float(current_filter["max_loss_left"]),
-                                                step=0.001,
-                                                format="%.3f",
-                                                key="filter_max_loss",
-                                                help="Max loss left")       
-    with max_loss_right_col:
-        max_loss_right= st.number_input("Max loss right",
-                                                value = float(current_filter["max_loss_right"]),
-                                                step=0.001,
-                                                format="%.3f",
-                                                key="filter_max_loss_right",
-                                                help= "Choose the max on the right of the target")
-    with limit_left_col:
-        limit_left = st.number_input("Limit left",
-                                                value=float(current_filter["limit_left_filter"]),
-                                                step=0.001,
-                                                format="%.3f",
-                                                key="limit_left_filter_key",
-                                                help="imit to filter_max_loss_right where the max on the left is applied") 
-    with limit_right_col:
-        limit_right= st.number_input("Limit right",
-                                                value = float(current_filter["limit_right_filter"]),
-                                                step=0.001,
-                                                format="%.3f",
-                                                key="limit_right_filter_key",
-                                                help= "limit to filter_max_loss_right where the max on the right is applied")
+    unlimited_loss = st.checkbox(label="unlimited loss", value=False)
+    if unlimited_loss:
+        max_loss_left=10
+        max_loss_right=10
+        limit_left=98
+        limit_right=98
+    else: 
+        max_loss_left_col, max_loss_right_col, limit_left_col, limit_right_col = st.columns([1.5, 1.5, 1.5, 1.5])
+        with max_loss_left_col:
+            max_loss_left = st.number_input("Max loss left",
+                                                    value=float(current_filter["max_loss_left"]),
+                                                    step=0.001,
+                                                    format="%.3f",
+                                                    key="filter_max_loss",
+                                                    help="Max loss left")       
+        with max_loss_right_col:
+            max_loss_right= st.number_input("Max loss right",
+                                                    value = float(current_filter["max_loss_right"]),
+                                                    step=0.001,
+                                                    format="%.3f",
+                                                    key="filter_max_loss_right",
+                                                    help= "Choose the max on the right of the target")
+        with limit_left_col:
+            limit_left = st.number_input("Limit left",
+                                                    value=float(current_filter["limit_left_filter"]),
+                                                    step=0.001,
+                                                    format="%.3f",
+                                                    key="limit_left_filter_key",
+                                                    help="imit to filter_max_loss_right where the max loss left is applied") 
+        with limit_right_col:
+            limit_right= st.number_input("Limit right",
+                                                    value = float(current_filter["limit_right_filter"]),
+                                                    step=0.001,
+                                                    format="%.3f",
+                                                    key="limit_right_filter_key",
+                                                    help= "limit to filter_max_loss_right where the max loss right is applied")
 
         
     max_premium_col, min_premium_col = st.columns([1.5, 1.5])

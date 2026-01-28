@@ -1,8 +1,8 @@
-import plotly.graph_objects as go
+﻿import plotly.graph_objects as go
 import streamlit as st
 
 from typing import Dict, List, Optional, Tuple
-from myproject.strategy.comparison_class import StrategyComparison
+from myproject.strategy.strategy_class import StrategyComparison
 from myproject.option.option_class import Option
 from myproject.app.image_saver import save_top10_summary
 from plotly.subplots import make_subplots
@@ -113,11 +113,11 @@ def create_payoff_diagram(
         "#17becf",
     ]
 
-    # Tracer chaque stratégie
+    # Tracer chaque stratÃ©gie
     for idx, comp in enumerate(comparisons):
         color = colors[idx % len(colors)]
 
-        # Calculer P&L (optimisé avec list comprehension)
+        # Calculer P&L (optimisÃ© avec list comprehension)
         pnl_values = comp.pnl_array
 
         # Courbe P&L
@@ -198,7 +198,7 @@ def create_payoff_diagram(
             fill="tozeroy",
             line=dict(color="rgba(128, 128, 128, 0.8)", width=2, dash="dot"),
             fillcolor="rgba(128, 128, 128, 0.2)",
-            hovertemplate="Prix: $%{x:.2f}<br>Probabilité: %{y:.4f}<extra></extra>",
+            hovertemplate="Prix: $%{x:.2f}<br>ProbabilitÃ©: %{y:.4f}<extra></extra>",
             yaxis="y2",
         ),
         secondary_y=True,
@@ -209,7 +209,7 @@ def create_payoff_diagram(
         x=mean_price,
         line_dash="dash",
         line_color="gray",
-        annotation_text=f"μ = {mean_price:.2f}",
+        annotation_text=f"Î¼ = {mean_price:.2f}",
         annotation_position="top right",
         opacity=0.5,
     )
@@ -225,7 +225,7 @@ def create_payoff_diagram(
             opacity=0.7,
         )
 
-    # Récupérer l'underlying depuis la première stratégie si disponible
+    # RÃ©cupÃ©rer l'underlying depuis la premiÃ¨re stratÃ©gie si disponible
     underlying_label = ""
     if comparisons and len(comparisons) > 0:
         first_comp = comparisons[0]
@@ -237,10 +237,10 @@ def create_payoff_diagram(
     # Configuration du layout
     if mixture is not None:
         fig.update_layout(
-            title=f"Diagramme de P&L à l'Expiration{underlying_label} avec Distribution Gaussienne",
+            title=f"Diagramme de P&L Ã  l'Expiration{underlying_label} avec Distribution Gaussienne",
             xaxis_title="Prix du Sous-Jacent ($)",
             yaxis_title="Profit / Perte ($)",
-            yaxis2_title="Densité de Probabilité",
+            yaxis2_title="DensitÃ© de ProbabilitÃ©",
             height=600,
             hovermode="x unified",
             legend=dict(
@@ -266,7 +266,7 @@ def create_payoff_diagram(
         )
     else:
         fig.update_layout(
-            title=f"Diagramme de P&L à l'Expiration{underlying_label}",
+            title=f"Diagramme de P&L Ã  l'Expiration{underlying_label}",
             xaxis_title="Prix du Sous-Jacent ($)",
             yaxis_title="Profit / Perte ($)",
             height=500,
@@ -306,7 +306,7 @@ def save_top5_summary_png(
     
     Args:
         comparisons: List of strategies (top 5 will be used)
-        output_dir: Directory to save the file (ignoré, utilise image_saver)
+        output_dir: Directory to save the file (ignorÃ©, utilise image_saver)
         filename: Custom filename (default: top5_summary.png)
     
     Returns:
@@ -371,3 +371,4 @@ def save_top5_summary_png(
             return filepath
         except Exception:
             return None
+

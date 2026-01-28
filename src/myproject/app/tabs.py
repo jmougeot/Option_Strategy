@@ -1,11 +1,11 @@
-"""
-Module pour gérer les différents tabs de l'application Streamlit
+﻿"""
+Module pour gÃ©rer les diffÃ©rents tabs de l'application Streamlit
 """
 
 import streamlit as st
 import numpy as np
 from typing import List, Optional, Tuple
-from myproject.strategy.comparison_class import StrategyComparison
+from myproject.strategy.strategy_class import StrategyComparison
 from myproject.app.utils import format_currency
 from myproject.app.comparison_table import create_comparison_table
 
@@ -27,20 +27,20 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
     col1, col2, col3, col4 = st.columns([10, 4, 4, 4])
     with col1:
         st.metric(
-            "🥇 Best Strategy", winner.strategy_name, f"Score: {winner.score:.3f}"
+            "ðŸ¥‡ Best Strategy", winner.strategy_name, f"Score: {winner.score:.3f}"
         )
     with col2:
-        st.metric("💰 Max Profit", format_currency(winner.max_profit), "")
+        st.metric("ðŸ’° Max Profit", format_currency(winner.max_profit), "")
     with col3:
         max_loss_str = (
             format_currency(winner.max_loss)
             if winner.max_loss != float("inf")
             else "Unlimited"
         )
-        st.metric("⚠️ Max Loss", max_loss_str, "")
+        st.metric("âš ï¸ Max Loss", max_loss_str, "")
     with col4:
         st.metric(
-            "🎯 Futures Reference",
+            "ðŸŽ¯ Futures Reference",
             format_currency(winner.profit_at_target),
             f"{winner.profit_at_target_pct:.1f}% of max",
         )
