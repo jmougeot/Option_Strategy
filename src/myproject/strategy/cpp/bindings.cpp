@@ -35,7 +35,7 @@ static OptionsCache g_cache;
  * Initialise le cache avec toutes les données des options
  * Note: profit_surface et loss_surface sont calculées dynamiquement, pas stockées
  */
-void init_options_cache(
+void init_options_cache(      
     py::array_t<double> premiums,
     py::array_t<double> deltas,
     py::array_t<double> gammas,
@@ -89,8 +89,6 @@ void init_options_cache(
         g_cache.options[i].average_pnl = avg_pnl_buf(i);
         g_cache.options[i].sigma_pnl = sigma_buf(i);
         g_cache.options[i].strike = strike_buf(i);
-        g_cache.options[i].profit_surface_ponderated = 0.0;  // Calculé dynamiquement
-        g_cache.options[i].loss_surface_ponderated = 0.0;    // Calculé dynamiquement
         g_cache.options[i].is_call = is_call_buf(i);
         g_cache.options[i].roll = rolls_buf(i);
         g_cache.options[i].roll_quarterly = rolls_q_buf(i);
@@ -118,12 +116,11 @@ void init_options_cache(
 
 /**
  * Traite un batch de combinaisons en C++
+ * Génère toutes les combinaisons de n_legs options avec tous les signes possibles
  * Retourne une liste de tuples (indices, signs, metrics_dict) pour les stratégies valides
  */
 py::list process_combinations_batch(
-    py::array_t<int> indices_batch,      // 2D array (n_combos x max_legs), -1 pour padding
-    py::array_t<int> signs_batch,        // 2D array (n_combos x max_legs)
-    py::array_t<int> combo_sizes,        // 1D array avec la taille de chaque combo
+    int n_legs,        
     double max_loss_left,
     double max_loss_right,
     double max_premium_params,
@@ -138,98 +135,98 @@ py::list process_combinations_batch(
     if (!g_cache.valid) {
         throw std::runtime_error("Cache not initialized. Call init_options_cache first.");
     }
-    
-    auto indices_buf = indices_batch.unchecked<2>();
-    auto signs_buf = signs_batch.unchecked<2>();
-    auto sizes_buf = combo_sizes.unchecked<1>();
-    
-    const size_t n_combos = indices_buf.shape(0);
-    const size_t max_legs = indices_buf.shape(1);
-    
+
     py::list results;
-    
+
     // Pré-allouer les vecteurs de travail
     std::vector<OptionData> combo_options;
     std::vector<int> combo_signs;
     std::vector<std::vector<double>> combo_pnl;
+    std::vector<int> c(n_legs, 0);  // Indices de combinaison
     
-    combo_options.reserve(max_legs);
-    combo_signs.reserve(max_legs);
-    combo_pnl.reserve(max_legs);
+    combo_options.reserve(n_legs);
+    combo_signs.reserve(n_legs);
+    combo_pnl.reserve(n_legs);
     
-    for (size_t c = 0; c < n_combos; ++c) {
-        const int n_legs = sizes_buf(c);
-        
-        combo_options.clear();
-        combo_signs.clear();
-        combo_pnl.clear();
-        
-        for (int i = 0; i < n_legs; ++i) {
-            int idx = indices_buf(c, i);
-            combo_options.push_back(g_cache.options[idx]);
-            combo_signs.push_back(signs_buf(c, i));
-            combo_pnl.push_back(g_cache.pnl_matrix[idx]);
-        }
-        
-        // Calculer les métriques avec les nouveaux paramètres
-        auto result = StrategyCalculator::calculate(
-            combo_options, combo_signs, combo_pnl, g_cache.prices, g_cache.mixture,
-            g_cache.average_mix, max_loss_left, max_loss_right, max_premium_params,
-            ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max, limit_left, limit_right
-        );
-        
-        if (result.has_value()) {
-            const auto& metrics = result.value();
-            
-            // Créer le tuple (indices, signs, metrics_dict)
-            py::list indices_list;
-            py::list signs_list;
+    // Générer toutes les combinaisons d'indices
+    do {    
+        // Pour chaque combinaison d'indices, tester tous les signes possibles
+        const int n_masks = 1 << n_legs;
+        for (int mask = 0; mask < n_masks; ++mask) {
+            combo_options.clear();
+            combo_signs.clear();
+            combo_pnl.clear();
+
+            // Construire la combinaison avec les indices et signes
             for (int i = 0; i < n_legs; ++i) {
-                indices_list.append(indices_buf(c, i));
-                signs_list.append(signs_buf(c, i));
+                int idx = c[i];  // Indice de l'option
+                int sgn = (mask & (1 << i)) ? 1 : -1;  // Signe: 1 (long) ou -1 (short)
+                combo_options.push_back(g_cache.options[idx]);
+                combo_signs.push_back(sgn);
+                combo_pnl.push_back(g_cache.pnl_matrix[idx]);
             }
+        
+            // Calculer les métriques avec les nouveaux paramètres
+            auto result = StrategyCalculator::calculate(
+                combo_options, combo_signs, combo_pnl, g_cache.prices, g_cache.mixture,
+                g_cache.average_mix, max_loss_left, max_loss_right, max_premium_params,
+                ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max, limit_left, limit_right
+            );
             
-            py::dict metrics_dict;
-            metrics_dict["total_premium"] = metrics.total_premium;
-            metrics_dict["total_delta"] = metrics.total_delta;
-            metrics_dict["total_gamma"] = metrics.total_gamma;
-            metrics_dict["total_vega"] = metrics.total_vega;
-            metrics_dict["total_theta"] = metrics.total_theta;
-            metrics_dict["total_iv"] = metrics.total_iv;
-            metrics_dict["max_profit"] = metrics.max_profit;
-            metrics_dict["max_loss"] = metrics.max_loss;
-            metrics_dict["max_loss_left"] = metrics.max_loss_left;
-            metrics_dict["max_loss_right"] = metrics.max_loss_right;
-            metrics_dict["total_average_pnl"] = metrics.total_average_pnl;
-            metrics_dict["total_sigma_pnl"] = metrics.total_sigma_pnl;
-            metrics_dict["surface_profit"] = metrics.surface_profit_nonponderated;
-            metrics_dict["surface_loss"] = metrics.surface_loss_nonponderated;
-            metrics_dict["surface_profit_ponderated"] = metrics.total_profit_surface_ponderated;
-            metrics_dict["surface_loss_ponderated"] = metrics.total_loss_surface_ponderated;
-            metrics_dict["min_profit_price"] = metrics.min_profit_price;
-            metrics_dict["max_profit_price"] = metrics.max_profit_price;
-            metrics_dict["profit_zone_width"] = metrics.profit_zone_width;
-            metrics_dict["call_count"] = metrics.call_count;
-            metrics_dict["put_count"] = metrics.put_count;
-            metrics_dict["breakeven_points"] = metrics.breakeven_points;
-            metrics_dict["total_roll"] = metrics.total_roll;
-            metrics_dict["total_roll_quarterly"] = metrics.total_roll_quarterly;
-            metrics_dict["total_roll_sum"] = metrics.total_roll_sum;
-            
-            // P&L array
-            py::array_t<double> pnl_arr(metrics.total_pnl_array.size());
-            auto pnl_out = pnl_arr.mutable_unchecked<1>();
-            for (size_t i = 0; i < metrics.total_pnl_array.size(); ++i) {
-                pnl_out(i) = metrics.total_pnl_array[i];
+            if (result.has_value()) {
+                const auto& metrics = result.value();
+                
+                // Créer le tuple (indices, signs, metrics_dict)
+                py::list indices_list;
+                py::list signs_list;
+                for (int i = 0; i < n_legs; ++i) {
+                    indices_list.append(c[i]);
+                    signs_list.append((mask & (1 << i)) ? 1 : -1);
+                }
+                
+                py::dict metrics_dict;
+                metrics_dict["total_premium"] = metrics.total_premium;
+                metrics_dict["total_delta"] = metrics.total_delta;
+                metrics_dict["total_gamma"] = metrics.total_gamma;
+                metrics_dict["total_vega"] = metrics.total_vega;
+                metrics_dict["total_theta"] = metrics.total_theta;
+                metrics_dict["total_iv"] = metrics.total_iv;
+                metrics_dict["max_profit"] = metrics.max_profit;
+                metrics_dict["max_loss"] = metrics.max_loss;
+                metrics_dict["max_loss_left"] = metrics.max_loss_left;
+                metrics_dict["max_loss_right"] = metrics.max_loss_right;
+                metrics_dict["total_average_pnl"] = metrics.total_average_pnl;
+                metrics_dict["total_sigma_pnl"] = metrics.total_sigma_pnl;
+                metrics_dict["surface_profit"] = metrics.surface_profit_nonponderated;
+                metrics_dict["surface_loss"] = metrics.surface_loss_nonponderated;
+                metrics_dict["surface_profit_ponderated"] = metrics.total_profit_surface_ponderated;
+                metrics_dict["surface_loss_ponderated"] = metrics.total_loss_surface_ponderated;
+                metrics_dict["min_profit_price"] = metrics.min_profit_price;
+                metrics_dict["max_profit_price"] = metrics.max_profit_price;
+                metrics_dict["profit_zone_width"] = metrics.profit_zone_width;
+                metrics_dict["call_count"] = metrics.call_count;
+                metrics_dict["put_count"] = metrics.put_count;
+                metrics_dict["breakeven_points"] = metrics.breakeven_points;
+                metrics_dict["total_roll"] = metrics.total_roll;
+                metrics_dict["total_roll_quarterly"] = metrics.total_roll_quarterly;
+                metrics_dict["total_roll_sum"] = metrics.total_roll_sum;
+                
+                // P&L array
+                py::array_t<double> pnl_arr(metrics.total_pnl_array.size());
+                auto pnl_out = pnl_arr.mutable_unchecked<1>();
+                for (size_t i = 0; i < metrics.total_pnl_array.size(); ++i) {
+                    pnl_out(i) = metrics.total_pnl_array[i];
+                }
+                metrics_dict["pnl_array"] = pnl_arr;
+                
+                results.append(py::make_tuple(indices_list, signs_list, metrics_dict));
             }
-            metrics_dict["pnl_array"] = pnl_arr;
-            
-            results.append(py::make_tuple(indices_list, signs_list, metrics_dict));
         }
-    }
+    } while (StrategyCalculator::next_combination(c, g_cache.n_options));
     
     return results;
 }
+
 
 
 /**
@@ -404,12 +401,11 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
     
     m.def("process_combinations_batch", &process_combinations_batch,
           R"pbdoc(
-              Traite un batch de combinaisons en C++.
+              Génère et traite toutes les combinaisons de n_legs options en C++.
+              Pour chaque combinaison d'indices, teste tous les signes possibles (long/short).
               
               Arguments:
-                  indices_batch: 2D array (n_combos x max_legs), -1 pour padding
-                  signs_batch: 2D array (n_combos x max_legs)
-                  combo_sizes: 1D array avec la taille de chaque combo
+                  n_legs: Nombre d'options dans chaque stratégie
                   max_loss_left: Perte maximale autorisée à gauche de average_mix
                   max_loss_right: Perte maximale autorisée à droite de average_mix
                   max_premium_params: Premium maximum autorisé
@@ -424,9 +420,7 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
               Retourne:
                   Liste de tuples (indices, signs, metrics_dict) pour les stratégies valides
           )pbdoc",
-          py::arg("indices_batch"),
-          py::arg("signs_batch"),
-          py::arg("combo_sizes"),
+          py::arg("n_legs"),
           py::arg("max_loss_left"),
           py::arg("max_loss_right"),
           py::arg("max_premium_params"),

@@ -130,6 +130,11 @@ public:
         double limit_right
     );
 
+    static bool next_combination(
+        std::vector<int>& c,
+        const int N
+    );
+
 private:
     // Filtres (retourne false si la stratégie doit être rejetée)
 

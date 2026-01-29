@@ -34,21 +34,8 @@ class OptionStrategyGeneratorV2:
         progress_tracker=None,
     ) -> Tuple[List[StrategyComparison], int]:
         """
-        GÃ©nÃ¨re toutes les combinaisons possibles d'options (1 Ã  max_legs).
-        
-        DÃ©lÃ¨gue le traitement au batch processor C++ pour des performances optimales.
-        
-        Args:
-            price_min: Prix minimum pour le range (non utilisÃ© - dÃ©fini dans les options)
-            price_max: Prix maximum pour le range (non utilisÃ© - dÃ©fini dans les options)
-            filter: Filtres Ã  appliquer aux stratÃ©gies
-            max_legs: Nombre maximum de legs par stratÃ©gie (1 Ã  4)
-            progress_tracker: Tracker de progression optionnel
-            
-        Returns:
-            Tuple[List[StrategyComparison], int]: 
-                - Liste des stratÃ©gies valides
-                - Nombre total de combinaisons testÃ©es
+        Géneration         
+        Traitement au batch processor C++ pour des performances optimales.
         """        
         strategies, grand_total = generate_all_strategies_batch(
             progress_tracker,

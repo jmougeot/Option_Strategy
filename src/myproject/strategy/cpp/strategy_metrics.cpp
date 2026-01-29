@@ -20,6 +20,23 @@ namespace strategy {
 // FONCTION PRINCIPALE
 // ============================================================================
 
+bool StrategyCalculator::next_combination(
+    std::vector<int>& c,
+    int N
+) {
+    int k = c.size();
+
+    for (int i = k - 1; i >= 0; --i) {
+        if (c[i] < N - 1) {
+            int v = ++c[i];
+            for (int j = i + 1; j < k; ++j)
+                c[j] = v;
+            return true;
+        }
+    }
+    return false; 
+}
+
 std::optional<StrategyMetrics> StrategyCalculator::calculate(
     const std::vector<OptionData>& options,
     const std::vector<int>& signs,
