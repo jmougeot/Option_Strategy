@@ -6,13 +6,12 @@ from typing import List, Callable, Tuple
 from dataclasses import dataclass
 
 from myproject.strategy.strategy_class import StrategyComparison
-from myproject.strategy.scoring.helpers import safe_value
-from myproject.strategy.scoring.normalizers import normalize_max, normalize_min_max, normalize_count
-from myproject.strategy.scoring.scorers import (
+from myproject.scoring.helpers import safe_value
+from myproject.scoring.normalizers import normalize_max, normalize_min_max, normalize_count
+from myproject.scoring.scorers import (
     score_higher_better,
     score_lower_better,
     score_moderate_better,
-    score_call_put,
 )
 
 

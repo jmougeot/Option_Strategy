@@ -12,8 +12,6 @@ from myproject.share_result.generate_email import (
     open_outlook_with_email,
 )
 
-
-
 def create_email_with_images(
     template_data: EmailTemplateData,
     comparisons: Optional[List] = None,

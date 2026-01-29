@@ -19,6 +19,7 @@ from myproject.app.processing import (
 from myproject.app.filter_widget import filter_params
 from myproject.app.progress_tracker import ProgressTracker
 from myproject.share_result.email_utils import StrategyEmailData, EmailTemplateData, create_email_with_images
+from myproject.share_result.generate_pdf import create_pdf_report
 
 
 # ============================================================================
@@ -203,28 +204,38 @@ def main():
                 st.error("❌ Error opening Outlook. See console for details.")
         
         # Button to generate PDF
-        comparisons_for_pdf = st.session_state.get("comparisons", None)
-        mixture_for_pdf = st.session_state.get("mixture", None)
-        
-        if comparisons_for_pdf:
-            # Build template data
-            template_data = build_email_template_data()
+        if st.button("📄 Generate PDF Report"):
+            comparisons_for_pdf = st.session_state.get("comparisons", None)
+            mixture_for_pdf = st.session_state.get("mixture", None)
             
-            pdf_bytes = create_pdf_report(
-                template_data=template_data,
-                comparisons=comparisons_for_pdf,
-                mixture=mixture_for_pdf
-            )
-            if pdf_bytes:
-                underlying_name = params.underlying if params.underlying else "Options"
-                date_str = datetime.now().strftime('%Y-%m-%d')
-                filename = f"Strategy_{underlying_name}_{date_str}.pdf"
-                st.download_button(
-                    label="📄 Download PDF Report",
-                    data=pdf_bytes,
-                    file_name=filename,
-                    mime="application/pdf"
+            if comparisons_for_pdf:
+                # Build template data
+                template_data = build_email_template_data()
+                
+                pdf_bytes = create_pdf_report(
+                    template_data=template_data,
+                    comparisons=comparisons_for_pdf,
+                    mixture=mixture_for_pdf
                 )
+                if pdf_bytes:
+                    # Store PDF in session state
+                    st.session_state["pdf_bytes"] = pdf_bytes
+                    st.session_state["pdf_filename"] = f"Strategy_{params.underlying if params.underlying else 'Options'}_{datetime.now().strftime('%Y-%m-%d')}.pdf"
+                    st.success("✅ PDF generated successfully!")
+                    st.rerun()
+                else:
+                    st.error("❌ Error generating PDF. See console for details.")
+            else:
+                st.warning("⚠️ No strategies to generate PDF. Run comparison first.")
+        
+        # Show download button if PDF exists in session state
+        if "pdf_bytes" in st.session_state and st.session_state["pdf_bytes"]:
+            st.download_button(
+                label="💾 Download PDF",
+                data=st.session_state["pdf_bytes"],
+                file_name=st.session_state.get("pdf_filename", "report.pdf"),
+                mime="application/pdf"
+            )
 
     # ========================================================================
     # MAIN AREA

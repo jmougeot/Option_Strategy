@@ -141,7 +141,7 @@ def save_payoff_diagram_png(
     limited_comparisons = comparisons[:max_strategies]
     # Import local pour éviter l'import circulaire
     from myproject.app.payoff_diagram import create_payoff_diagram
-    fig = create_payoff_diagram(mixture, limited_comparisons)
+    fig = create_payoff_diagram(limited_comparisons, mixture)
     return save_figure_to_png(fig, filename, width=500, height=250)
 
 def save_top10_summary(

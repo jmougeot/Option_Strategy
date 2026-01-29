@@ -8,7 +8,7 @@ Architecture modulaire pour le calcul des scores:
 - comparer.py: Comparateur principal
 """
 
-from myproject.strategy.scoring.comparer import StrategyComparerV2
-from myproject.strategy.scoring.metrics_config import MetricConfig, create_metrics_config
+from myproject.scoring.comparer import StrategyComparerV2
+from myproject.scoring.metrics_config import MetricConfig, create_metrics_config
 
 __all__ = ["StrategyComparerV2", "MetricConfig", "create_metrics_config"]

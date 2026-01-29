@@ -16,18 +16,12 @@ from myproject.app.filter_widget import FilterData
 
 class OptionStrategyGeneratorV2:
     """
-    GÃ©nÃ¨re toutes les stratÃ©gies possibles Ã  partir d'une liste d'options.
-    
-    Utilise le module C++ pour le traitement batch haute performance.
-    Teste toutes les combinaisons de 1 Ã  max_legs options avec diffÃ©rentes positions (long/short).
+    Génère toutes les strtégies à partir d'une liste d'options 
     """
 
     def __init__(self, options: List[Option]):
         """
-        Initialise le gÃ©nÃ©rateur avec une liste d'options triÃ©es.
-
-        Args:
-            options: Liste d'objets Option rÃ©cupÃ©rÃ©s depuis Bloomberg
+        Initilisation du générateur 
         """
         # Trier les options par expiration puis par strike croissant
         sorted_by_exp = sort_options_by_expiration(options)

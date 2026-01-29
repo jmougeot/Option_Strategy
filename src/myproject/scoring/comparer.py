@@ -9,7 +9,7 @@ from copy import deepcopy
 import numpy as np
 
 from myproject.strategy.strategy_class import StrategyComparison
-from myproject.strategy.scoring.metrics_config import MetricConfig, create_metrics_config
+from myproject.scoring.metrics_config import MetricConfig, create_metrics_config
 
 
 
