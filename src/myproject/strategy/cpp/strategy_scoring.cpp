@@ -7,6 +7,9 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <unordered_map>
+#include <queue>
+#include <limits>
 
 namespace strategy {
 
@@ -208,8 +211,29 @@ double StrategyScorer::calculate_score(
 }
 
 // ============================================================================
-// FILTRE DE DOUBLONS
+// FILTRE DE DOUBLONS - OPTIMISÉ AVEC HASH
 // ============================================================================
+
+// Fonction de hash pour un vecteur de P&L arrondi
+static size_t hash_pnl_array(const std::vector<double>& pnl, int decimals) {
+    double factor = std::pow(10.0, decimals);
+    size_t hash = 0;
+    
+    // Échantillonner quelques points pour le hash (début, milieu, fin)
+    std::vector<size_t> sample_indices;
+    if (pnl.size() > 0) sample_indices.push_back(0);
+    if (pnl.size() > 10) sample_indices.push_back(pnl.size() / 4);
+    if (pnl.size() > 5) sample_indices.push_back(pnl.size() / 2);
+    if (pnl.size() > 10) sample_indices.push_back(3 * pnl.size() / 4);
+    if (pnl.size() > 1) sample_indices.push_back(pnl.size() - 1);
+    
+    for (size_t idx : sample_indices) {
+        long long rounded = static_cast<long long>(std::round(pnl[idx] * factor));
+        hash ^= std::hash<long long>{}(rounded) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    }
+    
+    return hash;
+}
 
 bool StrategyScorer::are_pnl_equal(
     const std::vector<double>& pnl1,
@@ -239,32 +263,48 @@ bool StrategyScorer::are_pnl_equal(
 
 std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
     const std::vector<ScoredStrategy>& strategies,
-    int decimals
+    int decimals,
+    int max_unique
 ) {
     if (strategies.empty()) {
         return {};
     }
     
     std::vector<ScoredStrategy> uniques;
-    uniques.reserve(strategies.size());
+    uniques.reserve(max_unique > 0 ? max_unique : strategies.size());
+    
+    // Utiliser un hash map pour accélérer la détection des doublons
+    std::unordered_map<size_t, std::vector<size_t>> hash_buckets;
     
     int duplicates_count = 0;
     
     // Pour chaque stratégie
-    for (const auto& strat : strategies) {
+    for (size_t idx = 0; idx < strategies.size(); ++idx) {
+        // Arrêter dès qu'on a assez de stratégies uniques
+        if (max_unique > 0 && static_cast<int>(uniques.size()) >= max_unique) {
+            std::cout << "  ✅ " << max_unique << " stratégies uniques atteintes, arrêt du filtre" << std::endl;
+            break;
+        }
+        
+        const auto& strat = strategies[idx];
+        size_t pnl_hash = hash_pnl_array(strat.total_pnl_array, decimals);
+        
         bool is_duplicate = false;
         
-        // Vérifier si elle existe déjà dans uniques
-        for (const auto& unique : uniques) {
-            if (are_pnl_equal(strat.total_pnl_array, unique.total_pnl_array, decimals)) {
-                is_duplicate = true;
-                duplicates_count++;
-                break;
+        // Vérifier uniquement dans le bucket du même hash
+        if (hash_buckets.count(pnl_hash) > 0) {
+            for (size_t unique_idx : hash_buckets[pnl_hash]) {
+                if (are_pnl_equal(strat.total_pnl_array, uniques[unique_idx].total_pnl_array, decimals)) {
+                    is_duplicate = true;
+                    duplicates_count++;
+                    break;
+                }
             }
         }
         
         // Si pas un doublon, l'ajouter
         if (!is_duplicate) {
+            hash_buckets[pnl_hash].push_back(uniques.size());
             uniques.push_back(strat);
         }
     }
@@ -279,8 +319,31 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
 }
 
 // ============================================================================
-// SCORING ET RANKING PRINCIPAL
+// SCORING ET RANKING PRINCIPAL - OPTIMISÉ AVEC MIN-HEAP
 // ============================================================================
+
+static double extract_single_metric_value(const ScoredStrategy& strat, const std::string& metric_name) {
+    if (metric_name == "delta_neutral") {
+        return std::abs(strat.total_delta);
+    } else if (metric_name == "gamma_low") {
+        return std::abs(strat.total_gamma);
+    } else if (metric_name == "vega_low") {
+        return std::abs(strat.total_vega);
+    } else if (metric_name == "theta_positive") {
+        return strat.total_theta;
+    } else if (metric_name == "implied_vol_moderate") {
+        return strat.avg_implied_volatility;
+    } else if (metric_name == "average_pnl") {
+        return strat.average_pnl;
+    } else if (metric_name == "roll") {
+        return strat.roll;
+    } else if (metric_name == "roll_quarterly") {
+        return strat.roll_quarterly;
+    } else if (metric_name == "sigma_pnl") {
+        return strat.sigma_pnl;
+    }
+    return 0.0;
+}
 
 std::vector<ScoredStrategy> StrategyScorer::score_and_rank(
     std::vector<ScoredStrategy>& strategies,
@@ -302,55 +365,89 @@ std::vector<ScoredStrategy> StrategyScorer::score_and_rank(
     const size_t n_strategies = strategies.size();
     const size_t n_metrics = metrics.size();
     
-    // Matrice des scores: [n_strategies x n_metrics]
-    std::vector<std::vector<double>> scores_matrix(
-        n_strategies,
-        std::vector<double>(n_metrics, 0.0)
-    );
+    // ========== ÉTAPE 1: Calculer min/max pour TOUTES les métriques en un seul passage ==========
+    std::vector<double> metric_mins(n_metrics, std::numeric_limits<double>::max());
+    std::vector<double> metric_maxs(n_metrics, std::numeric_limits<double>::lowest());
     
-    // Pour chaque métrique
-    for (size_t j = 0; j < n_metrics; ++j) {
-        const auto& metric = metrics[j];
-        
-        // Extraire les valeurs de la métrique
-        std::vector<double> values = extract_metric_values(strategies, metric.name);
-        
-        // Normaliser
-        auto [min_val, max_val] = normalize_values(values, metric.normalizer);
-        
-        // Calculer les scores
-        if (max_val > min_val || (max_val == min_val && max_val != 0.0)) {
-            for (size_t i = 0; i < n_strategies; ++i) {
-                scores_matrix[i][j] = calculate_score(
-                    values[i],
-                    min_val,
-                    max_val,
-                    metric.scorer
-                );
+    for (const auto& strat : strategies) {
+        for (size_t j = 0; j < n_metrics; ++j) {
+            double value = extract_single_metric_value(strat, metrics[j].name);
+            if (std::isfinite(value)) {
+                metric_mins[j] = std::min(metric_mins[j], value);
+                metric_maxs[j] = std::max(metric_maxs[j], value);
             }
         }
     }
     
-    // Calculer le score final pondéré pour chaque stratégie
-    for (size_t i = 0; i < n_strategies; ++i) {
-        double final_score = 0.0;
-        for (size_t j = 0; j < n_metrics; ++j) {
-            final_score += scores_matrix[i][j] * metrics[j].weight;
+    // Corriger les cas où min == max
+    for (size_t j = 0; j < n_metrics; ++j) {
+        if (metric_mins[j] == metric_maxs[j]) {
+            metric_maxs[j] = metric_mins[j] + 1.0;
         }
-        strategies[i].score = final_score;
+        if (metric_mins[j] == std::numeric_limits<double>::max()) {
+            metric_mins[j] = 0.0;
+            metric_maxs[j] = 1.0;
+        }
     }
     
-    // Trier par score décroissant
-    std::sort(strategies.begin(), strategies.end(),
+    // ========== ÉTAPE 2: Scorer et maintenir top_n avec un min-heap d'INDICES ==========
+    // Stocker (score, index) pour éviter de copier les gros objets ScoredStrategy
+    using ScoreIndex = std::pair<double, size_t>;
+    auto cmp = [](const ScoreIndex& a, const ScoreIndex& b) {
+        return a.first > b.first;  // Min-heap: plus petit score en haut
+    };
+    std::priority_queue<ScoreIndex, std::vector<ScoreIndex>, decltype(cmp)> min_heap(cmp);
+    
+    for (size_t idx = 0; idx < strategies.size(); ++idx) {
+        auto& strat = strategies[idx];
+        
+        // Calculer le score pour cette stratégie
+        double final_score = 0.0;
+        
+        for (size_t j = 0; j < n_metrics; ++j) {
+            double value = extract_single_metric_value(strat, metrics[j].name);
+            double min_val = metric_mins[j];
+            double max_val = metric_maxs[j];
+            
+            double metric_score = calculate_score(value, min_val, max_val, metrics[j].scorer);
+            final_score += metric_score * metrics[j].weight;
+        }
+        
+        strat.score = final_score;
+        
+        // Ajouter l'index au heap (pas l'objet complet!)
+        if (static_cast<int>(min_heap.size()) < top_n) {
+            min_heap.push({final_score, idx});
+        } else if (final_score > min_heap.top().first) {
+            min_heap.pop();
+            min_heap.push({final_score, idx});
+        }
+    }
+    
+    // ========== ÉTAPE 3: Extraire les indices et construire le résultat ==========
+    std::vector<size_t> top_indices;
+    top_indices.reserve(min_heap.size());
+    
+    while (!min_heap.empty()) {
+        top_indices.push_back(min_heap.top().second);
+        min_heap.pop();
+    }
+    
+    // Construire le résultat en utilisant std::move pour éviter les copies
+    std::vector<ScoredStrategy> result;
+    result.reserve(top_indices.size());
+    
+    for (size_t idx : top_indices) {
+        result.push_back(std::move(strategies[idx]));
+    }
+    
+    std::sort(result.begin(), result.end(),
         [](const ScoredStrategy& a, const ScoredStrategy& b) {
             return a.score > b.score;
         }
     );
     
-    // Limiter au top_n et assigner les rangs
-    size_t result_size = std::min(static_cast<size_t>(top_n), n_strategies);
-    std::vector<ScoredStrategy> result(strategies.begin(), strategies.begin() + result_size);
-    
+    // Assigner les rangs
     for (size_t i = 0; i < result.size(); ++i) {
         result[i].rank = static_cast<int>(i + 1);
     }

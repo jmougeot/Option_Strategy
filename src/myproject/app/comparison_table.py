@@ -14,7 +14,6 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
                     If None or empty, no roll columns are shown.
         max_rows: Maximum number of rows to display (default: 5)
     """
-    print(f"🔍 DEBUG comparison_table: Stratégies reçues: {len(comparisons)}, max_rows: {max_rows}")
     data = []
     for idx, comp in enumerate(comparisons[:max_rows], 1):
         row = {

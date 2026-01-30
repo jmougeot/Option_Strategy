@@ -86,14 +86,14 @@ def init_cpp_cache(options: List[Option]) -> bool:
 def process_batch_cpp_with_scoring(
     n_legs: int,
     filter: FilterData,
-    top_n: int = 10,
+    top_n: int = 5,
     custom_weights: Optional[Dict[str, float]] = None
 ) -> List[StrategyComparison]:
     """
     Traite un batch de combinaisons via le module C++ AVEC scoring et ranking.
 
     Returns:
-        Liste de StrategyComparison pour les top_n stratégies
+        Liste de StrategyComparison pour les top_n stratégies (défaut: 5)
     """
     global _options_cache
     
@@ -193,10 +193,7 @@ def batch_to_strategies(
             rank=metrics.get('rank', 0),      # Rank depuis C++ si disponible
             rolls_detail=total_rolls_detail,
         )
-        
-        # DEBUG: Vérifier le pnl_array après création
-        print(f"🔍 DEBUG: Stratégie créée - pnl_array taille={len(strat.pnl_array)}, échantillon={strat.pnl_array[:3] if len(strat.pnl_array) > 0 else 'vide'}")
-        
+                
         strategies.append(strat)
     
     return strategies

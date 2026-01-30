@@ -11,6 +11,7 @@
 #include <vector>
 #include <array>
 #include <iostream>
+#include <map>
 
 namespace py = pybind11;
 
@@ -113,7 +114,6 @@ void init_options_cache(
     g_cache.valid = true;
 }
 
-
 /**
  * Génère toutes les combinaisons inférieur à n_legs options, les score et retourne le top_n
  */
@@ -140,15 +140,15 @@ py::list process_combinations_batch_with_scoring(
         throw std::invalid_argument("n_legs invalide");
     }
     
-    // Vecteur pour stocker toutes les stratégies valides
     std::vector<ScoredStrategy> valid_strategies;
     valid_strategies.reserve(100000); 
     
     for (int n_legs = 1; n_legs <= max_legs; ++n_legs) {
-        std::vector<int> c(n_legs);
-        for (int i = 0; i < n_legs; ++i) {
-            c[i] = i;
-        }
+        std::vector<int> c(n_legs, 0);  // Initialiser à [0, 0, ..., 0] pour combinaisons avec répétition
+        
+        size_t count_before = valid_strategies.size();
+        size_t combinations_tested = 0;
+        
         // Buffers réutilisables
         std::vector<OptionData> combo_options;
         std::vector<int> combo_signs;
@@ -158,7 +158,8 @@ py::list process_combinations_batch_with_scoring(
         combo_pnl.reserve(n_legs);
         
         // Générer toutes les combinaisons d'indices
-        do {    
+        do {
+            ++combinations_tested;
             // Pour chaque combinaison d'indices, tester tous les signes possibles
             const int n_masks = 1 << n_legs;
             for (int mask = 0; mask < n_masks; ++mask) {
@@ -226,18 +227,10 @@ py::list process_combinations_batch_with_scoring(
             }
         } while (StrategyCalculator::next_combination(c, g_cache.n_options));
         
-        // DEBUG: Compter combien de stratégies ont été ajoutées pour ce n_legs
-        size_t count_this_legs = 0;
-        for (const auto& s : valid_strategies) {
-            if (s.option_indices.size() == static_cast<size_t>(n_legs)) {
-                count_this_legs++;
-            }
-        }
-        std::cout << "  📊 C++: n_legs=" << n_legs << " -> " << count_this_legs << " stratégies valides" << std::endl;
+        size_t count_after = valid_strategies.size();
+        std::cout << " nouvelles valides=" << (count_after - count_before) 
+                  << " total=" << count_after << std::endl;
     }
-    
-    std::cout << "  📊 C++: TOTAL " << valid_strategies.size() << " stratégies valides générées" << std::endl;
-
     
     // ========== SCORING ET RANKING EN C++ ==========
     std::vector<MetricConfig> metrics;
@@ -257,9 +250,12 @@ py::list process_combinations_batch_with_scoring(
         top_n
     );
     
+    std::cout << "Scoring terminé" << ranked_strategies.size() << " top stratégies" << std::endl;
+    
     // ========== FILTRE DES DOUBLONS EN C++ ==========
-    std::vector<ScoredStrategy> unique_strategies = StrategyScorer::remove_duplicates(ranked_strategies, 4);
-
+    // S'arrête dès qu'on a top_n stratégies uniques
+    std::cout << " Filtre doublons en cours (max " << top_n << " uniques)..." << std::endl;
+    std::vector<ScoredStrategy> unique_strategies = StrategyScorer::remove_duplicates(ranked_strategies, 4, top_n);
 
     // ========== CONVERSION EN RÉSULTATS PYTHON ==========
     py::list results;

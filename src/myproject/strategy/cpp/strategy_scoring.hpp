@@ -137,11 +137,13 @@ public:
      * 
      * @param strategies Vecteur de stratégies à filtrer
      * @param decimals Nombre de décimales pour la tolérance (défaut: 4)
+     * @param max_unique Nombre max de stratégies uniques à retourner (0 = pas de limite)
      * @return Vecteur sans doublons (conserve la première occurrence)
      */
     static std::vector<ScoredStrategy> remove_duplicates(
         const std::vector<ScoredStrategy>& strategies,
-        int decimals = 4
+        int decimals = 4,
+        int max_unique = 0
     );
     
     /**
