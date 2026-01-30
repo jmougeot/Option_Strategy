@@ -76,12 +76,7 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
     # Appliquer les couleurs pour les rangs
     if 'Rank' in df.columns:
         styled_df = styled_df.map(color_rank, subset=['Rank'])
-    
-    # Appliquer le style général avec police plus grande
-    styled_df = styled_df.set_properties(**{
-        'font-size': '16px',
-        'padding': '10px'
-    })
+
     
     # Afficher avec hauteur limitée pour permettre le scroll
     st.dataframe(

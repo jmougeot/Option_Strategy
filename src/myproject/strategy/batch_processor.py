@@ -192,6 +192,8 @@ def batch_to_strategies(
             score=metrics.get('score', 0.0),  # Score depuis C++ si disponible
             rank=metrics.get('rank', 0),      # Rank depuis C++ si disponible
             rolls_detail=total_rolls_detail,
+            delta_levrage= metrics.get('delta_levrage'),
+            avg_pnl_levrage=metrics.get('avg_pnl_levrage')
         )
                 
         strategies.append(strat)

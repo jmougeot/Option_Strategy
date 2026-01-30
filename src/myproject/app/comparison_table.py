@@ -24,6 +24,8 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
             "Max Profit": format_currency(comp.max_profit),
             "Avg P&L": format_currency(comp.average_pnl) if comp.average_pnl is not None else "-",
             "Delta %": f"{comp.total_delta * 100:.2f}%",
+            "Lvg P&L" : format_currency(comp.avg_pnl_levrage) if comp.avg_pnl_levrage is not None else "-",
+            "Lvg Delta " : format_currency(comp.delta_levrage) if comp.delta_levrage is not None else "-",
         }
         
         # Colonnes de roll dynamiques basées sur roll_labels (limité à 2 rolls max)

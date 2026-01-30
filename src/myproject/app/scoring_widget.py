@@ -6,8 +6,6 @@ from typing import List
 SCORING_CATEGORIES = {
     "Gaussian Mixture": {
         "fields": ["average_pnl", "roll", "roll_quarterly", "sigma_pnl"],
-        "color": "📊",
-        "description": "Probability weighted metrics",
     },
     "Greeks": {
         "fields": ["delta_neutral", "gamma_low", "vega_low", "theta_positive"],
@@ -15,6 +13,9 @@ SCORING_CATEGORIES = {
     "Volatility & Cost": {
         "fields": ["implied_vol_moderate"],
     },
+    "Levarge" : {
+        "fields" : ["delta_levrage", "avg_pnl_levarge"]
+    }
 }
 
 # Mapping of field names to readable names
@@ -28,6 +29,8 @@ FIELD_LABELS = {
     "roll_quarterly": "Roll into next quarter",
     "sigma_pnl": "Standart deviation",
     "implied_vol_moderate": "Moderate IV",
+    "delta_levrage": "Levrage with delta",
+    "avg_pnl_levrage": "Levrage of expectied gain"
 }
 
 
