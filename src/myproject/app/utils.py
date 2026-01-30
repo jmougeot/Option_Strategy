@@ -85,17 +85,39 @@ def filter_same_strategies(comparisons: List[StrategyComparison], decimals: int 
     
     vues = set()
     uniques = []
+    duplicates_info = []
     
-    for comp in comparisons:
+    for i, comp in enumerate(comparisons):
         # Signature = tuple du pnl_array arrondi
         sig = tuple(np.round(comp.pnl_array, decimals))
         if sig not in vues:
             vues.add(sig)
             uniques.append(comp)
+        else:
+            # Trouver l'original
+            orig_idx = next(j for j, c in enumerate(uniques) if tuple(np.round(c.pnl_array, decimals)) == sig)
+            duplicates_info.append((i, orig_idx, comp, uniques[orig_idx]))
     
     n = len(comparisons) - len(uniques)
     if n > 0:
-        print(f"  ðŸ” {n} doublons Ã©liminÃ©s")
+        print(f"  🔍 {n} doublons éliminés (même profil P&L)")
+        if len(duplicates_info) > 0:
+            print(f"  🔍 DEBUG doublons - Premiers exemples:")
+            for dup_idx, orig_idx, dup, orig in duplicates_info[:3]:
+                dup_strikes = [f"{opt.strike:.1f}" for opt in dup.all_options]
+                orig_strikes = [f"{opt.strike:.1f}" for opt in orig.all_options]
+                dup_types = [opt.option_type[0].upper() for opt in dup.all_options]
+                orig_types = [opt.option_type[0].upper() for opt in orig.all_options]
+                dup_signs = ['+' if s > 0 else '-' for s in dup.signs]
+                orig_signs = ['+' if s > 0 else '-' for s in orig.signs]
+                print(f"    Dup #{dup_idx}: {''.join([f'{s}{t}@{k}' for s,t,k in zip(dup_signs, dup_types, dup_strikes)])}")
+                print(f"    Orig #{orig_idx}: {''.join([f'{s}{t}@{k}' for s,t,k in zip(orig_signs, orig_types, orig_strikes)])}")
+                # Comparer quelques valeurs du P&L
+                step = max(1, len(dup.pnl_array)//5)
+                pnl_sample_dup = dup.pnl_array[::step][:5]
+                pnl_sample_orig = orig.pnl_array[::step][:5]
+                print(f"      P&L dup (échantillon): {[f'{x:.2f}' for x in pnl_sample_dup]}")
+                print(f"      P&L orig (échantillon): {[f'{x:.2f}' for x in pnl_sample_orig]}")
     
     return uniques
 

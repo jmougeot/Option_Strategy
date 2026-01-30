@@ -5,20 +5,18 @@ Workflow Principal - Bloomberg to Strategy Comparison
 Ce module implemente le workflow complet :
 1. Import des donnees Bloomberg (ou simulation offline)
 2. Conversion en objets Option
-3. Generation de toutes les strategies possibles
-4. Comparaison et ranking des strategies
+3. Generation de toutes les strategies possibles avec SCORING C++
+4. Les stratégies sont déjà scorées et classées (pas besoin de comparer.py)
 
 Mode Offline:
     Definir OFFLINE_MODE=true dans l'environnement pour utiliser des donnees simulees.
 
 Utilise les fonctions optimisees des modules :
-- option_generator_v2.OptionStrategyGeneratorV2
-- comparor_v2.StrategyComparerV2
+- option_generator_v2.OptionStrategyGeneratorV2 (avec scoring C++ intégré)
 """
 
 from typing import List, Dict, Optional, Tuple
 from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
-from myproject.scoring.comparer import StrategyComparerV2
 from myproject.strategy.strategy_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_options
 from myproject.bloomberg.bloomberg_data_importer_offline import (
@@ -27,7 +25,6 @@ from myproject.bloomberg.bloomberg_data_importer_offline import (
 )
 from myproject.app.scenarios_widget import create_mixture_from_scenarios
 from myproject.app.scenarios_widget import ScenarioData
-from myproject.app.utils import filter_same_strategies
 from myproject.app.filter_widget import FilterData
 from myproject.app.progress_tracker import ProgressTracker, ProcessingStep
 import numpy as np
@@ -108,33 +105,24 @@ def process_bloomberg_to_strategies(
         progress_tracker.error("Aucune option trouvee")
         return [], stats, mixture, 0
 
-    # Generer les strategies
+    # Generer les strategies avec SCORING C++ intégré
     generator = OptionStrategyGeneratorV2(options)
-    all_strategies, nb_strategies_possibles = generator.generate_all_combinations(
+    
+
+    best_strategies = generator.generate_top_strategies(
         filter=filter,
         max_legs=max_legs,
-        progress_tracker=progress_tracker,
-    )
+        top_n=top_n,
+        custom_weights=scoring_weights)
 
-    stats["nb_strategies_totales"] = len(all_strategies)
-    stats["nb_strategies_possibles"] = nb_strategies_possibles
-
-    # Classement des strategies
+    stats["nb_strategies_possibles"] = (len(options*4)**max_legs)
+    
     progress_tracker.update(
         ProcessingStep.RANKING, 
-        f"Classement de {len(all_strategies)} strategies...",
+        f"Stratégies déjà scorées et filtrées en C++ - {len(best_strategies)} résultats",
         stats
     )
-
-    comparer = StrategyComparerV2()
-    best_strategies = comparer.compare_and_rank(
-        strategies=all_strategies, 
-        top_n=top_n, 
-        weights=scoring_weights
-    )
-
-    # Supprimer les doublons
-    best_strategies = filter_same_strategies(best_strategies)
+    
     stats["nb_strategies_classees"] = len(best_strategies)
 
     progress_tracker.update(ProcessingStep.DISPLAY, "Preparation de l'affichage...", stats)

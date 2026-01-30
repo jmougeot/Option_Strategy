@@ -7,8 +7,10 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "strategy_metrics.hpp"
+#include "strategy_scoring.hpp"
 #include <vector>
 #include <array>
+#include <iostream>
 
 namespace py = pybind11;
 
@@ -30,10 +32,8 @@ struct OptionsCache {
 // Cache global (sera initialisé par Python)
 static OptionsCache g_cache;
 
-
 /**
  * Initialise le cache avec toutes les données des options
- * Note: profit_surface et loss_surface sont calculées dynamiquement, pas stockées
  */
 void init_options_cache(      
     py::array_t<double> premiums,
@@ -115,12 +115,10 @@ void init_options_cache(
 
 
 /**
- * Traite un batch de combinaisons en C++
- * Génère toutes les combinaisons de n_legs options avec tous les signes possibles
- * Retourne une liste de tuples (indices, signs, metrics_dict) pour les stratégies valides
+ * Génère toutes les combinaisons inférieur à n_legs options, les score et retourne le top_n
  */
-py::list process_combinations_batch(
-    int n_legs,        
+py::list process_combinations_batch_with_scoring(
+    int max_legs,
     double max_loss_left,
     double max_loss_right,
     double max_premium_params,
@@ -130,99 +128,204 @@ py::list process_combinations_batch(
     double delta_min,
     double delta_max,
     double limit_left,
-    double limit_right
+    double limit_right,
+    int top_n = 1000,
+    py::dict custom_weights = py::dict()
 ) {
-    if (!g_cache.valid) {
-        throw std::runtime_error("Cache not initialized. Call init_options_cache first.");
+    if (!g_cache.valid || g_cache.n_options == 0) {
+        throw std::runtime_error("Cache non initialisé. Appelez init_options_cache() d'abord.");
     }
-
-    py::list results;
-
-    // Pré-allouer les vecteurs de travail
-    std::vector<OptionData> combo_options;
-    std::vector<int> combo_signs;
-    std::vector<std::vector<double>> combo_pnl;
-    std::vector<int> c(n_legs, 0);  // Indices de combinaison
     
-    combo_options.reserve(n_legs);
-    combo_signs.reserve(n_legs);
-    combo_pnl.reserve(n_legs);
+    if (max_legs <= 0 || max_legs > static_cast<int>(g_cache.n_options)) {
+        throw std::invalid_argument("n_legs invalide");
+    }
     
-    // Générer toutes les combinaisons d'indices
-    do {    
-        // Pour chaque combinaison d'indices, tester tous les signes possibles
-        const int n_masks = 1 << n_legs;
-        for (int mask = 0; mask < n_masks; ++mask) {
-            combo_options.clear();
-            combo_signs.clear();
-            combo_pnl.clear();
-
-            // Construire la combinaison avec les indices et signes
-            for (int i = 0; i < n_legs; ++i) {
-                int idx = c[i];  // Indice de l'option
-                int sgn = (mask & (1 << i)) ? 1 : -1;  // Signe: 1 (long) ou -1 (short)
-                combo_options.push_back(g_cache.options[idx]);
-                combo_signs.push_back(sgn);
-                combo_pnl.push_back(g_cache.pnl_matrix[idx]);
-            }
+    // Vecteur pour stocker toutes les stratégies valides
+    std::vector<ScoredStrategy> valid_strategies;
+    valid_strategies.reserve(100000); 
+    
+    for (int n_legs = 1; n_legs <= max_legs; ++n_legs) {
+        std::vector<int> c(n_legs);
+        for (int i = 0; i < n_legs; ++i) {
+            c[i] = i;
+        }
+        // Buffers réutilisables
+        std::vector<OptionData> combo_options;
+        std::vector<int> combo_signs;
+        std::vector<std::vector<double>> combo_pnl;
+        combo_options.reserve(n_legs);
+        combo_signs.reserve(n_legs);
+        combo_pnl.reserve(n_legs);
         
-            // Calculer les métriques avec les nouveaux paramètres
-            auto result = StrategyCalculator::calculate(
-                combo_options, combo_signs, combo_pnl, g_cache.prices, g_cache.mixture,
-                g_cache.average_mix, max_loss_left, max_loss_right, max_premium_params,
-                ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max, limit_left, limit_right
-            );
-            
-            if (result.has_value()) {
-                const auto& metrics = result.value();
-                
-                // Créer le tuple (indices, signs, metrics_dict)
-                py::list indices_list;
-                py::list signs_list;
+        // Générer toutes les combinaisons d'indices
+        do {    
+            // Pour chaque combinaison d'indices, tester tous les signes possibles
+            const int n_masks = 1 << n_legs;
+            for (int mask = 0; mask < n_masks; ++mask) {
+                combo_options.clear();
+                combo_signs.clear();
+                combo_pnl.clear();
+
+                // Construire la combinaison avec les indices et signes
                 for (int i = 0; i < n_legs; ++i) {
-                    indices_list.append(c[i]);
-                    signs_list.append((mask & (1 << i)) ? 1 : -1);
+                    int idx = c[i];  // Indice de l'option
+                    int sgn = (mask & (1 << i)) ? 1 : -1;  // Signe: 1 (long) ou -1 (short)
+                    combo_options.push_back(g_cache.options[idx]);
+                    combo_signs.push_back(sgn);
+                    combo_pnl.push_back(g_cache.pnl_matrix[idx]);
                 }
+            
+                // Calculer les métriques
+                auto result = StrategyCalculator::calculate(
+                    combo_options, combo_signs, combo_pnl, g_cache.prices, g_cache.mixture,
+                    g_cache.average_mix, max_loss_left, max_loss_right, max_premium_params,
+                    ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max, limit_left, limit_right
+                );
                 
-                py::dict metrics_dict;
-                metrics_dict["total_premium"] = metrics.total_premium;
-                metrics_dict["total_delta"] = metrics.total_delta;
-                metrics_dict["total_gamma"] = metrics.total_gamma;
-                metrics_dict["total_vega"] = metrics.total_vega;
-                metrics_dict["total_theta"] = metrics.total_theta;
-                metrics_dict["total_iv"] = metrics.total_iv;
-                metrics_dict["max_profit"] = metrics.max_profit;
-                metrics_dict["max_loss"] = metrics.max_loss;
-                metrics_dict["max_loss_left"] = metrics.max_loss_left;
-                metrics_dict["max_loss_right"] = metrics.max_loss_right;
-                metrics_dict["total_average_pnl"] = metrics.total_average_pnl;
-                metrics_dict["total_sigma_pnl"] = metrics.total_sigma_pnl;
-                metrics_dict["surface_profit"] = metrics.surface_profit_nonponderated;
-                metrics_dict["surface_loss"] = metrics.surface_loss_nonponderated;
-                metrics_dict["surface_profit_ponderated"] = metrics.total_profit_surface_ponderated;
-                metrics_dict["surface_loss_ponderated"] = metrics.total_loss_surface_ponderated;
-                metrics_dict["min_profit_price"] = metrics.min_profit_price;
-                metrics_dict["max_profit_price"] = metrics.max_profit_price;
-                metrics_dict["profit_zone_width"] = metrics.profit_zone_width;
-                metrics_dict["call_count"] = metrics.call_count;
-                metrics_dict["put_count"] = metrics.put_count;
-                metrics_dict["breakeven_points"] = metrics.breakeven_points;
-                metrics_dict["total_roll"] = metrics.total_roll;
-                metrics_dict["total_roll_quarterly"] = metrics.total_roll_quarterly;
-                metrics_dict["total_roll_sum"] = metrics.total_roll_sum;
-                
-                // P&L array
-                py::array_t<double> pnl_arr(metrics.total_pnl_array.size());
-                auto pnl_out = pnl_arr.mutable_unchecked<1>();
-                for (size_t i = 0; i < metrics.total_pnl_array.size(); ++i) {
-                    pnl_out(i) = metrics.total_pnl_array[i];
+                if (result.has_value()) {
+                    const auto& metrics = result.value();
+                    
+                    // Créer une ScoredStrategy
+                    ScoredStrategy strat;
+                    strat.total_premium = metrics.total_premium;
+                    strat.total_delta = metrics.total_delta;
+                    strat.total_gamma = metrics.total_gamma;
+                    strat.total_vega = metrics.total_vega;
+                    strat.total_theta = metrics.total_theta;
+                    strat.total_iv = metrics.total_iv;
+                    strat.avg_implied_volatility = metrics.total_iv / n_legs;  // Moyenne
+                    strat.average_pnl = metrics.total_average_pnl;
+                    strat.roll = metrics.total_roll;
+                    strat.roll_quarterly = metrics.total_roll_quarterly;
+                    strat.roll_sum = metrics.total_roll_sum;
+                    strat.sigma_pnl = metrics.total_sigma_pnl;
+                    strat.max_profit = metrics.max_profit;
+                    strat.max_loss = std::min(metrics.max_loss_left, metrics.max_loss_right);
+                    strat.max_loss_left = metrics.max_loss_left;
+                    strat.max_loss_right = metrics.max_loss_right;
+                    strat.min_profit_price = metrics.min_profit_price;
+                    strat.max_profit_price = metrics.max_profit_price;
+                    strat.profit_zone_width = metrics.profit_zone_width;
+                    strat.call_count = metrics.call_count;
+                    strat.put_count = metrics.put_count;
+                    strat.breakeven_points = metrics.breakeven_points;
+                    
+                    // Copier le P&L array
+                    strat.total_pnl_array = metrics.total_pnl_array;
+                    
+                    // Réserver et stocker les indices et signes (IMPORTANT: ne pas utiliser push_back sans réserver)
+                    strat.option_indices.reserve(n_legs);
+                    strat.signs.reserve(n_legs);
+                    for (int i = 0; i < n_legs; ++i) {
+                        strat.option_indices.push_back(c[i]);
+                        strat.signs.push_back((mask & (1 << i)) ? 1 : -1);
+                    }
+                    
+                    valid_strategies.push_back(strat);
                 }
-                metrics_dict["pnl_array"] = pnl_arr;
-                
-                results.append(py::make_tuple(indices_list, signs_list, metrics_dict));
+            }
+        } while (StrategyCalculator::next_combination(c, g_cache.n_options));
+        
+        // DEBUG: Compter combien de stratégies ont été ajoutées pour ce n_legs
+        size_t count_this_legs = 0;
+        for (const auto& s : valid_strategies) {
+            if (s.option_indices.size() == static_cast<size_t>(n_legs)) {
+                count_this_legs++;
             }
         }
-    } while (StrategyCalculator::next_combination(c, g_cache.n_options));
+        std::cout << "  📊 C++: n_legs=" << n_legs << " -> " << count_this_legs << " stratégies valides" << std::endl;
+    }
+    
+    std::cout << "  📊 C++: TOTAL " << valid_strategies.size() << " stratégies valides générées" << std::endl;
+
+    
+    // ========== SCORING ET RANKING EN C++ ==========
+    std::vector<MetricConfig> metrics;
+    if (custom_weights.size() > 0) {
+
+        metrics = StrategyScorer::create_default_metrics();
+        for (auto& metric : metrics) {
+            if (custom_weights.contains(metric.name.c_str())) {
+                metric.weight = custom_weights[metric.name.c_str()].cast<double>();
+            }
+        }
+    }
+    
+    std::vector<ScoredStrategy> ranked_strategies = StrategyScorer::score_and_rank(
+        valid_strategies,  
+        metrics,
+        top_n
+    );
+    
+    // ========== FILTRE DES DOUBLONS EN C++ ==========
+    std::vector<ScoredStrategy> unique_strategies = StrategyScorer::remove_duplicates(ranked_strategies, 4);
+
+
+    // ========== CONVERSION EN RÉSULTATS PYTHON ==========
+    py::list results;
+    
+    // DEBUG: Vérifier les 5 premières stratégies
+    size_t debug_count = std::min(size_t(5), unique_strategies.size());
+    for (size_t d = 0; d < debug_count; ++d) {
+        std::cout << "  Stratégie " << d << ": indices=[";
+        for (size_t i = 0; i < unique_strategies[d].option_indices.size(); ++i) {
+            std::cout << unique_strategies[d].option_indices[i];
+            if (i < unique_strategies[d].option_indices.size() - 1) std::cout << ",";
+        }
+        std::cout << "], signs=[";
+        for (size_t i = 0; i < unique_strategies[d].signs.size(); ++i) {
+            std::cout << unique_strategies[d].signs[i];
+            if (i < unique_strategies[d].signs.size() - 1) std::cout << ",";
+        }
+        std::cout << "], score=" << unique_strategies[d].score << std::endl;
+    }
+    
+    for (const auto& strat : unique_strategies) {
+        py::list indices_list;
+        py::list signs_list;
+        for (size_t i = 0; i < strat.option_indices.size(); ++i) {
+            indices_list.append(strat.option_indices[i]);
+            signs_list.append(strat.signs[i]);
+        }
+        
+        py::dict metrics_dict;
+        metrics_dict["total_premium"] = strat.total_premium;
+        metrics_dict["total_delta"] = strat.total_delta;
+        metrics_dict["total_gamma"] = strat.total_gamma;
+        metrics_dict["total_vega"] = strat.total_vega;
+        metrics_dict["total_theta"] = strat.total_theta;
+        metrics_dict["total_iv"] = strat.total_iv;
+        metrics_dict["avg_implied_volatility"] = strat.avg_implied_volatility;
+        metrics_dict["average_pnl"] = strat.average_pnl;
+        metrics_dict["total_average_pnl"] = strat.average_pnl;  // Alias pour compatibilité
+        metrics_dict["total_roll"] = strat.roll;
+        metrics_dict["total_roll_quarterly"] = strat.roll_quarterly;
+        metrics_dict["total_roll_sum"] = strat.roll_sum;
+        metrics_dict["sigma_pnl"] = strat.sigma_pnl;
+        metrics_dict["total_sigma_pnl"] = strat.sigma_pnl;  // Alias pour compatibilité
+        metrics_dict["max_profit"] = strat.max_profit;
+        metrics_dict["max_loss"] = strat.max_loss;
+        metrics_dict["max_loss_left"] = strat.max_loss_left;
+        metrics_dict["max_loss_right"] = strat.max_loss_right;
+        metrics_dict["min_profit_price"] = strat.min_profit_price;
+        metrics_dict["max_profit_price"] = strat.max_profit_price;
+        metrics_dict["profit_zone_width"] = strat.profit_zone_width;
+        metrics_dict["call_count"] = strat.call_count;
+        metrics_dict["put_count"] = strat.put_count;
+        metrics_dict["breakeven_points"] = strat.breakeven_points;
+        metrics_dict["score"] = strat.score;
+        metrics_dict["rank"] = strat.rank;
+        
+        // Ajouter le pnl_array
+        py::array_t<double> pnl_arr(strat.total_pnl_array.size());
+        auto pnl_out = pnl_arr.mutable_unchecked<1>();
+        for (size_t i = 0; i < strat.total_pnl_array.size(); ++i) {
+            pnl_out(i) = strat.total_pnl_array[i];
+        }
+        metrics_dict["pnl_array"] = pnl_arr;
+        
+        results.append(py::make_tuple(indices_list, signs_list, metrics_dict));
+    }
     
     return results;
 }
@@ -232,7 +335,6 @@ py::list process_combinations_batch(
 /**
  * Wrapper Python-friendly pour calculate()
  * Convertit les arrays NumPy en structures C++
- * Note: profit_surface et loss_surface sont calculées dynamiquement
  */
 py::object calculate_strategy_metrics(
     py::array_t<double> premiums,
@@ -346,10 +448,6 @@ py::object calculate_strategy_metrics(
     output["max_loss_right"] = metrics.max_loss_right;
     output["total_average_pnl"] = metrics.total_average_pnl;
     output["total_sigma_pnl"] = metrics.total_sigma_pnl;
-    output["surface_profit"] = metrics.surface_profit_nonponderated;
-    output["surface_loss"] = metrics.surface_loss_nonponderated;
-    output["surface_profit_ponderated"] = metrics.total_profit_surface_ponderated;
-    output["surface_loss_ponderated"] = metrics.total_loss_surface_ponderated;
     output["min_profit_price"] = metrics.min_profit_price;
     output["max_profit_price"] = metrics.max_profit_price;
     output["profit_zone_width"] = metrics.profit_zone_width;
@@ -399,26 +497,32 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("average_mix")
     );
     
-    m.def("process_combinations_batch", &process_combinations_batch,
+    m.def("process_combinations_batch_with_scoring", &process_combinations_batch_with_scoring,
           R"pbdoc(
-              Génère et traite toutes les combinaisons de n_legs options en C++.
-              Pour chaque combinaison d'indices, teste tous les signes possibles (long/short).
+              Génère toutes les combinaisons de n_legs options avec SCORING et RANKING en C++.
+              
+              Retourne le top_n des meilleures stratégies selon un système de scoring multi-critères.
+              Cette fonction est BEAUCOUP plus rapide que la version Python car tout le scoring
+              est fait en C++ (pas de conversion Python pour chaque stratégie).
               
               Arguments:
-                  n_legs: Nombre d'options dans chaque stratégie
-                  max_loss_left: Perte maximale autorisée à gauche de average_mix
-                  max_loss_right: Perte maximale autorisée à droite de average_mix
+                  n_legs: Nombre de legs par stratégie
+                  max_loss_left: Perte max autorisée à gauche
+                  max_loss_right: Perte max autorisée à droite
                   max_premium_params: Premium maximum autorisé
-                  ouvert_gauche: Nombre de short puts - long puts autorisé
-                  ouvert_droite: Nombre de short calls - long calls autorisé
+                  ouvert_gauche: Nombre de puts shorts non couverts autorisé
+                  ouvert_droite: Nombre de calls shorts non couverts autorisé
                   min_premium_sell: Premium minimum pour vendre une option
                   delta_min: Delta minimum autorisé
                   delta_max: Delta maximum autorisé
-                  limit_left: Prix limite gauche pour appliquer max_loss_left
-                  limit_right: Prix limite droite pour appliquer max_loss_right
+                  limit_left: Prix limite gauche
+                  limit_right: Prix limite droite
+                  top_n: Nombre de meilleures stratégies à retourner (défaut: 10)
+                  custom_weights: Dict optionnel de poids personnalisés (ex: {"average_pnl": 0.3})
                   
               Retourne:
-                  Liste de tuples (indices, signs, metrics_dict) pour les stratégies valides
+                  Liste de tuples (indices, signs, metrics_dict) pour les top_n stratégies
+                  metrics_dict contient maintenant 'score' et 'rank'
           )pbdoc",
           py::arg("n_legs"),
           py::arg("max_loss_left"),
@@ -430,7 +534,9 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("delta_min"),
           py::arg("delta_max"),
           py::arg("limit_left"),
-          py::arg("limit_right")
+          py::arg("limit_right"),
+          py::arg("top_n") = 10,
+          py::arg("custom_weights") = py::dict()
     );
     
     m.def("calculate_strategy_metrics", &calculate_strategy_metrics,

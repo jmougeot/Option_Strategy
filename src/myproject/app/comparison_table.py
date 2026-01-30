@@ -5,33 +5,31 @@ from typing import List, Optional
 import pandas as pd 
 
 
-def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: Optional[List[str]] = None) -> pd.DataFrame:
+def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: Optional[List[str]] = None, max_rows: int = 5) -> pd.DataFrame:
     """Creates a DataFrame for displaying comparisons with ALL scoring criteria.
     
     Args:
         comparisons: List of strategy comparisons
         roll_labels: List of roll expiry labels (ex: ["H6", "M6", "U6"]) to display as columns.
                     If None or empty, no roll columns are shown.
+        max_rows: Maximum number of rows to display (default: 5)
     """
+    print(f"🔍 DEBUG comparison_table: Stratégies reçues: {len(comparisons)}, max_rows: {max_rows}")
     data = []
-    for idx, comp in enumerate(comparisons, 1):
+    for idx, comp in enumerate(comparisons[:max_rows], 1):
         row = {
             "Rank": idx,
-            "Weighted Score": comp.score,
+            "Score": comp.score,
             "Strategy": comp.strategy_name,
-            "Expiry": format_expiration_date(comp.expiration_month, comp.expiration_year),
-            "Premium": f"{comp.premium:3f}",
+            "Premium": f"{comp.premium:.3f}",
             "Max Profit": format_currency(comp.max_profit),
             "Avg P&L": format_currency(comp.average_pnl) if comp.average_pnl is not None else "-",
-            "Ïƒ P&L": format_currency(comp.sigma_pnl) if comp.sigma_pnl is not None else "-",
-            "Delta": f"{comp.total_delta:.4f}",
-            "Gamma": f"{comp.total_gamma:.3f}",
-            "Vega": f"{comp.total_vega:.3f}",
+            "Delta %": f"{comp.total_delta * 100:.2f}%",
         }
         
-        # Colonnes de roll dynamiques basÃ©es sur roll_labels
+        # Colonnes de roll dynamiques basées sur roll_labels (limité à 2 rolls max)
         if roll_labels:
-            for label in roll_labels:
+            for label in roll_labels[:2]:  # Limiter à 2 rolls max pour réduire les colonnes
                 roll_value = comp.rolls_detail.get(label)
                 row[f"Roll {label}"] = f"{roll_value:.4f}" if roll_value is not None else "-"
         

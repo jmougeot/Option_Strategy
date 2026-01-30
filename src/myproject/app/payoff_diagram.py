@@ -118,9 +118,8 @@ def create_payoff_diagram(
         color = colors[idx % len(colors)]
 
         # Calculer P&L (optimisÃ© avec list comprehension)
-        pnl_values = comp.pnl_array
+        pnl_values = comp.pnl_array        
 
-        # Courbe P&L
         if mixture is not None:
             fig.add_trace(
                 go.Scatter(

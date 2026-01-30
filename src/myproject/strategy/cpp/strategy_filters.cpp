@@ -46,14 +46,14 @@ bool StrategyCalculator::filter_same_option_buy_sell(
 }
 
 
-bool StrategyCalculator::filter_put_count(
+bool StrategyCalculator::filter_put_open(
     const std::vector<OptionData>& options,
     const std::vector<int>& signs,
-    int ouvert_gauche,
-    int& put_count
+    int ouvert_gauche
 ) {
     int long_put_count = 0;
     int short_put_count = 0;
+    int put_count= 0;
     
     for (size_t i = 0; i < options.size(); ++i) {
         if (!options[i].is_call) {
@@ -64,28 +64,23 @@ bool StrategyCalculator::filter_put_count(
             }
         }
     }
-    
-    put_count = long_put_count - short_put_count;
+    put_count = short_put_count - long_put_count;
 
-    
-    // Filtre 1: Trop de short puts par rapport aux longs
-    if ((short_put_count - long_put_count) > ouvert_gauche) {
+    if (put_count > ouvert_gauche) {
         return false;
     }
     return true;
 }
 
-
 bool StrategyCalculator::filter_call_open(
     const std::vector<OptionData>& options,
     const std::vector<int>& signs,
-    int ouvert_droite,
-    int long_put_count,
-    int& call_count
+    int ouvert_droite
 ) {
     int long_call_count = 0;
     int short_call_count = 0;
-    
+    int call_count = 0;
+
     for (size_t i = 0; i < options.size(); ++i) {
         if (options[i].is_call) {
             if (signs[i] > 0) {
@@ -96,10 +91,9 @@ bool StrategyCalculator::filter_call_open(
         }
     }
     
-    call_count = long_call_count - short_call_count;
+    call_count = short_call_count - long_call_count;
     
-    // Filtre : Trop de short calls par rapport aux longs
-    if ((short_call_count - long_call_count) > ouvert_droite) {
+    if (call_count > ouvert_droite) {
         return false;
     }
     return true;

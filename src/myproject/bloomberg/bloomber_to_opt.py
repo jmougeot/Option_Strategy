@@ -99,7 +99,6 @@ def create_option_from_bloomberg(
         quantity: Quantité
         price_min: Prix min pour surfaces
         price_max: Prix max pour surfaces
-        calculate_surfaces: Si True, calcule les surfaces
         num_points: Nombre de points pour les surfaces
 
     Returns:
@@ -160,14 +159,12 @@ def create_option_from_bloomberg(
             # Timestamp
         )
 
-        # Initialiser la mixture et calculer les surfaces si les paramètres sont fournis
-        if mixture is not None:
-            # 1. Stocker la mixture et la grille de prix
-            option.prices, option.mixture, average_mix = mixture
+        # 1. Stocker la mixture et la grille de prix
+        option.prices, option.mixture, average_mix = mixture
 
-            # 2. Calculer toutes les surfaces et métriques
-            option._calcul_all_surface()
-            option.average_mix=average_mix
+        # 2. Calculer toutes les surfaces et métriques
+        option._calcul_all_surface()
+        option.average_mix=average_mix
 
         return option
 

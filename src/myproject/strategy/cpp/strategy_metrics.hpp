@@ -34,12 +34,6 @@ struct StrategyMetrics {
     double total_average_pnl;
     double total_sigma_pnl;
     
-    // Surfaces
-    double surface_profit_nonponderated;
-    double surface_loss_nonponderated;
-    double total_profit_surface_ponderated;
-    double total_loss_surface_ponderated;
-    
     // Profit zone
     double min_profit_price;
     double max_profit_price;
@@ -75,8 +69,6 @@ struct OptionData {
     double average_pnl;
     double sigma_pnl;
     double strike;
-    double profit_surface_ponderated;
-    double loss_surface_ponderated;
     double roll;            // Roll moyen (normalisé)
     double roll_quarterly;  // Roll Q-1 (trimestre précédent)
     double roll_sum;        // Roll brut (non normalisé)
@@ -144,32 +136,21 @@ private:
         double min_premium_sell
     );
     
-    static bool filter_call_count(
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs,
-        int& call_count,
-        int& long_call_count,
-        int& short_call_count
-    );
-    
     static bool filter_same_option_buy_sell(
         const std::vector<OptionData>& options,
         const std::vector<int>& signs
     );
     
-    static bool filter_put_count(
+    static bool filter_put_open(
         const std::vector<OptionData>& options,
         const std::vector<int>& signs,
-        int ouvert_gauche,
-        int& put_count
+        int ouvert_gauche
     );
     
     static bool filter_call_open(
         const std::vector<OptionData>& options,
         const std::vector<int>& signs,
-        int ouvert_droite,
-        int long_put_count,
-        int& call_count
+        int ouvert_droite
     );
     
     static bool filter_premium(

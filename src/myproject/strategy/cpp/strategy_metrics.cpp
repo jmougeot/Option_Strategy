@@ -4,12 +4,14 @@
  */
 
 #include "strategy_metrics.hpp"
+#include "strategy_scoring.hpp"
 #include <numeric>
 #include <cmath>
 
 // Inclure les implémentations séparées (unity build)
 #include "strategy_filters.cpp"
 #include "strategy_calculs.cpp"
+#include "strategy_scoring.cpp"
 
 // Note: strategy_filters.cpp et strategy_calculs.cpp définissent leurs fonctions
 // dans le namespace strategy, donc pas besoin de rouvrir le namespace ici.
@@ -83,13 +85,13 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
             ++long_put_count;
         }
     }
-    if (!filter_put_count(options, signs, ouvert_gauche, put_count)) {
+    if (!filter_put_open(options, signs, ouvert_gauche)) {
         return std::nullopt;
     }
     
     // Filtre 4b: Call open (ouvert_droite)
     int call_count_check;
-    if (!filter_call_open(options, signs, ouvert_droite, long_put_count, call_count_check)) {
+    if (!filter_call_open(options, signs, ouvert_droite)) {
         return std::nullopt;
     }
     
@@ -125,9 +127,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     }
     
     // ========== FILTRES DE PERTE BASÉS SUR LES LIMITES DE PRIX ==========
-    // Zone gauche (price < limit_left): perte max = max_loss_left_param
-    // Zone droite (price > limit_right): perte max = max_loss_right_param  
-    // Zone centrale (limit_left <= price <= limit_right): perte max = premium payé
     
     double max_loss_left = 0.0;
     double max_loss_right = 0.0;
@@ -184,8 +183,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     
     // Surfaces et sigma
     double dx = (prices.size() > 1) ? (prices[1] - prices[0]) : 1.0;
-    double surface_profit = 0.0, surface_loss = 0.0;
-    double total_profit_ponderated = 0.0, total_loss_ponderated = 0.0;
     double total_sigma_pnl = 0.0;
     
     // Calcul sigma avec mixture
@@ -230,10 +227,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     result.max_loss_right = max_loss_right;
     result.total_average_pnl = total_average_pnl;
     result.total_sigma_pnl = total_sigma_pnl;
-    result.surface_profit_nonponderated = surface_profit;
-    result.surface_loss_nonponderated = surface_loss;
-    result.total_profit_surface_ponderated = total_profit_ponderated;
-    result.total_loss_surface_ponderated = total_loss_ponderated;
     result.min_profit_price = min_profit_price;
     result.max_profit_price = max_profit_price;
     result.profit_zone_width = profit_zone_width;
