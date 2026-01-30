@@ -149,41 +149,51 @@ py::list process_combinations_batch_with_scoring(
     valid_strategies.reserve(100000); 
     
     for (int n_legs = 1; n_legs <= max_legs; ++n_legs) {
-        std::vector<int> c(n_legs, 0);  // Initialiser à [0, 0, ..., 0] pour combinaisons avec répétition
-        
         size_t count_before = valid_strategies.size();
-        size_t combinations_tested = 0;
         
-        // Mutex pour protéger l'accès concurrent à valid_strategies
-        std::mutex mtx;
+        // ========== ÉTAPE 1: Pré-générer toutes les combinaisons d'indices ==========
+        std::vector<std::vector<int>> all_combinations;
+        all_combinations.reserve(10000);
         
-        // Générer toutes les combinaisons d'indices
+        std::vector<int> c(n_legs, 0);
         do {
-            ++combinations_tested;
-            // Pour chaque combinaison d'indices, tester tous les signes possibles EN PARALLELE
-            const int n_masks = 1 << n_legs;
+            all_combinations.push_back(c);
+        } while (StrategyCalculator::next_combination(c, g_cache.n_options));
+        
+        const size_t n_combos = all_combinations.size();
+        const int n_masks = 1 << n_legs;
+        const size_t total_tasks = n_combos * n_masks;
+        
+        // ========== ÉTAPE 2: Traiter toutes les tâches EN PARALLÈLE ==========
+        std::vector<ScoredStrategy> local_results;
+        std::mutex mtx;
+        const int64_t total_tasks_signed = static_cast<int64_t>(total_tasks);
+        
+        #pragma omp parallel
+        {
+            // Buffer local au thread pour collecter les résultats
+            std::vector<ScoredStrategy> thread_results;
+            thread_results.reserve(1000);
             
-            // Copier les indices actuels pour la boucle parallèle
-            std::vector<int> current_indices(c);
-            
-            #pragma omp parallel for schedule(dynamic) if(n_masks > 8)
-            for (int mask = 0; mask < n_masks; ++mask) {
-                // Buffers locaux au thread
+            #pragma omp for schedule(dynamic, 64) nowait
+            for (int64_t task_id = 0; task_id < total_tasks_signed; ++task_id) {
+                size_t combo_idx = static_cast<size_t>(task_id) / n_masks;
+                int mask = static_cast<int>(task_id) % n_masks;
+                
+                const auto& indices = all_combinations[combo_idx];
+                
+                // Buffers locaux
                 std::vector<OptionData> combo_options;
                 std::vector<int> combo_signs;
                 std::vector<std::vector<double>> combo_pnl;
                 combo_options.reserve(n_legs);
                 combo_signs.reserve(n_legs);
                 combo_pnl.reserve(n_legs);
-                
-                combo_options.clear();
-                combo_signs.clear();
-                combo_pnl.clear();
 
-                // Construire la combinaison avec les indices et signes
+                // Construire la combinaison
                 for (int i = 0; i < n_legs; ++i) {
-                    int idx = current_indices[i];  // Utiliser la copie locale des indices
-                    int sgn = (mask & (1 << i)) ? 1 : -1;  // Signe: 1 (long) ou -1 (short)
+                    int idx = indices[i];
+                    int sgn = (mask & (1 << i)) ? 1 : -1;
                     combo_options.push_back(g_cache.options[idx]);
                     combo_signs.push_back(sgn);
                     combo_pnl.push_back(g_cache.pnl_matrix[idx]);
@@ -199,7 +209,6 @@ py::list process_combinations_batch_with_scoring(
                 if (result.has_value()) {
                     const auto& metrics = result.value();
                     
-                    // Créer une ScoredStrategy
                     ScoredStrategy strat;
                     strat.total_premium = metrics.total_premium;
                     strat.total_delta = metrics.total_delta;
@@ -207,7 +216,7 @@ py::list process_combinations_batch_with_scoring(
                     strat.total_vega = metrics.total_vega;
                     strat.total_theta = metrics.total_theta;
                     strat.total_iv = metrics.total_iv;
-                    strat.avg_implied_volatility = metrics.total_iv / n_legs;  // Moyenne
+                    strat.avg_implied_volatility = metrics.total_iv / n_legs;
                     strat.average_pnl = metrics.total_average_pnl;
                     strat.roll = metrics.total_roll;
                     strat.roll_quarterly = metrics.total_roll_quarterly;
@@ -223,30 +232,32 @@ py::list process_combinations_batch_with_scoring(
                     strat.call_count = metrics.call_count;
                     strat.put_count = metrics.put_count;
                     strat.breakeven_points = metrics.breakeven_points;
-                    
-                    // Copier le P&L array
                     strat.total_pnl_array = metrics.total_pnl_array;
                     
-                    // Réserver et stocker les indices et signes
                     strat.option_indices.reserve(n_legs);
                     strat.signs.reserve(n_legs);
                     for (int i = 0; i < n_legs; ++i) {
-                        strat.option_indices.push_back(current_indices[i]);
+                        strat.option_indices.push_back(indices[i]);
                         strat.signs.push_back((mask & (1 << i)) ? 1 : -1);
                     }
                     
-                    // Protection mutex pour l'ajout concurrent
-                    {
-                        std::lock_guard<std::mutex> lock(mtx);
-                        valid_strategies.push_back(std::move(strat));
-                    }
+                    thread_results.push_back(std::move(strat));
                 }
             }
-        } while (StrategyCalculator::next_combination(c, g_cache.n_options));
+            
+            // Fusionner les résultats du thread (une seule fois par thread)
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                valid_strategies.insert(valid_strategies.end(), 
+                    std::make_move_iterator(thread_results.begin()),
+                    std::make_move_iterator(thread_results.end()));
+            }
+        }
         
         size_t count_after = valid_strategies.size();
-        std::cout << " nouvelles valides=" << (count_after - count_before) 
-                  << " total=" << count_after << std::endl;
+        std::cout << "n_legs=" << n_legs << " combos=" << n_combos 
+                  << " tâches=" << total_tasks
+                  << " valides=" << (count_after - count_before) << std::endl;
     }
     
     // ========== SCORING ET RANKING EN C++ ==========
