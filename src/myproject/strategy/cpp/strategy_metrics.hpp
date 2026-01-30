@@ -47,6 +47,10 @@ struct StrategyMetrics {
     double total_roll;
     double total_roll_quarterly;
     double total_roll_sum;
+
+    // Levrage
+    double delta_levrage;
+    double avg_pnl_levrage;
     
     // Breakeven points (max 10 pour éviter allocation dynamique)
     std::vector<double> breakeven_points;
@@ -103,6 +107,8 @@ public:
      * @param limit_right Right limit where we accept to loose max loss right
      * @return std::optional<StrategyMetrics> - nullopt si invalide
      */
+
+
     static std::optional<StrategyMetrics> calculate(
         const std::vector<OptionData>& options,
         const std::vector<int>& signs,
@@ -208,6 +214,16 @@ private:
         const std::vector<int>& signs,
         double dx,
         double& total_sigma_pnl
+    );
+
+    static double delta_levrage(
+        const double total_average_pnl, 
+        const double premium
+    );
+
+    static double avg_pnl_levrage(
+        const double total_average_pnl, 
+        const double premium
     );
 };
 

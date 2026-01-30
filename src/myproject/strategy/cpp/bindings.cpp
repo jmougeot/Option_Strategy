@@ -149,7 +149,7 @@ py::list process_combinations_batch_with_scoring(
     valid_strategies.reserve(1000000); 
     
     for (int n_legs = 1; n_legs <= max_legs; ++n_legs) {
-        size_t count_before = valid_strategies.size();''
+        size_t count_before = valid_strategies.size();
         
         // ========== ÉTAPE 1: Pré-générer toutes les combinaisons d'indices ==========
         std::vector<std::vector<int>> all_combinations;
@@ -233,7 +233,9 @@ py::list process_combinations_batch_with_scoring(
                     strat.put_count = metrics.put_count;
                     strat.breakeven_points = metrics.breakeven_points;
                     strat.total_pnl_array = metrics.total_pnl_array;
-                    
+                    strat.avg_pnl_levrage = metrics.avg_pnl_levrage;
+                    strat.delta_levrage = metrics.delta_levrage;
+            
                     strat.option_indices.reserve(n_legs);
                     strat.signs.reserve(n_legs);
                     for (int i = 0; i < n_legs; ++i) {
@@ -323,6 +325,8 @@ py::list process_combinations_batch_with_scoring(
         metrics_dict["breakeven_points"] = strat.breakeven_points;
         metrics_dict["score"] = strat.score;
         metrics_dict["rank"] = strat.rank;
+        metrics_dict["delta_levrage"] = strat.delta_levrage;
+        metrics_dict["avg_pnl_levrage"] = strat.avg_pnl_levrage;
         
         // Ajouter le pnl_array
         py::array_t<double> pnl_arr(strat.total_pnl_array.size());
@@ -465,6 +469,8 @@ py::object calculate_strategy_metrics(
     output["total_roll"] = metrics.total_roll;
     output["total_roll_quarterly"] = metrics.total_roll_quarterly;
     output["total_roll_sum"] = metrics.total_roll_sum;
+    output["delta_levrage"] = metrics.delta_levrage;
+    output["avg_pnl_levrage"] = metrics.avg_pnl_levrage;
     
     // Convertir le P&L array en NumPy
     py::array_t<double> pnl_arr(metrics.total_pnl_array.size());
@@ -479,7 +485,7 @@ py::object calculate_strategy_metrics(
 
 
 PYBIND11_MODULE(strategy_metrics_cpp, m) {
-    m.doc() = "Module C++ optimisé pour les calculs de métriques de stratégies d'options";
+    m.doc() = "Module optimisé pour les calculs de métriques de stratégies d'options";
     
     m.def("init_options_cache", &init_options_cache,
           R"pbdoc(

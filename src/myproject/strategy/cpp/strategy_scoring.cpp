@@ -35,6 +35,10 @@ std::vector<MetricConfig> StrategyScorer::create_default_metrics() {
     metrics.emplace_back("roll_quarterly", 0.06, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
     metrics.emplace_back("sigma_pnl", 0.05, NormalizerType::MAX, ScorerType::LOWER_BETTER);
     
+    // Métriques de levier (valeur absolue élevée = meilleur)
+    metrics.emplace_back("delta_levrage", 0.08, NormalizerType::MAX, ScorerType::HIGHER_BETTER);
+    metrics.emplace_back("avg_pnl_levrage", 0.08, NormalizerType::MAX, ScorerType::HIGHER_BETTER);
+    
     return metrics;
 }
 
@@ -87,9 +91,11 @@ std::vector<double> StrategyScorer::extract_metric_values(
             value = strat.roll_quarterly;
         } else if (metric_name == "sigma_pnl") {
             value = strat.sigma_pnl;
+        } else if (metric_name == "delta_levrage") {
+            value = strat.delta_levrage;
+        } else if (metric_name == "avg_pnl_levrage") {
+              value = strat.avg_pnl_levrage;
         }
-        
-        // Filtrer les valeurs non finies
         if (std::isfinite(value)) {
             values.push_back(value);
         } else {
@@ -231,7 +237,6 @@ static size_t hash_pnl_array(const std::vector<double>& pnl, int decimals) {
         long long rounded = static_cast<long long>(std::round(pnl[idx] * factor));
         hash ^= std::hash<long long>{}(rounded) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
     }
-    
     return hash;
 }
 
@@ -273,7 +278,6 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
     std::vector<ScoredStrategy> uniques;
     uniques.reserve(max_unique > 0 ? max_unique : strategies.size());
     
-    // Utiliser un hash map pour accélérer la détection des doublons
     std::unordered_map<size_t, std::vector<size_t>> hash_buckets;
     
     int duplicates_count = 0;
@@ -282,7 +286,6 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
     for (size_t idx = 0; idx < strategies.size(); ++idx) {
         // Arrêter dès qu'on a assez de stratégies uniques
         if (max_unique > 0 && static_cast<int>(uniques.size()) >= max_unique) {
-            std::cout << "  ✅ " << max_unique << " stratégies uniques atteintes, arrêt du filtre" << std::endl;
             break;
         }
         
@@ -341,6 +344,10 @@ static double extract_single_metric_value(const ScoredStrategy& strat, const std
         return strat.roll_quarterly;
     } else if (metric_name == "sigma_pnl") {
         return strat.sigma_pnl;
+    } else if (metric_name == "delta_levrage") {
+        return strat.delta_levrage;
+    } else if (metric_name == "avg_pnl_levrage") {
+        return strat.avg_pnl_levrage;
     }
     return 0.0;
 }

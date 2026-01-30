@@ -125,7 +125,9 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     if (total_pnl.empty()) {
         return std::nullopt;
     }
-    
+
+    double delta_lvg = delta_levrage(total_delta, total_premium);
+    double avg_pnl_lvg= avg_pnl_levrage(total_average_pnl, total_premium);
     // ========== FILTRES DE PERTE BASÉS SUR LES LIMITES DE PRIX ==========
     
     double max_loss_left = 0.0;
@@ -237,6 +239,8 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     result.total_roll_sum = total_roll_sum;
     result.call_count = call_count_check;
     result.put_count = put_count;
+    result.delta_levrage = delta_lvg;
+    result.avg_pnl_levrage =avg_pnl_lvg;
     
     return result;
 }

@@ -112,6 +112,26 @@ std::vector<double> StrategyCalculator::calculate_breakeven_points(
     return breakevens;
 }
 
+double StrategyCalculator::delta_levrage(
+    const double total_average_pnl,
+    const double premium
+) {
+    if (std::abs(premium) > 1e-10) {
+        return std::abs(total_average_pnl / (1+ premium));
+    }
+    return 0.0;
+}
+
+double StrategyCalculator::avg_pnl_levrage(
+    const double total_average_pnl,
+    const double premium
+) {
+    if (std::abs(premium) > 1e-10) {
+        return std::abs(total_average_pnl / (1 + premium));
+    }
+    return 0.0;
+}
+
 
 void StrategyCalculator::calculate_surfaces(
     const std::vector<double>& total_pnl,

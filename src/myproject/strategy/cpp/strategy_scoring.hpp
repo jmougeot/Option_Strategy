@@ -67,6 +67,8 @@ struct ScoredStrategy {
     double min_profit_price;
     double max_profit_price;
     double profit_zone_width;
+    double delta_levrage;
+    double avg_pnl_levrage;
     int call_count;
     int put_count;
     std::vector<double> breakeven_points;
@@ -88,6 +90,7 @@ struct ScoredStrategy {
           roll(0), roll_quarterly(0), roll_sum(0), sigma_pnl(0),
           max_profit(0), max_loss(0), max_loss_left(0), max_loss_right(0),
           min_profit_price(0), max_profit_price(0), profit_zone_width(0),
+          delta_levrage(0), avg_pnl_levrage(0),
           call_count(0), put_count(0), score(0), rank(0) {}
 };
 
@@ -120,11 +123,6 @@ public:
     
     /**
      * Vérifie si deux P&L arrays sont identiques (avec tolérance)
-     * 
-     * @param pnl1 Premier P&L array
-     * @param pnl2 Deuxième P&L array
-     * @param decimals Nombre de décimales pour la tolérance (défaut: 4)
-     * @return true si les P&L sont identiques
      */
     static bool are_pnl_equal(
         const std::vector<double>& pnl1,
@@ -134,11 +132,6 @@ public:
     
     /**
      * Filtre les stratégies doublons (même profil P&L)
-     * 
-     * @param strategies Vecteur de stratégies à filtrer
-     * @param decimals Nombre de décimales pour la tolérance (défaut: 4)
-     * @param max_unique Nombre max de stratégies uniques à retourner (0 = pas de limite)
-     * @return Vecteur sans doublons (conserve la première occurrence)
      */
     static std::vector<ScoredStrategy> remove_duplicates(
         const std::vector<ScoredStrategy>& strategies,
@@ -148,11 +141,6 @@ public:
     
     /**
      * Score et classe les stratégies selon les métriques configurées
-     * 
-     * @param strategies Vecteur de stratégies à scorer
-     * @param metrics Configuration des métriques (optionnel, utilise défaut si vide)
-     * @param top_n Nombre de meilleures stratégies à retourner
-     * @return Vecteur de stratégies scorées et classées
      */
     static std::vector<ScoredStrategy> score_and_rank(
         std::vector<ScoredStrategy>& strategies,
