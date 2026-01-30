@@ -9,13 +9,24 @@ import sys
 
 __version__ = "1.0.0"
 
+# Flags de compilation avec OpenMP
+if sys.platform == "win32":
+    # MSVC: /O2 optimisation, /openmp pour parallélisation
+    compile_args = ["/O2", "/openmp"]
+    link_args = []
+else:
+    # GCC/Clang: -O3 optimisation, -fopenmp pour parallélisation
+    compile_args = ["-O3", "-ffast-math", "-fopenmp"]
+    link_args = ["-fopenmp"]
+
 ext_modules = [
     Pybind11Extension(
         "strategy_metrics_cpp",
         ["strategy_metrics.cpp", "bindings.cpp"],
         include_dirs=["."],
         cxx_std=17,
-        extra_compile_args=["-O3", "-ffast-math"] if sys.platform != "win32" else ["/O2"],
+        extra_compile_args=compile_args,
+        extra_link_args=link_args,
     ),
 ]
 

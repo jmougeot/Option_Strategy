@@ -12,6 +12,11 @@
 #include <array>
 #include <iostream>
 #include <map>
+#include <mutex>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace py = pybind11;
 
@@ -149,27 +154,35 @@ py::list process_combinations_batch_with_scoring(
         size_t count_before = valid_strategies.size();
         size_t combinations_tested = 0;
         
-        // Buffers réutilisables
-        std::vector<OptionData> combo_options;
-        std::vector<int> combo_signs;
-        std::vector<std::vector<double>> combo_pnl;
-        combo_options.reserve(n_legs);
-        combo_signs.reserve(n_legs);
-        combo_pnl.reserve(n_legs);
+        // Mutex pour protéger l'accès concurrent à valid_strategies
+        std::mutex mtx;
         
         // Générer toutes les combinaisons d'indices
         do {
             ++combinations_tested;
-            // Pour chaque combinaison d'indices, tester tous les signes possibles
+            // Pour chaque combinaison d'indices, tester tous les signes possibles EN PARALLELE
             const int n_masks = 1 << n_legs;
+            
+            // Copier les indices actuels pour la boucle parallèle
+            std::vector<int> current_indices(c);
+            
+            #pragma omp parallel for schedule(dynamic) if(n_masks > 8)
             for (int mask = 0; mask < n_masks; ++mask) {
+                // Buffers locaux au thread
+                std::vector<OptionData> combo_options;
+                std::vector<int> combo_signs;
+                std::vector<std::vector<double>> combo_pnl;
+                combo_options.reserve(n_legs);
+                combo_signs.reserve(n_legs);
+                combo_pnl.reserve(n_legs);
+                
                 combo_options.clear();
                 combo_signs.clear();
                 combo_pnl.clear();
 
                 // Construire la combinaison avec les indices et signes
                 for (int i = 0; i < n_legs; ++i) {
-                    int idx = c[i];  // Indice de l'option
+                    int idx = current_indices[i];  // Utiliser la copie locale des indices
                     int sgn = (mask & (1 << i)) ? 1 : -1;  // Signe: 1 (long) ou -1 (short)
                     combo_options.push_back(g_cache.options[idx]);
                     combo_signs.push_back(sgn);
@@ -214,15 +227,19 @@ py::list process_combinations_batch_with_scoring(
                     // Copier le P&L array
                     strat.total_pnl_array = metrics.total_pnl_array;
                     
-                    // Réserver et stocker les indices et signes (IMPORTANT: ne pas utiliser push_back sans réserver)
+                    // Réserver et stocker les indices et signes
                     strat.option_indices.reserve(n_legs);
                     strat.signs.reserve(n_legs);
                     for (int i = 0; i < n_legs; ++i) {
-                        strat.option_indices.push_back(c[i]);
+                        strat.option_indices.push_back(current_indices[i]);
                         strat.signs.push_back((mask & (1 << i)) ? 1 : -1);
                     }
                     
-                    valid_strategies.push_back(strat);
+                    // Protection mutex pour l'ajout concurrent
+                    {
+                        std::lock_guard<std::mutex> lock(mtx);
+                        valid_strategies.push_back(std::move(strat));
+                    }
                 }
             }
         } while (StrategyCalculator::next_combination(c, g_cache.n_options));
