@@ -132,8 +132,6 @@ void StrategyCalculator::calculate_surfaces(
         }
     }
     
-    
-    // Surfaces pondérées
     double sum_signed_sigma = 0.0;
     
     for (size_t i = 0; i < options.size(); ++i) {

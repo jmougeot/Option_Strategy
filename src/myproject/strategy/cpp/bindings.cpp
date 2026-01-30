@@ -146,10 +146,10 @@ py::list process_combinations_batch_with_scoring(
     }
     
     std::vector<ScoredStrategy> valid_strategies;
-    valid_strategies.reserve(100000); 
+    valid_strategies.reserve(1000000); 
     
     for (int n_legs = 1; n_legs <= max_legs; ++n_legs) {
-        size_t count_before = valid_strategies.size();
+        size_t count_before = valid_strategies.size();''
         
         // ========== ÉTAPE 1: Pré-générer toutes les combinaisons d'indices ==========
         std::vector<std::vector<int>> all_combinations;
@@ -281,28 +281,12 @@ py::list process_combinations_batch_with_scoring(
     std::cout << "Scoring terminé" << ranked_strategies.size() << " top stratégies" << std::endl;
     
     // ========== FILTRE DES DOUBLONS EN C++ ==========
-    // S'arrête dès qu'on a top_n stratégies uniques
     std::cout << " Filtre doublons en cours (max " << top_n << " uniques)..." << std::endl;
     std::vector<ScoredStrategy> unique_strategies = StrategyScorer::remove_duplicates(ranked_strategies, 4, top_n);
 
     // ========== CONVERSION EN RÉSULTATS PYTHON ==========
     py::list results;
-    
-    // DEBUG: Vérifier les 5 premières stratégies
-    size_t debug_count = std::min(size_t(5), unique_strategies.size());
-    for (size_t d = 0; d < debug_count; ++d) {
-        std::cout << "  Stratégie " << d << ": indices=[";
-        for (size_t i = 0; i < unique_strategies[d].option_indices.size(); ++i) {
-            std::cout << unique_strategies[d].option_indices[i];
-            if (i < unique_strategies[d].option_indices.size() - 1) std::cout << ",";
-        }
-        std::cout << "], signs=[";
-        for (size_t i = 0; i < unique_strategies[d].signs.size(); ++i) {
-            std::cout << unique_strategies[d].signs[i];
-            if (i < unique_strategies[d].signs.size() - 1) std::cout << ",";
-        }
-        std::cout << "], score=" << unique_strategies[d].score << std::endl;
-    }
+
     
     for (const auto& strat : unique_strategies) {
         py::list indices_list;

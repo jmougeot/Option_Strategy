@@ -36,6 +36,8 @@ class StrategyComparison:
     score: float = 0.0
     rank: int = 0
     rolls_detail: Dict[str, float] = field(default_factory=dict)  # Rolls par expiry (ex: {"H6": 0.5, "M6": 0.3})
+    delta_levrage = Optional[float] # delta 
+    avg_pnl_levrage = Optional[float] # avg/premium
 
 
     def get_positions(self) -> List[str]:
