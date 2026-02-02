@@ -4,8 +4,10 @@ Description: Web user interface to compare options strategies
 """
 
 import streamlit as st
+import uuid
 from datetime import datetime
-from myproject.app.main import process_bloomberg_to_strategies
+from streamlit_autorefresh import st_autorefresh
+
 from myproject.app.styles import inject_css
 from myproject.app.params_widget import sidebar_params
 from myproject.app.scenarios_widget import scenario_params
@@ -17,9 +19,14 @@ from myproject.app.processing import (
     save_to_session_state,
 )
 from myproject.app.filter_widget import filter_params
-from myproject.app.progress_tracker import ProgressTracker
+from myproject.app.async_processing import (
+    start_processing,
+    check_processing_status,
+    stop_processing,
+    cleanup_result_files,
+)
 from myproject.share_result.email_utils import StrategyEmailData, EmailTemplateData, create_email_with_images
-from myproject.share_result.generate_pdf import create_pdf_report
+from myproject.share_result.generate_pdf import create_pdf_report 
 
 
 # ============================================================================
@@ -156,7 +163,6 @@ def main():
                         "description": f"{best_pnl.strategy_name} {best_pnl.premium:.2f} Mid Price, {delta_str} delta"
                     })
             
-            # Build description texts from filter and params
             target_desc = f"Target defined by scenarios in the UI for {underlying}."
             tail_risk_desc = "Tail risk constraints as defined in filters."
             max_risk_desc = f"Open exposure left: {filter.ouvert_gauche}, right: {filter.ouvert_droite}"
@@ -238,62 +244,107 @@ def main():
             )
 
     # ========================================================================
-    # MAIN AREA
+    # MAIN AREA - Processing Controls
     # ========================================================================
+    
+    # Initialize session state
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())[:8]
+    if "processing" not in st.session_state:
+        st.session_state.processing = False
+    if "process" not in st.session_state:
+        st.session_state.process = None
 
-    compare_button = st.button("Run Comparison", type="primary", width="stretch")
+    # Callback for stop button
+    def on_stop_click():
+        if st.session_state.process is not None:
+            stop_processing(st.session_state.process)
+            st.session_state.processing = False
+            st.session_state.process = None
+
+    compare_button_column, stop_button_column = st.columns(2)
+    
+    with compare_button_column:
+        compare_button = st.button(
+            "Run Comparison", 
+            type="primary", 
+            width="stretch",
+            disabled=st.session_state.processing
+        )
+    with stop_button_column:
+        st.button(
+            "⛔ STOP", 
+            type="secondary", 
+            width="stretch",
+            on_click=on_stop_click
+        )
+    
     all_comparisons = None
+    mixture = None
+    underlying_price = None
 
-    if compare_button:
-
-        # Créer le tracker de progression
-        progress_tracker = ProgressTracker(max_legs=params.max_legs)
+    # Check if we have a running process
+    if st.session_state.processing and st.session_state.process is not None:
+        is_running, is_complete, result, error = check_processing_status(
+            st.session_state.session_id, 
+            st.session_state.process
+        )
         
-        try:
-            # Call main function doing EVERYTHING with progress tracking
-            best_strategies, stats, mixture, underlying_price= process_bloomberg_to_strategies(
-                brut_code=params.brut_code,
-                underlying=params.underlying,
-                months=params.months,
-                years=params.years,
-                strikes=params.strikes,
-                price_min=params.price_min,
-                price_max=params.price_max,
-                max_legs=params.max_legs,
-                scoring_weights=scoring_weights,
-                scenarios=scenarios,  # type: ignore
-                filter=filter,
-                roll_expiries=params.roll_expiries,
-                progress_tracker=progress_tracker,
-            )
-
-            # Check results
-            if not best_strategies:
-                st.error(" No strategy generated")
-                return
-
-            progress_tracker.complete(stats)
+        if is_complete:
+            st.session_state.processing = False
+            st.session_state.process = None
             
-        except Exception as e:
-            import traceback
-            full_traceback = traceback.format_exc()
-            progress_tracker.error(f"Erreur: {str(e)}")
-            st.error(f" Error during processing: {str(e)}")
-            st.code(full_traceback, language="python")
-            return
+            if error:
+                if "terminated" in error.lower():
+                    st.warning("⛔ Processing was terminated by user")
+                else:
+                    st.error(f"❌ Error: {error}")
+                return
+            
+            if result:
+                best_strategies, stats, mixture, underlying_price = result
+                
+                if not best_strategies:
+                    st.error("❌ No strategy generated")
+                    return
+                
+                all_comparisons = best_strategies
+                save_to_session_state(all_comparisons, params, scenarios)
+                st.session_state["mixture"] = mixture
+                st.success("✅ Processing complete!")
+            else:
+                st.warning("⛔ Processing was terminated")
+                return
+        else:
+            # Still running
+            st.info("⏳ Processing in progress... Click STOP to terminate immediately.")
+            st_autorefresh(interval=1000, limit=None, key="processing_refresh")
 
-        # Use best_strategies for display
-        all_comparisons = best_strategies
-
-        if not all_comparisons:
-            st.error(" No strategy available")
-            return
-
-        # Save to session_state (including scenarios)
-        save_to_session_state(all_comparisons, params, scenarios)
-
-        # Also save mixture for diagram export
-        st.session_state["mixture"] = mixture
+    elif compare_button and not st.session_state.processing:
+        st.session_state.processing = True
+        
+        # Prepare params dict for subprocess
+        _params = {
+            "brut_code": params.brut_code,
+            "underlying": params.underlying,
+            "months": params.months,
+            "years": params.years,
+            "strikes": params.strikes,
+            "price_min": params.price_min,
+            "price_max": params.price_max,
+            "max_legs": params.max_legs,
+            "scoring_weights": scoring_weights,
+            "scenarios": scenarios,
+            "filter": filter,
+            "roll_expiries": params.roll_expiries,
+        }
+        
+        # Start background process
+        process = start_processing(st.session_state.session_id, _params)
+        st.session_state.process = process
+        
+        st.info("⏳ Starting processing...")
+        st.rerun()
         
     if not all_comparisons:
         return
@@ -323,4 +374,6 @@ def main():
 # ============================================================================
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
     main()

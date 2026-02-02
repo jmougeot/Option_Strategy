@@ -13,7 +13,6 @@ from myproject.strategy.batch_processor import process_batch_cpp_with_scoring, i
 from myproject.option.option_filter import sort_options_by_expiration, sort_options_by_strike
 from myproject.app.filter_widget import FilterData
 
-
 class OptionStrategyGeneratorV2:
     """
     Génère toutes les strtégies à partir d'une liste d'options 

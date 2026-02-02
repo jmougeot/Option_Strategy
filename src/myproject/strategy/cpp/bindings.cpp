@@ -13,6 +13,8 @@
 #include <iostream>
 #include <map>
 #include <mutex>
+#include <atomic>
+
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -21,6 +23,20 @@
 namespace py = pybind11;
 
 using namespace strategy;
+
+std::atomic<bool> stop_flag(false);
+
+void stop() {
+    stop_flag.store(true);
+}
+
+void reset_stop() {
+    stop_flag.store(false);
+}
+
+bool is_stop_requested() {
+    return stop_flag.load();
+}
 
 
 // Structure pour stocker le cache des options côté C++
@@ -84,6 +100,8 @@ void init_options_cache(
     g_cache.options.resize(g_cache.n_options);
     g_cache.pnl_matrix.resize(g_cache.n_options);
     g_cache.prices.resize(g_cache.pnl_length);
+
+    stop_flag.store(false);
     
     for (size_t i = 0; i < g_cache.n_options; ++i) {
         g_cache.options[i].premium = prem_buf(i);
@@ -137,6 +155,8 @@ py::list process_combinations_batch_with_scoring(
     int top_n = 1000,
     py::dict custom_weights = py::dict()
 ) {
+    stop_flag.store(false);
+
     if (!g_cache.valid || g_cache.n_options == 0) {
         throw std::runtime_error("Cache non initialisé. Appelez init_options_cache() d'abord.");
     }
@@ -177,6 +197,11 @@ py::list process_combinations_batch_with_scoring(
             
             #pragma omp for schedule(dynamic, 64) nowait
             for (int64_t task_id = 0; task_id < total_tasks_signed; ++task_id) {
+                // Check stop flag - use continue instead of throw in OpenMP region
+                if(stop_flag.load()) {
+                    continue;
+                }
+
                 size_t combo_idx = static_cast<size_t>(task_id) / n_masks;
                 int mask = static_cast<int>(task_id) % n_masks;
                 
@@ -256,10 +281,20 @@ py::list process_combinations_batch_with_scoring(
             }
         }
         
+        // Check stop flag after parallel region completes
+        if (stop_flag.load()) {
+            throw std::runtime_error("Cancelled by user");
+        }
+        
         size_t count_after = valid_strategies.size();
         std::cout << "n_legs=" << n_legs << " combos=" << n_combos 
                   << " tâches=" << total_tasks
                   << " valides=" << (count_after - count_before) << std::endl;
+    }
+    
+    // Check stop flag before scoring
+    if (stop_flag.load()) {
+        throw std::runtime_error("Cancelled by user");
     }
     
     // ========== SCORING ET RANKING EN C++ ==========
@@ -343,147 +378,6 @@ py::list process_combinations_batch_with_scoring(
 }
 
 
-
-/**
- * Wrapper Python-friendly pour calculate()
- * Convertit les arrays NumPy en structures C++
- */
-py::object calculate_strategy_metrics(
-    py::array_t<double> premiums,
-    py::array_t<double> deltas,
-    py::array_t<double> gammas,
-    py::array_t<double> vegas,
-    py::array_t<double> thetas,
-    py::array_t<double> ivs,
-    py::array_t<double> average_pnls,
-    py::array_t<double> sigma_pnls,
-    py::array_t<double> strikes,
-    py::array_t<bool> is_calls,
-    py::array_t<double> rolls,
-    py::array_t<double> rolls_quarterly,
-    py::array_t<double> rolls_sum,
-    py::array_t<int> signs,
-    py::array_t<double> pnl_matrix,  // 2D array (n_options x pnl_length)
-    py::array_t<double> prices,
-    py::array_t<double> mixture,
-    double average_mix,
-    double max_loss_left,
-    double max_loss_right,
-    double max_premium_params,
-    int ouvert_gauche,
-    int ouvert_droite,
-    double min_premium_sell,
-    double delta_min,
-    double delta_max,
-    double limit_left,
-    double limit_right
-) {
-    // Accès aux buffers
-    auto prem_buf = premiums.unchecked<1>();
-    auto delta_buf = deltas.unchecked<1>();
-    auto gamma_buf = gammas.unchecked<1>();
-    auto vega_buf = vegas.unchecked<1>();
-    auto theta_buf = thetas.unchecked<1>();
-    auto iv_buf = ivs.unchecked<1>();
-    auto avg_pnl_buf = average_pnls.unchecked<1>();
-    auto sigma_buf = sigma_pnls.unchecked<1>();
-    auto strike_buf = strikes.unchecked<1>();
-    auto is_call_buf = is_calls.unchecked<1>();
-    auto rolls_buf = rolls.unchecked<1>();
-    auto rolls_q_buf = rolls_quarterly.unchecked<1>();
-    auto rolls_sum_buf = rolls_sum.unchecked<1>();
-    auto signs_buf = signs.unchecked<1>();
-    auto pnl_buf = pnl_matrix.unchecked<2>();
-    auto prices_buf = prices.unchecked<1>();
-    auto mixture_buf = mixture.unchecked<1>();
-    
-    const size_t n_options = prem_buf.shape(0);
-    const size_t pnl_length = prices_buf.shape(0);
-    
-    // Construire les vecteurs C++
-    std::vector<OptionData> options(n_options);
-    std::vector<int> signs_vec(n_options);
-    std::vector<std::vector<double>> pnl_matrix_vec(n_options);
-    std::vector<double> prices_vec(pnl_length);
-    std::vector<double> mixture_vec(pnl_length);
-    
-    for (size_t i = 0; i < n_options; ++i) {
-        options[i].premium = prem_buf(i);
-        options[i].delta = delta_buf(i);
-        options[i].gamma = gamma_buf(i);
-        options[i].vega = vega_buf(i);
-        options[i].theta = theta_buf(i);
-        options[i].implied_volatility = iv_buf(i);
-        options[i].average_pnl = avg_pnl_buf(i);
-        options[i].sigma_pnl = sigma_buf(i);
-        options[i].strike = strike_buf(i);
-        options[i].is_call = is_call_buf(i);
-        options[i].roll = rolls_buf(i);
-        options[i].roll_quarterly = rolls_q_buf(i);
-        options[i].roll_sum = rolls_sum_buf(i);
-        signs_vec[i] = signs_buf(i);
-        
-        pnl_matrix_vec[i].resize(pnl_length);
-        for (size_t j = 0; j < pnl_length; ++j) {
-            pnl_matrix_vec[i][j] = pnl_buf(i, j);
-        }
-    }
-    
-    for (size_t i = 0; i < pnl_length; ++i) {
-        prices_vec[i] = prices_buf(i);
-        mixture_vec[i] = mixture_buf(i);
-    }
-    
-    auto result = StrategyCalculator::calculate(
-        options, signs_vec, pnl_matrix_vec, prices_vec, mixture_vec,
-        average_mix, max_loss_left, max_loss_right, max_premium_params,
-        ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max, limit_left, limit_right
-    );
-    
-    if (!result.has_value()) {
-        return py::none();
-    }
-    
-    const auto& metrics = result.value();
-    
-    // Convertir en dictionnaire Python
-    py::dict output;
-    output["total_premium"] = metrics.total_premium;
-    output["total_delta"] = metrics.total_delta;
-    output["total_gamma"] = metrics.total_gamma;
-    output["total_vega"] = metrics.total_vega;
-    output["total_theta"] = metrics.total_theta;
-    output["total_iv"] = metrics.total_iv;
-    output["max_profit"] = metrics.max_profit;
-    output["max_loss"] = metrics.max_loss;
-    output["max_loss_left"] = metrics.max_loss_left;
-    output["max_loss_right"] = metrics.max_loss_right;
-    output["total_average_pnl"] = metrics.total_average_pnl;
-    output["total_sigma_pnl"] = metrics.total_sigma_pnl;
-    output["min_profit_price"] = metrics.min_profit_price;
-    output["max_profit_price"] = metrics.max_profit_price;
-    output["profit_zone_width"] = metrics.profit_zone_width;
-    output["call_count"] = metrics.call_count;
-    output["put_count"] = metrics.put_count;
-    output["breakeven_points"] = metrics.breakeven_points;
-    output["total_roll"] = metrics.total_roll;
-    output["total_roll_quarterly"] = metrics.total_roll_quarterly;
-    output["total_roll_sum"] = metrics.total_roll_sum;
-    output["delta_levrage"] = metrics.delta_levrage;
-    output["avg_pnl_levrage"] = metrics.avg_pnl_levrage;
-    
-    // Convertir le P&L array en NumPy
-    py::array_t<double> pnl_arr(metrics.total_pnl_array.size());
-    auto pnl_out = pnl_arr.mutable_unchecked<1>();
-    for (size_t i = 0; i < metrics.total_pnl_array.size(); ++i) {
-        pnl_out(i) = metrics.total_pnl_array[i];
-    }
-    output["pnl_array"] = pnl_arr;
-    
-    return output;
-}
-
-
 PYBIND11_MODULE(strategy_metrics_cpp, m) {
     m.doc() = "Module optimisé pour les calculs de métriques de stratégies d'options";
     
@@ -514,29 +408,6 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
     m.def("process_combinations_batch_with_scoring", &process_combinations_batch_with_scoring,
           R"pbdoc(
               Génère toutes les combinaisons de n_legs options avec SCORING et RANKING en C++.
-              
-              Retourne le top_n des meilleures stratégies selon un système de scoring multi-critères.
-              Cette fonction est BEAUCOUP plus rapide que la version Python car tout le scoring
-              est fait en C++ (pas de conversion Python pour chaque stratégie).
-              
-              Arguments:
-                  n_legs: Nombre de legs par stratégie
-                  max_loss_left: Perte max autorisée à gauche
-                  max_loss_right: Perte max autorisée à droite
-                  max_premium_params: Premium maximum autorisé
-                  ouvert_gauche: Nombre de puts shorts non couverts autorisé
-                  ouvert_droite: Nombre de calls shorts non couverts autorisé
-                  min_premium_sell: Premium minimum pour vendre une option
-                  delta_min: Delta minimum autorisé
-                  delta_max: Delta maximum autorisé
-                  limit_left: Prix limite gauche
-                  limit_right: Prix limite droite
-                  top_n: Nombre de meilleures stratégies à retourner (défaut: 10)
-                  custom_weights: Dict optionnel de poids personnalisés (ex: {"average_pnl": 0.3})
-                  
-              Retourne:
-                  Liste de tuples (indices, signs, metrics_dict) pour les top_n stratégies
-                  metrics_dict contient maintenant 'score' et 'rank'
           )pbdoc",
           py::arg("n_legs"),
           py::arg("max_loss_left"),
@@ -552,72 +423,22 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("top_n") = 10,
           py::arg("custom_weights") = py::dict()
     );
-    
-    m.def("calculate_strategy_metrics", &calculate_strategy_metrics,
-          R"pbdoc(
-              Calcule toutes les métriques d'une stratégie d'options.
-              
-              Retourne None si la stratégie est invalide (ne passe pas les filtres),
-              sinon retourne un dictionnaire avec toutes les métriques.
-              
-              Arguments:
-                  premiums: Array des primes
-                  deltas: Array des deltas
-                  gammas: Array des gammas
-                  vegas: Array des vegas
-                  thetas: Array des thetas
-                  ivs: Array des volatilités implicites
-                  average_pnls: Array des P&L moyens
-                  sigma_pnls: Array des écarts-types P&L
-                  strikes: Array des strikes
-                  is_calls: Array boolean (True=call, False=put)
-                  rolls: Array des rolls moyens
-                  rolls_quarterly: Array des rolls Q-1
-                  rolls_sum: Array des rolls bruts
-                  signs: Array des signes (+1=long, -1=short)
-                  pnl_matrix: Matrice 2D des P&L (n_options x pnl_length)
-                  prices: Array des prix du sous-jacent
-                  mixture: Array de la mixture (densité de probabilité)
-                  average_mix: Point de séparation left/right
-                  max_loss_left: Perte max à gauche de average_mix
-                  max_loss_right: Perte max à droite de average_mix
-                  max_premium_params: Premium maximum autorisé
-                  ouvert_gauche: Nombre de short puts - long puts autorisé
-                  ouvert_droite: Nombre de short calls - long calls autorisé
-                  min_premium_sell: Premium minimum pour vendre une option
-                  delta_min: Delta minimum autorisé
-                  delta_max: Delta maximum autorisé
-                  
-              Retourne:
-                  None si invalide, dict des métriques sinon
-          )pbdoc",
-          py::arg("premiums"),
-          py::arg("deltas"),
-          py::arg("gammas"),
-          py::arg("vegas"),
-          py::arg("thetas"),
-          py::arg("ivs"),
-          py::arg("average_pnls"),
-          py::arg("sigma_pnls"),
-          py::arg("strikes"),
-          py::arg("is_calls"),
-          py::arg("rolls"),
-          py::arg("rolls_quarterly"),
-          py::arg("rolls_sum"),
-          py::arg("signs"),
-          py::arg("pnl_matrix"),
-          py::arg("prices"),
-          py::arg("mixture"),
-          py::arg("average_mix"),
-          py::arg("max_loss_left"),
-          py::arg("max_loss_right"),
-          py::arg("max_premium_params"),
-          py::arg("ouvert_gauche"),
-          py::arg("ouvert_droite"),
-          py::arg("min_premium_sell"),
-          py::arg("delta_min"),
-          py::arg("delta_max"),
-          py::arg("limit_left"),
-          py::arg("limit_right")
+
+    m.def("stop", &stop,
+        R"pbdoc(
+            Arrete le processus en cours
+        )pbdoc"
+    );
+
+    m.def("reset_stop", &reset_stop,
+        R"pbdoc(
+            Reinitialise le flag d'arret
+        )pbdoc"
+    );
+
+    m.def("is_stop_requested", &is_stop_requested,
+        R"pbdoc(
+            Verifie si un arret a ete demande
+        )pbdoc"
     );
 }
