@@ -43,6 +43,7 @@ class FilterData:
     delta_max: float
     limit_left: float
     limit_right: float
+    confidence_senario: float
 
 
 # Patterns de signes par type de stratégie (triés par strike croissant)

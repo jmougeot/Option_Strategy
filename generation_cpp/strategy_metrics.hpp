@@ -86,28 +86,6 @@ struct OptionData {
  */
 class StrategyCalculator {
 public:
-    /**
-     * Calcule toutes les métriques d'une stratégie
-     * 
-     * @param options Vecteur de données d'options (structure plate)
-     * @param signs Signes (+1 long, -1 short)
-     * @param pnl_matrix Matrice des P&L (n_options x pnl_length)
-     * @param prices Array des prix du sous-jacent
-     * @param mixture Distribution de probabilité
-     * @param average_mix Moyenne de la mixture (point de séparation left/right)
-     * @param max_loss_left Perte max autorisée à gauche de average_mix
-     * @param max_loss_right Perte max autorisée à droite de average_mix
-     * @param max_premium_params Premium max autorisé
-     * @param ouvert_gauche Nombre de puts shorts non couverts autorisés
-     * @param ouvert_droite Nombre de calls shorts non couverts autorisés
-     * @param min_premium_sell Premium minimum pour une vente
-     * @param delta_min Delta minimum autorisé
-     * @param delta_max Delta maximum autorisé
-     * @param limit_left Left limit we accept to loose max loss left
-     * @param limit_right Right limit where we accept to loose max loss right
-     * @return std::optional<StrategyMetrics> - nullopt si invalide
-     */
-
 
     static std::optional<StrategyMetrics> calculate(
         const std::vector<OptionData>& options,
@@ -125,7 +103,8 @@ public:
         double delta_min,
         double delta_max,
         double limit_left,
-        double limit_right
+        double limit_right,
+        double confidence_senario
     );
 
     static bool next_combination(
@@ -223,7 +202,8 @@ private:
 
     static double avg_pnl_levrage(
         const double total_average_pnl, 
-        const double premium
+        const double premium,
+        const double confidence_senario
     );
 };
 

@@ -124,10 +124,11 @@ double StrategyCalculator::delta_levrage(
 
 double StrategyCalculator::avg_pnl_levrage(
     const double total_average_pnl,
-    const double premium
+    const double premium,
+    const double confidence_senario
 ) {
     if (std::abs(premium) > 1e-10) {
-        return std::abs(0.8* total_average_pnl) - 0.2*abs(premium);
+        return std::abs(confidence_senario* total_average_pnl) - abs((1- confidence_senario)* premium);
     }
     return 0.0;
 }

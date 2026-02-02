@@ -114,6 +114,7 @@ def process_batch_cpp_with_scoring(
         filter.delta_max,
         filter.limit_left,
         filter.limit_right,
+        filter.confidence_senario,
         top_n,
         weights_dict
     )

@@ -152,6 +152,7 @@ py::list process_combinations_batch_with_scoring(
     double delta_max,
     double limit_left,
     double limit_right,
+    double confidence_senario,
     int top_n = 1000,
     py::dict custom_weights = py::dict()
 ) {
@@ -228,7 +229,7 @@ py::list process_combinations_batch_with_scoring(
                 auto result = StrategyCalculator::calculate(
                     combo_options, combo_signs, combo_pnl, g_cache.prices, g_cache.mixture,
                     g_cache.average_mix, max_loss_left, max_loss_right, max_premium_params,
-                    ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max, limit_left, limit_right
+                    ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max, limit_left, limit_right, confidence_senario
                 );
                 
                 if (result.has_value()) {
@@ -318,7 +319,7 @@ py::list process_combinations_batch_with_scoring(
     // ========== FILTRE DES DOUBLONS EN C++ ==========
     std::cout << " Filtre doublons en cours (max " << top_n << " uniques)..." << std::endl;
     std::vector<ScoredStrategy> unique_strategies = StrategyScorer::remove_duplicates(ranked_strategies, 4, top_n);
-    std::cout << "Version 3.2.0" << std::endl;
+    std::cout << "Version 3.2.1" << std::endl;
     // ========== CONVERSION EN RÉSULTATS PYTHON ==========
     py::list results;
 
@@ -418,6 +419,7 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("delta_max"),
           py::arg("limit_left"),
           py::arg("limit_right"),
+          py::arg("confidence_senario"),
           py::arg("top_n") = 10,
           py::arg("custom_weights") = py::dict()
     );

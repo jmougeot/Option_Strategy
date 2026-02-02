@@ -55,7 +55,8 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     double delta_min,
     double delta_max,
     double limit_left,
-    double limit_right
+    double limit_right,
+    double confidence_senario
 ) {
     const size_t n_options = options.size();
     
@@ -127,7 +128,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     }
 
     double delta_lvg = delta_levrage(total_delta, total_premium);
-    double avg_pnl_lvg= avg_pnl_levrage(total_average_pnl, total_premium);
+    double avg_pnl_lvg= avg_pnl_levrage(total_average_pnl, total_premium, confidence_senario);
     // ========== FILTRES DE PERTE BASÉS SUR LES LIMITES DE PRIX ==========
     
     double max_loss_left = 0.0;
