@@ -33,7 +33,6 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
             for label in roll_labels[:2]:  # Limiter à 2 rolls max pour réduire les colonnes
                 roll_value = comp.rolls_detail.get(label)
                 row[f"Roll {label}"] = f"{roll_value:.4f}" if roll_value is not None else "-"
-        
         data.append(row)
     
     return pd.DataFrame(data)

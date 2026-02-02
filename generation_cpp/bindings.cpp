@@ -288,7 +288,7 @@ py::list process_combinations_batch_with_scoring(
         
         size_t count_after = valid_strategies.size();
         std::cout << "n_legs=" << n_legs << " combos=" << n_combos 
-                  << " tâches=" << total_tasks
+                  << " taches=" << total_tasks
                   << " valides=" << (count_after - count_before) << std::endl;
     }
     
@@ -314,9 +314,7 @@ py::list process_combinations_batch_with_scoring(
         metrics,
         top_n
     );
-    
-    std::cout << "Scoring terminé" << ranked_strategies.size() << " top stratégies" << std::endl;
-    
+        
     // ========== FILTRE DES DOUBLONS EN C++ ==========
     std::cout << " Filtre doublons en cours (max " << top_n << " uniques)..." << std::endl;
     std::vector<ScoredStrategy> unique_strategies = StrategyScorer::remove_duplicates(ranked_strategies, 4, top_n);

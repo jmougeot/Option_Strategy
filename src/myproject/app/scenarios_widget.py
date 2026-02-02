@@ -1,19 +1,15 @@
 from myproject.mixture.mixture_gaussienne import mixture
 from myproject.mixture.gauss import gaussian, asymetric_gaussian
+from myproject.app.data_types import ScenarioData
+from myproject.app.mixture_utils import create_mixture_from_scenarios
 import numpy as np
 from typing import Tuple
-from dataclasses import dataclass
 import streamlit as st
 from typing import Optional
 import uuid
 
-@dataclass
-class ScenarioData:
-    centers: list[float]
-    std_devs: list[float]  # std ou std_l si asymétrique
-    std_devs_r: list[float]  # std_r si asymétrique, sinon égal à std_devs
-    weights: list[float]
-    asymmetric: bool = False
+# Re-export for backward compatibility
+__all__ = ['ScenarioData', 'create_mixture_from_scenarios', 'scenario_params']
 
 
 def delete_scenario(scenario_id: str):
@@ -188,57 +184,3 @@ def scenario_params() -> Optional[ScenarioData]:
         weights=weights,
         asymmetric=asym_incertitude
     )
-
-
-def create_mixture_from_scenarios(
-    scenarios: ScenarioData,
-    price_min: float,
-    price_max: float,
-    num_points: int = 50,
-) -> Tuple[np.ndarray, np.ndarray, float]:
-    """
-    Crée une mixture gaussienne à partir des scénarios définis par l'utilisateur.
-    Supporte les gaussiennes symétriques et asymétriques.
-
-    Args:
-        scenarios: ScenarioData avec centers, std_devs, std_devs_r, weights, asymmetric
-        price_min: Prix minimum de la grille
-        price_max: Prix maximum de la grille
-        num_points: Nombre de points dans la grille
-
-    Returns:
-        (prices, mixture_normalized): Grille de prix et mixture gaussienne normalisée
-    """
-    # Extraire les paramètres des scénarios
-    centers = scenarios.centers
-    std_devs = scenarios.std_devs
-    std_devs_r = scenarios.std_devs_r
-    proba = scenarios.weights
-    is_asymmetric = getattr(scenarios, 'asymmetric', False)
-
-    if is_asymmetric:
-        # Mode asymétrique: utiliser asymetric_gaussian
-        prices, mix = mixture(
-            price_min=price_min,
-            price_max=price_max,
-            num_points=num_points,
-            proba=proba,
-            mus=centers,
-            sigmas=std_devs,
-            f=asymetric_gaussian,
-            sigmas_r=std_devs_r,
-        )
-    else:
-        # Mode symétrique: utiliser gaussian standard
-        prices, mix = mixture(
-            price_min=price_min,
-            price_max=price_max,
-            num_points=num_points,
-            proba=proba,
-            mus=centers,
-            sigmas=std_devs,
-            f=gaussian,
-        )
-    average = float(np.average(prices, weights=mix))
-    
-    return prices, mix, average

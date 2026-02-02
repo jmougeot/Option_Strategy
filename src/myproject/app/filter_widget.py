@@ -1,50 +1,10 @@
-from dataclasses import dataclass
 import streamlit as st
 from typing import Optional
+from myproject.app.data_types import FilterData, StrategyType, STRATEGYTYPE
 
-@dataclass
-class StrategyType:
-    put_condor: bool 
-    call_condor: bool
-    put_ladder:bool
-    call_ladder: bool
-    put_fly: bool
-    call_fly: bool
+# Re-export for backward compatibility
+__all__ = ['FilterData', 'StrategyType', 'STRATEGYTYPE', 'filter_params']
 
-# Patterns de signes par type de stratégie (triés par strike croissant)
-# Format: (type_options, pattern_signes)
-# type_options: "call", "put", ou "mixed"
-# pattern_signes: liste des signes pour chaque leg en ordre de strike croissant
-STRATEGYTYPE = {
-    # PUT Condor: +P1 -P2 -P3 +P4 (achète ailes, vend corps) - strikes croissants
-    "put_condor": {"option_type": "put", "signs": [1, -1, -1, 1]},
-    # CALL Condor: +C1 -C2 -C3 +C4 (achète ailes, vend corps) - strikes croissants  
-    "call_condor": {"option_type": "call", "signs": [1, -1, -1, 1]},
-    # PUT Ladder: +P1 -P2 -P3 (achète 1, vend 2) - strikes croissants
-    "put_ladder": {"option_type": "put", "signs": [-1, -1, 1]},
-    # CALL Ladder: -C1 -C2 +C3 (vend 2, achète 1) - strikes croissants
-    "call_ladder": {"option_type": "call", "signs": [1, -1, -1]},
-    # PUT Fly: +P1 -2*P2 +P3 (achète ailes, vend 2x corps) - strikes croissants
-    "put_fly": {"option_type": "put", "signs": [1, -1, -1, 1]},  # avec 2 options au milieu
-    # CALL Fly: +C1 -2*C2 +C3 (achète ailes, vend 2x corps) - strikes croissants
-    "call_fly": {"option_type": "call", "signs": [1, -1, -1, 1]},  # avec 2 options au milieu
-}
-
-
-@dataclass
-class FilterData:
-    max_loss_left: float
-    max_loss_right: float
-    max_premium: float
-    ouvert_gauche: int
-    ouvert_droite: int
-    min_premium_sell:float
-    filter_type: bool
-    strategies_include : Optional[StrategyType]
-    delta_min: float
-    delta_max: float
-    limit_left: float
-    limit_right: float
 
 def filter_params() -> FilterData:
     """

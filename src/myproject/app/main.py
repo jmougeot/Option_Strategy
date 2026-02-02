@@ -23,9 +23,8 @@ from myproject.bloomberg.bloomberg_data_importer_offline import (
     import_options_offline, 
     is_offline_mode
 )
-from myproject.app.scenarios_widget import create_mixture_from_scenarios
-from myproject.app.scenarios_widget import ScenarioData
-from myproject.app.filter_widget import FilterData
+from myproject.app.data_types import ScenarioData, FilterData
+from myproject.app.mixture_utils import create_mixture_from_scenarios
 import numpy as np
 
 
