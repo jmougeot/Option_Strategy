@@ -17,10 +17,10 @@ def filter_params() -> FilterData:
         st.session_state.filter = {
             "max_loss_right": 0.1,
             "max_loss_left":0.1, 
-            "max_premium": 0.05, 
+            "max_premium": 5.0, 
             "ouvert_gauche": 0, 
             "ouvert_droite": 0, 
-            "min_premium_sell": 0.05,
+            "min_premium_sell": 0.005,
             "delta_min": -0.75,
             "delta_max": 0.75,
             "limit_left_filter": 98.5,

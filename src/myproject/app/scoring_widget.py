@@ -5,16 +5,16 @@ from typing import List
 # Definition of scoring categories based on comparor_v2.py
 SCORING_CATEGORIES = {
     "Gaussian Mixture": {
-        "fields": ["average_pnl", "roll", "roll_quarterly", "sigma_pnl"],
+        "fields": ["average_pnl", "roll_quarterly", "sigma_pnl", "avg_pnl_levrage"],
     },
     "Greeks": {
-        "fields": ["delta_neutral", "gamma_low", "vega_low", "theta_positive"],
+        "fields": ["premium", "delta_neutral", "gamma_low", "vega_low", "theta_positive"],
     },
     "Volatility & Cost": {
         "fields": ["implied_vol_moderate"],
     },
     "Levarge" : {
-        "fields" : ["delta_levrage", "avg_pnl_levarge"]
+        "fields" : ["delta_levrage"]
     }
 }
 
@@ -25,12 +25,12 @@ FIELD_LABELS = {
     "vega_low": "Vega Low",
     "theta_positive": "Theta Positive",
     "average_pnl": "Expected gain at expiry",
-    "roll": "Sum of quarterly rolls",
     "roll_quarterly": "Roll into next quarter",
     "sigma_pnl": "Standart deviation",
     "implied_vol_moderate": "Moderate IV",
     "delta_levrage": "Levrage with delta",
-    "avg_pnl_levrage": "Levrage of expectied gain"
+    "avg_pnl_levrage": "Levrage of expectied gain",
+    "premium" : "premium"
 }
 
 
@@ -56,8 +56,13 @@ def scoring_weights_block() -> dict:
             col_idx = idx % num_cols
             with cols[col_idx]:
                 label = FIELD_LABELS.get(field_name, field_name) or field_name
-                # Default value: 100 for average_pnl, 0 for others
-                default_value = 100 if field_name == "average_pnl" else 0
+                # Default values: 100 for average_pnl, 50 for premium, 0 for others
+                if field_name == "average_pnl":
+                    default_value = 100
+                elif field_name == "premium":
+                    default_value = 50  # Premium proche de 0 = meilleur
+                else:
+                    default_value = 0
                 weight = (
                     st.slider(
                         str(label),

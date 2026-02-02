@@ -1,9 +1,5 @@
-from myproject.mixture.mixture_gaussienne import mixture
-from myproject.mixture.gauss import gaussian, asymetric_gaussian
 from myproject.app.data_types import ScenarioData
 from myproject.app.mixture_utils import create_mixture_from_scenarios
-import numpy as np
-from typing import Tuple
 import streamlit as st
 from typing import Optional
 import uuid

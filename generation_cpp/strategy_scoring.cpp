@@ -21,23 +21,23 @@ std::vector<MetricConfig> StrategyScorer::create_default_metrics() {
     std::vector<MetricConfig> metrics;
     
     // Greeks (optimisés pour neutralité)
-    metrics.emplace_back("delta_neutral", 0.08, NormalizerType::MAX, ScorerType::LOWER_BETTER);
-    metrics.emplace_back("gamma_low", 0.05, NormalizerType::MAX, ScorerType::LOWER_BETTER);
-    metrics.emplace_back("vega_low", 0.05, NormalizerType::MAX, ScorerType::LOWER_BETTER);
-    metrics.emplace_back("theta_positive", 0.05, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
-    
+    metrics.emplace_back("delta_neutral", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);
+    metrics.emplace_back("gamma_low", 0.00, NormalizerType::MAX, ScorerType::LOWER_BETTER);
+    metrics.emplace_back("vega_low", 0.00, NormalizerType::MAX, ScorerType::LOWER_BETTER);
+    metrics.emplace_back("theta_positive", 0.0, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
+    metrics.emplace_back("premium", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);  // Plus proche de 0 = meilleur (poids augmenté)
     // Volatilité
-    metrics.emplace_back("implied_vol_moderate", 0.04, NormalizerType::MIN_MAX, ScorerType::MODERATE_BETTER);
+    metrics.emplace_back("implied_vol_moderate", 0.00, NormalizerType::MIN_MAX, ScorerType::MODERATE_BETTER);
     
     // Métriques gaussiennes (mixture)
-    metrics.emplace_back("average_pnl", 0.20, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
-    metrics.emplace_back("roll", 0.06, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
-    metrics.emplace_back("roll_quarterly", 0.06, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
-    metrics.emplace_back("sigma_pnl", 0.05, NormalizerType::MAX, ScorerType::LOWER_BETTER);
+    metrics.emplace_back("average_pnl", 0.00 , NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
+    metrics.emplace_back("roll", 0.00, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
+    metrics.emplace_back("roll_quarterly", 0.00, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
+    metrics.emplace_back("sigma_pnl", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);
     
     // Métriques de levier (valeur absolue élevée = meilleur)
-    metrics.emplace_back("delta_levrage", 0.08, NormalizerType::MAX, ScorerType::HIGHER_BETTER);
-    metrics.emplace_back("avg_pnl_levrage", 0.08, NormalizerType::MAX, ScorerType::HIGHER_BETTER);
+    metrics.emplace_back("delta_levrage", 0.00, NormalizerType::MAX, ScorerType::HIGHER_BETTER);
+    metrics.emplace_back("avg_pnl_levrage", 0.0, NormalizerType::MAX, ScorerType::HIGHER_BETTER);
     
     return metrics;
 }
@@ -94,9 +94,10 @@ std::vector<double> StrategyScorer::extract_metric_values(
         } else if (metric_name == "delta_levrage") {
             value = strat.delta_levrage;
         } else if (metric_name == "avg_pnl_levrage") {
-              value = strat.avg_pnl_levrage;
-        }
-        if (std::isfinite(value)) {
+            value = strat.avg_pnl_levrage;
+        } else if (metric_name == "premium") {
+            value = std::abs(strat.total_premium);  // Valeur absolue pour centrer autour de 0
+        } if (std::isfinite(value)) {
             values.push_back(value);
         } else {
             values.push_back(0.0);
@@ -348,6 +349,8 @@ static double extract_single_metric_value(const ScoredStrategy& strat, const std
         return strat.delta_levrage;
     } else if (metric_name == "avg_pnl_levrage") {
         return strat.avg_pnl_levrage;
+    } else if (metric_name == "premium") {
+        return std::abs(strat.total_premium);  // Valeur absolue pour centrer autour de 0
     }
     return 0.0;
 }
