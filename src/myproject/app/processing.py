@@ -11,7 +11,7 @@ def process_comparison_results(
     best_strategies: List[StrategyComparison],
 ) -> Tuple[List[StrategyComparison], List[StrategyComparison]]:
     """
-    Traite les rÃ©sultats de comparaison et filtre pour le meilleur prix cible.
+    Traite les résultats de comparaison et filtre pour le meilleur prix cible.
 
     Args:
         best_strategies: Liste des meilleures stratÃ©gies
