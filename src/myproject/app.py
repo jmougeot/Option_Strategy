@@ -23,7 +23,6 @@ from myproject.app.async_processing import (
     start_processing,
     check_processing_status,
     stop_processing,
-    cleanup_result_files,
 )
 from myproject.share_result.email_utils import StrategyEmailData, EmailTemplateData, create_email_with_images
 from myproject.share_result.generate_pdf import create_pdf_report 
@@ -67,15 +66,8 @@ def main():
 
         st.markdown("---")
         
-        # Use session state scenarios which are list of dicts
-        scenarios_list = st.session_state.get("scenarios", [])
-        
-        # Get best strategy info from session state if available
-        best_strategy_data = None
-        top_strategies_data = None
         
         if "comparisons" in st.session_state and st.session_state.comparisons:
-            comparisons_list = st.session_state.comparisons
             
             # Build detailed strategy data for email/PDF
             def build_strategy_email_data(comp) -> StrategyEmailData:
@@ -104,9 +96,7 @@ def main():
                     breakeven_points=comp.breakeven_points,
                     legs_description=legs_desc,
                 )
-            
-            best_strategy_data = build_strategy_email_data(comparisons_list[0])
-            top_strategies_data = [build_strategy_email_data(c) for c in comparisons_list[:10]]
+        
         
         # Build email template data from session state if available
         def build_email_template_data() -> EmailTemplateData:

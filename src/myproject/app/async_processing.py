@@ -54,17 +54,6 @@ def run_processing_worker(session_id: str, params_dict: Dict[str, Any]):
         # Import here to avoid issues with multiprocessing
         from myproject.app.main import process_bloomberg_to_strategies
         
-        # Create a dummy progress tracker
-        class DummyProgressTracker:
-            def __init__(self, max_legs): 
-                self.max_legs = max_legs
-            def init_ui(self): pass
-            def update(self, *args, **kwargs): pass
-            def complete(self, *args): pass
-            def error(self, *args): pass
-        
-        progress_tracker = DummyProgressTracker(max_legs=params_dict["max_legs"])
-        
         # Reconstruct filter and scenarios from dict if needed
         filter_data = params_dict["filter"]
         scenarios_data = params_dict["scenarios"]
@@ -82,7 +71,6 @@ def run_processing_worker(session_id: str, params_dict: Dict[str, Any]):
             scenarios=scenarios_data,
             filter=filter_data,
             roll_expiries=params_dict["roll_expiries"],
-            progress_tracker=progress_tracker,
         )
         
         # Save result to file

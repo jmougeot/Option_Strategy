@@ -26,14 +26,12 @@ from myproject.bloomberg.bloomberg_data_importer_offline import (
 from myproject.app.scenarios_widget import create_mixture_from_scenarios
 from myproject.app.scenarios_widget import ScenarioData
 from myproject.app.filter_widget import FilterData
-from myproject.app.progress_tracker import ProgressTracker, ProcessingStep
 import numpy as np
 
 
 def process_bloomberg_to_strategies(
     filter: FilterData,
     scenarios: ScenarioData,
-    progress_tracker: ProgressTracker,
     underlying: str = "ER",
     months: List[str] = [],
     years: List[int] = [],
@@ -54,21 +52,15 @@ def process_bloomberg_to_strategies(
     stats = {}
     
     # Initialiser le tracker
-    progress_tracker.init_ui()
     
     # Verifier le mode offline
     offline = is_offline_mode()
-    if offline:
-        progress_tracker.update(ProcessingStep.FETCH_DATA, "MODE OFFLINE - Simulation...")
-    else:
-        progress_tracker.update(ProcessingStep.FETCH_DATA, "Connexion a Bloomberg...")
 
     # Creer la mixture de scenarios
     mixture = create_mixture_from_scenarios(
         scenarios, price_min, price_max, num_points
     )
 
-    progress_tracker.update(ProcessingStep.FETCH_DATA, "Import des options...")
 
     # Fetch options: Bloomberg ou Simulation selon OFFLINE_MODE
     if offline:
@@ -95,14 +87,9 @@ def process_bloomberg_to_strategies(
     # Tracker du fetch
     stats["nb_options"] = len(options)
     stats["underlying_price"] = underlying_price
-    progress_tracker.update(
-        ProcessingStep.FETCH_DATA,
-        f"{len(options)} options recuperees",
-        stats
-    )
+
 
     if not options:
-        progress_tracker.error("Aucune option trouvee")
         return [], stats, mixture, 0
 
     # Generer les strategies avec SCORING C++ intégré
@@ -117,15 +104,9 @@ def process_bloomberg_to_strategies(
 
     stats["nb_strategies_possibles"] = (len(options*4)**max_legs)
     
-    progress_tracker.update(
-        ProcessingStep.RANKING, 
-        f"Stratégies déjà scorées et filtrées en C++ - {len(best_strategies)} résultats",
-        stats
-    )
     
     stats["nb_strategies_classees"] = len(best_strategies)
 
-    progress_tracker.update(ProcessingStep.DISPLAY, "Preparation de l'affichage...", stats)
 
     return best_strategies, stats, mixture, underlying_price
 

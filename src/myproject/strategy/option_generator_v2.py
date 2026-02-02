@@ -35,22 +35,6 @@ class OptionStrategyGeneratorV2:
         top_n: int = 10,
         custom_weights: Optional[Dict[str, float]] = None
     ) -> List[StrategyComparison]:
-        """
-        Génération avec SCORING C++ intégré - RECOMMANDÉ
-        
-        Génère et score toutes les stratégies en C++, ne retourne que le top_n.
-        Beaucoup plus rapide que generate_all_combinations() + scoring Python.
-        
-        Args:
-            filter: Filtres à appliquer
-            max_legs: Nombre maximum de legs
-            top_n: Nombre de meilleures stratégies à retourner
-            progress_tracker: Tracker de progression
-            custom_weights: Poids personnalisés pour les métriques (optionnel)
-            
-        Returns:
-            Tuple (liste des top_n stratégies, nombre total de combinaisons)
-        """
 
         strategies = process_batch_cpp_with_scoring(
             max_legs,
