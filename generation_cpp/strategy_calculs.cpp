@@ -127,7 +127,7 @@ double StrategyCalculator::avg_pnl_levrage(
     const double premium
 ) {
     if (std::abs(premium) > 1e-10) {
-        return std::abs(total_average_pnl / (0.01 + premium));
+        return std::abs(0.2* total_average_pnl - 0.8 * premium);
     }
     return 0.0;
 }
