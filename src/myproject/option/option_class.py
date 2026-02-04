@@ -232,10 +232,10 @@ class Option:
     def _calculate_tail_penalty(self) -> None:
         """
         Calcule les tail penalties pour les positions long et short:
-        - tail_penalty: ∫ max(-pnl, 0)² dx (zone négative, pour achat)
-        - tail_penalty_short: ∫ max(pnl, 0)² dx (zone positive, pour vente)
+        - tail_penalty: ∫ max(-pnl, 0)² × gauss dx (zone négative, pour achat)
+        - tail_penalty_short: ∫ max(pnl, 0)² × gauss dx (zone positive, pour vente)
         
-        Quand on vend une option, la zone positive devient une perte.
+        Gaussienne avec σ = 3× taille intervalle pour donner du poids aux extrémités.
         """
         if self.pnl_array is None or self.prices is None:
             self.tail_penalty = 0.0
@@ -249,15 +249,23 @@ class Option:
             
             dx = self.dx if self.dx is not None else 1.0
             
-            # tail_penalty (long) = ∫ max(-pnl, 0)² dx
-            # Zone négative au carré - pour les achats
-            losses_long = np.maximum(-self.pnl_array, 0.0) ** 2
-            self.tail_penalty = float(np.sum(losses_long) * dx)
+            # Créer une gaussienne de pondération
+            center = self.average_mix if self.average_mix else float(np.mean(self.prices))
+            # σ = 3× taille intervalle → gaussienne plus plate, plus de poids aux extrémités
+            sigma = float(self.prices[-1] - self.prices[0]) * 3.0
+            if sigma <= 0:
+                sigma = 1.0
             
-            # tail_penalty_short = ∫ max(pnl, 0)² dx
-            # Zone positive au carré - pour les ventes (car la zone positive devient perte)
+            gauss_weights = np.exp(-0.5 * ((self.prices - center) / sigma) ** 2)
+            gauss_weights = gauss_weights / (np.sum(gauss_weights) * dx + 1e-10)
+            
+            # tail_penalty (long) = ∫ max(-pnl, 0)² × gauss × dx
+            losses_long = np.maximum(-self.pnl_array, 0.0) ** 2
+            self.tail_penalty = float(np.sum(losses_long * gauss_weights) * dx)
+            
+            # tail_penalty_short = ∫ max(pnl, 0)² × gauss × dx
             losses_short = np.maximum(self.pnl_array, 0.0) ** 2
-            self.tail_penalty_short = float(np.sum(losses_short) * dx)
+            self.tail_penalty_short = float(np.sum(losses_short * gauss_weights) * dx)
         except Exception:
             self.tail_penalty = 0.0
             self.tail_penalty_short = 0.0

@@ -43,7 +43,8 @@ std::vector<MetricConfig> StrategyScorer::create_default_metrics() {
     metrics.emplace_back("max_loss", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);  // Perte plus faible = meilleur
     
     // Tail penalty (risque de perte - plus faible = meilleur)
-    metrics.emplace_back("tail_penalty", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);
+    // MIN_MAX pour mieux différencier les valeurs dans une plage étroite
+    metrics.emplace_back("tail_penalty", 0.0, NormalizerType::MIN_MAX, ScorerType::LOWER_BETTER);
     
     return metrics;
 }
@@ -106,6 +107,7 @@ std::vector<double> StrategyScorer::extract_metric_values(
         } else if (metric_name == "max_loss") {
             value = std::abs(strat.max_loss);  // Valeur absolue de la perte max
         } else if (metric_name == "tail_penalty") {
+            // Valeur brute - MIN_MAX normalisera automatiquement
             value = std::abs(strat.tail_penalty);
         }
         
@@ -366,6 +368,7 @@ static double extract_single_metric_value(const ScoredStrategy& strat, const std
     } else if (metric_name == "max_loss") {
         return std::abs(strat.max_loss);
     } else if (metric_name == "tail_penalty") {
+        // Valeur brute - MIN_MAX normalisera automatiquement
         return std::abs(strat.tail_penalty);
     }
     return 0.0;
@@ -427,17 +430,32 @@ std::vector<ScoredStrategy> StrategyScorer::score_and_rank(
     for (size_t idx = 0; idx < strategies.size(); ++idx) {
         auto& strat = strategies[idx];
         
-        // Calculer le score pour cette stratégie
-        double final_score = 0.0;
+        // ========== MOYENNE GÉOMÉTRIQUE PONDÉRÉE AVEC PLANCHER ==========
+        // S = exp(Σ wᵢ × log(ε + xᵢ))
+        // Équivalent à: S = ∏(ε + xᵢ)^wᵢ
+        
+        constexpr double epsilon = 1e-6;  // Plancher pour éviter log(0)
+        double log_sum = 0.0;
+        double total_weight = 0.0;
         
         for (size_t j = 0; j < n_metrics; ++j) {
+            if (metrics[j].weight <= 0.0) continue;  // Skip poids nuls
+            
             double value = extract_single_metric_value(strat, metrics[j].name);
             double min_val = metric_mins[j];
             double max_val = metric_maxs[j];
             
+            // xᵢ ∈ [0,1] - score normalisé
             double metric_score = calculate_score(value, min_val, max_val, metrics[j].scorer);
-            final_score += metric_score * metrics[j].weight;
+            
+            // log(ε + xᵢ) pondéré par wᵢ
+            log_sum += metrics[j].weight * std::log(epsilon + metric_score);
+            total_weight += metrics[j].weight;
         }
+        
+        // S = exp(log_sum / total_weight) si on veut normaliser les poids
+        // Ou S = exp(log_sum) si les poids sont déjà normalisés
+        double final_score = (total_weight > 0.0) ? std::exp(log_sum) : 0.0;
         
         strat.score = final_score;
         
