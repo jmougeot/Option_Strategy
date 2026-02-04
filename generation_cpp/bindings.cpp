@@ -328,7 +328,7 @@ py::list process_combinations_batch_with_scoring(
     std::cout << " Filtre doublons en cours (max " << top_n << " uniques)..." << std::endl;
     std::vector<ScoredStrategy> unique_strategies = StrategyScorer::remove_duplicates(ranked_strategies, 4, top_n);
     
-    std::cout << "Version 3.2.4" << std::endl;
+    std::cout << "Version 3.2.5" << std::endl;
 
     // ========== CONVERSION EN RÉSULTATS PYTHON ==========
     py::list results;

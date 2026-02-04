@@ -7,6 +7,7 @@ Récupère les données d'options depuis Bloomberg.
 import blpapi
 from typing import Any, Optional, Tuple
 from myproject.bloomberg.connection import get_session, get_service
+from myproject.app.data_types import FutureData
 
 
 # Champs à récupérer (PX_LAST utilisé aussi pour le sous-jacent)
@@ -16,10 +17,41 @@ OPTION_FIELDS = [
     "OPT_IMP_VOL",
     "OPT_STRIKE_PX", "OPT_UNDL_PX", "OPT_PUT_CALL",
     "VOLUME", "OPEN_INT",
+    "LAST_TRADEABLE_DT", "OPT_EXPIRE_DT",
 ]
 
 
-def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyings: Optional[str] = None) -> Tuple[dict[str, dict[str, Any]], Optional[float]]:
+def _safe_get_value(element, field: str) -> Any:
+    """Extrait une valeur d'un élément Bloomberg de façon sécurisée."""
+    if not element.hasElement(field):
+        return None
+    try:
+        return element.getElement(field).getValue()
+    except Exception:
+        return None
+
+
+def _extract_underlying_price(field_data) -> Optional[float]:
+    """Extrait le prix du sous-jacent depuis PX_LAST ou PX_MID."""
+    for field in ["PX_LAST", "PX_MID"]:
+        price = _safe_get_value(field_data, field)
+        if price is not None:
+            return price
+    return None
+
+
+def _compute_premium(bid: float, ask: float, mid: float) -> Optional[float]:
+    """Calcule le premium à partir de bid/ask/mid."""
+    if mid > 0:
+        return mid
+    if bid > 0 and ask > 0:
+        return (bid + ask) / 2
+    if ask > 0:
+        return ask / 2
+    return None
+
+
+def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyings: Optional[str] = None) -> Tuple[dict[str, dict[str, Any]], FutureData]:
     """
     Récupère les données pour plusieurs tickers Bloomberg.
 
@@ -29,10 +61,9 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         underlyings: Ticker du sous-jacent pour récupérer son prix (optionnel)
 
     Returns:
-        Tuple (résultats options, prix du sous-jacent ou None)
+        Tuple (résultats options, FutureData avec prix sous-jacent et date)
     """
     results = {ticker: {} for ticker in tickers}
-    underlying_price: Optional[float] = None
 
     try:
         session = get_session()
@@ -68,6 +99,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         # Envoyer
         session.sendRequest(request)
         underlying_price : float = 98.0
+        last_tradable_date : Optional[str] = None
         # Lire la réponse
         while True:
             event = session.nextEvent(5000)
@@ -89,41 +121,33 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
                             
                             if security.hasElement("fieldData"):
                                 field_data = security.getElement("fieldData")
-                                ticker_data = {}
-
-                                for field in OPTION_FIELDS:
-                                    if field_data.hasElement(field):
-                                        try:
-                                            ticker_data[field] = field_data.getElement(field).getValue()
-                                        except:
-                                            ticker_data[field] = None
-                                    else:
-                                        ticker_data[field] = None
-
+                                
                                 # Si c'est le sous-jacent, extraire son prix
                                 if underlyings is not None and ticker == underlyings:
-                                    if field_data.hasElement("PX_LAST"):
-                                        try:
-                                            underlying_price = field_data.getElement("PX_LAST").getValue()
-                                        except:
-                                            pass
-                                    elif field_data.hasElement("PX_MID"):
-                                        try:
-                                            underlying_price = field_data.getElement("PX_MID").getValue()
-                                        except:
-                                            pass
+                                    price = _extract_underlying_price(field_data)
+                                    if price is not None:
+                                        underlying_price = price
                                 else:
-                                    results[ticker] = ticker_data
+                                    # Extraire tous les champs pour les options
+                                    results[ticker] = {field: _safe_get_value(field_data, field) for field in OPTION_FIELDS}
+                                    
+                                    # Extraire LAST_TRADEABLE_DT du premier ticker (une seule fois)
+                                    if last_tradable_date is None:
+                                        dt = _safe_get_value(field_data, "LAST_TRADEABLE_DT")
+                                        if dt is not None:
+                                            last_tradable_date = str(dt)
+                                        else :
+                                            dt = "Unknown"
 
             if event.eventType() == blpapi.event.Event.RESPONSE:
                 break
-        return results, underlying_price
+        return results, FutureData(underlying_price, last_tradable_date)
 
     except Exception as e:
         print(f"✗ Erreur fetch: {e}")
         import traceback
         traceback.print_exc()
-        return results, 98
+        return results, FutureData(98.0, None)
 
 
 def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:
@@ -134,17 +158,8 @@ def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:
     ask = data.get("PX_ASK") or 0.0
     mid = data.get("PX_MID") or 0.0
 
-    if mid > 0:
-        premium = mid
-    elif bid > 0 and ask > 0:
-        premium = (bid + ask) / 2
-    elif ask > 0:
-        premium = ask / 2
-    else:
-        premium = None
-
     return {
-        "premium": premium,
+        "premium": _compute_premium(bid, ask, mid),
         "bid": bid if bid > 0 else 0.0,
         "ask": ask if ask > 0 else 0.0,
         "delta": data.get("OPT_DELTA") or 0.0,

@@ -122,17 +122,22 @@ double StrategyCalculator::delta_levrage(
     return 0.0;
 }
 
+// double StrategyCalculator::avg_pnl_levrage(
+//     const double total_average_pnl,
+//     const double premium,
+//     const double confidence_senario
+// ) {
+//     if (std::abs(premium) > 1e-10) {
+//         return std::abs(confidence_senario* total_average_pnl) - abs((1- confidence_senario)* premium);
+//     }
+//     return 0.0;
+// }
 double StrategyCalculator::avg_pnl_levrage(
     const double total_average_pnl,
-    const double premium,
-    const double confidence_senario
+    const double premium
 ) {
-    if (std::abs(premium) > 1e-10) {
-        return std::abs(confidence_senario* total_average_pnl) - abs((1- confidence_senario)* premium);
-    }
-    return 0.0;
+    return std::abs(total_average_pnl) - (abs(premium) + 0.01);
 }
-
 
 void StrategyCalculator::calculate_surfaces(
     const std::vector<double>& total_pnl,

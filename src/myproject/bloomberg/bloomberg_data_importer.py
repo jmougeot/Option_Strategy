@@ -14,6 +14,7 @@ from myproject.bloomberg.ticker_builder import (
     build_option_ticker, build_option_ticker_brut, parse_brut_code, MonthCode)
 from myproject.bloomberg.bloomber_to_opt import create_option_from_bloomberg
 from myproject.option.option_class import Option
+from myproject.app.data_types import FutureData
 
 
 # ============================================================================
@@ -117,11 +118,11 @@ class PremiumFetcher:
         self.builder = builder
         self.main_data: Dict[str, Any] = {}
         self.roll_premiums: Dict[PremiumKey, float] = {}
-        self.underlying_price: float = 0
+        self.future_data: FutureData = FutureData(98.0, None)
     
     def fetch_all(self):
         """Fetch toutes les données en batch."""
-        self.main_data, self.underlying_price = fetch_options_batch(
+        self.main_data, self.future_data = fetch_options_batch(
             self.builder.main_tickers, 
             underlyings=self.builder.underlying_ticker
         )
@@ -261,11 +262,11 @@ def import_options(
     brut_code: Optional[List[str]] = None,
     suffix: str = "Comdty",
     default_position: PositionType = "long",
-) -> Tuple[List[Option], float]:
+) -> Tuple[List[Option], FutureData]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne des objets Option.
     Returns:
-        Tuple (liste d'objets Option, prix du sous-jacent )
+        Tuple (liste d'objets Option, FutureData avec prix et date)
     """
     print("\n🔨 Construction des tickers...")
     
@@ -281,7 +282,7 @@ def import_options(
 
 
     # 2. Fetch des données
-    underlying_price: float = 98
+    future_data = FutureData(98.0, None)
     options: List[Option] = []
     
     try:
@@ -291,12 +292,9 @@ def import_options(
         # 3. Traitement des options
         processor = OptionProcessor(builder, fetcher, mixture, default_position)
         options = processor.process_all()
-        underlying_price = fetcher.underlying_price
+        future_data = fetcher.future_data
         
-        if underlying_price is not None:
-            print(f"here is the {underlying_price}")
-        else:
-            print("No underlying ref")
+        print(f"📊 Future: price={future_data.underlying_price}, last_trade={future_data.last_tradable_date}")
         
     except Exception as e:
         print(f"\n✗ Erreur lors du fetch batch: {e}")
@@ -304,4 +302,4 @@ def import_options(
         traceback.print_exc()
 
 
-    return options, underlying_price
+    return options, future_data

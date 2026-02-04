@@ -16,6 +16,12 @@ class ScenarioData:
     weights: List[float]
     asymmetric: bool = False
 
+@dataclass
+class FutureData:
+    """Data on the future (underlying price and last tradeable date)"""
+    underlying_price: float
+    last_tradable_date: Optional[str] = None
+
 
 @dataclass
 class StrategyType:

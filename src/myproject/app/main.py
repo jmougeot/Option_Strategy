@@ -23,7 +23,7 @@ from myproject.bloomberg.bloomberg_data_importer_offline import (
     import_options_offline, 
     is_offline_mode
 )
-from myproject.app.data_types import ScenarioData, FilterData
+from myproject.app.data_types import ScenarioData, FilterData, FutureData
 from myproject.app.mixture_utils import create_mixture_from_scenarios
 import numpy as np
 
@@ -43,14 +43,13 @@ def process_bloomberg_to_strategies(
     num_points: int = 200,
     brut_code: Optional[List[str]] = None,
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
-) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray, float], float]:
+) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray, float], FutureData]:
     """
     Fonction principale simplifiee pour Streamlit.
     Importe les options depuis Bloomberg (ou simulation offline) et retourne les meilleures strategies + stats.
     """
     stats = {}
-    
-    # Initialiser le tracker
+    future_data = FutureData(98.0, None)
     
     # Verifier le mode offline
     offline = is_offline_mode()
@@ -71,8 +70,9 @@ def process_bloomberg_to_strategies(
             strikes=strikes,
             default_position="long",
         )
+        future_data = FutureData(underlying_price, None)
     else:
-        options, underlying_price = import_options(
+        options, future_data = import_options(
             mixture=mixture,
             underlying=underlying,
             months=months,
@@ -85,11 +85,11 @@ def process_bloomberg_to_strategies(
 
     # Tracker du fetch
     stats["nb_options"] = len(options)
-    stats["underlying_price"] = underlying_price
+    stats["future_data"] = future_data
 
 
     if not options:
-        return [], stats, mixture, 0
+        return [], stats, mixture, future_data
 
     # Generer les strategies avec SCORING C++ intégré
     generator = OptionStrategyGeneratorV2(options)
@@ -107,5 +107,5 @@ def process_bloomberg_to_strategies(
     stats["nb_strategies_classees"] = len(best_strategies)
 
 
-    return best_strategies, stats, mixture, underlying_price
+    return best_strategies, stats, mixture, future_data
 

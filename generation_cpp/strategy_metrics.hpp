@@ -202,8 +202,7 @@ private:
 
     static double avg_pnl_levrage(
         const double total_average_pnl, 
-        const double premium,
-        const double confidence_senario
+        const double premium
     );
 };
 

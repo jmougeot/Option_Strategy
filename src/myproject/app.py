@@ -24,6 +24,7 @@ from myproject.app.async_processing import (
     check_processing_status,
     stop_processing,
 )
+from myproject.app.data_types import FutureData
 from myproject.share_result.email_utils import StrategyEmailData, EmailTemplateData, create_email_with_images
 from myproject.share_result.generate_pdf import create_pdf_report 
 
@@ -163,7 +164,8 @@ def main():
             weighting_desc = ", ".join([f"{k}: {v:.0%}" for k, v in scoring_weights.items() if v > 0])
             
             # Get reference price from session state (underlying price)
-            ref_price = st.session_state.get("underlying_price", "N/A")
+            future_data_email = st.session_state.get("future_data", FutureData(0, None))
+            ref_price = future_data_email.underlying_price if future_data_email else "N/A"
             ref_price_str = f"{ref_price:.4f}" if isinstance(ref_price, (int, float)) else str(ref_price)
             
             return EmailTemplateData(
@@ -271,7 +273,7 @@ def main():
     
     all_comparisons = None
     mixture = None
-    underlying_price = None
+    future_data: FutureData = FutureData(98.0, None)
 
     # Check if we have a running process
     if st.session_state.processing and st.session_state.process is not None:
@@ -292,7 +294,7 @@ def main():
                 return
             
             if result:
-                best_strategies, stats, mixture, underlying_price = result
+                best_strategies, stats, mixture, future_data = result
                 
                 if not best_strategies:
                     st.error("❌ No strategy generated")
@@ -301,6 +303,7 @@ def main():
                 all_comparisons = best_strategies
                 save_to_session_state(all_comparisons, params, scenarios)
                 st.session_state["mixture"] = mixture
+                st.session_state["future_data"] = future_data
                 st.success("✅ Processing complete!")
             else:
                 st.warning("⛔ Processing was terminated")
@@ -352,11 +355,24 @@ def main():
 
     # Display each tab with its dedicated module
     with tab1:
+        # Afficher les infos du future en haut
+        future_data = st.session_state.get("future_data", FutureData(0, None))
+        if future_data:
+            col_price, col_date = st.columns(2)
+            with col_price:
+                st.metric("📊 Underlying Price", f"{future_data.underlying_price:.4f}")
+            with col_date:
+                date_str = future_data.last_tradable_date if future_data.last_tradable_date else "N/A"
+                st.metric("📅 Last Tradeable Date", date_str)
+            st.markdown("---")
+        
         # Générer les labels de roll dynamiquement (ex: ["H6", "M6", "U6"])
         roll_labels = [f"{m}{y}" for m, y in params.roll_expiries] if params.roll_expiries else None
         display_overview_tab(comparisons, roll_labels=roll_labels)
 
     with tab2:
+        future_data = st.session_state.get("future_data", FutureData(0, None))
+        underlying_price = future_data.underlying_price if future_data else 0
         create_payoff_diagram(top_5_comparisons, mixture, underlying_price) #type:ignore
 
 # ============================================================================
