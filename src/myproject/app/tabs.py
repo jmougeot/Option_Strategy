@@ -51,7 +51,7 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
 
     # Comparison Table avec style amélioré
     st.subheader("Top 5 Strategies")
-    df = create_comparison_table(comparisons, roll_labels=roll_labels, max_rows=5)
+    df = create_comparison_table(comparisons, roll_labels=roll_labels, max_rows=10)
 
     # Vérifier que le DataFrame n'est pas vide
     if df.empty:

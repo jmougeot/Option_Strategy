@@ -42,6 +42,9 @@ std::vector<MetricConfig> StrategyScorer::create_default_metrics() {
     // Métrique de risque
     metrics.emplace_back("max_loss", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);  // Perte plus faible = meilleur
     
+    // Tail penalty (risque de perte - plus faible = meilleur)
+    metrics.emplace_back("tail_penalty", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);
+    
     return metrics;
 }
 
@@ -102,7 +105,11 @@ std::vector<double> StrategyScorer::extract_metric_values(
             value = std::abs(strat.total_premium);  // Valeur absolue pour centrer autour de 0
         } else if (metric_name == "max_loss") {
             value = std::abs(strat.max_loss);  // Valeur absolue de la perte max
-        } if (std::isfinite(value)) {
+        } else if (metric_name == "tail_penalty") {
+            value = std::abs(strat.tail_penalty);
+        }
+        
+        if (std::isfinite(value)) {
             values.push_back(value);
         } else {
             values.push_back(0.0);
@@ -355,9 +362,11 @@ static double extract_single_metric_value(const ScoredStrategy& strat, const std
     } else if (metric_name == "avg_pnl_levrage") {
         return strat.avg_pnl_levrage;
     } else if (metric_name == "premium") {
-        return std::abs(strat.total_premium);  // Valeur absolue pour centrer autour de 0
+        return std::abs(strat.total_premium);
     } else if (metric_name == "max_loss") {
-        return std::abs(strat.max_loss);  // Valeur absolue de la perte max
+        return std::abs(strat.max_loss);
+    } else if (metric_name == "tail_penalty") {
+        return std::abs(strat.tail_penalty);
     }
     return 0.0;
 }

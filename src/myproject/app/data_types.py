@@ -6,7 +6,6 @@ These are pure Python dataclasses that don't depend on Streamlit.
 from dataclasses import dataclass
 from typing import List, Optional
 
-
 @dataclass
 class ScenarioData:
     """Data structure for scenario parameters"""
@@ -21,6 +20,7 @@ class FutureData:
     """Data on the future (underlying price and last tradeable date)"""
     underlying_price: float
     last_tradable_date: Optional[str] = None
+    number_strategies: Optional[int] = None
 
 
 @dataclass

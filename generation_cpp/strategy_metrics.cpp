@@ -215,6 +215,12 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         total_roll_sum += signs[i] * options[i].roll_sum;
     }
     
+    // Calcul du tail penalty (linéarité de l'intégrale)
+    double tail_penalty = 0.0;
+    for (size_t i = 0; i < options.size(); ++i) {
+        tail_penalty += signs[i] * options[i].tail_penalty;
+    }
+    
     // ========== CONSTRUCTION DU RÉSULTAT ==========
     
     StrategyMetrics result;
@@ -241,7 +247,8 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     result.call_count = call_count_check;
     result.put_count = put_count;
     result.delta_levrage = delta_lvg;
-    result.avg_pnl_levrage =avg_pnl_lvg;
+    result.avg_pnl_levrage = avg_pnl_lvg;
+    result.tail_penalty = tail_penalty;
     
     return result;
 }

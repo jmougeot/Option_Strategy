@@ -69,6 +69,7 @@ struct ScoredStrategy {
     double profit_zone_width;
     double delta_levrage;
     double avg_pnl_levrage;
+    double tail_penalty;  // Tail penalty total
     int call_count;
     int put_count;
     std::vector<double> breakeven_points;
@@ -90,7 +91,7 @@ struct ScoredStrategy {
           roll(0), roll_quarterly(0), roll_sum(0), sigma_pnl(0),
           max_profit(0), max_loss(0), max_loss_left(0), max_loss_right(0),
           min_profit_price(0), max_profit_price(0), profit_zone_width(0),
-          delta_levrage(0), avg_pnl_levrage(0),
+          delta_levrage(0), avg_pnl_levrage(0), tail_penalty(0),
           call_count(0), put_count(0), score(0), rank(0) {}
 };
 

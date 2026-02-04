@@ -50,6 +50,7 @@ class Option:
     pnl_ponderation: Optional[np.ndarray] = None
     average_pnl: float = 0.0
     sigma_pnl: float = 0.0
+    tail_penalty: float = 0.0  # ∫ max(-pnl, 0)² dx (zone négative au carré, non pondérée)
     dx: Optional[float] = None
     average_mix: float = 0.0
 
@@ -207,7 +208,7 @@ class Option:
         2. Calcul de la pondération (mixture × P&L × dx)
         3. Calcul de l'espérance du P&L
         4. Calcul de l'écart-type du P&L
-        5. Calcul des surfaces de profit et perte
+        5. Calcul du tail penalty (∫ max(-pnl, 0)² dx)
 
         Returns:
             Tuple[float, float]: (loss_surface, profit_surface)
@@ -223,6 +224,33 @@ class Option:
 
         # 4. Calculer l'écart-type du P&L
         self._sigma_pnl()
+
+        # 5. Calculer le tail penalty: ∫ max(-pnl, 0)² dx (zone négative au carré)
+        self._calculate_tail_penalty()
+
+    def _calculate_tail_penalty(self) -> None:
+        """
+        Calcule le tail penalty: ∫ max(-pnl, 0)² dx
+        C'est l'intégrale de la zone négative du P&L au carré, non pondérée.
+        Plus cette valeur est élevée, plus le risque de perte est important.
+        """
+        if self.pnl_array is None or self.prices is None:
+            self.tail_penalty = 0.0
+            return
+
+        try:
+            # Calculer dx si pas déjà fait
+            if self.dx is None and len(self.prices) > 1:
+                self.dx = float(np.mean(np.diff(self.prices)))
+            
+            dx = self.dx if self.dx is not None else 1.0
+            
+            # Tail penalty = ∫ max(-pnl, 0)² dx
+            # On prend les pertes (pnl < 0), on les met en valeur absolue et au carré
+            losses_squared = np.maximum(-self.pnl_array, 0.0) ** 2
+            self.tail_penalty = float(np.sum(losses_squared) * dx)
+        except Exception:
+            self.tail_penalty = 0.0
 
     # ============================================================================
     # POSITION HELPERS - Méthodes utilitaires pour faciliter les checks de position

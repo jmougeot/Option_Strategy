@@ -58,6 +58,9 @@ def init_cpp_cache(options: List[Option]) -> bool:
     rolls_quarterly = np.array([opt.roll_quarterly or 0.0 for opt in options], dtype=np.float64)
     rolls_sum = np.array([opt.roll_sum or 0.0 for opt in options], dtype=np.float64)
     
+    # Tail penalties (calculés dans Option._calcul_all_surface)
+    tail_penalties = np.array([opt.tail_penalty or 0.0 for opt in options], dtype=np.float64)
+    
     # Matrice P&L
     pnl_matrix = np.zeros((n, pnl_length), dtype=np.float64)
     for i, opt in enumerate(options):
@@ -73,7 +76,7 @@ def init_cpp_cache(options: List[Option]) -> bool:
     strategy_metrics_cpp.init_options_cache(  # type: ignore
         premiums, deltas, gammas, vegas, thetas, ivs,
         average_pnls, sigma_pnls, strikes,
-        is_calls, rolls, rolls_quarterly, rolls_sum,
+        is_calls, rolls, rolls_quarterly, rolls_sum, tail_penalties,
         pnl_matrix, prices, mixture, average_mix
     )
     
@@ -193,8 +196,9 @@ def batch_to_strategies(
             score=metrics.get('score', 0.0),  # Score depuis C++ si disponible
             rank=metrics.get('rank', 0),      # Rank depuis C++ si disponible
             rolls_detail=total_rolls_detail,
-            delta_levrage= metrics.get('delta_levrage'),
-            avg_pnl_levrage=metrics.get('avg_pnl_levrage')
+            delta_levrage=metrics.get('delta_levrage', 0.0),
+            avg_pnl_levrage=metrics.get('avg_pnl_levrage', 0.0),
+            tail_penalty=metrics.get('tail_penalty', 0.0),
         )
                 
         strategies.append(strat)

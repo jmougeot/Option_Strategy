@@ -2,7 +2,6 @@
 # FONCTIONS UTILITAIRES
 # ============================================================================
 
-import pandas as pd
 from typing import Dict, List
 from myproject.strategy.strategy_class import StrategyComparison
 from myproject.option.option_class import Option

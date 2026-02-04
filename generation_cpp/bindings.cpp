@@ -71,6 +71,7 @@ void init_options_cache(
     py::array_t<double> rolls,
     py::array_t<double> rolls_quarterly,
     py::array_t<double> rolls_sum,
+    py::array_t<double> tail_penalties,
     py::array_t<double> pnl_matrix,
     py::array_t<double> prices,
     py::array_t<double> mixture,
@@ -89,6 +90,7 @@ void init_options_cache(
     auto rolls_buf = rolls.unchecked<1>();
     auto rolls_q_buf = rolls_quarterly.unchecked<1>();
     auto rolls_sum_buf = rolls_sum.unchecked<1>();
+    auto tail_pen_buf = tail_penalties.unchecked<1>();
     auto pnl_buf = pnl_matrix.unchecked<2>();
     auto prices_buf = prices.unchecked<1>();
     auto mixture_buf = mixture.unchecked<1>();
@@ -117,6 +119,7 @@ void init_options_cache(
         g_cache.options[i].roll = rolls_buf(i);
         g_cache.options[i].roll_quarterly = rolls_q_buf(i);
         g_cache.options[i].roll_sum = rolls_sum_buf(i);
+        g_cache.options[i].tail_penalty = tail_pen_buf(i);
         
         g_cache.pnl_matrix[i].resize(g_cache.pnl_length);
         for (size_t j = 0; j < g_cache.pnl_length; ++j) {
@@ -261,6 +264,7 @@ py::list process_combinations_batch_with_scoring(
                     strat.total_pnl_array = metrics.total_pnl_array;
                     strat.avg_pnl_levrage = metrics.avg_pnl_levrage;
                     strat.delta_levrage = metrics.delta_levrage;
+                    strat.tail_penalty = metrics.tail_penalty;
             
                     strat.option_indices.reserve(n_legs);
                     strat.signs.reserve(n_legs);
@@ -371,6 +375,7 @@ py::list process_combinations_batch_with_scoring(
         metrics_dict["rank"] = strat.rank;
         metrics_dict["delta_levrage"] = strat.delta_levrage;
         metrics_dict["avg_pnl_levrage"] = strat.avg_pnl_levrage;
+        metrics_dict["tail_penalty"] = strat.tail_penalty;
         
         // Ajouter le pnl_array
         py::array_t<double> pnl_arr(strat.total_pnl_array.size());
@@ -408,6 +413,7 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("rolls"),
           py::arg("rolls_quarterly"),
           py::arg("rolls_sum"),
+          py::arg("tail_penalties"),
           py::arg("pnl_matrix"),
           py::arg("prices"),
           py::arg("mixture"),

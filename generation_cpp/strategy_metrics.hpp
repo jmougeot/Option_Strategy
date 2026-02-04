@@ -52,6 +52,9 @@ struct StrategyMetrics {
     double delta_levrage;
     double avg_pnl_levrage;
     
+    // Tail penalty (risque de perte)
+    double tail_penalty;  // Somme des tail_penalty pour la stratégie
+    
     // Breakeven points (max 10 pour éviter allocation dynamique)
     std::vector<double> breakeven_points;
     
@@ -76,6 +79,7 @@ struct OptionData {
     double roll;            // Roll moyen (normalisé)
     double roll_quarterly;  // Roll Q-1 (trimestre précédent)
     double roll_sum;        // Roll brut (non normalisé)
+    double tail_penalty;   
     bool is_call;
     // pnl_array sera passé séparément comme matrice
 };

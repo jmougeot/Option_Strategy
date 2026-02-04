@@ -27,7 +27,7 @@ def process_comparison_results(
     comparisons = [c for c in best_strategies]
 
     # Top 5 pour le diagramme
-    top_5_comparisons = comparisons[:10]
+    top_5_comparisons = comparisons[:5]
 
     return comparisons, top_5_comparisons
 

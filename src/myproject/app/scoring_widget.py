@@ -9,7 +9,7 @@ SCORING_FIELDS = {
     "max_loss": ("Max Drawdown", 0),
     "premium": ("Premium", 0),
     "avg_pnl_levrage": ("Leverage of expected gain", 0),
-
+    "tail_penalty": ("Tail Risk Penalty", 0),
 }
 
 ADVENCED_SCORING_FIELDS = {
