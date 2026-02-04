@@ -60,6 +60,7 @@ def init_cpp_cache(options: List[Option]) -> bool:
     
     # Tail penalties (calculés dans Option._calcul_all_surface)
     tail_penalties = np.array([opt.tail_penalty or 0.0 for opt in options], dtype=np.float64)
+    tail_penalties_short = np.array([opt.tail_penalty_short or 0.0 for opt in options], dtype=np.float64)
     
     # Matrice P&L
     pnl_matrix = np.zeros((n, pnl_length), dtype=np.float64)
@@ -76,7 +77,7 @@ def init_cpp_cache(options: List[Option]) -> bool:
     strategy_metrics_cpp.init_options_cache(  # type: ignore
         premiums, deltas, gammas, vegas, thetas, ivs,
         average_pnls, sigma_pnls, strikes,
-        is_calls, rolls, rolls_quarterly, rolls_sum, tail_penalties,
+        is_calls, rolls, rolls_quarterly, rolls_sum, tail_penalties, tail_penalties_short,
         pnl_matrix, prices, mixture, average_mix
     )
     

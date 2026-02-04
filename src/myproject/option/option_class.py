@@ -50,7 +50,8 @@ class Option:
     pnl_ponderation: Optional[np.ndarray] = None
     average_pnl: float = 0.0
     sigma_pnl: float = 0.0
-    tail_penalty: float = 0.0  # ∫ max(-pnl, 0)² dx (zone négative au carré, non pondérée)
+    tail_penalty: float = 0.0  # ∫ max(-pnl, 0)² dx (zone négative au carré, pour achat)
+    tail_penalty_short: float = 0.0  # ∫ max(pnl, 0)² dx (zone positive au carré, pour vente)
     dx: Optional[float] = None
     average_mix: float = 0.0
 
@@ -230,12 +231,15 @@ class Option:
 
     def _calculate_tail_penalty(self) -> None:
         """
-        Calcule le tail penalty: ∫ max(-pnl, 0)² dx
-        C'est l'intégrale de la zone négative du P&L au carré, non pondérée.
-        Plus cette valeur est élevée, plus le risque de perte est important.
+        Calcule les tail penalties pour les positions long et short:
+        - tail_penalty: ∫ max(-pnl, 0)² dx (zone négative, pour achat)
+        - tail_penalty_short: ∫ max(pnl, 0)² dx (zone positive, pour vente)
+        
+        Quand on vend une option, la zone positive devient une perte.
         """
         if self.pnl_array is None or self.prices is None:
             self.tail_penalty = 0.0
+            self.tail_penalty_short = 0.0
             return
 
         try:
@@ -245,12 +249,18 @@ class Option:
             
             dx = self.dx if self.dx is not None else 1.0
             
-            # Tail penalty = ∫ max(-pnl, 0)² dx
-            # On prend les pertes (pnl < 0), on les met en valeur absolue et au carré
-            losses_squared = np.maximum(-self.pnl_array, 0.0) ** 2
-            self.tail_penalty = float(np.sum(losses_squared) * dx)
+            # tail_penalty (long) = ∫ max(-pnl, 0)² dx
+            # Zone négative au carré - pour les achats
+            losses_long = np.maximum(-self.pnl_array, 0.0) ** 2
+            self.tail_penalty = float(np.sum(losses_long) * dx)
+            
+            # tail_penalty_short = ∫ max(pnl, 0)² dx
+            # Zone positive au carré - pour les ventes (car la zone positive devient perte)
+            losses_short = np.maximum(self.pnl_array, 0.0) ** 2
+            self.tail_penalty_short = float(np.sum(losses_short) * dx)
         except Exception:
             self.tail_penalty = 0.0
+            self.tail_penalty_short = 0.0
 
     # ============================================================================
     # POSITION HELPERS - Méthodes utilitaires pour faciliter les checks de position

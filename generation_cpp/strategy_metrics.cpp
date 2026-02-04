@@ -215,10 +215,18 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         total_roll_sum += signs[i] * options[i].roll_sum;
     }
     
-    // Calcul du tail penalty (linéarité de l'intégrale)
+    // Calcul du tail penalty
+    // Pour achat (sign=+1): utiliser tail_penalty (zone négative)
+    // Pour vente (sign=-1): utiliser tail_penalty_short (zone positive qui devient perte)
     double tail_penalty = 0.0;
     for (size_t i = 0; i < options.size(); ++i) {
-        tail_penalty += signs[i] * options[i].tail_penalty;
+        if (signs[i] > 0) {
+            // Achat: la zone négative du P&L est la perte
+            tail_penalty += options[i].tail_penalty;
+        } else {
+            // Vente: la zone positive du P&L devient la perte
+            tail_penalty += options[i].tail_penalty_short;
+        }
     }
     
     // ========== CONSTRUCTION DU RÉSULTAT ==========

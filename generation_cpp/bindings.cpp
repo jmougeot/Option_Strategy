@@ -72,6 +72,7 @@ void init_options_cache(
     py::array_t<double> rolls_quarterly,
     py::array_t<double> rolls_sum,
     py::array_t<double> tail_penalties,
+    py::array_t<double> tail_penalties_short,
     py::array_t<double> pnl_matrix,
     py::array_t<double> prices,
     py::array_t<double> mixture,
@@ -91,6 +92,7 @@ void init_options_cache(
     auto rolls_q_buf = rolls_quarterly.unchecked<1>();
     auto rolls_sum_buf = rolls_sum.unchecked<1>();
     auto tail_pen_buf = tail_penalties.unchecked<1>();
+    auto tail_pen_short_buf = tail_penalties_short.unchecked<1>();
     auto pnl_buf = pnl_matrix.unchecked<2>();
     auto prices_buf = prices.unchecked<1>();
     auto mixture_buf = mixture.unchecked<1>();
@@ -120,6 +122,7 @@ void init_options_cache(
         g_cache.options[i].roll_quarterly = rolls_q_buf(i);
         g_cache.options[i].roll_sum = rolls_sum_buf(i);
         g_cache.options[i].tail_penalty = tail_pen_buf(i);
+        g_cache.options[i].tail_penalty_short = tail_pen_short_buf(i);
         
         g_cache.pnl_matrix[i].resize(g_cache.pnl_length);
         for (size_t j = 0; j < g_cache.pnl_length; ++j) {
@@ -414,6 +417,7 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("rolls_quarterly"),
           py::arg("rolls_sum"),
           py::arg("tail_penalties"),
+          py::arg("tail_penalties_short"),
           py::arg("pnl_matrix"),
           py::arg("prices"),
           py::arg("mixture"),

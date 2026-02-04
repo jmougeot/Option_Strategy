@@ -79,7 +79,8 @@ struct OptionData {
     double roll;            // Roll moyen (normalisé)
     double roll_quarterly;  // Roll Q-1 (trimestre précédent)
     double roll_sum;        // Roll brut (non normalisé)
-    double tail_penalty;   
+    double tail_penalty;     // Pour achat (zone négative au carré)
+    double tail_penalty_short;  // Pour vente (zone positive au carré)
     bool is_call;
     // pnl_array sera passé séparément comme matrice
 };
