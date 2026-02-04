@@ -3,12 +3,10 @@ Module pour gÃ©rer les diffÃ©rents tabs de l'application Streamlit
 """
 
 import streamlit as st
-import numpy as np
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from myproject.strategy.strategy_class import StrategyComparison
 from myproject.app.utils import format_currency, format_expiration_date
 from myproject.app.comparison_table import create_comparison_table
-import pandas as pd
 
 
 def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Optional[List[str]] = None):
@@ -44,8 +42,8 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
         st.metric("Max Loss", max_loss_str, "")
     with col4:
         st.metric(
-            "Futures Reference",
-            format_currency(winner.profit_at_target),
+            "Expected gain at expiry",
+            format_currency(winner.average_pnl),
             f"{winner.profit_at_target_pct:.1f}% of max",
         )
 

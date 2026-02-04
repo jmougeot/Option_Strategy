@@ -136,7 +136,7 @@ double StrategyCalculator::avg_pnl_levrage(
     const double total_average_pnl,
     const double premium
 ) {
-    return std::abs(total_average_pnl) - (abs(premium) + 0.01);
+    return total_average_pnl - std::max(premium , 0.01);
 }
 
 void StrategyCalculator::calculate_surfaces(
