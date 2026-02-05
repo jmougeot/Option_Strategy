@@ -56,7 +56,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     double delta_max,
     double limit_left,
     double limit_right,
-    double confidence_senario
 ) {
     const size_t n_options = options.size();
     

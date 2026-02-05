@@ -330,7 +330,7 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
     if (duplicates_count > 0) {
         std::cout << "  🔍 C++ filtre doublons: " << duplicates_count 
                   << " stratégies dupliquées éliminées (même profil P&L)" << std::endl;
-        std::cout << "  ✅ " << uniques.size() << " stratégies uniques conservées" << std::endl;
+        std::cout <<  uniques.size() << " stratégies uniques conservées" << std::endl;
     }
     
     return uniques;

@@ -108,8 +108,7 @@ public:
         double delta_min,
         double delta_max,
         double limit_left,
-        double limit_right,
-        double confidence_senario
+        double limit_right
     );
 
     static bool next_combination(
