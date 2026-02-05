@@ -25,22 +25,13 @@ def filter_params() -> FilterData:
             "delta_max": 0.75,
             "limit_left_filter": 98.5,
             "limit_right_filter": 98,
-            "confidence_senario": 0.2
         }
 
     
     # Retrieve current values from session_state
     current_filter = st.session_state.filter
-    unlimited_loss_col, confidence_col,  = st.columns(2)
-    with unlimited_loss_col:
-        unlimited_loss = st.checkbox(label="unlimited loss", value=False)
-    with confidence_col:
-        confidence_senario = st.number_input("Confidence in senario",
-                                             value = float(current_filter["confidence_senario"]),
-                                             format="%.3f",
-                                             key="confidence_senario",
-                                             help="Give the ratio you believe in the scenario ex: (0.8*avg - 0.2*abs(premium))")
 
+    unlimited_loss = st.checkbox(label="unlimited loss", value=False)
 
     if unlimited_loss:
         max_loss_left=10
@@ -162,7 +153,6 @@ def filter_params() -> FilterData:
         "min_premium_sell": min_premium_sell,
         "limit_left_filter": limit_left,
         "limit_right_filter": limit_right,
-        "confidence_senario": confidence_senario
     }
 
 
@@ -179,5 +169,4 @@ def filter_params() -> FilterData:
         delta_max=delta_max,
         limit_left=limit_left,
         limit_right=limit_right,
-        confidence_senario=confidence_senario
     )
