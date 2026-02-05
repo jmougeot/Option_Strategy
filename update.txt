@@ -1,0 +1,6 @@
+git pull 
+.\venv\Scripts\Activate.ps1
+cd generation_cpp
+pip install .
+cd ..
+./run.bat

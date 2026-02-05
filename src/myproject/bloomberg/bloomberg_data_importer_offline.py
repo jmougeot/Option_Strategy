@@ -234,31 +234,9 @@ def import_options_offline(
     months: List[str],
     years: List[int],
     strikes: List[float],
-    roll_expiries: Optional[List[Tuple[str, int]]] = None,
-    brut_code: Optional[List[str]] = None,
-    suffix: str = "Comdty",
     default_position: Literal["long", "short"] = "long",
 ) -> Tuple[List[Option], float]:
-    """
-    Simule l'import d'options depuis Bloomberg.
-    
-    Génère des options avec des données Black-Scholes réalistes.
-    Compatible avec la signature de import_options().
-    
-    Args:
-        mixture: Tuple (prices, probabilities, average)
-        underlying: Symbole du sous-jacent (ex: "ER")
-        months: Liste des mois d'expiration
-        years: Liste des années
-        strikes: Liste des strikes
-        roll_expiries: Ignoré en mode offline
-        brut_code: Ignoré en mode offline
-        suffix: Ignoré en mode offline
-        default_position: Position par défaut
-        
-    Returns:
-        Tuple (liste d'options, prix du sous-jacent)
-    """
+
     print("\n🔧 MODE OFFLINE - Simulation des données Bloomberg")
     
     # Prix du sous-jacent simulé (centre de la grille de prix)

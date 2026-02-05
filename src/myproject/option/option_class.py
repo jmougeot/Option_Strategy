@@ -199,21 +199,43 @@ class Option:
         self.sigma_pnl = sigma
         return sigma
 
+
+    def _calculate_tail_penalty(self) -> None:
+        if self.pnl_array is None or self.prices is None:
+            self.tail_penalty = 0.0
+            self.tail_penalty_short = 0.0
+            return
+        try:
+            # Calculer dx si pas déjà fait
+            if self.dx is None and len(self.prices) > 1:
+                self.dx = float(np.mean(np.diff(self.prices)))
+
+            dx = self.dx if self.dx is not None else 1.0
+
+            # Créer une gaussienne de pondération
+            center = self.average_mix if self.average_mix else float(np.mean(self.prices))
+
+            # σ = 3× taille intervalle → gaussienne plus plate, plus de poids aux extrémités
+            sigma = float(self.prices[-1] - self.prices[0]) * 3.0
+            if sigma <= 0:
+                sigma = 1.0
+            
+            gauss_weights = np.exp(-0.5 * ((self.prices - center) / sigma) ** 2)
+            gauss_weights = gauss_weights / (np.sum(gauss_weights) * dx + 1e-10)
+            
+            # tail_penalty (long) = ∫ max(-pnl, 0)² × gauss × dx
+            losses_long = np.maximum(-self.pnl_array, 0.0) ** 2
+            self.tail_penalty = float(np.sum(losses_long * gauss_weights) * dx)
+
+            # tail_penalty_short = ∫ max(pnl, 0)² × gauss × dx
+            losses_short = np.maximum(self.pnl_array, 0.0) ** 2
+            self.tail_penalty_short = float(np.sum(losses_short * gauss_weights) * dx)
+        except Exception:
+            self.tail_penalty = 0.0
+            self.tail_penalty_short = 0.0
+
+    
     def _calcul_all_surface(self) -> None:
-        """
-        Calcule toutes les surfaces et métriques associées à la mixture.
-        Robuste: ne lève jamais d'exception, retourne (0, 0) en cas d'erreur.
-
-        Ordre d'exécution:
-        1. Calcul du P&L array
-        2. Calcul de la pondération (mixture × P&L × dx)
-        3. Calcul de l'espérance du P&L
-        4. Calcul de l'écart-type du P&L
-        5. Calcul du tail penalty (∫ max(-pnl, 0)² dx)
-
-        Returns:
-            Tuple[float, float]: (loss_surface, profit_surface)
-        """
         # 1. Calculer le P&L array (utilise self.prices)
         self._calculate_pnl_array()
 
@@ -228,47 +250,6 @@ class Option:
 
         # 5. Calculer le tail penalty: ∫ max(-pnl, 0)² dx (zone négative au carré)
         self._calculate_tail_penalty()
-
-    def _calculate_tail_penalty(self) -> None:
-        """
-        Calcule les tail penalties pour les positions long et short:
-        - tail_penalty: ∫ max(-pnl, 0)² × gauss dx (zone négative, pour achat)
-        - tail_penalty_short: ∫ max(pnl, 0)² × gauss dx (zone positive, pour vente)
-        
-        Gaussienne avec σ = 3× taille intervalle pour donner du poids aux extrémités.
-        """
-        if self.pnl_array is None or self.prices is None:
-            self.tail_penalty = 0.0
-            self.tail_penalty_short = 0.0
-            return
-
-        try:
-            # Calculer dx si pas déjà fait
-            if self.dx is None and len(self.prices) > 1:
-                self.dx = float(np.mean(np.diff(self.prices)))
-            
-            dx = self.dx if self.dx is not None else 1.0
-            
-            # Créer une gaussienne de pondération
-            center = self.average_mix if self.average_mix else float(np.mean(self.prices))
-            # σ = 3× taille intervalle → gaussienne plus plate, plus de poids aux extrémités
-            sigma = float(self.prices[-1] - self.prices[0]) * 3.0
-            if sigma <= 0:
-                sigma = 1.0
-            
-            gauss_weights = np.exp(-0.5 * ((self.prices - center) / sigma) ** 2)
-            gauss_weights = gauss_weights / (np.sum(gauss_weights) * dx + 1e-10)
-            
-            # tail_penalty (long) = ∫ max(-pnl, 0)² × gauss × dx
-            losses_long = np.maximum(-self.pnl_array, 0.0) ** 2
-            self.tail_penalty = float(np.sum(losses_long * gauss_weights) * dx)
-            
-            # tail_penalty_short = ∫ max(pnl, 0)² × gauss × dx
-            losses_short = np.maximum(self.pnl_array, 0.0) ** 2
-            self.tail_penalty_short = float(np.sum(losses_short * gauss_weights) * dx)
-        except Exception:
-            self.tail_penalty = 0.0
-            self.tail_penalty_short = 0.0
 
     # ============================================================================
     # POSITION HELPERS - Méthodes utilitaires pour faciliter les checks de position

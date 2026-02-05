@@ -2,7 +2,7 @@
 Module pour la logique de traitement et de filtrage des stratÃ©gies
 """
 
-from typing import List, Tuple, Optional, Dict, Any, TYPE_CHECKING
+from typing import List, Tuple, Optional, Dict, Any
 from myproject.strategy.strategy_class import StrategyComparison
 from myproject.app.scenarios_widget import ScenarioData
 
