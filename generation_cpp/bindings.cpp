@@ -283,9 +283,13 @@ py::list process_combinations_batch_with_scoring(
             
                     strat.option_indices.reserve(n_legs);
                     strat.signs.reserve(n_legs);
+                    strat.strikes.reserve(n_legs);
+                    strat.is_calls.reserve(n_legs);
                     for (int i = 0; i < n_legs; ++i) {
                         strat.option_indices.push_back(indices[i]);
                         strat.signs.push_back((mask & (1 << i)) ? 1 : -1);
+                        strat.strikes.push_back(g_cache.options[indices[i]].strike);
+                        strat.is_calls.push_back(g_cache.options[indices[i]].is_call);
                     }
                     
                     thread_results.push_back(std::move(strat));

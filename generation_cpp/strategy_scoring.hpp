@@ -87,6 +87,10 @@ struct ScoredStrategy {
     std::vector<int> option_indices;
     std::vector<int> signs;
     
+    // Strikes et types (pour détection de doublons)
+    std::vector<double> strikes;
+    std::vector<bool> is_calls;
+    
     // Score et rang
     double score;
     int rank;
@@ -129,13 +133,12 @@ public:
     );
     
     /**
-     * Vérifie que deux stratégies ont les mêmes options (mêmes indices et signs)
+     * Vérifie que deux stratégies ont le même payoff
+     * Logique: même strikes triés + même signs triés + nombre pair de différences call/put
      */
-    static bool are_same_options(
-        const std::vector<int>& indices1,
-        const std::vector<int>& indices2,
-        const std::vector<int>& sign1,
-        const std::vector<int>& sign2
+    static bool are_same_payoff(
+        const ScoredStrategy& s1,
+        const ScoredStrategy& s2
     );
     
     /**

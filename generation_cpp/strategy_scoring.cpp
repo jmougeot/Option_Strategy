@@ -261,24 +261,56 @@ static size_t hash_pnl_array(const std::vector<double>& pnl, int decimals) {
 }
 
 
-bool StrategyScorer::are_same_options(
-    const std::vector<int>& indices1,
-    const std::vector<int>& indices2,
-    const std::vector<int>& sign1,
-    const std::vector<int>& sign2
+bool StrategyScorer::are_same_payoff(
+    const ScoredStrategy& s1,
+    const ScoredStrategy& s2
 ) {
-    // Vérifier que les tailles sont identiques
-    if (indices1.size() != indices2.size() || sign1.size() != sign2.size()) {
+    // 1. Vérifier que les tailles sont identiques
+    if (s1.strikes.size() != s2.strikes.size()) {
         return false;
     }
     
-    for (size_t i = 0; i < indices1.size(); i++) {
-        // Si les indices d'options ou les signs sont différents, ce n'est pas un doublon
-        if (indices1[i] != indices2[i] || sign1[i] != sign2[i]) {
+    const size_t n = s1.strikes.size();
+    
+    // 2. Créer des triplets (strike, sign, is_call) triés par (strike, sign)
+    struct Leg {
+        double strike;
+        int sign;
+        bool is_call;
+    };
+    
+    std::vector<Leg> legs1(n), legs2(n);
+    for (size_t i = 0; i < n; i++) {
+        legs1[i] = {s1.strikes[i], s1.signs[i], s1.is_calls[i]};
+        legs2[i] = {s2.strikes[i], s2.signs[i], s2.is_calls[i]};
+    }
+    
+    // Trier par (strike, sign)
+    auto cmp = [](const Leg& a, const Leg& b) {
+        if (std::abs(a.strike - b.strike) > 1e-6) return a.strike < b.strike;
+        return a.sign < b.sign;
+    };
+    std::sort(legs1.begin(), legs1.end(), cmp);
+    std::sort(legs2.begin(), legs2.end(), cmp);
+    
+    // 3. Vérifier que les strikes et signs sont identiques
+    for (size_t i = 0; i < n; i++) {
+        if (std::abs(legs1[i].strike - legs2[i].strike) > 1e-6 || legs1[i].sign != legs2[i].sign) {
             return false;
         }
     }
-    return true;
+    
+    // 4. Compter le nombre de différences call/put pour chaque (strike, sign)
+    int diff_count = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (legs1[i].is_call != legs2[i].is_call) {
+            diff_count++;
+        }
+    }
+    
+    // 5. Si nombre pair de différences → même payoff (parité call-put)
+    //    Si nombre impair → payoff différent
+    return (diff_count % 2 == 0);
 }
 
 std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
@@ -305,9 +337,10 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
         bool is_duplicate = false;
 
         // Vérifier si cette stratégie est un doublon d'une stratégie déjà dans uniques
+        // Utilise la logique: même strikes + même signs + nombre pair de diff call/put
         for (size_t i = 0; i < uniques.size(); i++) {
             const auto& unique = uniques[i];
-            if (are_same_options(strat.option_indices, unique.option_indices, strat.signs, unique.signs)) {
+            if (are_same_payoff(strat, unique)) {
                 is_duplicate = true;
                 duplicates_count++;
                 break;
