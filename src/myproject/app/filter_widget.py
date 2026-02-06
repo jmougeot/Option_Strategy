@@ -42,28 +42,28 @@ def filter_params() -> FilterData:
         max_loss_left_col, max_loss_right_col, limit_left_col, limit_right_col = st.columns([1.5, 1.5, 1.5, 1.5])
         with max_loss_left_col:
             max_loss_left = st.number_input("Max loss left",
-                                                    value=float(current_filter["max_loss_left"]),
+                                                    value=float(current_filter.get("max_loss_left", 0.1)),
                                                     step=0.001,
                                                     format="%.3f",
                                                     key="filter_max_loss",
                                                     help="Max loss left")       
         with max_loss_right_col:
             max_loss_right= st.number_input("Max loss right",
-                                                    value = float(current_filter["max_loss_right"]),
+                                                    value = float(current_filter.get("max_loss_right", 0.1)),
                                                     step=0.001,
                                                     format="%.3f",
                                                     key="filter_max_loss_right",
                                                     help= "Choose the max on the right of the target")
         with limit_left_col:
             limit_left = st.number_input("Limit left",
-                                                    value=float(current_filter["limit_left_filter"]),
+                                                    value=float(current_filter.get("limit_left_filter", 98.5)),
                                                     step=0.001,
                                                     format="%.3f",
                                                     key="limit_left_filter_key",
                                                     help="imit to filter_max_loss_right where the max loss left is applied") 
         with limit_right_col:
             limit_right= st.number_input("Limit right",
-                                                    value = float(current_filter["limit_right_filter"]),
+                                                    value = float(current_filter.get("limit_right_filter", 98.0)),
                                                     step=0.001,
                                                     format="%.3f",
                                                     key="limit_right_filter_key",
@@ -73,7 +73,7 @@ def filter_params() -> FilterData:
     max_premium_col, min_premium_col = st.columns([1.5, 1.5])
     with max_premium_col:
         max_premium = st.number_input("Max premium",
-                                               value=float(current_filter["max_premium"]),
+                                               value=float(current_filter.get("max_premium", 5.0)),
                                                step=0.0025,
                                                format="%.4f",
                                                key="filter_max_premium",
@@ -81,7 +81,7 @@ def filter_params() -> FilterData:
 
     with min_premium_col:
         min_premium_sell = st.number_input("Min price for short",
-                                        value=float(current_filter["min_premium_sell"]),
+                                        value=float(current_filter.get("min_premium_sell", 0.005)),
                                         step=0.001,
                                         format="%.3f",
                                         key="filter_min_premium_sell",
@@ -91,13 +91,13 @@ def filter_params() -> FilterData:
     ouvert_gauche_col, ouvert_droite_col = st.columns([2,2])
     with ouvert_gauche_col:
         ouvert_gauche = st.number_input("PUT: Short-Long",
-                                               value=int(current_filter["ouvert_gauche"]),
+                                               value=int(current_filter.get("ouvert_gauche", 0)),
                                                step=1,
                                                key="filter_ouvert_gauche",
                                                help="Number of puts sold - bought")
     with ouvert_droite_col:
         ouvert_droite = st.number_input("CALL: Short-Long",
-                                               value=int(current_filter["ouvert_droite"]),
+                                               value=int(current_filter.get("ouvert_droite", 0)),
                                                step=1,
                                                key="filter_ouvert_droite",
                                                help="Number of calls sold - bought")

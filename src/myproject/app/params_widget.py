@@ -56,7 +56,8 @@ def sidebar_params() -> UIParams:
     brut_code_check =st.checkbox(
         "Provide raw code",
         value=False,
-        help="Provide full Bloomberg code"
+        help="Provide full Bloomberg code",
+        key="brut_code_check"
     )
     
     # Defaults
@@ -70,11 +71,13 @@ def sidebar_params() -> UIParams:
         c1, c2 = st.columns(2)
         with c1:
             underlying = st.text_input(
-                "Underlying:", value="ER", help="Bloomberg Code (ER = EURIBOR)"
+                "Underlying:", value="ER", help="Bloomberg Code (ER = EURIBOR)",
+                key="param_underlying"
             )
         with c2:
             years_input = st.text_input(
-                "Years:", value="6", help="6=2026, 7=2027 (comma separated)"
+                "Years:", value="6", help="6=2026, 7=2027 (comma separated)",
+                key="param_years"
             )
 
         c1 , c2= st.columns(2)
@@ -83,11 +86,13 @@ def sidebar_params() -> UIParams:
                 "Expiration Month:",
                 value="F",
                 help="H=Mar, M=Jun, U=Sep, Z=Dec",
+                key="param_months"
             )
     
         with c2:
                 price_step = st.number_input(
-            "Price Step ($)", value=0.0625, step=0.0001, format="%.4f"
+            "Price Step ($)", value=0.0625, step=0.0001, format="%.4f",
+            key="param_price_step"
         )
 
     else:
@@ -96,21 +101,25 @@ def sidebar_params() -> UIParams:
             code_brut=st.text_input(
                 "Full Bloomberg Code",
                 value="RXWF26C2,RXWF26P2",
-                help="Search for Bloomberg code and include put and call"
+                help="Search for Bloomberg code and include put and call",
+                key="param_brut_code"
             )
         with c2:
             price_step = st.number_input(
-            "Price Step ($)", value=0.0625, step=0.0001, format="%.4f"
+            "Price Step ($)", value=0.0625, step=0.0001, format="%.4f",
+            key="param_price_step"
         )
 
     c1, c2 = st.columns(2)
     with c1:
         price_min = st.number_input(
-            "Min Price ($)", value=97.750, step=0.0001, format="%.4f"
+            "Min Price ($)", value=97.750, step=0.0001, format="%.4f",
+            key="param_price_min"
         )
     with c2:
         price_max = st.number_input(
-            "Max Price ($)", value=98.750, step=0.0001, format="%.4f"
+            "Max Price ($)", value=98.750, step=0.0001, format="%.4f",
+            key="param_price_max"
             )
     
     roll_expiries: Optional[List[RollExpiry]] = None
@@ -120,21 +129,23 @@ def sidebar_params() -> UIParams:
         custom_roll = st.checkbox(
             "Custom roll",
             value=False,
-            help="Check to specify roll expiries."
+            help="Check to specify roll expiries.",
+            key="param_custom_roll"
         )
         
         if custom_roll:
             roll_input = st.text_input(
                 "Roll months",
                 value="Z5",
-                help="Format: M1Y1, M2Y2 (e.g. Z5 or H6, Z5)"
+                help="Format: M1Y1, M2Y2 (e.g. Z5 or H6, Z5)",
+                key="param_roll_input"
             )
             if roll_input:
                 roll_expiries = parse_roll_input(roll_input)
 
     strikes = strike_list(price_min, price_max, price_step)
 
-    max_legs = st.slider("Max legs per strategy:", 1, 9, 4)
+    max_legs = st.slider("Max legs per strategy:", 1, 9, 4, key="param_max_legs")
 
     years = [int(y.strip()) for y in years_input.split(",") if y.strip()]
     months = [m.strip() for m in months_input.split(",") if m.strip()]

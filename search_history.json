@@ -1,0 +1,146 @@
+[
+  {
+    "id": "20260206_161547",
+    "timestamp": "2026-02-06 16:15:47",
+    "underlying": "ER",
+    "months": [
+      "F"
+    ],
+    "years": [
+      7
+    ],
+    "price_range": "97.7500 - 99.0000",
+    "max_legs": 4,
+    "num_strategies": 10,
+    "best_strategy": "ERF7 +97.75C-97.8125C-97.8125C+98.0625C",
+    "best_score": 1.000001,
+    "params": {
+      "underlying": "ER",
+      "months": [
+        "F"
+      ],
+      "years": [
+        7
+      ],
+      "price_min": 97.75,
+      "price_max": 99.0,
+      "max_legs": 4,
+      "roll_expiries": null
+    },
+    "scenarios": [
+      {
+        "id": "75ad483e-7117-4afa-bffd-dfda738666a5",
+        "price": 97.0,
+        "std": 0.1,
+        "std_r": 0.1,
+        "weight": 50.0
+      }
+    ],
+    "filter_data": {
+      "max_loss_left": 0.1,
+      "max_loss_right": 0.1,
+      "max_premium": 1.0,
+      "delta_min": -0.75,
+      "delta_max": 0.75,
+      "ouvert_gauche": 1,
+      "ouvert_droite": 1
+    },
+    "scoring_weights": {
+      "avg_pnl_levrage": 0.0,
+      "roll_quarterly": 0.0,
+      "max_loss": 0.0,
+      "average_pnl": 1.0,
+      "avg_intra_life_pnl": 0.0,
+      "premium": 0.0,
+      "sigma_pnl": 0,
+      "delta_neutral": 0,
+      "gamma_low": 0,
+      "vega_low": 0,
+      "theta_positive": 0,
+      "implied_vol_moderate": 0,
+      "delta_levrage": 0
+    },
+    "top_strategies_summary": [
+      {
+        "rank": 1,
+        "name": "ERF7 +97.75C-97.8125C-97.8125C+98.0625C",
+        "score": 1.000001,
+        "average_pnl": 0.11002039468815905,
+        "premium": -0.10009999999999986,
+        "max_loss": -0.08740000000000014
+      },
+      {
+        "rank": 2,
+        "name": "ERF7 +97.75C-97.8125C-97.875C+98.125C",
+        "score": 0.9905967271547785,
+        "average_pnl": 0.10898573287797264,
+        "premium": -0.0990000000000002,
+        "max_loss": -0.0884999999999998
+      },
+      {
+        "rank": 3,
+        "name": "ERF7 +97.75C-97.8125C-97.9375C+98.1875C",
+        "score": 0.9806012386351238,
+        "average_pnl": 0.10788602528593927,
+        "premium": -0.0979000000000001,
+        "max_loss": -0.0895999999999999
+      },
+      {
+        "rank": 4,
+        "name": "ERF7 +97.75C-97.875C-97.875C+98.1875C",
+        "score": 0.9784656871419982,
+        "average_pnl": 0.1076510710677887,
+        "premium": -0.09760000000000035,
+        "max_loss": -0.08989999999999965
+      },
+      {
+        "rank": 5,
+        "name": "ERF7 +97.75C-97.8125C-98.0C+98.25C",
+        "score": 0.9706031004785186,
+        "average_pnl": 0.10678602617980282,
+        "premium": -0.0968,
+        "max_loss": -0.0907
+      },
+      {
+        "rank": 6,
+        "name": "ERF7 +97.75C-97.875C-97.9375C+98.25C",
+        "score": 0.9666523538439603,
+        "average_pnl": 0.1063513634757558,
+        "premium": -0.09630000000000027,
+        "max_loss": -0.09119999999999973
+      },
+      {
+        "rank": 7,
+        "name": "ERF7 +97.75C-97.8125C-98.0625C+98.3125C",
+        "score": 0.9606049542143394,
+        "average_pnl": 0.10568602618166789,
+        "premium": -0.0956999999999999,
+        "max_loss": -0.0918000000000001
+      },
+      {
+        "rank": 8,
+        "name": "ERF7 +97.75C-97.8125C-98.125P+98.375P",
+        "score": 0.9560603422683854,
+        "average_pnl": 0.1051860261816695,
+        "premium": 0.15480000000000027,
+        "max_loss": -0.09230000000000027
+      },
+      {
+        "rank": 9,
+        "name": "ERF7 +97.75C-97.875C-98.0C+98.3125C",
+        "score": 0.9539274485197721,
+        "average_pnl": 0.10495136436961916,
+        "premium": -0.09489999999999998,
+        "max_loss": -0.09260000000000002
+      },
+      {
+        "rank": 10,
+        "name": "ERF7 +97.75C-97.9375C-97.9375C+98.3125C",
+        "score": 0.9521122533783394,
+        "average_pnl": 0.1047516558837227,
+        "premium": -0.0947,
+        "max_loss": -0.0928
+      }
+    ]
+  }
+]

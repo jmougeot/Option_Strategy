@@ -15,6 +15,7 @@ from myproject.app.scoring_widget import scoring_weights_block
 from myproject.app.tabs import display_overview_tab
 from myproject.app.payoff_diagram import create_payoff_diagram
 from myproject.app.help_tab import display_help_tab
+from myproject.app.history_tab import display_history_tab, add_to_history, init_history, apply_pending_restore
 from myproject.app.processing import (
     process_comparison_results,
     save_to_session_state,
@@ -48,6 +49,10 @@ inject_css()
 # ============================================================================
 
 def main():
+    # Appliquer une restauration pendante AVANT la création des widgets
+    init_history()
+    apply_pending_restore()
+    
     # Header
     st.markdown(
         '<div class="main-header">Options Strategy Comparator</div>',
@@ -305,6 +310,36 @@ def main():
                 save_to_session_state(all_comparisons, params, scenarios)
                 st.session_state["mixture"] = mixture
                 st.session_state["future_data"] = future_data
+                
+                # Sauvegarder dans l'historique
+                _params_for_history = {
+                    "underlying": params.underlying,
+                    "months": params.months,
+                    "years": params.years,
+                    "price_min": params.price_min,
+                    "price_max": params.price_max,
+                    "max_legs": params.max_legs,
+                    "roll_expiries": params.roll_expiries,
+                }
+                _filter_for_history = {
+                    "max_loss_left": filter.max_loss_left,
+                    "max_loss_right": filter.max_loss_right,
+                    "max_premium": filter.max_premium,
+                    "delta_min": filter.delta_min,
+                    "delta_max": filter.delta_max,
+                    "ouvert_gauche": filter.ouvert_gauche,
+                    "ouvert_droite": filter.ouvert_droite,
+                }
+                add_to_history(
+                    params=_params_for_history,
+                    comparisons=all_comparisons,
+                    mixture=mixture,
+                    future_data=future_data,
+                    scenarios=st.session_state.get("scenarios", []),
+                    filter_data=_filter_for_history,
+                    scoring_weights=scoring_weights
+                )
+                
                 st.success("✅ Processing complete!")
             else:
                 st.warning("⛔ Processing was terminated")
@@ -341,14 +376,18 @@ def main():
         st.rerun()
 
     # ====================================================================
-    # TABS FOR DISPLAY - Help is always visible
+    # TABS FOR DISPLAY - Help and History are always visible
     # ====================================================================
 
-    tab1, tab2, tab3 = st.tabs(["Overview", "P&L Diagram", "📚 Help"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Overview", "P&L Diagram", "📜 History", "📚 Help"])
 
     # Help tab is always available
-    with tab3:
+    with tab4:
         display_help_tab()
+    
+    # History tab is always available
+    with tab3:
+        display_history_tab()
         
     if not all_comparisons:
         with tab1:
