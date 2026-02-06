@@ -9,7 +9,7 @@ Le traitement est entiÃ¨rement dÃ©lÃ©guÃ© au batch processor C++ pour de
 from typing import List, Tuple, Optional, Dict
 from myproject.option.option_class import Option
 from myproject.strategy.strategy_class import StrategyComparison
-from myproject.strategy.batch_processor import process_batch_cpp_with_scoring
+from myproject.strategy.batch_processor import process_batch_cpp_with_scoring, init_cpp_cache
 from myproject.app.filter_widget import FilterData
 
 def sort_options_by_expiration(options: List[Option]) -> List[Option]:
@@ -41,6 +41,10 @@ class OptionStrategyGeneratorV2:
         """
         sorted_by_exp = sort_options_by_expiration(options)
         self.options = sorted(sorted_by_exp, key=lambda opt: opt.strike)
+        
+        # Initialiser le cache C++ avec les options
+        if not init_cpp_cache(self.options):
+            raise RuntimeError("Failed to initialize C++ cache with options")
 
     def generate_top_strategies(
         self,
