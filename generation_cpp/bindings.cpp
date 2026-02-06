@@ -331,8 +331,6 @@ py::list process_combinations_batch_with_scoring(
                 metric.weight = custom_weights[metric.name.c_str()].cast<double>();
             }
         }
-        // Debug: afficher les poids
-        std::cout << "DEBUG Weights: ";
         for (const auto& m : metrics) {
             if (m.weight > 0) {
                 std::cout << m.name << "=" << m.weight << " ";

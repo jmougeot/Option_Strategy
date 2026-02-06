@@ -105,8 +105,13 @@ def process_bloomberg_to_strategies(
         top_n=top_n,
         custom_weights=scoring_weights)
 
-    stats["nb_strategies_possibles"] = (len(options*4)**max_legs)
-    
+    # Estimer le nombre de combinaisons screened
+    # Pour N options et k legs: C(N,k) * 2^k (long/short pour chaque leg)
+    # Total = Σ(k=1 à max_legs) C(N,k) * 2^k
+    from math import comb
+    n_opts = len(options)
+    total_combinations = sum(comb(n_opts, k) * (2 ** k) for k in range(1, max_legs + 1))
+    stats["nb_strategies_possibles"] = total_combinations
     
     stats["nb_strategies_classees"] = len(best_strategies)
 

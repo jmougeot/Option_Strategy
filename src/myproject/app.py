@@ -310,6 +310,7 @@ def main():
                 save_to_session_state(all_comparisons, params, scenarios)
                 st.session_state["mixture"] = mixture
                 st.session_state["future_data"] = future_data
+                st.session_state["stats"] = stats
                 
                 # Sauvegarder dans l'historique
                 _params_for_history = {
@@ -340,7 +341,23 @@ def main():
                     scoring_weights=scoring_weights
                 )
                 
-                st.success("✅ Processing complete!")
+                # Afficher les stats de recherche
+                nb_screened = stats.get("nb_strategies_possibles", 0)
+                nb_options = stats.get("nb_options", 0)
+                nb_kept = stats.get("nb_strategies_classees", 0)
+                
+                # Formater le nombre (ex: 1.4B, 250M, 50K)
+                def format_large_number(n):
+                    if n >= 1_000_000_000:
+                        return f"{n / 1_000_000_000:.1f}B"
+                    elif n >= 1_000_000:
+                        return f"{n / 1_000_000:.1f}M"
+                    elif n >= 1_000:
+                        return f"{n / 1_000:.1f}K"
+                    else:
+                        return str(n)
+                
+                st.success(f"✅ Processing complete! Screened **{format_large_number(nb_screened)}** strategies from {nb_options} options → Kept **{nb_kept}** best")
             else:
                 st.warning("⛔ Processing was terminated")
                 return
@@ -405,13 +422,30 @@ def main():
     with tab1:
         # Afficher les infos du future en haut
         future_data = st.session_state.get("future_data", FutureData(0, None))
-        if future_data:
-            col_price, col_date = st.columns(2)
+        stats = st.session_state.get("stats", {})
+        
+        if future_data or stats:
+            col_price, col_date, col_screened = st.columns(3)
             with col_price:
-                st.metric("📊 Underlying Price", f"{future_data.underlying_price:.4f}")
+                if future_data:
+                    st.metric("📊 Underlying Price", f"{future_data.underlying_price:.4f}")
             with col_date:
-                date_str = future_data.last_tradable_date if future_data.last_tradable_date else "N/A"
-                st.metric("📅 Last Tradeable Date", date_str)
+                if future_data:
+                    date_str = future_data.last_tradable_date if future_data.last_tradable_date else "N/A"
+                    st.metric("📅 Last Tradeable Date", date_str)
+            with col_screened:
+                if stats:
+                    nb_screened = stats.get("nb_strategies_possibles", 0)
+                    # Formater le nombre
+                    if nb_screened >= 1_000_000_000:
+                        screened_str = f"{nb_screened / 1_000_000_000:.1f}B"
+                    elif nb_screened >= 1_000_000:
+                        screened_str = f"{nb_screened / 1_000_000:.1f}M"
+                    elif nb_screened >= 1_000:
+                        screened_str = f"{nb_screened / 1_000:.1f}K"
+                    else:
+                        screened_str = str(nb_screened)
+                    st.metric("🔍 Strategies Screened", screened_str)
             st.markdown("---")
         
         # Générer les labels de roll dynamiquement (ex: ["H6", "M6", "U6"])
