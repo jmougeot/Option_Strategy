@@ -215,8 +215,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     }
     
     // Calcul du tail penalty
-    // Pour achat (sign=+1): utiliser tail_penalty (zone négative)
-    // Pour vente (sign=-1): utiliser tail_penalty_short (zone positive qui devient perte)
     double tail_penalty = 0.0;
     for (size_t i = 0; i < options.size(); ++i) {
         if (signs[i] > 0) {
@@ -229,18 +227,13 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     }
     
     // Calcul des prix intra-vie et P&L de la stratégie
-    // Pour chaque date intermédiaire, somme pondérée des prix/pnl intra-vie des options
     std::array<double, N_INTRA_DATES> strategy_intra_life_prices;
     std::array<double, N_INTRA_DATES> strategy_intra_life_pnl;
     for (int t = 0; t < N_INTRA_DATES; ++t) {
         double total_value = 0.0;
         double total_pnl_t = 0.0;
         for (size_t i = 0; i < options.size(); ++i) {
-            // Le signe détermine si on est long (+1) ou short (-1)
-            // Long: on possède l'option, donc on gagne sa valeur
-            // Short: on doit l'option, donc c'est un coût
             total_value += signs[i] * options[i].intra_life_prices[t];
-            // P&L: pour short, le P&L est inversé (on gagne si l'option perd de la valeur)
             total_pnl_t += signs[i] * options[i].intra_life_pnl[t];
         }
         strategy_intra_life_prices[t] = total_value;

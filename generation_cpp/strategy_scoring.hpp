@@ -72,6 +72,7 @@ struct ScoredStrategy {
     double tail_penalty;  // Tail penalty total
     int call_count;
     int put_count;
+
     std::vector<double> breakeven_points;
     
     // P&L array pour la stratégie complète
@@ -128,12 +129,13 @@ public:
     );
     
     /**
-     * Vérifie si deux P&L arrays sont identiques (avec tolérance)
+     * Vérifie que deux stratégies ont les mêmes options (mêmes indices et signs)
      */
-    static bool are_pnl_equal(
-        const std::vector<double>& pnl1,
-        const std::vector<double>& pnl2,
-        int decimals = 4
+    static bool are_same_options(
+        const std::vector<int>& indices1,
+        const std::vector<int>& indices2,
+        const std::vector<int>& sign1,
+        const std::vector<int>& sign2
     );
     
     /**

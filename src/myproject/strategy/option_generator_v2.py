@@ -9,9 +9,25 @@ Le traitement est entiÃ¨rement dÃ©lÃ©guÃ© au batch processor C++ pour de
 from typing import List, Tuple, Optional, Dict
 from myproject.option.option_class import Option
 from myproject.strategy.strategy_class import StrategyComparison
-from myproject.strategy.batch_processor import process_batch_cpp_with_scoring, init_cpp_cache
-from myproject.option.option_filter import sort_options_by_expiration, sort_options_by_strike
+from myproject.strategy.batch_processor import process_batch_cpp_with_scoring
 from myproject.app.filter_widget import FilterData
+
+def sort_options_by_expiration(options: List[Option]) -> List[Option]:
+    """
+    Trie les options par date d'expiration (année > mois > semaine > jour).
+    """
+
+    def expiration_key(opt: Option):
+        # expiration_month est une lettre (F,G,H...) : on la convertit en index
+        month_order = ["F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"]
+        try:
+            month_index = month_order.index(opt.expiration_month)
+        except ValueError:
+            month_index = -1  # si valeur inattendue, met à la fin
+        return (opt.expiration_year, month_index)
+
+    return sorted(options, key=expiration_key)
+
 
 class OptionStrategyGeneratorV2:
     """
@@ -23,11 +39,9 @@ class OptionStrategyGeneratorV2:
         """
         Initilisation du générateur 
         """
-        # Trier les options par expiration puis par strike croissant
         sorted_by_exp = sort_options_by_expiration(options)
-        self.options = sort_options_by_strike(sorted_by_exp)
-        init_cpp_cache(options)
-    
+        self.options = sorted(sorted_by_exp, key=lambda opt: opt.strike)
+
     def generate_top_strategies(
         self,
         filter: FilterData,

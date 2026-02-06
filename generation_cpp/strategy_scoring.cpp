@@ -260,29 +260,24 @@ static size_t hash_pnl_array(const std::vector<double>& pnl, int decimals) {
     return hash;
 }
 
-bool StrategyScorer::are_pnl_equal(
-    const std::vector<double>& pnl1,
-    const std::vector<double>& pnl2,
-    int decimals
+
+bool StrategyScorer::are_same_options(
+    const std::vector<int>& indices1,
+    const std::vector<int>& indices2,
+    const std::vector<int>& sign1,
+    const std::vector<int>& sign2
 ) {
-    // Vérifier la taille
-    if (pnl1.size() != pnl2.size()) {
+    // Vérifier que les tailles sont identiques
+    if (indices1.size() != indices2.size() || sign1.size() != sign2.size()) {
         return false;
     }
     
-    // Calculer le facteur de multiplication pour l'arrondi
-    double factor = std::pow(10.0, decimals);
-    
-    // Comparer chaque valeur avec tolérance
-    for (size_t i = 0; i < pnl1.size(); ++i) {
-        double rounded1 = std::round(pnl1[i] * factor) / factor;
-        double rounded2 = std::round(pnl2[i] * factor) / factor;
-        
-        if (std::abs(rounded1 - rounded2) > 1e-10) {
+    for (size_t i = 0; i < indices1.size(); i++) {
+        // Si les indices d'options ou les signs sont différents, ce n'est pas un doublon
+        if (indices1[i] != indices2[i] || sign1[i] != sign2[i]) {
             return false;
         }
     }
-    
     return true;
 }
 
@@ -298,8 +293,6 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
     std::vector<ScoredStrategy> uniques;
     uniques.reserve(max_unique > 0 ? max_unique : strategies.size());
     
-    std::unordered_map<size_t, std::vector<size_t>> hash_buckets;
-    
     int duplicates_count = 0;
     
     // Pour chaque stratégie
@@ -308,34 +301,27 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
         if (max_unique > 0 && static_cast<int>(uniques.size()) >= max_unique) {
             break;
         }
-        
         const auto& strat = strategies[idx];
-        size_t pnl_hash = hash_pnl_array(strat.total_pnl_array, decimals);
-        
         bool is_duplicate = false;
-        
-        // Vérifier uniquement dans le bucket du même hash
-        if (hash_buckets.count(pnl_hash) > 0) {
-            for (size_t unique_idx : hash_buckets[pnl_hash]) {
-                if (are_pnl_equal(strat.total_pnl_array, uniques[unique_idx].total_pnl_array, decimals)) {
-                    is_duplicate = true;
-                    duplicates_count++;
-                    break;
-                }
+
+        // Vérifier si cette stratégie est un doublon d'une stratégie déjà dans uniques
+        for (size_t i = 0; i < uniques.size(); i++) {
+            const auto& unique = uniques[i];
+            if (are_same_options(strat.option_indices, unique.option_indices, strat.signs, unique.signs)) {
+                is_duplicate = true;
+                duplicates_count++;
+                break;
             }
         }
         
-        // Si pas un doublon, l'ajouter
         if (!is_duplicate) {
-            hash_buckets[pnl_hash].push_back(uniques.size());
             uniques.push_back(strat);
         }
     }
     
     if (duplicates_count > 0) {
-        std::cout << "  🔍 C++ filtre doublons: " << duplicates_count 
-                  << " stratégies dupliquées éliminées (même profil P&L)" << std::endl;
-        std::cout <<  uniques.size() << " stratégies uniques conservées" << std::endl;
+        std::cout << " C++ filtre doublons: " << duplicates_count << " stratégies dupliquées éliminées (même strikes et signs)" << std::endl;
+        std::cout << uniques.size() << " stratégies uniques conservées" << std::endl;
     }
     
     return uniques;
