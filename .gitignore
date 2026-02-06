@@ -43,19 +43,11 @@ Thumbs.db
 *.swp
 *~
 
-# Base de données (gardez les données d'exemple pour GitHub)
-# Décommentez si vous avez des données sensibles
-# calls_export.json
-# options_data.json
-# calls_database.db
-
-# Bloomberg API (si vous avez des credentials)
-bloomberg_credentials.json
-*.credentials
+# Historique de recherhce
+search_history.json
 
 # Fichiers utilisateur
 user_settings.json
-custom_strategies.py
 
 # Tests
 .pytest_cache/
