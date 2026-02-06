@@ -46,6 +46,9 @@ std::vector<MetricConfig> StrategyScorer::create_default_metrics() {
     // MIN_MAX pour mieux différencier les valeurs dans une plage étroite
     metrics.emplace_back("tail_penalty", 0.0, NormalizerType::MIN_MAX, ScorerType::LOWER_BETTER);
     
+    // Moyenne des P&L intra-vie (plus élevé = meilleur)
+    metrics.emplace_back("avg_intra_life_pnl", 0.0, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
+    
     return metrics;
 }
 
@@ -109,6 +112,8 @@ std::vector<double> StrategyScorer::extract_metric_values(
         } else if (metric_name == "tail_penalty") {
             // Valeur brute - MIN_MAX normalisera automatiquement
             value = std::abs(strat.tail_penalty);
+        } else if (metric_name == "avg_intra_life_pnl") {
+            value = strat.avg_intra_life_pnl;
         }
         
         if (std::isfinite(value)) {

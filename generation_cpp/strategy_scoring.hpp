@@ -77,6 +77,11 @@ struct ScoredStrategy {
     // P&L array pour la stratégie complète
     std::vector<double> total_pnl_array;
     
+    // Prix intra-vie (valeur de la stratégie à dates intermédiaires)
+    std::array<double, 5> intra_life_prices;  // [V_t1, V_t2, V_t3, V_t4, V_t5]
+    std::array<double, 5> intra_life_pnl;     // P&L moyen à chaque date
+    double avg_intra_life_pnl;                // Moyenne des P&L intra-vie
+    
     // Indices des options et signes
     std::vector<int> option_indices;
     std::vector<int> signs;
@@ -92,7 +97,7 @@ struct ScoredStrategy {
           max_profit(0), max_loss(0), max_loss_left(0), max_loss_right(0),
           min_profit_price(0), max_profit_price(0), profit_zone_width(0),
           delta_levrage(0), avg_pnl_levrage(0), tail_penalty(0),
-          call_count(0), put_count(0), score(0), rank(0) {}
+          call_count(0), put_count(0), intra_life_prices{}, intra_life_pnl{}, avg_intra_life_pnl(0), score(0), rank(0) {}
 };
 
 // ============================================================================

@@ -25,12 +25,12 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
             "Avg P&L": format_currency(comp.average_pnl) if comp.average_pnl is not None else "-",
             "Delta %": f"{comp.total_delta * 100:.2f}%",
             "Lvg P&L" : format_currency(comp.avg_pnl_levrage) if comp.avg_pnl_levrage is not None else "-",
-            "Tail Risk": f"{comp.tail_penalty:.2f}" if comp.tail_penalty is not None else "-",
+            "Avg Intra P&L": format_currency(comp.avg_intra_life_pnl) if comp.avg_intra_life_pnl is not None else "-",
         }
         
         # Colonnes de roll dynamiques basées sur roll_labels (limité à 2 rolls max)
         if roll_labels:
-            for label in roll_labels[:2]:  # Limiter à 2 rolls max pour réduire les colonnes
+            for label in roll_labels[:4]:  # Limiter à 2 rolls max pour réduire les colonnes
                 roll_value = comp.rolls_detail.get(label)
                 row[f"Roll {label}"] = f"{roll_value:.4f}" if roll_value is not None else "-"
         data.append(row)

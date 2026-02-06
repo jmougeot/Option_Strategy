@@ -73,6 +73,8 @@ void init_options_cache(
     py::array_t<double> rolls_sum,
     py::array_t<double> tail_penalties,
     py::array_t<double> tail_penalties_short,
+    py::array_t<double> intra_life_prices,  // Matrice (n_options, N_INTRA_DATES)
+    py::array_t<double> intra_life_pnl,     // Matrice (n_options, N_INTRA_DATES) - P&L moyen
     py::array_t<double> pnl_matrix,
     py::array_t<double> prices,
     py::array_t<double> mixture,
@@ -93,6 +95,8 @@ void init_options_cache(
     auto rolls_sum_buf = rolls_sum.unchecked<1>();
     auto tail_pen_buf = tail_penalties.unchecked<1>();
     auto tail_pen_short_buf = tail_penalties_short.unchecked<1>();
+    auto intra_life_buf = intra_life_prices.unchecked<2>();  // Matrice (n_options, N_INTRA_DATES)
+    auto intra_life_pnl_buf = intra_life_pnl.unchecked<2>(); // Matrice (n_options, N_INTRA_DATES)
     auto pnl_buf = pnl_matrix.unchecked<2>();
     auto prices_buf = prices.unchecked<1>();
     auto mixture_buf = mixture.unchecked<1>();
@@ -123,6 +127,12 @@ void init_options_cache(
         g_cache.options[i].roll_sum = rolls_sum_buf(i);
         g_cache.options[i].tail_penalty = tail_pen_buf(i);
         g_cache.options[i].tail_penalty_short = tail_pen_short_buf(i);
+        
+        // Copier les prix intra-vie et P&L intra-vie
+        for (int t = 0; t < N_INTRA_DATES; ++t) {
+            g_cache.options[i].intra_life_prices[t] = intra_life_buf(i, t);
+            g_cache.options[i].intra_life_pnl[t] = intra_life_pnl_buf(i, t);
+        }
         
         g_cache.pnl_matrix[i].resize(g_cache.pnl_length);
         for (size_t j = 0; j < g_cache.pnl_length; ++j) {
@@ -267,6 +277,9 @@ py::list process_combinations_batch_with_scoring(
                     strat.avg_pnl_levrage = metrics.avg_pnl_levrage;
                     strat.delta_levrage = metrics.delta_levrage;
                     strat.tail_penalty = metrics.tail_penalty;
+                    strat.intra_life_prices = metrics.intra_life_prices;
+                    strat.intra_life_pnl = metrics.intra_life_pnl;
+                    strat.avg_intra_life_pnl = metrics.avg_intra_life_pnl;
             
                     strat.option_indices.reserve(n_legs);
                     strat.signs.reserve(n_legs);
@@ -379,6 +392,23 @@ py::list process_combinations_batch_with_scoring(
         metrics_dict["avg_pnl_levrage"] = strat.avg_pnl_levrage;
         metrics_dict["tail_penalty"] = strat.tail_penalty;
         
+        // Ajouter les prix intra-vie
+        py::list intra_life_list;
+        for (int t = 0; t < 5; ++t) {
+            intra_life_list.append(strat.intra_life_prices[t]);
+        }
+        metrics_dict["intra_life_prices"] = intra_life_list;
+        
+        // Ajouter le P&L intra-vie
+        py::list intra_life_pnl_list;
+        for (int t = 0; t < 5; ++t) {
+            intra_life_pnl_list.append(strat.intra_life_pnl[t]);
+        }
+        metrics_dict["intra_life_pnl"] = intra_life_pnl_list;
+        
+        // Ajouter la moyenne des P&L intra-vie
+        metrics_dict["avg_intra_life_pnl"] = strat.avg_intra_life_pnl;
+        
         // Ajouter le pnl_array
         py::array_t<double> pnl_arr(strat.total_pnl_array.size());
         auto pnl_out = pnl_arr.mutable_unchecked<1>();
@@ -417,6 +447,8 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("rolls_sum"),
           py::arg("tail_penalties"),
           py::arg("tail_penalties_short"),
+          py::arg("intra_life_prices"),
+          py::arg("intra_life_pnl"),
           py::arg("pnl_matrix"),
           py::arg("prices"),
           py::arg("mixture"),

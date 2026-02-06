@@ -8,6 +8,7 @@ SCORING_FIELDS = {
     "roll_quarterly": ("Roll into next quarter", 0),
     "max_loss": ("Tail Risk Penalty", 0),
     "average_pnl": ("Expected gain at expiry", 100),
+    "avg_intra_life_pnl": ("Avg Intra-Life P&L", 0),
     "premium": ("Premium", 0),
 
 }

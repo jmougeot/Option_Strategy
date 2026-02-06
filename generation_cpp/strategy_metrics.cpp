@@ -55,7 +55,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     double delta_min,
     double delta_max,
     double limit_left,
-    double limit_right,
+    double limit_right
 ) {
     const size_t n_options = options.size();
     
@@ -228,6 +228,32 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         }
     }
     
+    // Calcul des prix intra-vie et P&L de la stratégie
+    // Pour chaque date intermédiaire, somme pondérée des prix/pnl intra-vie des options
+    std::array<double, N_INTRA_DATES> strategy_intra_life_prices;
+    std::array<double, N_INTRA_DATES> strategy_intra_life_pnl;
+    for (int t = 0; t < N_INTRA_DATES; ++t) {
+        double total_value = 0.0;
+        double total_pnl_t = 0.0;
+        for (size_t i = 0; i < options.size(); ++i) {
+            // Le signe détermine si on est long (+1) ou short (-1)
+            // Long: on possède l'option, donc on gagne sa valeur
+            // Short: on doit l'option, donc c'est un coût
+            total_value += signs[i] * options[i].intra_life_prices[t];
+            // P&L: pour short, le P&L est inversé (on gagne si l'option perd de la valeur)
+            total_pnl_t += signs[i] * options[i].intra_life_pnl[t];
+        }
+        strategy_intra_life_prices[t] = total_value;
+        strategy_intra_life_pnl[t] = total_pnl_t;
+    }
+    
+    // Calcul de la moyenne des P&L intra-vie
+    double sum_intra_pnl = 0.0;
+    for (int t = 0; t < N_INTRA_DATES; ++t) {
+        sum_intra_pnl += strategy_intra_life_pnl[t];
+    }
+    double avg_intra_life_pnl = sum_intra_pnl / N_INTRA_DATES;
+    
     // ========== CONSTRUCTION DU RÉSULTAT ==========
     
     StrategyMetrics result;
@@ -256,6 +282,9 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     result.delta_levrage = delta_lvg;
     result.avg_pnl_levrage = avg_pnl_lvg;
     result.tail_penalty = tail_penalty;
+    result.intra_life_prices = strategy_intra_life_prices;
+    result.intra_life_pnl = strategy_intra_life_pnl;
+    result.avg_intra_life_pnl = avg_intra_life_pnl;
     
     return result;
 }

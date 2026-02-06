@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import numpy as np
 from typing import Dict, List, Tuple, Literal, Optional, Any
-from myproject.option.option_class import Option
+from myproject.option.option_class import Option, N_INTRA_DATES
 
 
 @dataclass
@@ -39,6 +39,13 @@ class StrategyComparison:
     delta_levrage : float = 0.0
     avg_pnl_levrage : float = 0.0 # avg/premium
     tail_penalty: float = 0.0  # Risque de perte (∫ max(-pnl, 0)² dx)
+    
+    # Intra-vie pricing (valeur de la stratégie à dates intermédiaires)
+    # Calculé via le tilt terminal (voir intra_life.md)
+    intra_life_prices: Optional[List[float]] = None  # [V_t1, V_t2, V_t3, V_t4, V_t5]
+    intra_life_pnl: Optional[List[float]] = None     # P&L moyen à chaque date
+    intra_life_dates: Optional[List[float]] = None   # Fractions de temps [0.2, 0.4, 0.6, 0.8, 1.0]
+    avg_intra_life_pnl: Optional[float] = None       # Moyenne des P&L intra-vie
 
 
     def get_positions(self) -> List[str]:

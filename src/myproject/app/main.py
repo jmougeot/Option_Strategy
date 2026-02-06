@@ -16,6 +16,8 @@ Utilise les fonctions optimisees des modules :
 """
 
 from typing import List, Dict, Optional, Tuple
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.strategy_class import StrategyComparison
 from myproject.bloomberg.bloomberg_data_importer import import_options
@@ -70,7 +72,9 @@ def process_bloomberg_to_strategies(
             strikes=strikes,
             default_position="long",
         )
-        future_data = FutureData(underlying_price, None)
+        # En mode offline, définir une date par défaut de 5 mois dans le futur
+        default_expiry_date = (datetime.now() + relativedelta(months=5)).strftime("%Y-%m-%d")
+        future_data = FutureData(underlying_price, default_expiry_date)
     else:
         options, future_data = import_options(
             mixture=mixture,

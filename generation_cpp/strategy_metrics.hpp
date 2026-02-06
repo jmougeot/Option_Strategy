@@ -13,6 +13,9 @@
 
 namespace strategy {
 
+// Nombre de dates intermédiaires pour le pricing intra-vie
+constexpr int N_INTRA_DATES = 5;
+
 /**
  * Structure légère retournée par les calculs C++
  * Contient toutes les métriques calculées
@@ -55,6 +58,11 @@ struct StrategyMetrics {
     // Tail penalty (risque de perte)
     double tail_penalty;  // Somme des tail_penalty pour la stratégie
     
+    // Intra-vie pricing (prix à dates intermédiaires avec tilt terminal)
+    std::array<double, N_INTRA_DATES> intra_life_prices;  // [V_t1, V_t2, V_t3, V_t4, V_t5]
+    std::array<double, N_INTRA_DATES> intra_life_pnl;     // P&L moyen à chaque date
+    double avg_intra_life_pnl;                            // Moyenne des P&L intra-vie
+    
     // Breakeven points (max 10 pour éviter allocation dynamique)
     std::vector<double> breakeven_points;
     
@@ -83,6 +91,10 @@ struct OptionData {
     double tail_penalty_short;  // Pour vente (zone positive au carré)
     bool is_call;
     // pnl_array sera passé séparément comme matrice
+    
+    // Intra-vie pricing (pré-calculé en Python)
+    std::array<double, N_INTRA_DATES> intra_life_prices;  // Prix à dates intermédiaires
+    std::array<double, N_INTRA_DATES> intra_life_pnl;     // P&L moyen à chaque date
 };
 
 

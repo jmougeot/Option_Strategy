@@ -1,4 +1,5 @@
-Ok donc voila ce que j'ssaye de faire : pour chaque option prend la date d'expiration finale : divise la en 5 et pour chaques date ajoute la dans la classe de l'option 
+Ok donc voila ce que j'ssaye de faire : pour chaque option prend la date d'expiration finale : divise la en 5 et pour chaques date ajoute la dans la classe de l'option (price at date 1, date 2 etc.... ) 
+puis fais les calculs dans c++
 
 
 Si (F_0) (et surtout la *loi “market-consistent”* implicite) est donnée par le marché, alors “choisir une diffusion normale” **comme dynamique de base** revient à inventer une loi risque-neutre qui n’est pas celle du marché. Tu casses l’ancrage MTM.

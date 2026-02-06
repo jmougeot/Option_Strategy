@@ -220,6 +220,8 @@ def _generate_simulated_option(
         option.prices, option.mixture, average_mix = mixture
         option._calcul_all_surface()
         option.average_mix = average_mix
+        # Calculer les prix intra-vie avec le tilt terminal
+        option.calculate_all_intra_life(sigma_market=iv_smile)
     
     return option
 
