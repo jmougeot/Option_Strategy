@@ -24,7 +24,7 @@ namespace strategy {
 
 bool StrategyCalculator::next_combination(
     std::vector<int>& c,
-    int N
+    const int N
 ) {
     int k = c.size();
 

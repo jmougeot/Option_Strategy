@@ -294,6 +294,14 @@ def import_options(
         options = processor.process_all()
         future_data = fetcher.future_data
         
+        # 4. Calculer les prix intra-vie pour toutes les options (avec Bachelier)
+        if options:
+            # Estimer le temps jusqu'à expiration (en années)
+            time_to_expiry = 0.25  # ~3 mois par défaut
+            for option in options:
+                option.calculate_all_intra_life(all_options=options, time_to_expiry=time_to_expiry)
+            print(f"  • Prix intra-vie calculés pour {len(options)} options")
+        
         print(f"📊 Future: price={future_data.underlying_price}, last_trade={future_data.last_tradable_date}")
         
     except Exception as e:

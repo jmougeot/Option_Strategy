@@ -1,10 +1,56 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Literal, Optional, Tuple
 import numpy as np
+from scipy.stats import norm
 
 
 # Nombre de dates intermédiaires pour le pricing intra-vie
 N_INTRA_DATES = 5
+
+
+def bachelier_price(F: float, K: float, sigma: float, T: float, is_call: bool) -> float:
+    """
+    Calcule le prix d'une option avec le modèle de Bachelier (normal model).
+    
+    Formules:
+    - Call: V = (F - K) * Phi(d) + sigma * sqrt(T) * phi(d)
+    - Put:  V = (K - F) * Phi(-d) + sigma * sqrt(T) * phi(d)
+    
+    où d = (F - K) / (sigma * sqrt(T))
+    
+    Args:
+        F: Prix forward du sous-jacent
+        K: Strike de l'option
+        sigma: Volatilité normale (en unités absolues, pas en %)
+        T: Temps jusqu'à expiration (en années)
+        is_call: True pour call, False pour put
+        
+    Returns:
+        Prix de l'option
+    """
+    if T <= 0:
+        # À expiration, valeur intrinsèque
+        if is_call:
+            return max(F - K, 0.0)
+        else:
+            return max(K - F, 0.0)
+    
+    if sigma <= 0:
+        # Sans volatilité, valeur intrinsèque actualisée
+        if is_call:
+            return max(F - K, 0.0)
+        else:
+            return max(K - F, 0.0)
+    
+    sigma_sqrt_T = sigma * np.sqrt(T)
+    d = (F - K) / sigma_sqrt_T
+    
+    if is_call:
+        price = (F - K) * norm.cdf(d) + sigma_sqrt_T * norm.pdf(d)
+    else:
+        price = (K - F) * norm.cdf(-d) + sigma_sqrt_T * norm.pdf(d)
+    
+    return max(price, 0.0)
 
 
 def breeden_litzenberger_density(
@@ -129,12 +175,13 @@ class Option:
     dx: Optional[float] = None
     average_mix: float = 0.0
 
-    # ============ INTRA-VIE (Pricing intermédiaire) ============
-    # Prix de l'option à N_INTRA_DATES dates intermédiaires (t1, t2, ..., t5)
-    # Calculés via le tilt terminal (ratio d'espérances) selon intra_life.md
-    intra_life_prices: Optional[List[float]] = None  # [V_t1, V_t2, V_t3, V_t4, V_t5]
-    intra_life_pnl: Optional[List[float]] = None     # P&L moyen à chaque date [pnl_t1, ..., pnl_t5]
+    # ============ INTRA-VIE (Pricing intermédiaire via Bachelier) ============
+    # Matrice de prix: (N_INTRA_DATES x N_strikes) - prix de l'option à chaque (date, prix_sous_jacent)
+    # Calculés via le modèle de Bachelier à différentes dates et prix du sous-jacent
+    intra_life_prices: Optional[np.ndarray] = None   # Matrice (5 dates x N strikes)
+    intra_life_pnl: Optional[np.ndarray] = None      # Matrice P&L (5 dates x N strikes)
     intra_life_dates: Optional[List[float]] = None   # Fractions de temps [0.2, 0.4, 0.6, 0.8, 1.0]
+    intra_life_underlying_prices: Optional[np.ndarray] = None  # Prix sous-jacent utilisés (= strikes)
     market_density: Optional[np.ndarray] = None      # q_T(x) - densité risque-neutre du marché
     view_density: Optional[np.ndarray] = None        # p_T(x) - densité de la vue macro
     tilt_weights: Optional[np.ndarray] = None        # L_T = p_T / q_T (Radon-Nikodym)
@@ -445,115 +492,93 @@ class Option:
         return L_T
     
     def _calculate_intra_life_prices(self, 
-                                     n_dates: int = N_INTRA_DATES,
-                                     risk_free_rate: float = 0.0) -> Optional[List[float]]:
+                                     underlying_prices: np.ndarray,
+                                     time_to_expiry: float = 1.0,
+                                     n_dates: int = N_INTRA_DATES) -> Optional[np.ndarray]:
         """
-        Calcule les prix de l'option à n_dates intermédiaires avant expiration.
+        Calcule les prix de l'option via Bachelier à différentes dates et prix du sous-jacent.
         
-        Utilise le tilt terminal selon la formule:
-        V_t^view = E^Q[D(t,T) * g(F_T) * L_T | F_t] / E^Q[L_T | F_t]
-        
-        Où:
-        - Q = mesure risque-neutre du marché
-        - g(F_T) = payoff de l'option
-        - L_T = p_T(F_T) / q_T(F_T) = tilt terminal
-        - D(t,T) = discount factor
+        Crée une matrice (n_dates x len(underlying_prices)) où chaque cellule contient
+        le prix Bachelier de l'option pour cette combinaison (date, prix_sous_jacent).
         
         Args:
+            underlying_prices: Array des prix du sous-jacent à simuler (typiquement les strikes)
+            time_to_expiry: Temps total jusqu'à expiration (en années)
             n_dates: Nombre de dates intermédiaires (défaut: 5)
-            risk_free_rate: Taux sans risque annuel
             
         Returns:
-            Liste des prix [V_t1, V_t2, ..., V_tn]
+            Matrice des prix (n_dates x len(underlying_prices))
         """
-        if self.prices is None or self.pnl_array is None:
+        if self.implied_volatility <= 0:
             return None
             
-        # Calculer les poids du tilt si pas déjà fait
-        if self.tilt_weights is None:
-            self._calculate_tilt_weights()
-            
-        if self.tilt_weights is None:
-            return None
-            
-        dx = float(np.mean(np.diff(self.prices))) if len(self.prices) > 1 else 1.0
+        # Volatilité normale (Bachelier) = IV * prix_sous_jacent approximatif
+        # Pour Bachelier, sigma est en unités absolues (pas en %)
+        # implied_volatility est stocké en pourcentage (ex: 20 pour 20%), donc diviser par 100
+        # Approximation: sigma_normal ≈ IV * F (où F est le forward moyen)
+        F_ref = self.underlying_price if self.underlying_price else self.strike
+        iv_decimal = self.implied_volatility / 100.0  # Convertir de % en décimal
+        sigma_normal = iv_decimal * F_ref
         
-        # Payoff de l'option (intrinsic value at expiry)
-        if self.option_type.lower() == "call":
-            payoff = np.maximum(self.prices - self.strike, 0.0)
-        else:
-            payoff = np.maximum(self.strike - self.prices, 0.0)
+        is_call = self.option_type.lower() == "call"
+        K = self.strike
         
-        # Dates intermédiaires: t/T = 0.2, 0.4, 0.6, 0.8, 1.0 (pour n_dates=5)
+        # Dates intermédiaires: t/T = 0.2, 0.4, 0.6, 0.8, 1.0
         self.intra_life_dates = [(i + 1) / n_dates for i in range(n_dates)]
-        self.intra_life_prices = []
-        self.intra_life_pnl = []
+        self.intra_life_underlying_prices = underlying_prices
         
-        # Coût initial de l'option (ce qu'on a payé/reçu)
+        n_prices = len(underlying_prices)
+        self.intra_life_prices = np.zeros((n_dates, n_prices))
+        self.intra_life_pnl = np.zeros((n_dates, n_prices))
+        
+        # Coût initial de l'option
         initial_cost = self.premium
         
-        for t_frac in self.intra_life_dates:
-            # Time to expiry restant (en fraction de la période totale)
-            tau = 1.0 - t_frac  # temps restant jusqu'à expiration
+        for i, t_frac in enumerate(self.intra_life_dates):
+            # Temps restant jusqu'à expiration
+            T_remaining = time_to_expiry * (1.0 - t_frac)
             
-            # Discount factor simplifié (on suppose T=1 an comme normalisation)
-            discount = np.exp(-risk_free_rate * tau)
-            
-            # Calcul du prix avec tilt:
-            # V_t^view = E^Q[D * g(F_T) * L_T] / E^Q[L_T]
-            # ≈ sum(q_T * D * payoff * L_T * dx) / sum(q_T * L_T * dx)
-            # = sum(p_T * D * payoff * dx) / sum(p_T * dx)  (car p_T = q_T * L_T)
-            
-            if self.view_density is not None:
-                numerator = np.sum(self.view_density * discount * payoff * dx)
-                denominator = np.sum(self.view_density * dx) + 1e-10
-                V_t = float(numerator / denominator)
-            elif self.mixture is not None:
-                # Fallback: utiliser la mixture directement
-                numerator = np.sum(self.mixture * discount * payoff * dx)
-                denominator = np.sum(self.mixture * dx) + 1e-10
-                V_t = float(numerator / denominator)
-            else:
-                # Dernier fallback: utiliser le premium actuel
-                V_t = self.premium
-            
-            self.intra_life_prices.append(V_t)
-            
-            # Calcul du P&L moyen à cette date
-            # P&L = valeur actuelle - coût initial
-            # Pour long: on a payé initial_cost, on peut revendre à V_t
-            # P&L = V_t - initial_cost
-            pnl_t = V_t - initial_cost
-            self.intra_life_pnl.append(pnl_t)
+            for j, F in enumerate(underlying_prices):
+                # Prix Bachelier pour ce (date, prix_sous_jacent)
+                price = bachelier_price(F, K, sigma_normal, T_remaining, is_call)
+                self.intra_life_prices[i, j] = price
+                
+                # P&L = valeur actuelle - coût initial
+                self.intra_life_pnl[i, j] = price - initial_cost
         
         return self.intra_life_prices
     
     def calculate_all_intra_life(self, 
-                                 sigma_market: Optional[float] = None,
                                  n_dates: int = N_INTRA_DATES,
-                                 risk_free_rate: float = 0.0,
                                  all_options: Optional[List["Option"]] = None,
-                                 time_to_expiry: float = 1.0) -> Optional[List[float]]:
+                                 time_to_expiry: float = 1.0) -> Optional[np.ndarray]:
         """
-        Calcule tous les éléments nécessaires pour le pricing intra-vie.
+        Calcule les prix intra-vie via le modèle de Bachelier.
         
-        1. Construit la densité marché q_T (Breeden-Litzenberger si all_options fourni)
-        2. Calcule les poids du tilt L_T = p_T / q_T  
-        3. Calcule les prix à n_dates intermédiaires
+        Crée une matrice (n_dates x N_strikes) où:
+        - Les dates sont 5 divisions de la période (20%, 40%, 60%, 80%, 100%)
+        - Les prix du sous-jacent sont les strikes de toutes les options
         
         Args:
-            sigma_market: Volatilité implicite pour la densité marché (log-normale)
-            n_dates: Nombre de dates intermédiaires
-            risk_free_rate: Taux sans risque annuel
-            all_options: Liste d'options pour Breeden-Litzenberger (même expiration)
+            n_dates: Nombre de dates intermédiaires (défaut: 5)
+            all_options: Liste de toutes les options (pour extraire les strikes)
             time_to_expiry: Temps jusqu'à expiration (en années)
             
         Returns:
-            Liste des prix intra-vie [V_t1, ..., V_tn]
+            Matrice des prix intra-vie (n_dates x N_strikes)
         """
-        self._build_market_density(sigma_market, all_options, risk_free_rate, time_to_expiry)
-        self._calculate_tilt_weights()
-        return self._calculate_intra_life_prices(n_dates, risk_free_rate)
+        # Extraire les strikes uniques de toutes les options
+        if all_options:
+            all_strikes = sorted(set(opt.strike for opt in all_options))
+            underlying_prices = np.array(all_strikes)
+        elif self.prices is not None:
+            # Fallback: utiliser la grille de prix existante
+            underlying_prices = self.prices
+        else:
+            # Dernier fallback: créer une grille autour du strike
+            underlying_prices = np.linspace(self.strike * 0.8, self.strike * 1.2, 20)
+        
+        return self._calculate_intra_life_prices(underlying_prices, time_to_expiry, n_dates)
 
     # ============================================================================
     # POSITION HELPERS - Méthodes utilitaires pour faciliter les checks de position

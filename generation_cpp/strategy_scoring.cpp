@@ -309,28 +309,15 @@ bool StrategyScorer::are_same_payoff(
     }
     
     // 5. Si nombre pair de différences → vérifier le max_loss pour confirmer
-    //    Si nombre impair → payoff différent
     if (diff_count % 2 != 0) {
-        return false;  // Nombre impair = payoff différent
+        return false; 
     }
     
-    // 6. Nombre pair: vérifier que le max_loss est similaire (tolérance 0.5%)
-    //    Cela confirme que la parité call-put s'applique bien
-    double max_loss_tolerance = 0.005;  // 0.5%
     double max_loss_diff = std::abs(s1.max_loss - s2.max_loss);
-    double max_loss_avg = (std::abs(s1.max_loss) + std::abs(s2.max_loss)) / 2.0;
     
-    if (max_loss_avg > 1e-6) {
-        // Comparaison relative
-        if (max_loss_diff / max_loss_avg > max_loss_tolerance) {
-            return false;  // Max loss trop différent
+    if (max_loss_diff > 0.05) {
+            return false; 
         }
-    } else {
-        // Comparaison absolue si max_loss proche de 0
-        if (max_loss_diff > 0.01) {
-            return false;
-        }
-    }
     
     return true;  // Même payoff confirmé
 }

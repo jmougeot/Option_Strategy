@@ -97,7 +97,7 @@ struct ScoredStrategy {
     
     ScoredStrategy() 
         : total_premium(0), total_delta(0), total_gamma(0), total_vega(0),
-          total_theta(0), total_iv(0), avg_implied_volatility(0), average_pnl(0),
+          total_iv(0), avg_implied_volatility(0), average_pnl(0),
           roll(0), roll_quarterly(0), roll_sum(0), sigma_pnl(0),
           max_profit(0), max_loss(0), max_loss_left(0), max_loss_right(0),
           min_profit_price(0), max_profit_price(0), profit_zone_width(0),

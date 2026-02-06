@@ -166,9 +166,8 @@ def create_option_from_bloomberg(
         option._calcul_all_surface()
         option.average_mix=average_mix
         
-        # 3. Calculer les prix intra-vie avec le tilt terminal
-        sigma_market = iv / 100.0 if iv else 0.20  # Convertir IV en décimal
-        option.calculate_all_intra_life(sigma_market=sigma_market)
+        # Note: intra_life sera calculé après avoir créé toutes les options
+        # car on a besoin de tous les strikes pour le calcul Bachelier
 
         return option
 

@@ -62,22 +62,32 @@ def init_cpp_cache(options: List[Option]) -> bool:
     tail_penalties = np.array([opt.tail_penalty or 0.0 for opt in options], dtype=np.float64)
     tail_penalties_short = np.array([opt.tail_penalty_short or 0.0 for opt in options], dtype=np.float64)
     
-    # Prix intra-vie et P&L intra-vie (calculés via le tilt terminal)
-    # Nombre de dates intermédiaires (doit correspondre à N_INTRA_DATES en C++)
+    # Prix intra-vie et P&L intra-vie (calculés via Bachelier)
+    # Le C++ attend une matrice (n_options x 5 dates) avec un seul prix par date
+    # On calcule le prix moyen pondéré par la mixture si disponible
     n_intra_dates = 5
     intra_life_prices = np.zeros((n, n_intra_dates), dtype=np.float64)
     intra_life_pnl = np.zeros((n, n_intra_dates), dtype=np.float64)
+    
     for i, opt in enumerate(options):
-        if opt.intra_life_prices is not None and len(opt.intra_life_prices) == n_intra_dates:
-            intra_life_prices[i] = opt.intra_life_prices
+        if opt.intra_life_prices is not None:
+            # intra_life_prices est maintenant une matrice (5 dates x N strikes)
+            if isinstance(opt.intra_life_prices, np.ndarray) and opt.intra_life_prices.ndim == 2:
+                # Calculer le prix moyen pour chaque date
+                # Si on a la mixture et les prix, pondérer par la mixture
+                for t in range(min(n_intra_dates, opt.intra_life_prices.shape[0])):
+                    # Prix moyen simple sur tous les strikes
+                    intra_life_prices[i, t] = np.mean(opt.intra_life_prices[t, :])
+                    if opt.intra_life_pnl is not None and opt.intra_life_pnl.ndim == 2:
+                        intra_life_pnl[i, t] = np.mean(opt.intra_life_pnl[t, :])
+            elif len(opt.intra_life_prices) == n_intra_dates:
+                # Ancienne structure: vecteur de 5 valeurs
+                intra_life_prices[i] = opt.intra_life_prices
+                if opt.intra_life_pnl is not None and len(opt.intra_life_pnl) == n_intra_dates:
+                    intra_life_pnl[i] = opt.intra_life_pnl
         else:
             # Valeur de repli: utiliser le premium comme approximation
             intra_life_prices[i] = [opt.premium] * n_intra_dates
-        
-        if opt.intra_life_pnl is not None and len(opt.intra_life_pnl) == n_intra_dates:
-            intra_life_pnl[i] = opt.intra_life_pnl
-        else:
-            # Valeur de repli: P&L = 0 (pas de changement)
             intra_life_pnl[i] = [0.0] * n_intra_dates
     
     # Matrice P&L

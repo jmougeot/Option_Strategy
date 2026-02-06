@@ -14,6 +14,7 @@ from myproject.app.scenarios_widget import scenario_params
 from myproject.app.scoring_widget import scoring_weights_block
 from myproject.app.tabs import display_overview_tab
 from myproject.app.payoff_diagram import create_payoff_diagram
+from myproject.app.help_tab import display_help_tab
 from myproject.app.processing import (
     process_comparison_results,
     save_to_session_state,
@@ -338,20 +339,28 @@ def main():
         
         st.info("⏳ Starting processing...")
         st.rerun()
+
+    # ====================================================================
+    # TABS FOR DISPLAY - Help is always visible
+    # ====================================================================
+
+    tab1, tab2, tab3 = st.tabs(["Overview", "P&L Diagram", "📚 Help"])
+
+    # Help tab is always available
+    with tab3:
+        display_help_tab()
         
     if not all_comparisons:
+        with tab1:
+            st.info("👆 Configure parameters and click 'Run Comparison' to generate strategies.")
+        with tab2:
+            st.info("👆 Run a comparison first to see P&L diagrams.")
         return
 
     # Traiter et filtrer les résultats
     comparisons, top_5_comparisons = process_comparison_results(
         all_comparisons
     )
-
-    # ====================================================================
-    # TABS FOR DISPLAY
-    # ====================================================================
-
-    tab1, tab2 = st.tabs(["Overview", "P&L Diagram"])
 
     # Display each tab with its dedicated module
     with tab1:

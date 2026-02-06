@@ -220,8 +220,7 @@ def _generate_simulated_option(
         option.prices, option.mixture, average_mix = mixture
         option._calcul_all_surface()
         option.average_mix = average_mix
-        # Calculer les prix intra-vie avec le tilt terminal
-        option.calculate_all_intra_life(sigma_market=iv_smile)
+        # Note: intra_life sera calculé après avoir créé toutes les options
     
     return option
 
@@ -285,5 +284,12 @@ def import_options_offline(
                               f"Delta={option.delta:.4f}, IV={option.implied_volatility:.1f}%")
     
     print(f"\n✅ {len(options)} options simulées générées")
+    
+    # Calculer les prix intra-vie pour toutes les options (avec les strikes comme prix du sous-jacent)
+    if options:
+        time_to_expiry = month_to_days.get(months[0], 30) / 365 if months else 0.25
+        for option in options:
+            option.calculate_all_intra_life(all_options=options, time_to_expiry=time_to_expiry)
+        print(f"  • Prix intra-vie calculés pour {len(options)} options")
     
     return options, underlying_price
