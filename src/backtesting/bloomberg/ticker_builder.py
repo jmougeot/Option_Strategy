@@ -12,7 +12,7 @@ Exemples:
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Literal, Tuple
+from typing import Dict, List, Literal
 
 from src.backtesting.config import SFRConfig
 
@@ -30,15 +30,6 @@ class TickerMeta:
     option_type: str     # "call" ou "put"
     strike: float
     suffix: str
-
-    @property
-    def type_char(self) -> OptionType:
-        return "C" if self.option_type == "call" else "P"
-
-    @property
-    def display_name(self) -> str:
-        sym = self.type_char
-        return f"SFR {self.expiry_month}{self.expiry_year} {sym} {self.strike:.2f}"
 
 
 class SFRTickerBuilder:
@@ -128,11 +119,3 @@ class SFRTickerBuilder:
               f"step={self.config.strike_step})")
 
         return self
-
-    def get_tickers_by_type(self, option_type: str) -> List[str]:
-        """Retourne les tickers filtrés par type ('call' ou 'put')."""
-        return [t for t, m in self.metadata.items() if m.option_type == option_type]
-
-    def get_strike_for_ticker(self, ticker: str) -> float:
-        """Retourne le strike associé à un ticker."""
-        return self.metadata[ticker].strike

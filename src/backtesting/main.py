@@ -1,21 +1,21 @@
 """
-Backtesting Pipeline — SFR Implied Distribution
-=================================================
+Backtesting Pipeline — SFR Options
+=====================================
 Point d'entrée principal du module de backtesting.
 
-Ce pipeline:
-1. Construit les tickers Bloomberg pour les options SFR (calls + puts, strikes 95-97)
-2. Récupère l'historique des prix via BDH (30/07/2024 → 13/03/2025)
-3. Extrait la distribution de probabilité implicite (Breeden-Litzenberger)
-4. Analyse et visualise l'évolution de la densité
+Deux modes :
+  A) **Distribution** : analyse de la densité implicite (Breeden-Litzenberger)
+  B) **Stratégie**    : backtesting de stratégies d'options générées/scorées
 
-Usage:
-    python -m backtesting.main                      # Mode Bloomberg live
-    python -m backtesting.main --offline data.csv    # Mode offline (CSV)
-    python -m backtesting.main --save output.csv     # Sauvegarder les données
+Usage :
+    # Mode distribution (densité implicite)
+    python -m backtesting.main distribution --offline data.csv
 
-Ticker Bloomberg SFR (SOFR Futures Options):
-    =@BDH("SFRH5C 96.00 Comdty", "PX_LAST", "30/07/2024", "13/03/2025")
+    # Mode stratégie (backtesting complet)
+    python -m backtesting.main strategy --offline data.csv --freq 5 --max-legs 4
+
+    # Raccourci (défaut = stratégie)
+    python -m backtesting.main --offline data.csv
 """
 
 import argparse
@@ -258,60 +258,184 @@ class BacktestingPipeline:
 
 
 # ============================================================================
+# MODE STRATÉGIE — Backtesting via OptionStrategyGeneratorV2
+# ============================================================================
+
+def run_strategy_backtest(args):
+    """Lance le backtesting de stratégies d'options."""
+    from src.backtesting.strategy.backtest_engine import BacktestEngine, BacktestConfig
+    from myproject.app.data_types import FilterData
+
+    sfr = SFRConfig(
+        strike_min=args.strike_min,
+        strike_max=args.strike_max,
+        strike_step=args.strike_step,
+    )
+
+    # Filtre par défaut (peu restrictif)
+    filt = FilterData(
+        max_loss_left=args.max_loss,
+        max_loss_right=args.max_loss,
+        max_premium=999.0,
+        ouvert_gauche=99,
+        ouvert_droite=99,
+        min_premium_sell=0.0,
+        filter_type=False,
+        strategies_include=None,
+        delta_min=-10.0,
+        delta_max=10.0,
+        limit_left=0.0,
+        limit_right=0.0,
+    )
+
+    # Scoring par défaut
+    weights = {"average_pnl": 1.0}
+
+    bt_config = BacktestConfig(
+        sfr_config=sfr,
+        filter=filt,
+        scoring_weights=weights,
+        max_legs=args.max_legs,
+        top_n=args.top_n,
+        select_top_k=args.top_k,
+        entry_frequency_days=args.freq,
+        min_days_before_expiry=args.min_dte,
+        smooth_sigma=args.smooth,
+    )
+
+    engine = BacktestEngine(bt_config)
+
+    if getattr(args, "grid", False):
+        # Mode grid search — compare plusieurs jeux de poids
+        grid_result = engine.run_weight_grid(
+            csv_path=args.offline,
+            save_csv=args.save,
+            verbose=True,
+        )
+        if args.output:
+            grid_result.save_comparison_csv(args.output)
+        return grid_result
+
+    # Mode normal — un seul jeu de poids
+    results = engine.run(
+        csv_path=args.offline,
+        save_csv=args.save,
+        verbose=True,
+    )
+
+    # Export CSV si demandé
+    if args.output:
+        results.save_to_csv(args.output)
+
+    return results
+
+
+# ============================================================================
 # POINT D'ENTRÉE CLI
 # ============================================================================
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Backtesting SFR — Distribution de probabilité implicite"
+        description="Backtesting SFR — Distribution implicite & Stratégies"
     )
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="mode", help="Mode de backtesting")
+
+    # ---- Paramètres communs ----
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
         "--offline", type=str, default=None,
-        help="Chemin du CSV pour mode offline (sans Bloomberg)"
-    )
-    parser.add_argument(
+        help="Chemin du CSV pour mode offline (sans Bloomberg)")
+    common.add_argument(
         "--save", type=str, default=None,
-        help="Chemin pour sauvegarder les données Bloomberg en CSV"
-    )
-    parser.add_argument(
+        help="Chemin pour sauvegarder les données Bloomberg en CSV")
+    common.add_argument(
         "--strike-min", type=float, default=95.0,
-        help="Strike minimum (défaut: 95.0)"
-    )
-    parser.add_argument(
+        help="Strike minimum (défaut: 95.0)")
+    common.add_argument(
         "--strike-max", type=float, default=97.0,
-        help="Strike maximum (défaut: 97.0)"
-    )
-    parser.add_argument(
+        help="Strike maximum (défaut: 97.0)")
+    common.add_argument(
         "--strike-step", type=float, default=0.125,
-        help="Pas des strikes (défaut: 0.125)"
-    )
-    parser.add_argument(
+        help="Pas des strikes (défaut: 0.125)")
+    common.add_argument(
         "--smooth", type=float, default=0.5,
-        help="Paramètre de lissage gaussien (défaut: 0.5)"
-    )
-    parser.add_argument(
+        help="Paramètre de lissage gaussien (défaut: 0.5)")
+
+    # ---- Sous-commande : distribution ----
+    dist_parser = subparsers.add_parser(
+        "distribution", parents=[common],
+        help="Analyse de la distribution de probabilité implicite")
+    dist_parser.add_argument(
         "--no-plots", action="store_true",
-        help="Ne pas afficher les graphiques"
-    )
+        help="Ne pas afficher les graphiques")
+
+    # ---- Sous-commande : strategy ----
+    strat_parser = subparsers.add_parser(
+        "strategy", parents=[common],
+        help="Backtesting de stratégies d'options")
+    strat_parser.add_argument(
+        "--max-legs", type=int, default=4,
+        help="Nombre max de legs (défaut: 4)")
+    strat_parser.add_argument(
+        "--top-n", type=int, default=10,
+        help="Nombre de stratégies à générer par date (défaut: 10)")
+    strat_parser.add_argument(
+        "--top-k", type=int, default=1,
+        help="Nombre de stratégies à suivre par date (défaut: 1)")
+    strat_parser.add_argument(
+        "--freq", type=int, default=5,
+        help="Fréquence d'entrée en jours (défaut: 5)")
+    strat_parser.add_argument(
+        "--min-dte", type=int, default=5,
+        help="Jours min avant expiry pour entrer (défaut: 5)")
+    strat_parser.add_argument(
+        "--max-loss", type=float, default=-999.0,
+        help="Perte max autorisée (défaut: -999 = pas de filtre)")
+    strat_parser.add_argument(
+        "--output", type=str, default=None,
+        help="Chemin CSV pour exporter les résultats")
+    strat_parser.add_argument(
+        "--grid", action="store_true",
+        help="Lancer un grid search sur les poids de scoring")
+
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
 
-    config = SFRConfig(
-        strike_min=args.strike_min,
-        strike_max=args.strike_max,
-        strike_step=args.strike_step,
-    )
+    # Défaut : mode strategy si aucun sous-commande
+    if args.mode is None:
+        args.mode = "strategy"
+        # Ajouter les attributs manquants avec défauts
+        for attr, val in [
+            ("max_legs", 4), ("top_n", 10), ("top_k", 1),
+            ("freq", 5), ("min_dte", 5), ("max_loss", -999.0),
+            ("output", None), ("no_plots", False), ("grid", False),
+        ]:
+            if not hasattr(args, attr):
+                setattr(args, attr, val)
 
-    pipeline = BacktestingPipeline(config)
-    pipeline.run(
-        csv_path=args.offline,
-        save_path=args.save,
-        smooth_sigma=args.smooth,
-        show_plots=not args.no_plots,
-    )
+    if args.mode == "distribution":
+        # Pipeline d'analyse de densité (existant)
+        config = SFRConfig(
+            strike_min=args.strike_min,
+            strike_max=args.strike_max,
+            strike_step=args.strike_step,
+        )
+        pipeline = BacktestingPipeline(config)
+        pipeline.run(
+            csv_path=args.offline,
+            save_path=args.save,
+            smooth_sigma=args.smooth,
+            show_plots=not args.no_plots,
+        )
+
+    elif args.mode == "strategy":
+        run_strategy_backtest(args)
+
+    else:
+        print(f"Mode inconnu: {args.mode}")
 
 
 if __name__ == "__main__":

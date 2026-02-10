@@ -6,25 +6,8 @@ de la distribution implicite.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 from datetime import date
-
-
-# ============================================================================
-# CODES MOIS BLOOMBERG
-# ============================================================================
-
-MONTH_CODES = {
-    "F": "January",   "G": "February",  "H": "March",
-    "J": "April",     "K": "May",       "M": "June",
-    "N": "July",      "Q": "August",    "U": "September",
-    "V": "October",   "X": "November",  "Z": "December",
-}
-
-MONTH_CODE_TO_NUM = {
-    "F": 1,  "G": 2,  "H": 3,  "J": 4,  "K": 5,  "M": 6,
-    "N": 7,  "Q": 8,  "U": 9,  "V": 10, "X": 11, "Z": 12,
-}
 
 
 # ============================================================================
@@ -92,15 +75,6 @@ class SFRConfig:
     def full_year(self) -> int:
         """Année complète (2025 pour year=5)."""
         return 2020 + self.expiry_year
-
-    @property
-    def time_to_expiry_years(self) -> float:
-        """
-        Approximation du temps jusqu'à expiration en années
-        depuis start_date.
-        """
-        delta = self.end_date - self.start_date
-        return delta.days / 365.25
 
 
 # ============================================================================

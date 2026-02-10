@@ -110,34 +110,6 @@ class DensityAnalyzer:
         return matrix, dates, grid
 
     # -----------------------------------------------------------------
-    # Comparaison entre dates
-    # -----------------------------------------------------------------
-
-    def compare_dates(
-        self,
-        dates: List[date],
-    ) -> Dict[date, Dict]:
-        """
-        Compare la distribution entre plusieurs dates.
-
-        Returns:
-            {date: {density, moments, quantiles}}
-        """
-        result = {}
-        for d in dates:
-            density = self.implied_dist.get_density(d)
-            moments = self.implied_dist.get_moments(d)
-            quantiles = self.implied_dist.get_quantiles(d)
-
-            if density is not None:
-                result[d] = {
-                    "density": density,
-                    "moments": moments,
-                    "quantiles": quantiles,
-                }
-        return result
-
-    # -----------------------------------------------------------------
     # Visualisation (matplotlib)
     # -----------------------------------------------------------------
 

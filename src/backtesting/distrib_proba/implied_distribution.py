@@ -195,14 +195,12 @@ class ImpliedDistribution:
     def compute_all_dates(
         self,
         smooth_sigma: float = 0.5,
-        min_strikes: int = 4,
     ) -> Dict[date, np.ndarray]:
         """
         Calcule la densité implicite pour chaque date de l'historique.
 
         Args:
             smooth_sigma: Lissage gaussien
-            min_strikes: Nombre minimum de strikes requis
 
         Returns:
             {date: density_array}
@@ -311,10 +309,4 @@ class ImpliedDistribution:
         """Retourne les dates pour lesquelles la densité a été calculée."""
         return sorted(self._densities.keys())
 
-    def get_cdf(self, target_date: date) -> Optional[np.ndarray]:
-        """Retourne la CDF (fonction de répartition) pour une date."""
-        q_T = self._densities.get(target_date)
-        if q_T is None:
-            return None
-        dx = float(np.mean(np.diff(self.price_grid)))
-        return np.cumsum(q_T) * dx
+

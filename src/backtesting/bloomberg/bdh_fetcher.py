@@ -53,14 +53,6 @@ def _get_session(host: str = "localhost", port: int = 8194) -> Session:
     return _session
 
 
-def close_session():
-    """Ferme proprement la session Bloomberg."""
-    global _session
-    if _session:
-        _session.stop()
-        _session = None
-
-
 # ============================================================================
 # BDH FETCHER
 # ============================================================================
