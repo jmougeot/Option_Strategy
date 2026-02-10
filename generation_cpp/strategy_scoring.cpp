@@ -531,4 +531,254 @@ std::vector<ScoredStrategy> StrategyScorer::score_and_rank(
     return result;
 }
 
+// ============================================================================
+// MULTI-WEIGHT SCORING — normalisation commune, N rankings
+// ============================================================================
+
+std::pair<
+    std::vector<std::vector<ScoredStrategy>>,
+    std::vector<ScoredStrategy>
+> StrategyScorer::multi_score_and_rank(
+    std::vector<ScoredStrategy>& strategies,
+    const std::vector<std::vector<MetricConfig>>& weight_sets,
+    int top_n
+) {
+    std::vector<std::vector<ScoredStrategy>> per_set_results;
+
+    if (strategies.empty() || weight_sets.empty()) {
+        return {per_set_results, {}};
+    }
+
+    const size_t n_strats = strategies.size();
+    const size_t n_sets = weight_sets.size();
+
+    // ====== 1. Collect ALL metric names across every weight set ======
+    // We need one common normalisation for each metric.
+    std::vector<std::string> all_metric_names;
+    {
+        std::unordered_map<std::string, bool> seen;
+        for (const auto& ws : weight_sets) {
+            for (const auto& mc : ws) {
+                if (!seen[mc.name]) {
+                    seen[mc.name] = true;
+                    all_metric_names.push_back(mc.name);
+                }
+            }
+        }
+    }
+    const size_t n_metrics = all_metric_names.size();
+
+    // ====== 2. Common normalisation: compute min/max for every metric ======
+    // Build a map: metric_name → (NormalizerType, min, max)
+    struct NormInfo {
+        NormalizerType normalizer;
+        ScorerType scorer;
+        double min_val;
+        double max_val;
+    };
+    std::unordered_map<std::string, NormInfo> norm_map;
+
+    // First pass: figure out normalizer / scorer from the default metrics
+    auto defaults = create_default_metrics();
+    std::unordered_map<std::string, MetricConfig*> default_lookup;
+    for (auto& d : defaults) default_lookup[d.name] = &d;
+
+    for (const auto& name : all_metric_names) {
+        NormInfo ni{NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER,
+                    std::numeric_limits<double>::max(),
+                    std::numeric_limits<double>::lowest()};
+        auto it = default_lookup.find(name);
+        if (it != default_lookup.end()) {
+            ni.normalizer = it->second->normalizer;
+            ni.scorer = it->second->scorer;
+        }
+        norm_map[name] = ni;
+    }
+
+    // Second pass: scan ALL strategies to find global min/max
+    for (const auto& strat : strategies) {
+        for (const auto& name : all_metric_names) {
+            double v = extract_single_metric_value(strat, name);
+            if (std::isfinite(v)) {
+                auto& ni = norm_map[name];
+                ni.min_val = std::min(ni.min_val, v);
+                ni.max_val = std::max(ni.max_val, v);
+            }
+        }
+    }
+
+    // Fix degenerate ranges
+    for (auto& [name, ni] : norm_map) {
+        if (ni.min_val == std::numeric_limits<double>::max()) {
+            ni.min_val = 0.0;
+            ni.max_val = 1.0;
+        }
+        if (ni.min_val == ni.max_val) {
+            ni.max_val = ni.min_val + 1.0;
+        }
+    }
+
+    // ====== 3. Pre-compute normalised metric scores per strategy ======
+    // metric_scores[metric_name][strat_idx] = score ∈ [0,1]
+    std::unordered_map<std::string, std::vector<double>> metric_scores;
+    for (const auto& name : all_metric_names) {
+        auto& ni = norm_map[name];
+        auto& scores = metric_scores[name];
+        scores.resize(n_strats);
+        for (size_t i = 0; i < n_strats; ++i) {
+            double v = extract_single_metric_value(strategies[i], name);
+            scores[i] = calculate_score(v, ni.min_val, ni.max_val, ni.scorer);
+        }
+    }
+
+    // ====== 4. For each weight set, score all strategies & keep top N ======
+    // Also store per-set ranking for consensus.
+    // per_set_ranks[set_idx][strat_idx] = rank (1-based) or 0 if not in top
+
+    // We store all scores per set in a flat vector to compute rankings
+    std::vector<std::vector<double>> all_set_scores(n_sets); // [set][strat]
+
+    for (size_t s = 0; s < n_sets; ++s) {
+        const auto& ws = weight_sets[s];
+
+        // Normalise weights for this set
+        double total_w = 0.0;
+        for (const auto& mc : ws) total_w += mc.weight;
+        if (total_w <= 0.0) total_w = 1.0;
+
+        all_set_scores[s].resize(n_strats);
+
+        for (size_t i = 0; i < n_strats; ++i) {
+            // Geometric mean scoring (same as score_and_rank)
+            constexpr double epsilon = 1e-6;
+            double log_sum = 0.0;
+
+            for (const auto& mc : ws) {
+                if (mc.weight <= 0.0) continue;
+                double w_norm = mc.weight / total_w;
+                double ms = 0.0;
+                auto it = metric_scores.find(mc.name);
+                if (it != metric_scores.end()) {
+                    ms = it->second[i];
+                }
+                log_sum += w_norm * std::log(epsilon + ms);
+            }
+
+            all_set_scores[s][i] = std::exp(log_sum);
+        }
+
+        // Build top_n for this set using min-heap of indices
+        using SI = std::pair<double, size_t>;
+        auto cmp = [](const SI& a, const SI& b) { return a.first > b.first; };
+        std::priority_queue<SI, std::vector<SI>, decltype(cmp)> heap(cmp);
+
+        for (size_t i = 0; i < n_strats; ++i) {
+            double sc = all_set_scores[s][i];
+            if (static_cast<int>(heap.size()) < top_n) {
+                heap.push({sc, i});
+            } else if (sc > heap.top().first) {
+                heap.pop();
+                heap.push({sc, i});
+            }
+        }
+
+        // Extract, sort, remove duplicates
+        std::vector<size_t> top_idx;
+        top_idx.reserve(heap.size());
+        while (!heap.empty()) {
+            top_idx.push_back(heap.top().second);
+            heap.pop();
+        }
+
+        std::vector<ScoredStrategy> set_result;
+        set_result.reserve(top_idx.size());
+        for (size_t idx : top_idx) {
+            ScoredStrategy copy = strategies[idx]; // copy for per-set result
+            copy.score = all_set_scores[s][idx];
+            set_result.push_back(std::move(copy));
+        }
+
+        std::sort(set_result.begin(), set_result.end(),
+            [](const ScoredStrategy& a, const ScoredStrategy& b) {
+                return a.score > b.score;
+            });
+
+        for (size_t i = 0; i < set_result.size(); ++i) {
+            set_result[i].rank = static_cast<int>(i + 1);
+        }
+
+        // Deduplicate
+        auto unique = remove_duplicates(set_result, 4, top_n);
+        per_set_results.push_back(std::move(unique));
+    }
+
+    // ====== 5. Consensus ranking via average rank ======
+    // Build rank for each strategy in each set (rank = position in sorted
+    // order of all_set_scores; strategies not in top_n still need a rank).
+    // To keep it efficient, we rank ALL strategies per set (argsort).
+
+    // argsort each set's scores (descending)
+    std::vector<std::vector<int>> per_set_rank(n_sets, std::vector<int>(n_strats, 0));
+    for (size_t s = 0; s < n_sets; ++s) {
+        std::vector<size_t> order(n_strats);
+        std::iota(order.begin(), order.end(), 0);
+        std::sort(order.begin(), order.end(),
+            [&](size_t a, size_t b) {
+                return all_set_scores[s][a] > all_set_scores[s][b];
+            });
+        for (size_t r = 0; r < n_strats; ++r) {
+            per_set_rank[s][order[r]] = static_cast<int>(r + 1);
+        }
+    }
+
+    // Average rank per strategy
+    std::vector<double> avg_rank(n_strats, 0.0);
+    for (size_t i = 0; i < n_strats; ++i) {
+        double sum = 0.0;
+        for (size_t s = 0; s < n_sets; ++s) {
+            sum += per_set_rank[s][i];
+        }
+        avg_rank[i] = sum / static_cast<double>(n_sets);
+    }
+
+    // Top_n by lowest average rank (use min-heap on NEGATIVE avg rank)
+    using ARI = std::pair<double, size_t>; // (avg_rank, idx) — lower is better
+    auto cmp_ar = [](const ARI& a, const ARI& b) { return a.first < b.first; }; // max-heap = worst at top
+    std::priority_queue<ARI, std::vector<ARI>, decltype(cmp_ar)> cons_heap(cmp_ar);
+
+    for (size_t i = 0; i < n_strats; ++i) {
+        if (static_cast<int>(cons_heap.size()) < top_n) {
+            cons_heap.push({avg_rank[i], i});
+        } else if (avg_rank[i] < cons_heap.top().first) {
+            cons_heap.pop();
+            cons_heap.push({avg_rank[i], i});
+        }
+    }
+
+    std::vector<ScoredStrategy> consensus;
+    consensus.reserve(cons_heap.size());
+    while (!cons_heap.empty()) {
+        size_t idx = cons_heap.top().second;
+        ScoredStrategy copy = strategies[idx];
+        // Store avg rank as the score (lower = better,
+        // so we invert so higher score = better for display)
+        copy.score = 1.0 / (avg_rank[idx] + 1e-9);
+        cons_heap.pop();
+        consensus.push_back(std::move(copy));
+    }
+
+    std::sort(consensus.begin(), consensus.end(),
+        [](const ScoredStrategy& a, const ScoredStrategy& b) {
+            return a.score > b.score;
+        });
+
+    for (size_t i = 0; i < consensus.size(); ++i) {
+        consensus[i].rank = static_cast<int>(i + 1);
+    }
+
+    auto unique_consensus = remove_duplicates(consensus, 4, top_n);
+
+    return {per_set_results, unique_consensus};
+}
+
 } // namespace strategy

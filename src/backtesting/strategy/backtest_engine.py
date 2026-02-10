@@ -38,11 +38,9 @@ from src.backtesting.bloomberg.ticker_builder import SFRTickerBuilder
 from src.backtesting.distrib_proba.implied_distribution import ImpliedDistribution
 from src.backtesting.strategy.option_builder import OptionBuilder
 from src.backtesting.strategy.results import BacktestResults, TradeRecord, WeightGridResult
-
 from myproject.app.data_types import FilterData
 from myproject.option.option_class import Option
 from myproject.strategy.strategy_class import StrategyComparison
-
 
 # ============================================================================
 # SCORING WEIGHT PRESETS (grilles prédéfinies)

@@ -15,11 +15,12 @@ Utilise les fonctions optimisees des modules :
 - option_generator_v2.OptionStrategyGeneratorV2 (avec scoring C++ intégré)
 """
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Union
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from myproject.strategy.option_generator_v2 import OptionStrategyGeneratorV2
 from myproject.strategy.strategy_class import StrategyComparison
+from myproject.strategy.multi_ranking import MultiRankingResult
 from myproject.bloomberg.bloomberg_data_importer import import_options
 from myproject.bloomberg.bloomberg_data_importer_offline import (
     import_options_offline, 
@@ -41,11 +42,11 @@ def process_bloomberg_to_strategies(
     price_max: float = 100.0,
     max_legs: int = 4,
     top_n: int = 10,
-    scoring_weights: Optional[Dict[str, float]] = None,
+    scoring_weights: Optional[Union[Dict[str, float], List[Dict[str, float]]]] = None,
     num_points: int = 200,
     brut_code: Optional[List[str]] = None,
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
-) -> Tuple[List[StrategyComparison], Dict, Tuple[np.ndarray, np.ndarray, float], FutureData]:
+) -> Tuple[Union[List[StrategyComparison], MultiRankingResult], Dict, Tuple[np.ndarray, np.ndarray, float], FutureData]:
     """
     Fonction principale simplifiee pour Streamlit.
     Importe les options depuis Bloomberg (ou simulation offline) et retourne les meilleures strategies + stats.
@@ -97,13 +98,36 @@ def process_bloomberg_to_strategies(
 
     # Generer les strategies avec SCORING C++ intégré
     generator = OptionStrategyGeneratorV2(options)
-    
 
-    best_strategies = generator.generate_top_strategies(
-        filter=filter,
-        max_legs=max_legs,
-        top_n=top_n,
-        custom_weights=scoring_weights)
+    # Déterminer si on utilise le multi-scoring
+    weight_sets: Optional[List[Dict[str, float]]] = None
+    single_weights: Optional[Dict[str, float]] = None
+
+    if isinstance(scoring_weights, list):
+        if len(scoring_weights) > 1:
+            weight_sets = scoring_weights
+        elif len(scoring_weights) == 1:
+            single_weights = scoring_weights[0]
+    elif isinstance(scoring_weights, dict):
+        single_weights = scoring_weights
+
+    if weight_sets is not None:
+        # Multi-scoring: N jeux de poids simultanés
+        multi_result = generator.generate_top_strategies_multi(
+            filter=filter,
+            max_legs=max_legs,
+            top_n=top_n,
+            weight_sets=weight_sets,
+        )
+        best_strategies = multi_result  # type: ignore
+    else:
+        # Single-scoring (rétro-compatible)
+        best_strategies = generator.generate_top_strategies(
+            filter=filter,
+            max_legs=max_legs,
+            top_n=top_n,
+            custom_weights=single_weights,
+        )
 
     # Estimer le nombre de combinaisons screened
     # Pour N options et k legs: C(N,k) * 2^k (long/short pour chaque leg)
@@ -113,7 +137,10 @@ def process_bloomberg_to_strategies(
     total_combinations = sum(comb(n_opts, k) * (2 ** k) for k in range(1, max_legs + 1))
     stats["nb_strategies_possibles"] = total_combinations
     
-    stats["nb_strategies_classees"] = len(best_strategies)
+    if isinstance(best_strategies, MultiRankingResult):
+        stats["nb_strategies_classees"] = len(best_strategies.consensus_strategies)
+    else:
+        stats["nb_strategies_classees"] = len(best_strategies)
 
 
     return best_strategies, stats, mixture, future_data

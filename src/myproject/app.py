@@ -27,6 +27,7 @@ from myproject.app.async_processing import (
     stop_processing,
 )
 from myproject.app.data_types import FutureData
+from myproject.strategy.multi_ranking import MultiRankingResult
 from myproject.share_result.email_utils import StrategyEmailData, EmailTemplateData, create_email_with_images
 from myproject.share_result.generate_pdf import create_pdf_report 
 
@@ -167,7 +168,10 @@ def main():
             delta_desc = f"Limited from {filter.delta_min:.0f} to {filter.delta_max:.0f} delta"
             premium_desc = f"{filter.max_premium:.2f} max"
             max_loss_desc = f"{filter.max_loss_left:.2f} on downside / {filter.max_loss_right:.2f} on upside"
-            weighting_desc = ", ".join([f"{k}: {v:.0%}" for k, v in scoring_weights.items() if v > 0])
+            weighting_desc = " | ".join(
+                ", ".join(f"{k}: {v:.0%}" for k, v in ws.items() if v > 0)
+                for ws in scoring_weights
+            ) if scoring_weights else "default"
             
             # Get reference price from session state (underlying price)
             future_data_email = st.session_state.get("future_data", FutureData(0, None))
@@ -305,8 +309,16 @@ def main():
                 if not best_strategies:
                     st.error("❌ No strategy generated")
                     return
-                
-                all_comparisons = best_strategies
+
+                # Handle MultiRankingResult or plain list
+                multi_result = None
+                if isinstance(best_strategies, MultiRankingResult):
+                    multi_result = best_strategies
+                    all_comparisons = multi_result.all_strategies_flat()
+                    st.session_state["multi_ranking"] = multi_result
+                else:
+                    all_comparisons = best_strategies
+                    st.session_state.pop("multi_ranking", None)
                 save_to_session_state(all_comparisons, params, scenarios)
                 st.session_state["mixture"] = mixture
                 st.session_state["future_data"] = future_data
@@ -450,7 +462,23 @@ def main():
         
         # Générer les labels de roll dynamiquement (ex: ["H6", "M6", "U6"])
         roll_labels = [f"{m}{y}" for m, y in params.roll_expiries] if params.roll_expiries else None
-        display_overview_tab(comparisons, roll_labels=roll_labels)
+
+        # Multi-ranking: afficher les sous-onglets par jeu de poids
+        multi_ranking: MultiRankingResult | None = st.session_state.get("multi_ranking", None)
+        if multi_ranking is not None and multi_ranking.is_multi:
+            sub_tab_names = ["🏆 Consensus"] + [
+                f"Set {i+1}" for i in range(multi_ranking.n_sets)
+            ]
+            sub_tabs = st.tabs(sub_tab_names)
+            with sub_tabs[0]:
+                display_overview_tab(comparisons, roll_labels=roll_labels)
+            for i in range(multi_ranking.n_sets):
+                with sub_tabs[i + 1]:
+                    set_comps = multi_ranking.per_set_strategies[i]
+                    st.caption(multi_ranking.get_active_weights_summary(i))
+                    display_overview_tab(set_comps, roll_labels=roll_labels)
+        else:
+            display_overview_tab(comparisons, roll_labels=roll_labels)
 
     with tab2:
         future_data = st.session_state.get("future_data", FutureData(0, None))

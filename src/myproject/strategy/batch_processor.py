@@ -8,6 +8,7 @@ import strategy_metrics_cpp
 
 from myproject.option.option_class import Option
 from myproject.strategy.strategy_class import StrategyComparison
+from myproject.strategy.multi_ranking import MultiRankingResult
 from myproject.strategy.strategy_naming import generate_strategy_name
 from myproject.option.option_utils_v2 import get_expiration_info
 from myproject.app.filter_widget import FilterData
@@ -153,6 +154,70 @@ def process_batch_cpp_with_scoring(
 
     
     return strategies
+
+
+# =============================================================================
+# MULTI-SCORING (N jeux de poids simultanés)
+# =============================================================================
+
+def process_batch_cpp_with_multi_scoring(
+    n_legs: int,
+    filter: FilterData,
+    top_n: int = 10,
+    weight_sets: Optional[List[Dict[str, float]]] = None,
+) -> MultiRankingResult:
+    """
+    Traite un batch via C++ avec N jeux de poids simultanés.
+
+    Le C++ fait :
+      1. Génération parallèle des combinaisons (identique au single)
+      2. Normalisation commune de toutes les métriques
+      3. Scoring par jeu de poids → top_n par jeu
+      4. Classement consensus par moyenne des rangs
+
+    Returns:
+        MultiRankingResult contenant per_set + consensus
+    """
+    global _options_cache
+
+    if not _options_cache:
+        raise RuntimeError("Options cache is empty. Call init_cpp_cache() first.")
+
+    if not weight_sets:
+        raise ValueError("weight_sets ne peut pas être vide pour le multi-scoring")
+
+    # Convertir en liste de dicts pour le C++
+    weight_dicts = [dict(ws) for ws in weight_sets]
+
+    raw = strategy_metrics_cpp.process_combinations_batch_with_multi_scoring(  # type: ignore
+        n_legs,
+        filter.max_loss_left,
+        filter.max_loss_right,
+        filter.max_premium,
+        filter.ouvert_gauche,
+        filter.ouvert_droite,
+        filter.min_premium_sell,
+        filter.delta_min,
+        filter.delta_max,
+        filter.limit_left,
+        filter.limit_right,
+        top_n,
+        weight_dicts,
+    )
+
+    # raw est un dict {"per_set": [...], "consensus": [...], "n_weight_sets": N, "n_candidates": M}
+    per_set_strategies: List[List[StrategyComparison]] = []
+    for set_results in raw["per_set"]:
+        per_set_strategies.append(batch_to_strategies(set_results, _options_cache))
+
+    consensus_strategies = batch_to_strategies(raw["consensus"], _options_cache)
+
+    return MultiRankingResult(
+        per_set_strategies=per_set_strategies,
+        consensus_strategies=consensus_strategies,
+        weight_sets=weight_sets,
+        n_candidates=int(raw.get("n_candidates", 0)),
+    )
 
 
 # =============================================================================

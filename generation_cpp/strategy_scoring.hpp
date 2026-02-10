@@ -158,6 +158,33 @@ public:
         std::vector<MetricConfig> metrics = {},
         int top_n = 10
     );
+
+    /**
+     * Multi-weight scoring : normalise une seule fois, score N jeux de poids.
+     *
+     * Pour chaque weight set :
+     *   - Calcule le score de chaque stratégie (normalisation commune)
+     *   - Garde le top_n par weight set
+     *
+     * Ensuite calcule un rang moyen (consensus) :
+     *   - Pour chaque stratégie apparaissant dans au moins un top_n,
+     *     son rang moyen = moyenne de ses rangs dans chaque weight set
+     *     (si absente d'un set, elle reçoit rang = top_n + 1)
+     *   - Retourne les top_n stratégies par rang moyen le plus bas.
+     *
+     * @param strategies      Toutes les stratégies candidates (modifié in-place pour score)
+     * @param weight_sets     Liste de vecteurs de MetricConfig (un par weight set)
+     * @param top_n           Nombre de résultats par set
+     * @return                Pair : (per-set top_n lists, consensus top_n)
+     */
+    static std::pair<
+        std::vector<std::vector<ScoredStrategy>>,  // per-set results
+        std::vector<ScoredStrategy>                 // consensus
+    > multi_score_and_rank(
+        std::vector<ScoredStrategy>& strategies,
+        const std::vector<std::vector<MetricConfig>>& weight_sets,
+        int top_n = 10
+    );
 };
 
 } // namespace strategy

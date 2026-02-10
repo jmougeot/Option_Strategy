@@ -33,7 +33,7 @@ class HistoryEntry:
     params: Dict[str, Any] = field(default_factory=dict)
     scenarios: List[Dict] = field(default_factory=list)
     filter_data: Dict[str, Any] = field(default_factory=dict)
-    scoring_weights: Dict[str, float] = field(default_factory=dict)
+    scoring_weights: Any = field(default_factory=dict)  # Dict[str,float] or List[Dict[str,float]]
     # Résumé des top stratégies (pour affichage, sérialisable en JSON)
     top_strategies_summary: List[Dict] = field(default_factory=list)
     # Données runtime (non persistées en JSON)
@@ -129,7 +129,7 @@ def add_to_history(
     future_data: Any,
     scenarios: List[Dict],
     filter_data: Dict[str, Any],
-    scoring_weights: Dict[str, float]
+    scoring_weights: Any
 ):
     """Ajoute une recherche à l'historique."""
     init_history()
@@ -277,11 +277,9 @@ def apply_pending_restore():
     # RESTAURER LES POIDS DE SCORING
     # =========================================================================
     if entry.scoring_weights:
-        for weight_name, weight_value in entry.scoring_weights.items():
-            # Les clés de widget sont préfixées par "weight_"
-            widget_key = f"weight_{weight_name}"
-            # Convertir en pourcentage (0-100) car les widgets utilisent des entiers
-            st.session_state[widget_key] = int(weight_value * 100)
+        # Support both old Dict and new List[Dict] format
+        ws_list = entry.scoring_weights if isinstance(entry.scoring_weights, list) else [entry.scoring_weights]
+        st.session_state["weight_sets"] = ws_list
     
     # =========================================================================
     # RESTAURER LES PARAMÈTRES (underlying, price, max_legs, etc.)
@@ -466,8 +464,11 @@ def display_history_tab():
                 
                 st.markdown("**Poids de scoring:**")
                 if entry.scoring_weights:
-                    weights_str = ", ".join([f"{k}: {v:.0%}" for k, v in entry.scoring_weights.items() if v > 0])
-                    st.markdown(f"- {weights_str}" if weights_str else "- Aucun poids actif")
+                    ws_list = entry.scoring_weights if isinstance(entry.scoring_weights, list) else [entry.scoring_weights]
+                    for wi, ws in enumerate(ws_list):
+                        ws_str = ", ".join(f"{k}: {v:.0%}" for k, v in ws.items() if v > 0)
+                        label = f"Set {wi+1}: " if len(ws_list) > 1 else ""
+                        st.markdown(f"- {label}{ws_str}" if ws_str else "- Aucun poids actif")
                 
                 # Top stratégies (depuis résumé JSON ou comparisons en mémoire)
                 st.markdown("**Top 5 des stratégies:**")
