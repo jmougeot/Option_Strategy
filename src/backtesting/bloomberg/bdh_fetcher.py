@@ -9,13 +9,14 @@ Récupère les données historiques d'options via l'API Bloomberg blpapi.
 Utilise HistoricalDataRequest au lieu de ReferenceDataRequest.
 """
 
-import blpapi  # type: ignore[import-untyped]
+import blpapi
 from blpapi.event import Event
 from blpapi.session import Session
 from blpapi.sessionoptions import SessionOptions
-from datetime import date, datetime
+from blpapi.name import Name as blpname
+from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -121,22 +122,29 @@ class BDHFetcher:
             service = session.getService("//blp/refdata")
 
             request = service.createRequest("HistoricalDataRequest")
+            securities = blpname("securities")
+            fields = blpname("fields")
+            startDate= blpname("startDate")
+            endDate = blpname("endDate")
+            periodicitySelection = blpname("periodicitySelection")
+            nonTradingDayFillOption = blpname("nonTradingDayFillOption")
+            nonTradingDayFillMethod = blpname("nonTradingDayFillMethod")
 
             # Ajouter les tickers
             for ticker in tickers:
-                request.append("securities", ticker)
+                request.append(securities, ticker)
 
             # Champs
-            request.append("fields", self.config.bbg_field)
+            request.append(fields, self.config.bbg_field)
 
             # Dates (format YYYYMMDD)
-            request.set("startDate", self.config.start_date_str)
-            request.set("endDate", self.config.end_date_str)
+            request.set(startDate, self.config.start_date_str)
+            request.set(endDate, self.config.end_date_str)
 
             # Options
-            request.set("periodicitySelection", "DAILY")
-            request.set("nonTradingDayFillOption", "NON_TRADING_WEEKDAYS")
-            request.set("nonTradingDayFillMethod", "PREVIOUS_VALUE")
+            request.set(periodicitySelection, "DAILY")
+            request.set(nonTradingDayFillOption, "NON_TRADING_WEEKDAYS")
+            request.set(nonTradingDayFillMethod, "PREVIOUS_VALUE")
 
             session.sendRequest(request)
 
