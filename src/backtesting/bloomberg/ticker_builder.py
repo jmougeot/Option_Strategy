@@ -14,7 +14,7 @@ Exemples:
 from dataclasses import dataclass
 from typing import Dict, List, Literal, Tuple
 
-from backtesting.config import SFRConfig
+from src.backtesting.config import SFRConfig
 
 
 OptionType = Literal["C", "P"]

@@ -17,8 +17,8 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from backtesting.config import SFRConfig
-from backtesting.distrib_proba.implied_distribution import ImpliedDistribution
+from src.backtesting.config import SFRConfig
+from src.backtesting.distrib_proba.implied_distribution import ImpliedDistribution
 
 
 class DensityAnalyzer:
@@ -73,7 +73,7 @@ class DensityAnalyzer:
         for d in self.implied_dist.get_available_dates():
             q = self.implied_dist.get_quantiles(d, quantiles)
             if q is not None:
-                row = {"date": d}
+                row: Dict[str, object] = {"date": d}
                 for qval, xval in q.items():
                     row[f"q{int(qval*100):02d}"] = xval
                 records.append(row)

@@ -21,8 +21,8 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from backtesting.config import SFRConfig
-from backtesting.bloomberg.ticker_builder import SFRTickerBuilder
+from src.backtesting.config import SFRConfig
+from src.backtesting.bloomberg.ticker_builder import SFRTickerBuilder
 
 
 # ============================================================================
@@ -353,7 +353,8 @@ class BDHFetcher:
             date_prices = {}
             for idx, val in df[col].items():
                 if pd.notna(val) and val > 0:
-                    date_prices[idx.date()] = val
+                    dt = idx if isinstance(idx, date) else pd.Timestamp(str(idx)).date()
+                    date_prices[dt] = val
             if date_prices:
                 fetcher.raw_data[col] = date_prices
 
