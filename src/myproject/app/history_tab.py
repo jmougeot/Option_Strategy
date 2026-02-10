@@ -112,14 +112,23 @@ def load_history_from_json() -> List[HistoryEntry]:
 
 
 def init_history():
-    """Initialise l'historique dans session_state si nécessaire."""
+    """Initialise l'historique dans session_state si nécessaire.
+    
+    Au tout premier lancement (session_state vierge), charge le JSON
+    et restaure automatiquement la dernière entrée pour retrouver
+    l'état de la session précédente.
+    """
     if "search_history" not in st.session_state:
         # Charger depuis JSON au démarrage
         st.session_state.search_history = load_history_from_json()
     
     # Initialiser le flag de restauration pendante
     if "pending_restore" not in st.session_state:
-        st.session_state.pending_restore = None
+        # Premier lancement → restaurer automatiquement la dernière entrée
+        if st.session_state.search_history:
+            st.session_state.pending_restore = st.session_state.search_history[0]
+        else:
+            st.session_state.pending_restore = None
 
 
 def add_to_history(
@@ -279,7 +288,11 @@ def apply_pending_restore():
     if entry.scoring_weights:
         # Support both old Dict and new List[Dict] format
         ws_list = entry.scoring_weights if isinstance(entry.scoring_weights, list) else [entry.scoring_weights]
-        st.session_state["weight_sets"] = ws_list
+        # Store as custom weight sets (history entries may not map to presets)
+        st.session_state["custom_weight_sets"] = ws_list
+        # Deactivate all presets when restoring from history
+        from myproject.app.scoring_widget import RANKING_PRESETS
+        st.session_state["preset_active"] = {name: False for name in RANKING_PRESETS}
     
     # =========================================================================
     # RESTAURER LES PARAMÈTRES (underlying, price, max_legs, etc.)

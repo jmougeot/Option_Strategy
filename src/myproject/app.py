@@ -6,12 +6,13 @@ Description: Web user interface to compare options strategies
 import streamlit as st
 import uuid
 from datetime import datetime
+from typing import Dict, List
 from streamlit_autorefresh import st_autorefresh
 
 from myproject.app.styles import inject_css
 from myproject.app.params_widget import sidebar_params
 from myproject.app.scenarios_widget import scenario_params
-from myproject.app.scoring_widget import scoring_weights_block
+from myproject.app.scoring_widget import scoring_weights_block, RANKING_PRESETS
 from myproject.app.tabs import display_overview_tab
 from myproject.app.payoff_diagram import create_payoff_diagram
 from myproject.app.help_tab import display_help_tab
@@ -37,7 +38,7 @@ from myproject.share_result.generate_pdf import create_pdf_report
 # ============================================================================
 
 st.set_page_config(
-    page_title="Options Strategy Comparator",
+    page_title="M2O",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -49,6 +50,27 @@ inject_css()
 # MAIN INTERFACE
 # ============================================================================
 
+def _build_weight_set_names(weight_list: List[Dict[str, float]]) -> List[str]:
+    """
+    Try to match each weight dict to a known RANKING_PRESETS name.
+    Falls back to 'Custom #i' for unknown sets.
+    """
+    names: List[str] = []
+    custom_idx = 0
+    for ws in weight_list:
+        active = {k: v for k, v in ws.items() if v > 0}
+        matched = False
+        for preset_name, preset_weights in RANKING_PRESETS.items():
+            if active == preset_weights:
+                names.append(preset_name)
+                matched = True
+                break
+        if not matched:
+            custom_idx += 1
+            names.append(f"Custom #{custom_idx}")
+    return names
+
+
 def main():
     # Appliquer une restauration pendante AVANT la création des widgets
     init_history()
@@ -56,10 +78,10 @@ def main():
     
     # Header
     st.markdown(
-        '<div class="main-header">Options Strategy Comparator</div>',
-        unsafe_allow_html=True,
+        '<div class="main-header">M20</div>',
     )
     st.markdown("---")
+
 
     # ========================================================================
     # SIDEBAR - PARAMETERS
@@ -300,7 +322,7 @@ def main():
                 if "terminated" in error.lower():
                     st.warning("⛔ Processing was terminated by user")
                 else:
-                    st.error(f"❌ Error: {error}")
+                    st.error(f"é❌ Error: {error}")
                 return
             
             if result:
@@ -314,6 +336,8 @@ def main():
                 multi_result = None
                 if isinstance(best_strategies, MultiRankingResult):
                     multi_result = best_strategies
+                    # Attach readable names from scoring widget state
+                    multi_result.weight_set_names = _build_weight_set_names(scoring_weights)
                     all_comparisons = multi_result.all_strategies_flat()
                     st.session_state["multi_ranking"] = multi_result
                 else:
@@ -467,7 +491,7 @@ def main():
         multi_ranking: MultiRankingResult | None = st.session_state.get("multi_ranking", None)
         if multi_ranking is not None and multi_ranking.is_multi:
             sub_tab_names = ["🏆 Consensus"] + [
-                f"Set {i+1}" for i in range(multi_ranking.n_sets)
+                multi_ranking.get_set_label(i) for i in range(multi_ranking.n_sets)
             ]
             sub_tabs = st.tabs(sub_tab_names)
             with sub_tabs[0]:
@@ -475,7 +499,6 @@ def main():
             for i in range(multi_ranking.n_sets):
                 with sub_tabs[i + 1]:
                     set_comps = multi_ranking.per_set_strategies[i]
-                    st.caption(multi_ranking.get_active_weights_summary(i))
                     display_overview_tab(set_comps, roll_labels=roll_labels)
         else:
             display_overview_tab(comparisons, roll_labels=roll_labels)

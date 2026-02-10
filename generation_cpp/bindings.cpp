@@ -153,6 +153,82 @@ void init_options_cache(
     g_cache.valid = true;
 }
 
+// ============================================================================
+// Helper: convertit un ScoredStrategy en py::tuple (indices, signs, metrics)
+// ============================================================================
+static py::tuple scored_strategy_to_python(const ScoredStrategy& strat) {
+    py::list indices_list;
+    py::list signs_list;
+    for (size_t i = 0; i < strat.option_indices.size(); ++i) {
+        indices_list.append(strat.option_indices[i]);
+        signs_list.append(strat.signs[i]);
+    }
+
+    py::dict metrics_dict;
+    metrics_dict["total_premium"] = strat.total_premium;
+    metrics_dict["total_delta"] = strat.total_delta;
+    metrics_dict["total_gamma"] = strat.total_gamma;
+    metrics_dict["total_vega"] = strat.total_vega;
+    metrics_dict["total_theta"] = strat.total_theta;
+    metrics_dict["total_iv"] = strat.total_iv;
+    metrics_dict["avg_implied_volatility"] = strat.avg_implied_volatility;
+    metrics_dict["average_pnl"] = strat.average_pnl;
+    metrics_dict["total_average_pnl"] = strat.average_pnl;
+    metrics_dict["total_roll"] = strat.roll;
+    metrics_dict["total_roll_quarterly"] = strat.roll_quarterly;
+    metrics_dict["total_roll_sum"] = strat.roll_sum;
+    metrics_dict["sigma_pnl"] = strat.sigma_pnl;
+    metrics_dict["total_sigma_pnl"] = strat.sigma_pnl;
+    metrics_dict["max_profit"] = strat.max_profit;
+    metrics_dict["max_loss"] = strat.max_loss;
+    metrics_dict["max_loss_left"] = strat.max_loss_left;
+    metrics_dict["max_loss_right"] = strat.max_loss_right;
+    metrics_dict["min_profit_price"] = strat.min_profit_price;
+    metrics_dict["max_profit_price"] = strat.max_profit_price;
+    metrics_dict["profit_zone_width"] = strat.profit_zone_width;
+    metrics_dict["call_count"] = strat.call_count;
+    metrics_dict["put_count"] = strat.put_count;
+    metrics_dict["breakeven_points"] = strat.breakeven_points;
+    metrics_dict["score"] = strat.score;
+    metrics_dict["rank"] = strat.rank;
+    metrics_dict["delta_levrage"] = strat.delta_levrage;
+    metrics_dict["avg_pnl_levrage"] = strat.avg_pnl_levrage;
+    metrics_dict["tail_penalty"] = strat.tail_penalty;
+
+    py::list intra_life_list;
+    for (int t = 0; t < 5; ++t) {
+        intra_life_list.append(strat.intra_life_prices[t]);
+    }
+    metrics_dict["intra_life_prices"] = intra_life_list;
+
+    py::list intra_life_pnl_list;
+    for (int t = 0; t < 5; ++t) {
+        intra_life_pnl_list.append(strat.intra_life_pnl[t]);
+    }
+    metrics_dict["intra_life_pnl"] = intra_life_pnl_list;
+    metrics_dict["avg_intra_life_pnl"] = strat.avg_intra_life_pnl;
+
+    py::array_t<double> pnl_arr(strat.total_pnl_array.size());
+    auto pnl_out = pnl_arr.mutable_unchecked<1>();
+    for (size_t i = 0; i < strat.total_pnl_array.size(); ++i) {
+        pnl_out(i) = strat.total_pnl_array[i];
+    }
+    metrics_dict["pnl_array"] = pnl_arr;
+
+    return py::make_tuple(indices_list, signs_list, metrics_dict);
+}
+
+// ============================================================================
+// Helper: convertit une liste de ScoredStrategy en py::list
+// ============================================================================
+static py::list scored_list_to_python(const std::vector<ScoredStrategy>& strategies) {
+    py::list results;
+    for (const auto& strat : strategies) {
+        results.append(scored_strategy_to_python(strat));
+    }
+    return results;
+}
+
 /**
  * Génère toutes les combinaisons inférieur à n_legs options, les score et retourne le top_n
  */
@@ -353,83 +429,6 @@ py::list process_combinations_batch_with_scoring(
 
     // ========== CONVERSION EN RÉSULTATS PYTHON ==========
     return scored_list_to_python(unique_strategies);
-}
-
-
-// ============================================================================
-// Helper: convertit un ScoredStrategy en py::tuple (indices, signs, metrics)
-// ============================================================================
-static py::tuple scored_strategy_to_python(const ScoredStrategy& strat) {
-    py::list indices_list;
-    py::list signs_list;
-    for (size_t i = 0; i < strat.option_indices.size(); ++i) {
-        indices_list.append(strat.option_indices[i]);
-        signs_list.append(strat.signs[i]);
-    }
-
-    py::dict metrics_dict;
-    metrics_dict["total_premium"] = strat.total_premium;
-    metrics_dict["total_delta"] = strat.total_delta;
-    metrics_dict["total_gamma"] = strat.total_gamma;
-    metrics_dict["total_vega"] = strat.total_vega;
-    metrics_dict["total_theta"] = strat.total_theta;
-    metrics_dict["total_iv"] = strat.total_iv;
-    metrics_dict["avg_implied_volatility"] = strat.avg_implied_volatility;
-    metrics_dict["average_pnl"] = strat.average_pnl;
-    metrics_dict["total_average_pnl"] = strat.average_pnl;
-    metrics_dict["total_roll"] = strat.roll;
-    metrics_dict["total_roll_quarterly"] = strat.roll_quarterly;
-    metrics_dict["total_roll_sum"] = strat.roll_sum;
-    metrics_dict["sigma_pnl"] = strat.sigma_pnl;
-    metrics_dict["total_sigma_pnl"] = strat.sigma_pnl;
-    metrics_dict["max_profit"] = strat.max_profit;
-    metrics_dict["max_loss"] = strat.max_loss;
-    metrics_dict["max_loss_left"] = strat.max_loss_left;
-    metrics_dict["max_loss_right"] = strat.max_loss_right;
-    metrics_dict["min_profit_price"] = strat.min_profit_price;
-    metrics_dict["max_profit_price"] = strat.max_profit_price;
-    metrics_dict["profit_zone_width"] = strat.profit_zone_width;
-    metrics_dict["call_count"] = strat.call_count;
-    metrics_dict["put_count"] = strat.put_count;
-    metrics_dict["breakeven_points"] = strat.breakeven_points;
-    metrics_dict["score"] = strat.score;
-    metrics_dict["rank"] = strat.rank;
-    metrics_dict["delta_levrage"] = strat.delta_levrage;
-    metrics_dict["avg_pnl_levrage"] = strat.avg_pnl_levrage;
-    metrics_dict["tail_penalty"] = strat.tail_penalty;
-
-    py::list intra_life_list;
-    for (int t = 0; t < 5; ++t) {
-        intra_life_list.append(strat.intra_life_prices[t]);
-    }
-    metrics_dict["intra_life_prices"] = intra_life_list;
-
-    py::list intra_life_pnl_list;
-    for (int t = 0; t < 5; ++t) {
-        intra_life_pnl_list.append(strat.intra_life_pnl[t]);
-    }
-    metrics_dict["intra_life_pnl"] = intra_life_pnl_list;
-    metrics_dict["avg_intra_life_pnl"] = strat.avg_intra_life_pnl;
-
-    py::array_t<double> pnl_arr(strat.total_pnl_array.size());
-    auto pnl_out = pnl_arr.mutable_unchecked<1>();
-    for (size_t i = 0; i < strat.total_pnl_array.size(); ++i) {
-        pnl_out(i) = strat.total_pnl_array[i];
-    }
-    metrics_dict["pnl_array"] = pnl_arr;
-
-    return py::make_tuple(indices_list, signs_list, metrics_dict);
-}
-
-// ============================================================================
-// Helper: convertit une liste de ScoredStrategy en py::list
-// ============================================================================
-static py::list scored_list_to_python(const std::vector<ScoredStrategy>& strategies) {
-    py::list results;
-    for (const auto& strat : strategies) {
-        results.append(scored_strategy_to_python(strat));
-    }
-    return results;
 }
 
 /**
