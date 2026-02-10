@@ -285,9 +285,9 @@ config = SFRConfig(
     expiry_year=5,
     strike_min=95.0,
     strike_max=97.0,
-    strike_step=0.125,
+    strike_step=0.625,
     start_date=date(2024, 7, 30),
-    end_date=date(2025, 3, 13),
+    end_date=date(2025, 12, 13),
     bbg_field="PX_LAST",
 )
 
