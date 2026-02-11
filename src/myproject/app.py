@@ -43,9 +43,9 @@ def main():
     apply_pending_restore()
 
     # Header
-    col_left, col_center, col_right = st.columns([2, 2, 1])
-    with col_center:
-        st.image("./assets/m2o_logo.png", width=400)
+    # col_left, col_center, col_right = st.columns([2, 2, 1])
+    # with col_center:
+    #     st.image("./assets/m2o_logo.png", width=400)
 
     # ========================================================================
     # SIDEBAR - Parameters + Navigation
