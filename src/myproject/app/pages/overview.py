@@ -6,14 +6,13 @@ import streamlit as st
 import uuid
 from typing import Dict, List
 from streamlit_autorefresh import st_autorefresh
-
 from myproject.app.tabs import display_overview_tab
 from myproject.app.payoff_diagram import create_payoff_diagram
 from myproject.app.processing import process_comparison_results, save_to_session_state
 from myproject.app.async_processing import start_processing, check_processing_status, stop_processing
-from myproject.app.data_types import FutureData
+from myproject.app.data_types import FilterData, FutureData
+from myproject.app.params_widget import UIParams
 from myproject.strategy.multi_ranking import MultiRankingResult
-
 
 def _build_weight_set_names(weight_list: List[Dict[str, float]]) -> List[str]:
     from myproject.app.scoring_widget import RANKING_PRESETS
@@ -48,9 +47,9 @@ def run():
     """Main Overview page content."""
 
     # Retrieve sidebar data stored in session_state by app.py
-    params = st.session_state.get("_params_widget")
+    params: UIParams = st.session_state.get("_params_widget") #type: ignore
     scenarios = st.session_state.get("_scenarios_widget")
-    filter = st.session_state.get("_filter_widget")
+    filter: FilterData = st.session_state.get("_filter_widget") #type: ignore
     scoring_weights = st.session_state.get("_scoring_weights", [])
 
     # ========================================================================
@@ -82,7 +81,6 @@ def run():
         st.button("⛔ STOP", type="secondary", width="stretch", on_click=on_stop_click)
 
     all_comparisons = None
-    mixture = None
 
     # ------------------------------------------------------------------
     # Check running process
@@ -91,7 +89,6 @@ def run():
         is_running, is_complete, result, error = check_processing_status(
             st.session_state.session_id, st.session_state.process
         )
-
         if is_complete:
             st.session_state.processing = False
             st.session_state.process = None

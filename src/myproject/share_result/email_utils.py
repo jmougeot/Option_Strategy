@@ -88,8 +88,8 @@ def build_email_template_data(params, filter, scoring_weights) -> EmailTemplateD
 
 def create_email_with_images(
     template_data: EmailTemplateData,
+    mixture: Optional[tuple],
     comparisons: Optional[List] = None,
-    mixture: Optional[tuple] = None,
 ) -> bool:
     """
     Create an Outlook email with embedded images.

@@ -589,43 +589,26 @@ std::pair<
         per_set_results.push_back(std::move(unique));
     }
 
-    // ====== 5. Meta ranking via average rank ======
+    // ====== 5. Meta ranking via total score (sum of per-set scores) ======
 
-    // argsort each set's scores (descending)
-    std::vector<std::vector<int>> per_set_rank(n_sets, std::vector<int>(n_strats, 0));
-    for (size_t s = 0; s < n_sets; ++s) {
-        std::vector<size_t> order(n_strats);
-        std::iota(order.begin(), order.end(), 0);
-        std::sort(order.begin(), order.end(),
-            [&](size_t a, size_t b) {
-                return all_set_scores[s][a] > all_set_scores[s][b];
-            });
-        for (size_t r = 0; r < n_strats; ++r) {
-            per_set_rank[s][order[r]] = static_cast<int>(r + 1);
-        }
-    }
-
-    // Average rank per strategy
-    std::vector<double> avg_rank(n_strats, 0.0);
+    std::vector<double> total_score(n_strats, 0.0);
     for (size_t i = 0; i < n_strats; ++i) {
-        double sum = 0.0;
         for (size_t s = 0; s < n_sets; ++s) {
-            sum += per_set_rank[s][i];
+            total_score[i] += all_set_scores[s][i];
         }
-        avg_rank[i] = sum / static_cast<double>(n_sets);
     }
 
-    // Top_n by lowest average rank (use min-heap on NEGATIVE avg rank)
-    using ARI = std::pair<double, size_t>; // (avg_rank, idx) — lower is better
-    auto cmp_ar = [](const ARI& a, const ARI& b) { return a.first < b.first; }; // max-heap = worst at top
+    // Top_n by highest total score (use min-heap)
+    using ARI = std::pair<double, size_t>; // (total_score, idx) — higher is better
+    auto cmp_ar = [](const ARI& a, const ARI& b) { return a.first > b.first; }; // min-heap = worst at top
     std::priority_queue<ARI, std::vector<ARI>, decltype(cmp_ar)> cons_heap(cmp_ar);
 
     for (size_t i = 0; i < n_strats; ++i) {
         if (static_cast<int>(cons_heap.size()) < top_n) {
-            cons_heap.push({avg_rank[i], i});
-        } else if (avg_rank[i] < cons_heap.top().first) {
+            cons_heap.push({total_score[i], i});
+        } else if (total_score[i] > cons_heap.top().first) {
             cons_heap.pop();
-            cons_heap.push({avg_rank[i], i});
+            cons_heap.push({total_score[i], i});
         }
     }
 
@@ -634,9 +617,7 @@ std::pair<
     while (!cons_heap.empty()) {
         size_t idx = cons_heap.top().second;
         ScoredStrategy copy = strategies[idx];
-        // Store avg rank as the score (lower = better,
-        // so we invert so higher score = better for display)
-        copy.score = 1.0 / (avg_rank[idx] + 1e-9);
+        copy.score = total_score[idx];
         cons_heap.pop();
         consensus.push_back(std::move(copy));
     }

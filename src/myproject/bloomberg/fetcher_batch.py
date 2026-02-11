@@ -6,6 +6,8 @@ Récupère les données d'options depuis Bloomberg.
 
 import blpapi
 from typing import Any, Optional, Tuple
+
+from matplotlib.colors import BivarColormap
 from myproject.bloomberg.connection import get_session, get_service
 from myproject.app.data_types import FutureData
 
@@ -14,7 +16,7 @@ from myproject.app.data_types import FutureData
 OPTION_FIELDS = [
     "PX_BID", "PX_ASK", "PX_MID", "PX_LAST",
     "OPT_DELTA", "OPT_GAMMA", "OPT_VEGA", "OPT_THETA", "OPT_RHO",
-    "OPT_IMP_VOL",
+    "OPT_IMP_VOL", "IVOL_MID", "IVOL_BID", "IVOL_ASK",
     "OPT_STRIKE_PX", "OPT_UNDL_PX", "OPT_PUT_CALL",
     "VOLUME", "OPEN_INT",
     "LAST_TRADEABLE_DT", "OPT_EXPIRE_DT",
@@ -40,7 +42,7 @@ def _extract_underlying_price(field_data) -> Optional[float]:
     return None
 
 
-def _compute_premium(bid: float, ask: float, mid: float) -> Optional[float]:
+def _compute_mid(bid: float, ask: float, mid: float) -> Optional[float]:
     """Calcule le premium à partir de bid/ask/mid."""
     if mid > 0:
         return mid
@@ -49,7 +51,6 @@ def _compute_premium(bid: float, ask: float, mid: float) -> Optional[float]:
     if ask > 0:
         return ask / 2
     return None
-
 
 def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyings: Optional[str] = None) -> Tuple[dict[str, dict[str, Any]], FutureData]:
     """
@@ -157,19 +158,19 @@ def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:
     bid = data.get("PX_BID") or 0.0
     ask = data.get("PX_ASK") or 0.0
     mid = data.get("PX_MID") or 0.0
+    iv_bid = data.get("IVOL_BID") or 0.0
+    iv_ask = data.get("IVOL_MID") or 0.0
+    iv_mid = data.get("IVOL_MID") or 0.0
 
     return {
-        "premium": _compute_premium(bid, ask, mid),
+        "premium": _compute_mid(bid, ask, mid),
+        "implied_volatility": _compute_mid(iv_bid, iv_ask, iv_mid),
         "bid": bid if bid > 0 else 0.0,
         "ask": ask if ask > 0 else 0.0,
         "delta": data.get("OPT_DELTA") or 0.0,
         "gamma": data.get("OPT_GAMMA") or 0.0,
         "vega": data.get("OPT_VEGA") or 0.0,
         "theta": data.get("OPT_THETA") or 0.0,
-        "rho": data.get("OPT_RHO") or 0.0,
-        "implied_volatility": data.get("OPT_IMP_VOL") or 0.15,
         "strike": data.get("OPT_STRIKE_PX") or 0.0,
         "underlying_price": data.get("OPT_UNDL_PX") or 0.0,
-        "volume": int(data.get("VOLUME") or 0),
-        "open_interest": int(data.get("OPEN_INT") or 0),
     }
