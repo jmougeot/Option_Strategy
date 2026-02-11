@@ -99,35 +99,21 @@ def process_bloomberg_to_strategies(
     # Generer les strategies avec SCORING C++ intégré
     generator = OptionStrategyGeneratorV2(options)
 
-    # Déterminer si on utilise le multi-scoring
-    weight_sets: Optional[List[Dict[str, float]]] = None
-    single_weights: Optional[Dict[str, float]] = None
-
+    # Normaliser en liste de dicts de poids
     if isinstance(scoring_weights, list):
-        if len(scoring_weights) > 1:
-            weight_sets = scoring_weights
-        elif len(scoring_weights) == 1:
-            single_weights = scoring_weights[0]
+        weight_sets = scoring_weights
     elif isinstance(scoring_weights, dict):
-        single_weights = scoring_weights
-
-    if weight_sets is not None:
-        # Multi-scoring: N jeux de poids simultanés
-        multi_result = generator.generate_top_strategies_multi(
-            filter=filter,
-            max_legs=max_legs,
-            top_n=top_n,
-            weight_sets=weight_sets,
-        )
-        best_strategies = multi_result  # type: ignore
+        weight_sets = [scoring_weights]
     else:
-        # Single-scoring (rétro-compatible)
-        best_strategies = generator.generate_top_strategies(
-            filter=filter,
-            max_legs=max_legs,
-            top_n=top_n,
-            custom_weights=single_weights,
-        )
+        weight_sets = [{}]
+
+    # Toujours utiliser le multi-scoring (fonctionne aussi avec 1 jeu)
+    best_strategies = generator.generate_top_strategies_multi(
+        filter=filter,
+        max_legs=max_legs,
+        top_n=top_n,
+        weight_sets=weight_sets,
+    )
 
     # Estimer le nombre de combinaisons screened
     # Pour N options et k legs: C(N,k) * 2^k (long/short pour chaque leg)
@@ -136,11 +122,7 @@ def process_bloomberg_to_strategies(
     n_opts = len(options)
     total_combinations = sum(comb(n_opts, k) * (2 ** k) for k in range(1, max_legs + 1))
     stats["nb_strategies_possibles"] = total_combinations
-    
-    if isinstance(best_strategies, MultiRankingResult):
-        stats["nb_strategies_classees"] = len(best_strategies.consensus_strategies)
-    else:
-        stats["nb_strategies_classees"] = len(best_strategies)
+    stats["nb_strategies_classees"] = len(best_strategies.consensus_strategies)
 
 
     return best_strategies, stats, mixture, future_data

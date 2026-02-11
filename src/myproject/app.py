@@ -3,6 +3,7 @@ Streamlit Interface for Options Strategy Comparison
 Description: Web user interface to compare options strategies
 """
 
+from ctypes import alignment
 import streamlit as st
 import uuid
 from datetime import datetime
@@ -77,10 +78,7 @@ def main():
     apply_pending_restore()
     
     # Header
-    st.markdown(
-        '<div class="main-header">M20</div>',
-    )
-    st.markdown("---")
+    # st.image("./assets/m2o_logo.png")
 
 
     # ========================================================================
@@ -332,17 +330,11 @@ def main():
                     st.error("❌ No strategy generated")
                     return
 
-                # Handle MultiRankingResult or plain list
-                multi_result = None
-                if isinstance(best_strategies, MultiRankingResult):
-                    multi_result = best_strategies
-                    # Attach readable names from scoring widget state
-                    multi_result.weight_set_names = _build_weight_set_names(scoring_weights)
-                    all_comparisons = multi_result.all_strategies_flat()
-                    st.session_state["multi_ranking"] = multi_result
-                else:
-                    all_comparisons = best_strategies
-                    st.session_state.pop("multi_ranking", None)
+                # Always MultiRankingResult (multi-weight scoring only)
+                multi_result = best_strategies
+                multi_result.weight_set_names = _build_weight_set_names(scoring_weights)
+                all_comparisons = multi_result.all_strategies_flat()
+                st.session_state["multi_ranking"] = multi_result
                 save_to_session_state(all_comparisons, params, scenarios)
                 st.session_state["mixture"] = mixture
                 st.session_state["future_data"] = future_data

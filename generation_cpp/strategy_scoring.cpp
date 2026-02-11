@@ -197,9 +197,10 @@ double StrategyScorer::calculate_score(
     
     switch (scorer) {
         case ScorerType::HIGHER_BETTER: {
-            // Plus élevé = meilleur
-            if (max_val > 0.0) {
-                return std::clamp(value / max_val, 0.0, 1.0);
+            // Plus élevé = meilleur — normalisé sur [min, max]
+            if (max_val > min_val) {
+                double normalized = (value - min_val) / (max_val - min_val);
+                return std::clamp(normalized, 0.0, 1.0);
             }
             return 0.0;
         }
@@ -214,9 +215,9 @@ double StrategyScorer::calculate_score(
         }
         
         case ScorerType::MODERATE_BETTER: {
-            // Valeur modérée = meilleur (autour de 0.5)
-            if (max_val > 0.0) {
-                double normalized = value / max_val;
+            // Valeur modérée = meilleur (autour du milieu de la plage)
+            if (max_val > min_val) {
+                double normalized = (value - min_val) / (max_val - min_val);
                 double score = 1.0 - std::abs(normalized - 0.5) * 2.0;
                 return std::max(0.0, score);
             }
@@ -369,7 +370,7 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
 }
 
 // ============================================================================
-// SCORING ET RANKING PRINCIPAL - OPTIMISÉ AVEC MIN-HEAP
+// EXTRACTION DE VALEUR PAR MÉTRIQUE
 // ============================================================================
 
 static double extract_single_metric_value(const ScoredStrategy& strat, const std::string& metric_name) {
@@ -400,135 +401,11 @@ static double extract_single_metric_value(const ScoredStrategy& strat, const std
     } else if (metric_name == "max_loss") {
         return std::abs(strat.max_loss);
     } else if (metric_name == "tail_penalty") {
-        // Valeur brute - MIN_MAX normalisera automatiquement
         return std::abs(strat.tail_penalty);
+    } else if (metric_name == "avg_intra_life_pnl") {
+        return strat.avg_intra_life_pnl;
     }
     return 0.0;
-}
-
-std::vector<ScoredStrategy> StrategyScorer::score_and_rank(
-    std::vector<ScoredStrategy>& strategies,
-    std::vector<MetricConfig> metrics,
-    int top_n
-) {
-    if (strategies.empty()) {
-        return {};
-    }
-    
-    // Utiliser métriques par défaut si non fournies
-    if (metrics.empty()) {
-        metrics = create_default_metrics();
-    }
-    
-    // Normaliser les poids
-    normalize_weights(metrics);
-    
-    const size_t n_strategies = strategies.size();
-    const size_t n_metrics = metrics.size();
-    
-    // ========== ÉTAPE 1: Calculer min/max pour TOUTES les métriques en un seul passage ==========
-    std::vector<double> metric_mins(n_metrics, std::numeric_limits<double>::max());
-    std::vector<double> metric_maxs(n_metrics, std::numeric_limits<double>::lowest());
-    
-    for (const auto& strat : strategies) {
-        for (size_t j = 0; j < n_metrics; ++j) {
-            double value = extract_single_metric_value(strat, metrics[j].name);
-            if (std::isfinite(value)) {
-                metric_mins[j] = std::min(metric_mins[j], value);
-                metric_maxs[j] = std::max(metric_maxs[j], value);
-            }
-        }
-    }
-    
-    // Corriger les cas où min == max
-    for (size_t j = 0; j < n_metrics; ++j) {
-        if (metric_mins[j] == metric_maxs[j]) {
-            metric_maxs[j] = metric_mins[j] + 1.0;
-        }
-        if (metric_mins[j] == std::numeric_limits<double>::max()) {
-            metric_mins[j] = 0.0;
-            metric_maxs[j] = 1.0;
-        }
-    }
-    
-    // ========== ÉTAPE 2: Scorer et maintenir top_n avec un min-heap d'INDICES ==========
-    // Stocker (score, index) pour éviter de copier les gros objets ScoredStrategy
-    using ScoreIndex = std::pair<double, size_t>;
-    auto cmp = [](const ScoreIndex& a, const ScoreIndex& b) {
-        return a.first > b.first;  // Min-heap: plus petit score en haut
-    };
-    std::priority_queue<ScoreIndex, std::vector<ScoreIndex>, decltype(cmp)> min_heap(cmp);
-    
-    for (size_t idx = 0; idx < strategies.size(); ++idx) {
-        auto& strat = strategies[idx];
-        
-        // ========== MOYENNE GÉOMÉTRIQUE PONDÉRÉE AVEC PLANCHER ==========
-        // S = exp(Σ wᵢ × log(ε + xᵢ))
-        // Équivalent à: S = ∏(ε + xᵢ)^wᵢ
-        
-        constexpr double epsilon = 1e-6;  // Plancher pour éviter log(0)
-        double log_sum = 0.0;
-        double total_weight = 0.0;
-        
-        for (size_t j = 0; j < n_metrics; ++j) {
-            if (metrics[j].weight <= 0.0) continue;  // Skip poids nuls
-            
-            double value = extract_single_metric_value(strat, metrics[j].name);
-            double min_val = metric_mins[j];
-            double max_val = metric_maxs[j];
-            
-            // xᵢ ∈ [0,1] - score normalisé
-            double metric_score = calculate_score(value, min_val, max_val, metrics[j].scorer);
-            
-            // log(ε + xᵢ) pondéré par wᵢ
-            log_sum += metrics[j].weight * std::log(epsilon + metric_score);
-            total_weight += metrics[j].weight;
-        }
-        
-        // S = exp(log_sum / total_weight) si on veut normaliser les poids
-        // Ou S = exp(log_sum) si les poids sont déjà normalisés
-        double final_score = (total_weight > 0.0) ? std::exp(log_sum) : 0.0;
-        
-        strat.score = final_score;
-        
-        // Ajouter l'index au heap (pas l'objet complet!)
-        if (static_cast<int>(min_heap.size()) < top_n) {
-            min_heap.push({final_score, idx});
-        } else if (final_score > min_heap.top().first) {
-            min_heap.pop();
-            min_heap.push({final_score, idx});
-        }
-    }
-    
-    // ========== ÉTAPE 3: Extraire les indices et construire le résultat ==========
-    std::vector<size_t> top_indices;
-    top_indices.reserve(min_heap.size());
-    
-    while (!min_heap.empty()) {
-        top_indices.push_back(min_heap.top().second);
-        min_heap.pop();
-    }
-    
-    // Construire le résultat en utilisant std::move pour éviter les copies
-    std::vector<ScoredStrategy> result;
-    result.reserve(top_indices.size());
-    
-    for (size_t idx : top_indices) {
-        result.push_back(std::move(strategies[idx]));
-    }
-    
-    std::sort(result.begin(), result.end(),
-        [](const ScoredStrategy& a, const ScoredStrategy& b) {
-            return a.score > b.score;
-        }
-    );
-    
-    // Assigner les rangs
-    for (size_t i = 0; i < result.size(); ++i) {
-        result[i].rank = static_cast<int>(i + 1);
-    }
-    
-    return result;
 }
 
 // ============================================================================
@@ -649,7 +526,7 @@ std::pair<
         all_set_scores[s].resize(n_strats);
 
         for (size_t i = 0; i < n_strats; ++i) {
-            // Geometric mean scoring (same as score_and_rank)
+            // Geometric mean scoring
             constexpr double epsilon = 1e-6;
             double log_sum = 0.0;
 
@@ -681,7 +558,7 @@ std::pair<
                 heap.push({sc, i});
             }
         }
-
+        
         // Extract, sort, remove duplicates
         std::vector<size_t> top_idx;
         top_idx.reserve(heap.size());
@@ -712,10 +589,7 @@ std::pair<
         per_set_results.push_back(std::move(unique));
     }
 
-    // ====== 5. Consensus ranking via average rank ======
-    // Build rank for each strategy in each set (rank = position in sorted
-    // order of all_set_scores; strategies not in top_n still need a rank).
-    // To keep it efficient, we rank ALL strategies per set (argsort).
+    // ====== 5. Meta ranking via average rank ======
 
     // argsort each set's scores (descending)
     std::vector<std::vector<int>> per_set_rank(n_sets, std::vector<int>(n_strats, 0));

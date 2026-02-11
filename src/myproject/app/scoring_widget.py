@@ -54,7 +54,8 @@ RANKING_PRESETS: Dict[str, Dict[str, float]] = {
     "R6 — Leverage + Dynamic":    {"avg_pnl_levrage": 0.50, "avg_intra_life_pnl": 0.50},
     "R7 — Dynamic + Leverage":    {"avg_intra_life_pnl": 0.50, "avg_pnl_levrage": 0.50},
 }
-
+fields_list = list(SCORING_FIELDS.items())
+midpoint= len(fields_list)//2
 
 # ============================================================================
 # Helpers
@@ -70,8 +71,25 @@ def _make_full_weights(sparse: Dict[str, float]) -> Dict[str, float]:
 def _weight_row_editor(index: int, defaults: Dict[str, float]) -> Dict[str, float]:
     """Render editable number inputs for one custom weight set."""
     weights: Dict[str, float] = {}
-    cols = st.columns(len(SCORING_FIELDS))
-    for col_idx, (field_name, label) in enumerate(SCORING_FIELDS.items()):
+
+    # First ligne 
+    cols = st.columns(midpoint)
+    for col_idx, (field_name, label) in enumerate(fields_list[:midpoint]):
+        default_val = int(defaults.get(field_name, 0) * 100)
+        with cols[col_idx]:
+            val = st.number_input(
+                label,
+                min_value=0,
+                max_value=100,
+                value=default_val,
+                step=1,
+                key=f"custom_ws_{index}_{field_name}",
+            ) / 100
+            weights[field_name] = val
+
+    # Second ligne
+    cols = st.columns(len(fields_list) - midpoint)
+    for col_idx, (field_name, label) in enumerate(fields_list[midpoint:]):
         default_val = int(defaults.get(field_name, 0) * 100)
         with cols[col_idx]:
             val = st.number_input(
@@ -123,7 +141,7 @@ def scoring_weights_block() -> List[Dict[str, float]]:
         # Default: only R1 active
         st.session_state.preset_active = {name: (i == 0) for i, name in enumerate(RANKING_PRESETS)}
     if "custom_weight_sets" not in st.session_state:
-        st.session_state.custom_weight_sets: List[Dict[str, float]] = []
+        st.session_state.custom_weight_sets: List[Dict[str, float]]
 
     # ---- Render preset checkboxes ----
     active: Dict[str, bool] = {}
@@ -147,7 +165,7 @@ def scoring_weights_block() -> List[Dict[str, float]]:
     # ---- Custom weight sets (optional) ----
     custom_sets: List[Dict[str, float]] = st.session_state.custom_weight_sets
 
-    with st.expander(f"🔧 Custom weight sets ({len(custom_sets)})", expanded=False):
+    with st.expander(f"Custom weight sets ({len(custom_sets)})", expanded=False):
         edited_custom: List[Dict[str, float]] = []
         indices_to_remove: List[int] = []
 

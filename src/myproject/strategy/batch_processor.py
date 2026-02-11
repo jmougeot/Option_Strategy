@@ -113,51 +113,7 @@ def init_cpp_cache(options: List[Option]) -> bool:
     return True
 
 # =============================================================================
-# TRAITEMENT C++
-# =============================================================================
-
-def process_batch_cpp_with_scoring(
-    n_legs: int,
-    filter: FilterData,
-    top_n: int = 5,
-    custom_weights: Optional[Dict[str, float]] = None
-) -> List[StrategyComparison]:
-    """
-    Traite un batch de combinaisons via le module C++ AVEC scoring et ranking.
-
-    Returns:
-        Liste de StrategyComparison pour les top_n stratégies (défaut: 5)
-    """
-    global _options_cache
-    
-    if not _options_cache:
-        raise RuntimeError("Options cache is empty. Call init_cpp_cache() first.")
-    
-    weights_dict = custom_weights if custom_weights else {}
-    
-    raw_results = strategy_metrics_cpp.process_combinations_batch_with_scoring(  # type: ignore
-        n_legs,
-        filter.max_loss_left,
-        filter.max_loss_right,
-        filter.max_premium,
-        filter.ouvert_gauche,
-        filter.ouvert_droite,
-        filter.min_premium_sell,
-        filter.delta_min,
-        filter.delta_max,
-        filter.limit_left,
-        filter.limit_right,
-        top_n,
-        weights_dict
-    )
-    strategies = batch_to_strategies(raw_results, _options_cache)
-
-    
-    return strategies
-
-
-# =============================================================================
-# MULTI-SCORING (N jeux de poids simultanés)
+# TRAITEMENT C++ — MULTI-SCORING (N jeux de poids simultanés)
 # =============================================================================
 
 def process_batch_cpp_with_multi_scoring(
@@ -170,10 +126,12 @@ def process_batch_cpp_with_multi_scoring(
     Traite un batch via C++ avec N jeux de poids simultanés.
 
     Le C++ fait :
-      1. Génération parallèle des combinaisons (identique au single)
+      1. Génération parallèle des combinaisons
       2. Normalisation commune de toutes les métriques
       3. Scoring par jeu de poids → top_n par jeu
       4. Classement consensus par moyenne des rangs
+
+    Fonctionne aussi avec un seul jeu de poids (N=1).
 
     Returns:
         MultiRankingResult contenant per_set + consensus

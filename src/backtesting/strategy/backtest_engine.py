@@ -536,17 +536,18 @@ class BacktestEngine:
             return []
 
         # 2. Scoring C++ — ne ré-initialise le cache que si la date change
-        from myproject.strategy.batch_processor import init_cpp_cache, process_batch_cpp_with_scoring
+        from myproject.strategy.batch_processor import init_cpp_cache, process_batch_cpp_with_multi_scoring
 
         if _last_cached_date != entry_date:
             init_cpp_cache(options)
 
-        strategies = process_batch_cpp_with_scoring(
+        multi_result = process_batch_cpp_with_multi_scoring(
             self.config.max_legs,
             self.config.filter,
             top_n=self.config.top_n,
-            custom_weights=scoring_weights,
+            weight_sets=[scoring_weights],
         )
+        strategies = multi_result.all_strategies_flat()
 
         if not strategies:
             if verbose:

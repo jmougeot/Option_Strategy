@@ -151,15 +151,6 @@ public:
     );
     
     /**
-     * Score et classe les stratégies selon les métriques configurées
-     */
-    static std::vector<ScoredStrategy> score_and_rank(
-        std::vector<ScoredStrategy>& strategies,
-        std::vector<MetricConfig> metrics = {},
-        int top_n = 10
-    );
-
-    /**
      * Multi-weight scoring : normalise une seule fois, score N jeux de poids.
      *
      * Pour chaque weight set :

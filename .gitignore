@@ -60,3 +60,6 @@ site/
 
 #Build
 dist/
+
+#ENV 
+.env
