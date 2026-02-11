@@ -81,5 +81,5 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
         styled_df,
         hide_index=True,
         height=400,
-        use_container_width=True
+        width="stretch"
     )

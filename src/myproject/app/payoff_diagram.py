@@ -64,6 +64,7 @@ def create_payoff_diagram(
     comparisons: List[StrategyComparison],
     mixture: Tuple[np.ndarray, np.ndarray, float],
     underlying_price: Optional[float] = None,
+    key: Optional[str] = None,
 ):
     """
     Creates an interactive P&L diagram for all strategies with optional Gaussian mixture
@@ -236,7 +237,7 @@ def create_payoff_diagram(
     # Configuration du layout
     if mixture is not None:
         fig.update_layout(
-            title=f"Diagramme de P&L Ã  l'Expiration{underlying_label} avec Distribution Gaussienne",
+            title=f"Diagramme de P&L à l'Expiration{underlying_label} avec Distribution Gaussienne",
             xaxis_title="Prix du Sous-Jacent ($)",
             yaxis_title="Profit / Perte ($)",
             yaxis2_title="DensitÃ© de ProbabilitÃ©",
@@ -265,7 +266,7 @@ def create_payoff_diagram(
         )
     else:
         fig.update_layout(
-            title=f"Diagramme de P&L Ã  l'Expiration{underlying_label}",
+            title=f"Diagramme de P&L à l'Expiration{underlying_label}",
             xaxis_title="Prix du Sous-Jacent ($)",
             yaxis_title="Profit / Perte ($)",
             height=500,
@@ -289,7 +290,7 @@ def create_payoff_diagram(
             ),
         )
     
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, width="stretch", key=key)
     return fig
 
    

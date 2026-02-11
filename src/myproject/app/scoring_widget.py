@@ -42,7 +42,6 @@ ALL_FIELDS = {**SCORING_FIELDS, **ADVANCED_SCORING_FIELDS}
 
 # ============================================================================
 # Predefined ranking presets  (R1–R7)
-# Values are raw percentages — they'll be normalised by the C++ scorer.
 # ============================================================================
 
 RANKING_PRESETS: Dict[str, Dict[str, float]] = {
@@ -141,7 +140,7 @@ def scoring_weights_block() -> List[Dict[str, float]]:
         # Default: only R1 active
         st.session_state.preset_active = {name: (i == 0) for i, name in enumerate(RANKING_PRESETS)}
     if "custom_weight_sets" not in st.session_state:
-        st.session_state.custom_weight_sets: List[Dict[str, float]]
+        st.session_state.custom_weight_sets = []
 
     # ---- Render preset checkboxes ----
     active: Dict[str, bool] = {}
@@ -174,7 +173,7 @@ def scoring_weights_block() -> List[Dict[str, float]]:
             edited = _weight_row_editor(i, ws)
             edited_custom.append(edited)
 
-            if st.button(f"🗑 Remove #{i + 1}", key=f"rm_custom_{i}"):
+            if st.button(f"Remove {i + 1}", key=f"rm_custom_{i}"):
                 indices_to_remove.append(i)
 
         # Handle removals
@@ -185,7 +184,7 @@ def scoring_weights_block() -> List[Dict[str, float]]:
             st.rerun()
 
         # Add button
-        if st.button("➕ Add custom weight set"):
+        if st.button("Add custom weight set"):
             base = _make_full_weights({"average_pnl": 1.0})
             custom_sets.append(base)
             st.session_state.custom_weight_sets = custom_sets
@@ -200,7 +199,7 @@ def scoring_weights_block() -> List[Dict[str, float]]:
 
     # Fallback: if nothing is selected, default to R1
     if not result:
-        st.warning("⚠️ Aucun ranking sélectionné — R1 (Leverage) activé par défaut.")
+        st.warning("Aucun ranking sélectionné — R1 (Leverage) activé par défaut.")
         result = [_make_full_weights(RANKING_PRESETS["R1 — Leverage"])]
 
     return result

@@ -3,7 +3,6 @@ Streamlit Interface for Options Strategy Comparison
 Description: Web user interface to compare options strategies
 """
 
-from ctypes import alignment
 import streamlit as st
 import uuid
 from datetime import datetime
@@ -78,8 +77,9 @@ def main():
     apply_pending_restore()
     
     # Header
-    # st.image("./assets/m2o_logo.png")
-
+    col_left, col_center, col_right = st.columns([2, 2, 1])
+    with col_center:
+        st.image("./assets/m2o_logo.png", width=400)
 
     # ========================================================================
     # SIDEBAR - PARAMETERS
@@ -424,21 +424,19 @@ def main():
     # TABS FOR DISPLAY - Help and History are always visible
     # ====================================================================
 
-    tab1, tab2, tab3, tab4 = st.tabs(["Overview", "P&L Diagram", "📜 History", "📚 Help"])
+    tab1, tab2, tab3 = st.tabs(["Overview", "History", "Help"])
 
     # Help tab is always available
-    with tab4:
+    with tab3:
         display_help_tab()
     
     # History tab is always available
-    with tab3:
+    with tab2:
         display_history_tab()
         
     if not all_comparisons:
         with tab1:
             st.info("👆 Configure parameters and click 'Run Comparison' to generate strategies.")
-        with tab2:
-            st.info("👆 Run a comparison first to see P&L diagrams.")
         return
 
     # Traiter et filtrer les résultats
@@ -479,6 +477,10 @@ def main():
         # Générer les labels de roll dynamiquement (ex: ["H6", "M6", "U6"])
         roll_labels = [f"{m}{y}" for m, y in params.roll_expiries] if params.roll_expiries else None
 
+        # Underlying price for diagrams
+        future_data = st.session_state.get("future_data", FutureData(0, None))
+        underlying_price = future_data.underlying_price if future_data else 0
+
         # Multi-ranking: afficher les sous-onglets par jeu de poids
         multi_ranking: MultiRankingResult | None = st.session_state.get("multi_ranking", None)
         if multi_ranking is not None and multi_ranking.is_multi:
@@ -488,17 +490,15 @@ def main():
             sub_tabs = st.tabs(sub_tab_names)
             with sub_tabs[0]:
                 display_overview_tab(comparisons, roll_labels=roll_labels)
+                create_payoff_diagram(comparisons[:5], mixture, underlying_price, key="payoff_consensus")  # type:ignore
             for i in range(multi_ranking.n_sets):
                 with sub_tabs[i + 1]:
                     set_comps = multi_ranking.per_set_strategies[i]
                     display_overview_tab(set_comps, roll_labels=roll_labels)
+                    create_payoff_diagram(set_comps[:5], mixture, underlying_price, key=f"payoff_set_{i}")  # type:ignore
         else:
             display_overview_tab(comparisons, roll_labels=roll_labels)
-
-    with tab2:
-        future_data = st.session_state.get("future_data", FutureData(0, None))
-        underlying_price = future_data.underlying_price if future_data else 0
-        create_payoff_diagram(top_5_comparisons, mixture, underlying_price) #type:ignore
+            create_payoff_diagram(top_5_comparisons, mixture, underlying_price, key="payoff_single")  # type:ignore
 
 # ============================================================================
 # POINT D'ENTRÉE
