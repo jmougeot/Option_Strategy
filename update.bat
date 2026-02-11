@@ -4,15 +4,15 @@ setlocal
 REM Aller dans le dossier du script
 cd /d "%~dp0"
 
-REM Activer l'environnement
-.\venv\Scripts\Activate.ps1
-
 REM telecharge les changements
 git pull
 git checkout jean
 
-REM Update 
-cd generation_cpp
-pip install .
-cd ..
-./run.bat
+REM Clean rebuild C++ extension
+call rebuild.bat
+
+REM Update pip dependencies
+.venv\Scripts\pip.exe install -r requirements.txt
+
+REM Launch
+call run.bat
