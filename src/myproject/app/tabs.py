@@ -20,6 +20,10 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
     """
     st.header("Strategies Overview")
 
+    if not comparisons:
+        st.info("No strategies to display for this ranking.")
+        return
+
     # Winner card avec expiry
     winner = comparisons[0]
     expiry_str = format_expiration_date(winner.expiration_month, winner.expiration_year)

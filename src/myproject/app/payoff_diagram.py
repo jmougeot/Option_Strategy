@@ -77,6 +77,9 @@ def create_payoff_diagram(
     Returns:
         Plotly figure with P&L curves and optionally the mixture
     """
+    if not comparisons:
+        return None
+
     # Generate price range
     price_range = comparisons[0].prices
 
