@@ -29,19 +29,8 @@ def build_email_template_data(params, filter, scoring_weights) -> EmailTemplateD
             delta_pct = int(best_roll.total_delta * 100) if best_roll.total_delta else 0
             delta_str = f"+{delta_pct}%" if delta_pct >= 0 else f"{delta_pct}%"
             best_strategies.append({
-                "label": "Best strategy for Roll",
+                "label": "Best strategy for Roll (first selected expiry)",
                 "description": f"{best_roll.strategy_name} {best_roll.premium:.2f} Mid Price, {delta_str} delta"
-            })
-
-        cumul_sorted = sorted([c for c in comparisons_list if hasattr(c, 'roll_pnl') and c.roll_pnl],
-                                key=lambda x: sum(x.roll_pnl) if x.roll_pnl else 0, reverse=True)
-        if cumul_sorted:
-            best_cumul = cumul_sorted[0]
-            delta_pct = int(best_cumul.total_delta * 100) if best_cumul.total_delta else 0
-            delta_str = f"+{delta_pct}%" if delta_pct >= 0 else f"{delta_pct}%"
-            best_strategies.append({
-                "label": "Best strategy for cumulated Roll",
-                "description": f"{best_cumul.strategy_name} {best_cumul.premium:.2f} Mid Price, {delta_str} delta"
             })
 
         pnl_sorted = sorted([c for c in comparisons_list if c.average_pnl],

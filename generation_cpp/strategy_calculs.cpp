@@ -11,25 +11,15 @@ namespace strategy {
 void StrategyCalculator::calculate_greeks(
     const std::vector<OptionData>& options,
     const std::vector<int>& signs,
-    double& total_gamma,
-    double& total_vega,
-    double& total_theta,
     double& total_iv
 ) {
-    total_gamma = 0.0;
-    total_vega = 0.0;
-    total_theta = 0.0;
     total_iv = 0.0;
     
     for (size_t i = 0; i < options.size(); ++i) {
         const double s = static_cast<double>(signs[i]);
-        total_gamma += s * options[i].gamma;
-        total_vega += s * options[i].vega;
-        total_theta += s * options[i].theta;
         total_iv += s * options[i].implied_volatility;
     }
 }
-
 
 std::vector<double> StrategyCalculator::calculate_total_pnl(
     const std::vector<std::vector<double>>& pnl_matrix,
@@ -57,38 +47,6 @@ std::vector<double> StrategyCalculator::calculate_total_pnl(
     return total_pnl;
 }
 
-
-void StrategyCalculator::calculate_profit_zone(
-    const std::vector<double>& total_pnl,
-    const std::vector<double>& prices,
-    double& min_profit_price,
-    double& max_profit_price,
-    double& profit_zone_width
-) {
-    min_profit_price = 0.0;
-    max_profit_price = 0.0;
-    profit_zone_width = 0.0;
-    
-    int first_profitable = -1;
-    int last_profitable = -1;
-    
-    for (size_t i = 0; i < total_pnl.size(); ++i) {
-        if (total_pnl[i] > 0.0) {
-            if (first_profitable < 0) {
-                first_profitable = static_cast<int>(i);
-            }
-            last_profitable = static_cast<int>(i);
-        }
-    }
-    
-    if (first_profitable >= 0) {
-        min_profit_price = prices[first_profitable];
-        max_profit_price = prices[last_profitable];
-        profit_zone_width = max_profit_price - min_profit_price;
-    }
-}
-
-
 std::vector<double> StrategyCalculator::calculate_breakeven_points(
     const std::vector<double>& total_pnl,
     const std::vector<double>& prices
@@ -112,14 +70,38 @@ std::vector<double> StrategyCalculator::calculate_breakeven_points(
     return breakevens;
 }
 
-double StrategyCalculator::delta_levrage(
-    const double total_average_pnl,
-    const double premium
+void StrategyCalculator::calculate_profit_zone(
+    const std::vector<double>& total_pnl,
+    const std::vector<double>& prices,
+    double& min_profit_price,
+    double& max_profit_price,
+    double& profit_zone_width
 ) {
-    if (std::abs(premium) > 1e-10) {
-        return std::abs(total_average_pnl / (1+ premium));
+    min_profit_price = 0.0;
+    max_profit_price = 0.0;
+    profit_zone_width = 0.0;
+
+    if (total_pnl.empty() || prices.empty() || total_pnl.size() != prices.size()) {
+        return;
     }
-    return 0.0;
+
+    bool found = false;
+    for (size_t i = 0; i < total_pnl.size(); ++i) {
+        if (total_pnl[i] > 0.0) {
+            if (!found) {
+                min_profit_price = prices[i];
+                max_profit_price = prices[i];
+                found = true;
+            } else {
+                if (prices[i] < min_profit_price) min_profit_price = prices[i];
+                if (prices[i] > max_profit_price) max_profit_price = prices[i];
+            }
+        }
+    }
+
+    if (found) {
+        profit_zone_width = max_profit_price - min_profit_price;
+    }
 }
 
 double StrategyCalculator::avg_pnl_levrage(
@@ -127,34 +109,6 @@ double StrategyCalculator::avg_pnl_levrage(
     const double premium
 ) {
     return total_average_pnl /(std::max(std::abs(premium) , 0.005));
-}
-
-void StrategyCalculator::calculate_surfaces(
-    const std::vector<double>& total_pnl,
-    const std::vector<OptionData>& options,
-    const std::vector<int>& signs,
-    double dx,
-    double& total_sigma_pnl
-) {
-    // Surfaces non pondérées
-    double sum_positive = 0.0;
-    double sum_negative = 0.0;
-    
-    for (double pnl : total_pnl) {
-        if (pnl > 0.0) {
-            sum_positive += pnl;
-        } else {
-            sum_negative += pnl;  // Négatif
-        }
-    }
-    
-    double sum_signed_sigma = 0.0;
-    
-    for (size_t i = 0; i < options.size(); ++i) {
-        sum_signed_sigma += signs[i] * options[i].sigma_pnl;
-    }
-    
-    total_sigma_pnl = std::abs(sum_signed_sigma);
 }
 
 } // namespace strategy

@@ -352,17 +352,17 @@ def run():
         **Warning:** Very high leverage may indicate a risky strategy with low probability of success.
         """)
     
-    # Roll Quarterly
-    with st.expander("🔄 Roll into Next Quarter"):
+    # Roll
+    with st.expander("🔄 Roll (first selected expiry)"):
         st.markdown("""
         **Definition:** The price difference between the current option and the same option 
-        on the next quarter's expiry.
+        on the first roll expiry selected in the parameters.
         
         **Formula:**
-        $$Roll = Price_{Q+1} - Price_{current}$$
+        $$Roll = Price_{roll[0]} - Price_{current}$$
         
         **Interpretation:**
-        - **Roll > 0**: Option is more expensive on the next expiry (contango)
+        - **Roll > 0**: Option is more expensive on the selected roll expiry (contango)
         - **Roll < 0**: Option is cheaper on the next expiry (backwardation)
         - For a **long** position, positive roll is favorable (time value increases)
         - **Higher = Better** (for long positions)

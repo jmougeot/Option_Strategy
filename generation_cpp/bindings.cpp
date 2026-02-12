@@ -60,19 +60,12 @@ static OptionsCache g_cache;
 void init_options_cache(      
     py::array_t<double> premiums,
     py::array_t<double> deltas,
-    py::array_t<double> gammas,
-    py::array_t<double> vegas,
-    py::array_t<double> thetas,
     py::array_t<double> ivs,
     py::array_t<double> average_pnls,
     py::array_t<double> sigma_pnls,
     py::array_t<double> strikes,
     py::array_t<bool> is_calls,
     py::array_t<double> rolls,
-    py::array_t<double> rolls_quarterly,
-    py::array_t<double> rolls_sum,
-    py::array_t<double> tail_penalties,
-    py::array_t<double> tail_penalties_short,
     py::array_t<double> intra_life_prices,  // Matrice (n_options, N_INTRA_DATES)
     py::array_t<double> intra_life_pnl,     // Matrice (n_options, N_INTRA_DATES) - P&L moyen
     py::array_t<double> pnl_matrix,
@@ -82,19 +75,12 @@ void init_options_cache(
 ) {
     auto prem_buf = premiums.unchecked<1>();
     auto delta_buf = deltas.unchecked<1>();
-    auto gamma_buf = gammas.unchecked<1>();
-    auto vega_buf = vegas.unchecked<1>();
-    auto theta_buf = thetas.unchecked<1>();
     auto iv_buf = ivs.unchecked<1>();
     auto avg_pnl_buf = average_pnls.unchecked<1>();
     auto sigma_buf = sigma_pnls.unchecked<1>();
     auto strike_buf = strikes.unchecked<1>();
     auto is_call_buf = is_calls.unchecked<1>();
     auto rolls_buf = rolls.unchecked<1>();
-    auto rolls_q_buf = rolls_quarterly.unchecked<1>();
-    auto rolls_sum_buf = rolls_sum.unchecked<1>();
-    auto tail_pen_buf = tail_penalties.unchecked<1>();
-    auto tail_pen_short_buf = tail_penalties_short.unchecked<1>();
     auto intra_life_buf = intra_life_prices.unchecked<2>();  // Matrice (n_options, N_INTRA_DATES)
     auto intra_life_pnl_buf = intra_life_pnl.unchecked<2>(); // Matrice (n_options, N_INTRA_DATES)
     auto pnl_buf = pnl_matrix.unchecked<2>();
@@ -114,19 +100,11 @@ void init_options_cache(
     for (size_t i = 0; i < g_cache.n_options; ++i) {
         g_cache.options[i].premium = prem_buf(i);
         g_cache.options[i].delta = delta_buf(i);
-        g_cache.options[i].gamma = gamma_buf(i);
-        g_cache.options[i].vega = vega_buf(i);
-        g_cache.options[i].theta = theta_buf(i);
         g_cache.options[i].implied_volatility = iv_buf(i);
         g_cache.options[i].average_pnl = avg_pnl_buf(i);
-        g_cache.options[i].sigma_pnl = sigma_buf(i);
         g_cache.options[i].strike = strike_buf(i);
         g_cache.options[i].is_call = is_call_buf(i);
         g_cache.options[i].roll = rolls_buf(i);
-        g_cache.options[i].roll_quarterly = rolls_q_buf(i);
-        g_cache.options[i].roll_sum = rolls_sum_buf(i);
-        g_cache.options[i].tail_penalty = tail_pen_buf(i);
-        g_cache.options[i].tail_penalty_short = tail_pen_short_buf(i);
         
         // Copier les prix intra-vie et P&L intra-vie
         for (int t = 0; t < N_INTRA_DATES; ++t) {
@@ -167,18 +145,10 @@ static py::tuple scored_strategy_to_python(const ScoredStrategy& strat) {
     py::dict metrics_dict;
     metrics_dict["total_premium"] = strat.total_premium;
     metrics_dict["total_delta"] = strat.total_delta;
-    metrics_dict["total_gamma"] = strat.total_gamma;
-    metrics_dict["total_vega"] = strat.total_vega;
-    metrics_dict["total_theta"] = strat.total_theta;
     metrics_dict["total_iv"] = strat.total_iv;
-    metrics_dict["avg_implied_volatility"] = strat.avg_implied_volatility;
     metrics_dict["average_pnl"] = strat.average_pnl;
     metrics_dict["total_average_pnl"] = strat.average_pnl;
     metrics_dict["total_roll"] = strat.roll;
-    metrics_dict["total_roll_quarterly"] = strat.roll_quarterly;
-    metrics_dict["total_roll_sum"] = strat.roll_sum;
-    metrics_dict["sigma_pnl"] = strat.sigma_pnl;
-    metrics_dict["total_sigma_pnl"] = strat.sigma_pnl;
     metrics_dict["max_profit"] = strat.max_profit;
     metrics_dict["max_loss"] = strat.max_loss;
     metrics_dict["max_loss_left"] = strat.max_loss_left;
@@ -188,22 +158,18 @@ static py::tuple scored_strategy_to_python(const ScoredStrategy& strat) {
     metrics_dict["profit_zone_width"] = strat.profit_zone_width;
     metrics_dict["call_count"] = strat.call_count;
     metrics_dict["put_count"] = strat.put_count;
-    metrics_dict["breakeven_points"] = strat.breakeven_points;
     metrics_dict["score"] = strat.score;
     metrics_dict["rank"] = strat.rank;
     metrics_dict["delta_levrage"] = strat.delta_levrage;
     metrics_dict["avg_pnl_levrage"] = strat.avg_pnl_levrage;
-    metrics_dict["tail_penalty"] = strat.tail_penalty;
 
     py::list intra_life_list;
-    for (int t = 0; t < 5; ++t) {
-        intra_life_list.append(strat.intra_life_prices[t]);
+    for (int t = 0; t < 5; ++t) {intra_life_list.append(strat.intra_life_prices[t]);
     }
     metrics_dict["intra_life_prices"] = intra_life_list;
 
     py::list intra_life_pnl_list;
-    for (int t = 0; t < 5; ++t) {
-        intra_life_pnl_list.append(strat.intra_life_pnl[t]);
+    for (int t = 0; t < 5; ++t) {intra_life_pnl_list.append(strat.intra_life_pnl[t]);
     }
     metrics_dict["intra_life_pnl"] = intra_life_pnl_list;
     metrics_dict["avg_intra_life_pnl"] = strat.avg_intra_life_pnl;
@@ -342,16 +308,9 @@ py::dict process_combinations_batch_with_multi_scoring(
                     ScoredStrategy strat;
                     strat.total_premium = metrics.total_premium;
                     strat.total_delta = metrics.total_delta;
-                    strat.total_gamma = metrics.total_gamma;
-                    strat.total_vega = metrics.total_vega;
-                    strat.total_theta = metrics.total_theta;
                     strat.total_iv = metrics.total_iv;
-                    strat.avg_implied_volatility = metrics.total_iv / n_legs;
                     strat.average_pnl = metrics.total_average_pnl;
                     strat.roll = metrics.total_roll;
-                    strat.roll_quarterly = metrics.total_roll_quarterly;
-                    strat.roll_sum = metrics.total_roll_sum;
-                    strat.sigma_pnl = metrics.total_sigma_pnl;
                     strat.max_profit = metrics.max_profit;
                     strat.max_loss = std::min(metrics.max_loss_left, metrics.max_loss_right);
                     strat.max_loss_left = metrics.max_loss_left;
@@ -364,8 +323,6 @@ py::dict process_combinations_batch_with_multi_scoring(
                     strat.breakeven_points = metrics.breakeven_points;
                     strat.total_pnl_array = metrics.total_pnl_array;
                     strat.avg_pnl_levrage = metrics.avg_pnl_levrage;
-                    strat.delta_levrage = metrics.delta_levrage;
-                    strat.tail_penalty = metrics.tail_penalty;
                     strat.intra_life_prices = metrics.intra_life_prices;
                     strat.intra_life_pnl = metrics.intra_life_pnl;
                     strat.avg_intra_life_pnl = metrics.avg_intra_life_pnl;
@@ -374,6 +331,7 @@ py::dict process_combinations_batch_with_multi_scoring(
                     strat.signs.reserve(n_legs);
                     strat.strikes.reserve(n_legs);
                     strat.is_calls.reserve(n_legs);
+
                     for (int i = 0; i < n_legs; ++i) {
                         strat.option_indices.push_back(indices[i]);
                         strat.signs.push_back((mask & (1 << i)) ? 1 : -1);
@@ -444,19 +402,12 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           )pbdoc",
           py::arg("premiums"),
           py::arg("deltas"),
-          py::arg("gammas"),
-          py::arg("vegas"),
-          py::arg("thetas"),
           py::arg("ivs"),
           py::arg("average_pnls"),
           py::arg("sigma_pnls"),
           py::arg("strikes"),
           py::arg("is_calls"),
           py::arg("rolls"),
-          py::arg("rolls_quarterly"),
-          py::arg("rolls_sum"),
-          py::arg("tail_penalties"),
-          py::arg("tail_penalties_short"),
           py::arg("intra_life_prices"),
           py::arg("intra_life_pnl"),
           py::arg("pnl_matrix"),

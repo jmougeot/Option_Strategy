@@ -19,34 +19,11 @@ namespace strategy {
 
 std::vector<MetricConfig> StrategyScorer::create_default_metrics() {
     std::vector<MetricConfig> metrics;
-    
-    // Greeks (optimisés pour neutralité)
-    metrics.emplace_back("delta_neutral", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);
-    metrics.emplace_back("gamma_low", 0.00, NormalizerType::MAX, ScorerType::LOWER_BETTER);
-    metrics.emplace_back("vega_low", 0.00, NormalizerType::MAX, ScorerType::LOWER_BETTER);
-    metrics.emplace_back("theta_positive", 0.0, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
-    metrics.emplace_back("premium", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);  // Plus proche de 0 = meilleur (poids augmenté)
-    // Volatilité
-    metrics.emplace_back("implied_vol_moderate", 0.00, NormalizerType::MIN_MAX, ScorerType::MODERATE_BETTER);
-    
-    // Métriques gaussiennes (mixture)
+    metrics.emplace_back("premium", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER); 
     metrics.emplace_back("average_pnl", 0.00 , NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
     metrics.emplace_back("roll", 0.00, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
-    metrics.emplace_back("roll_quarterly", 0.00, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
-    metrics.emplace_back("sigma_pnl", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);
-    
-    // Métriques de levier (valeur absolue élevée = meilleur)
-    metrics.emplace_back("delta_levrage", 0.00, NormalizerType::MAX, ScorerType::HIGHER_BETTER);
-    metrics.emplace_back("avg_pnl_levrage", 0.0, NormalizerType::MAX, ScorerType::HIGHER_BETTER);
-    
-    // Métrique de risque
-    metrics.emplace_back("max_loss", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER);  // Perte plus faible = meilleur
-    
-    // Tail penalty (risque de perte - plus faible = meilleur)
-    // MIN_MAX pour mieux différencier les valeurs dans une plage étroite
+    metrics.emplace_back("avg_pnl_levrage", 0.0, NormalizerType::MAX, ScorerType::HIGHER_BETTER);    
     metrics.emplace_back("tail_penalty", 0.0, NormalizerType::MIN_MAX, ScorerType::LOWER_BETTER);
-    
-    // Moyenne des P&L intra-vie (plus élevé = meilleur)
     metrics.emplace_back("avg_intra_life_pnl", 0.0, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
     
     return metrics;
@@ -60,8 +37,7 @@ void StrategyScorer::normalize_weights(std::vector<MetricConfig>& metrics) {
     double total_weight = 0.0;
     for (const auto& metric : metrics) {
         total_weight += metric.weight;
-    }
-    
+    }  
     if (total_weight > 0.0) {
         for (auto& metric : metrics) {
             metric.weight /= total_weight;
@@ -82,40 +58,17 @@ std::vector<double> StrategyScorer::extract_metric_values(
     
     for (const auto& strat : strategies) {
         double value = 0.0;
-        
-        if (metric_name == "delta_neutral") {
-            value = std::abs(strat.total_delta);
-        } else if (metric_name == "gamma_low") {
-            value = std::abs(strat.total_gamma);
-        } else if (metric_name == "vega_low") {
-            value = std::abs(strat.total_vega);
-        } else if (metric_name == "theta_positive") {
-            value = strat.total_theta;
-        } else if (metric_name == "implied_vol_moderate") {
-            value = strat.avg_implied_volatility;
-        } else if (metric_name == "average_pnl") {
+        if (metric_name == "average_pnl") {
             value = strat.average_pnl;
         } else if (metric_name == "roll") {
             value = strat.roll;
-        } else if (metric_name == "roll_quarterly") {
-            value = strat.roll_quarterly;
-        } else if (metric_name == "sigma_pnl") {
-            value = strat.sigma_pnl;
         } else if (metric_name == "delta_levrage") {
-            value = strat.delta_levrage;
-        } else if (metric_name == "avg_pnl_levrage") {
             value = strat.avg_pnl_levrage;
         } else if (metric_name == "premium") {
-            value = std::abs(strat.total_premium);  // Valeur absolue pour centrer autour de 0
-        } else if (metric_name == "max_loss") {
-            value = std::abs(strat.max_loss);  // Valeur absolue de la perte max
-        } else if (metric_name == "tail_penalty") {
-            // Valeur brute - MIN_MAX normalisera automatiquement
-            value = std::abs(strat.tail_penalty);
+            value = std::abs(strat.total_premium);
         } else if (metric_name == "avg_intra_life_pnl") {
             value = strat.avg_intra_life_pnl;
         }
-        
         if (std::isfinite(value)) {
             values.push_back(value);
         } else {
@@ -145,11 +98,9 @@ std::pair<double, double> StrategyScorer::normalize_values(
             valid_values.push_back(v);
         }
     }
-    
     if (valid_values.empty()) {
         return {0.0, 1.0};
     }
-    
     switch (normalizer) {
         case NormalizerType::MAX: {
             double max_val = *std::max_element(valid_values.begin(), valid_values.end());
@@ -164,18 +115,7 @@ std::pair<double, double> StrategyScorer::normalize_values(
                 return {min_val, min_val + 1.0};  // Éviter division par zéro
             }
             return {min_val, max_val};
-        }
-        
-        case NormalizerType::COUNT: {
-            auto minmax = std::minmax_element(valid_values.begin(), valid_values.end());
-            double min_val = *minmax.first;
-            double max_val = *minmax.second;
-            if (max_val == min_val) {
-                return {min_val, min_val + 1.0};
-            }
-            return {min_val, max_val};
-        }
-        
+        }  
         default:
             return {0.0, 1.0};
     }
@@ -204,7 +144,6 @@ double StrategyScorer::calculate_score(
             }
             return 0.0;
         }
-        
         case ScorerType::LOWER_BETTER: {
             // Plus bas = meilleur
             if (max_val > min_val) {
@@ -214,53 +153,10 @@ double StrategyScorer::calculate_score(
             return 0.0;
         }
         
-        case ScorerType::MODERATE_BETTER: {
-            // Valeur modérée = meilleur (autour du milieu de la plage)
-            if (max_val > min_val) {
-                double normalized = (value - min_val) / (max_val - min_val);
-                double score = 1.0 - std::abs(normalized - 0.5) * 2.0;
-                return std::max(0.0, score);
-            }
-            return 0.0;
-        }
-        
-        case ScorerType::POSITIVE_BETTER: {
-            // Valeur positive = meilleur
-            if (value >= 0.0 && max_val > min_val) {
-                return std::clamp((value - min_val) / (max_val - min_val), 0.0, 1.0);
-            }
-            return 0.0;
-        }
-        
         default:
             return 0.0;
     }
 }
-
-// ============================================================================
-// FILTRE DE DOUBLONS - OPTIMISÉ AVEC HASH
-// ============================================================================
-
-// Fonction de hash pour un vecteur de P&L arrondi
-static size_t hash_pnl_array(const std::vector<double>& pnl, int decimals) {
-    double factor = std::pow(10.0, decimals);
-    size_t hash = 0;
-    
-    // Échantillonner quelques points pour le hash (début, milieu, fin)
-    std::vector<size_t> sample_indices;
-    if (pnl.size() > 0) sample_indices.push_back(0);
-    if (pnl.size() > 10) sample_indices.push_back(pnl.size() / 4);
-    if (pnl.size() > 5) sample_indices.push_back(pnl.size() / 2);
-    if (pnl.size() > 10) sample_indices.push_back(3 * pnl.size() / 4);
-    if (pnl.size() > 1) sample_indices.push_back(pnl.size() - 1);
-    
-    for (size_t idx : sample_indices) {
-        long long rounded = static_cast<long long>(std::round(pnl[idx] * factor));
-        hash ^= std::hash<long long>{}(rounded) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-    }
-    return hash;
-}
-
 
 bool StrategyScorer::are_same_payoff(
     const ScoredStrategy& s1,
@@ -300,7 +196,7 @@ bool StrategyScorer::are_same_payoff(
             return false;
         }
     }
-    
+
     // 4. Compter le nombre de différences call/put pour chaque (strike, sign)
     int diff_count = 0;
     for (size_t i = 0; i < n; i++) {
@@ -346,8 +242,6 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
         const auto& strat = strategies[idx];
         bool is_duplicate = false;
 
-        // Vérifier si cette stratégie est un doublon d'une stratégie déjà dans uniques
-        // Utilise la logique: même strikes + même signs + nombre pair de diff call/put
         for (size_t i = 0; i < uniques.size(); i++) {
             const auto& unique = uniques[i];
             if (are_same_payoff(strat, unique)) {
@@ -356,7 +250,6 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
                 break;
             }
         }
-        
         if (!is_duplicate) {
             uniques.push_back(strat);
         }
@@ -374,34 +267,14 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
 // ============================================================================
 
 static double extract_single_metric_value(const ScoredStrategy& strat, const std::string& metric_name) {
-    if (metric_name == "delta_neutral") {
-        return std::abs(strat.total_delta);
-    } else if (metric_name == "gamma_low") {
-        return std::abs(strat.total_gamma);
-    } else if (metric_name == "vega_low") {
-        return std::abs(strat.total_vega);
-    } else if (metric_name == "theta_positive") {
-        return strat.total_theta;
-    } else if (metric_name == "implied_vol_moderate") {
-        return strat.avg_implied_volatility;
-    } else if (metric_name == "average_pnl") {
+    if (metric_name == "average_pnl") {
         return strat.average_pnl;
     } else if (metric_name == "roll") {
         return strat.roll;
-    } else if (metric_name == "roll_quarterly") {
-        return strat.roll_quarterly;
-    } else if (metric_name == "sigma_pnl") {
-        return strat.sigma_pnl;
-    } else if (metric_name == "delta_levrage") {
-        return strat.delta_levrage;
     } else if (metric_name == "avg_pnl_levrage") {
         return strat.avg_pnl_levrage;
     } else if (metric_name == "premium") {
         return std::abs(strat.total_premium);
-    } else if (metric_name == "max_loss") {
-        return std::abs(strat.max_loss);
-    } else if (metric_name == "tail_penalty") {
-        return std::abs(strat.tail_penalty);
     } else if (metric_name == "avg_intra_life_pnl") {
         return strat.avg_intra_life_pnl;
     }
@@ -430,7 +303,6 @@ std::pair<
     const size_t n_sets = weight_sets.size();
 
     // ====== 1. Collect ALL metric names across every weight set ======
-    // We need one common normalisation for each metric.
     std::vector<std::string> all_metric_names;
     {
         std::unordered_map<std::string, bool> seen;
@@ -446,7 +318,6 @@ std::pair<
     const size_t n_metrics = all_metric_names.size();
 
     // ====== 2. Common normalisation: compute min/max for every metric ======
-    // Build a map: metric_name → (NormalizerType, min, max)
     struct NormInfo {
         NormalizerType normalizer;
         ScorerType scorer;
@@ -496,7 +367,6 @@ std::pair<
     }
 
     // ====== 3. Pre-compute normalised metric scores per strategy ======
-    // metric_scores[metric_name][strat_idx] = score ∈ [0,1]
     std::unordered_map<std::string, std::vector<double>> metric_scores;
     for (const auto& name : all_metric_names) {
         auto& ni = norm_map[name];
@@ -509,10 +379,6 @@ std::pair<
     }
 
     // ====== 4. For each weight set, score all strategies & keep top N ======
-    // Also store per-set ranking for consensus.
-    // per_set_ranks[set_idx][strat_idx] = rank (1-based) or 0 if not in top
-
-    // We store all scores per set in a flat vector to compute rankings
     std::vector<std::vector<double>> all_set_scores(n_sets); // [set][strat]
 
     for (size_t s = 0; s < n_sets; ++s) {
@@ -590,7 +456,6 @@ std::pair<
     }
 
     // ====== 5. Meta ranking via total score (sum of per-set scores) ======
-
     std::vector<double> total_score(n_strats, 0.0);
     for (size_t i = 0; i < n_strats; ++i) {
         for (size_t s = 0; s < n_sets; ++s) {

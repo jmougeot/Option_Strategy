@@ -78,46 +78,57 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     }
     
     // Filtre 4: Put count (ouvert_gauche)
-    int put_count;
-    int long_put_count = 0;
-    for (size_t i = 0; i < options.size(); ++i) {
-        if (!options[i].is_call && signs[i] > 0) {
-            ++long_put_count;
-        }
-    }
     if (!filter_put_open(options, signs, ouvert_gauche)) {
         return std::nullopt;
     }
     
     // Filtre 4b: Call open (ouvert_droite)
-    int call_count_check;
     if (!filter_call_open(options, signs, ouvert_droite)) {
         return std::nullopt;
     }
     
+    // Filtres/agrégations fusionnés en une seule passe
+    double total_premium = 0.0;
+    double total_delta = 0.0;
+    double total_average_pnl = 0.0;
+    double total_roll = 0.0;
+    int call_count = 0;
+    int put_count = 0;
+
+    for (size_t i = 0; i < options.size(); ++i) {
+        const double s = static_cast<double>(signs[i]);
+        total_premium += s * options[i].premium;
+        total_delta += s * options[i].delta;
+        total_average_pnl += s * options[i].average_pnl;
+        total_roll += s * options[i].roll;
+
+        if (options[i].is_call) {
+            ++call_count;
+        } else {
+            ++put_count;
+        }
+    }
+
     // Filtre 5: Premium
-    double total_premium;
-    if (!filter_premium(options, signs, max_premium_params, total_premium)) {
+    if (std::abs(total_premium) > max_premium_params) {
         return std::nullopt;
     }
-    
+
     // Filtre 6: Delta (avec bornes min/max)
-    double total_delta;
-    if (!filter_delta(options, signs, delta_min, delta_max, total_delta)) {
+    if (total_delta < delta_min || total_delta > delta_max) {
         return std::nullopt;
     }
-    
+
     // Filtre 7: Average P&L
-    double total_average_pnl;
-    if (!filter_average_pnl(options, signs, total_average_pnl)) {
+    if (total_average_pnl < 0.0) {
         return std::nullopt;
     }
     
     // ========== CALCULS ==========
     
     // Greeks
-    double total_gamma, total_vega, total_theta, total_iv;
-    calculate_greeks(options, signs, total_gamma, total_vega, total_theta, total_iv);
+    double total_iv;
+    calculate_greeks(options, signs, total_iv);
     
     // P&L total
     std::vector<double> total_pnl = calculate_total_pnl(pnl_matrix, signs);
@@ -126,8 +137,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         return std::nullopt;
     }
 
-    double delta_lvg = delta_levrage(total_delta, total_premium);
-    double avg_pnl_lvg= avg_pnl_levrage(total_average_pnl, total_premium);
+    double avg_pnl_lvg = avg_pnl_levrage(total_average_pnl, total_premium);
     // ========== FILTRES DE PERTE BASÉS SUR LES LIMITES DE PRIX ==========
     
     double max_loss_left = 0.0;
@@ -161,16 +171,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         }
     }
     
-    // Trouver l'index de séparation basé sur average_mix (pour d'autres calculs)
-    size_t split_idx = 0;
-    for (size_t i = 0; i < prices.size(); ++i) {
-        if (prices[i] >= average_mix) {
-            split_idx = i;
-            break;
-        }
-    }
-    if (split_idx == 0) split_idx = prices.size() / 2;
-    
     // Max profit / max loss global
     auto [min_it, max_it] = std::minmax_element(total_pnl.begin(), total_pnl.end());
     double max_profit = *max_it;
@@ -182,49 +182,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     // Profit zone
     double min_profit_price, max_profit_price, profit_zone_width;
     calculate_profit_zone(total_pnl, prices, min_profit_price, max_profit_price, profit_zone_width);
-    
-    // Surfaces et sigma
-    double dx = (prices.size() > 1) ? (prices[1] - prices[0]) : 1.0;
-    double total_sigma_pnl = 0.0;
-    
-    // Calcul sigma avec mixture
-    if (!mixture.empty()) {
-        double mass = 0.0;
-        for (double m : mixture) mass += m;
-        mass *= dx;
-        
-        if (mass > 0.0) {
-            double var = 0.0;
-            for (size_t i = 0; i < total_pnl.size() && i < mixture.size(); ++i) {
-                double diff = total_pnl[i] - total_average_pnl;
-                var += mixture[i] * diff * diff;
-            }
-            var *= dx / mass;
-            total_sigma_pnl = std::sqrt(std::max(var, 0.0));
-        }
-    }
-    
-    // Calcul des rolls
-    double total_roll = 0.0;
-    double total_roll_quarterly = 0.0;
-    double total_roll_sum = 0.0;
-    for (size_t i = 0; i < options.size(); ++i) {
-        total_roll += signs[i] * options[i].roll;
-        total_roll_quarterly += signs[i] * options[i].roll_quarterly;
-        total_roll_sum += signs[i] * options[i].roll_sum;
-    }
-    
-    // Calcul du tail penalty
-    double tail_penalty = 0.0;
-    for (size_t i = 0; i < options.size(); ++i) {
-        if (signs[i] > 0) {
-            // Achat: la zone négative du P&L est la perte
-            tail_penalty += options[i].tail_penalty;
-        } else {
-            // Vente: la zone positive du P&L devient la perte
-            tail_penalty += options[i].tail_penalty_short;
-        }
-    }
     
     // Calcul des prix intra-vie et P&L de la stratégie
     std::array<double, N_INTRA_DATES> strategy_intra_life_prices;
@@ -252,29 +209,21 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     StrategyMetrics result;
     result.total_premium = total_premium;
     result.total_delta = total_delta;
-    result.total_gamma = total_gamma;
-    result.total_vega = total_vega;
-    result.total_theta = total_theta;
     result.total_iv = total_iv;
     result.max_profit = max_profit;
     result.max_loss = max_loss;
     result.max_loss_left = max_loss_left;
     result.max_loss_right = max_loss_right;
     result.total_average_pnl = total_average_pnl;
-    result.total_sigma_pnl = total_sigma_pnl;
     result.min_profit_price = min_profit_price;
     result.max_profit_price = max_profit_price;
     result.profit_zone_width = profit_zone_width;
     result.breakeven_points = std::move(breakeven_points);
     result.total_pnl_array = std::move(total_pnl);
     result.total_roll = total_roll;
-    result.total_roll_quarterly = total_roll_quarterly;
-    result.total_roll_sum = total_roll_sum;
-    result.call_count = call_count_check;
+    result.call_count = call_count;
     result.put_count = put_count;
-    result.delta_levrage = delta_lvg;
     result.avg_pnl_levrage = avg_pnl_lvg;
-    result.tail_penalty = tail_penalty;
     result.intra_life_prices = strategy_intra_life_prices;
     result.intra_life_pnl = strategy_intra_life_pnl;
     result.avg_intra_life_pnl = avg_intra_life_pnl;

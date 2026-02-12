@@ -14,7 +14,7 @@ from myproject.strategy.strategy_class import StrategyComparison
 # Metric key → short human label (used in summaries)
 _METRIC_LABELS: Dict[str, str] = {
     "avg_pnl_levrage": "Leverage",
-    "roll_quarterly": "Roll",
+    "roll": "Roll",
     "avg_intra_life_pnl": "Dynamic",
     "average_pnl": "Gain",
     "max_loss": "Tail Risk",

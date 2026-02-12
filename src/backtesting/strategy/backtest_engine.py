@@ -60,7 +60,7 @@ DEFAULT_WEIGHT_GRID: List[Dict[str, float]] = [
     # 6) Premium income
     {"premium": 0.5, "average_pnl": 0.3, "max_loss": 0.2},
     # 7) Roll + average PnL
-    {"roll_quarterly": 0.4, "average_pnl": 0.6},
+    {"roll": 0.4, "average_pnl": 0.6},
     # 8) Conservative
     {"average_pnl": 0.4, "max_loss": 0.4, "sigma_pnl": 0.2},
 ]

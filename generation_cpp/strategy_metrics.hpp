@@ -24,9 +24,6 @@ struct StrategyMetrics {
     // Greeks agrégés
     double total_premium;
     double total_delta;
-    double total_gamma;
-    double total_vega;
-    double total_theta;
     double total_iv;
     
     // P&L metrics
@@ -35,7 +32,6 @@ struct StrategyMetrics {
     double max_loss_left;   // Max loss à gauche de average_mix
     double max_loss_right;  // Max loss à droite de average_mix
     double total_average_pnl;
-    double total_sigma_pnl;
     
     // Profit zone
     double min_profit_price;
@@ -48,16 +44,10 @@ struct StrategyMetrics {
     
     // Roll
     double total_roll;
-    double total_roll_quarterly;
-    double total_roll_sum;
 
     // Levrage
-    double delta_levrage;
     double avg_pnl_levrage;
-    
-    // Tail penalty (risque de perte)
-    double tail_penalty;  // Somme des tail_penalty pour la stratégie
-    
+        
     // Intra-vie pricing (prix à dates intermédiaires avec tilt terminal)
     std::array<double, N_INTRA_DATES> intra_life_prices;  // [V_t1, V_t2, V_t3, V_t4, V_t5]
     std::array<double, N_INTRA_DATES> intra_life_pnl;     // P&L moyen à chaque date
@@ -77,18 +67,10 @@ struct StrategyMetrics {
 struct OptionData {
     double premium;
     double delta;
-    double gamma;
-    double vega;
-    double theta;
     double implied_volatility;
     double average_pnl;
-    double sigma_pnl;
     double strike;
     double roll;            // Roll moyen (normalisé)
-    double roll_quarterly;  // Roll Q-1 (trimestre précédent)
-    double roll_sum;        // Roll brut (non normalisé)
-    double tail_penalty;     // Pour achat (zone négative au carré)
-    double tail_penalty_short;  // Pour vente (zone positive au carré)
     bool is_call;
     // pnl_array sera passé séparément comme matrice
     
@@ -179,9 +161,6 @@ private:
     static void calculate_greeks(
         const std::vector<OptionData>& options,
         const std::vector<int>& signs,
-        double& total_gamma,
-        double& total_vega,
-        double& total_theta,
         double& total_iv
     );
     
@@ -201,19 +180,6 @@ private:
     static std::vector<double> calculate_breakeven_points(
         const std::vector<double>& total_pnl,
         const std::vector<double>& prices
-    );
-    
-    static void calculate_surfaces(
-        const std::vector<double>& total_pnl,
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs,
-        double dx,
-        double& total_sigma_pnl
-    );
-
-    static double delta_levrage(
-        const double total_average_pnl, 
-        const double premium
     );
 
     static double avg_pnl_levrage(

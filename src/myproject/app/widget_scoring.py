@@ -20,7 +20,7 @@ from typing import Dict, List
 
 SCORING_FIELDS: Dict[str, str] = {
     "avg_pnl_levrage":   "Leverage",
-    "roll_quarterly":    "Roll",
+    "roll":             "Roll",
     "avg_intra_life_pnl":"Dynamic Life",
     "average_pnl":       "Expected Gain",
     "max_loss":          "Tail Risk",
@@ -46,10 +46,10 @@ ALL_FIELDS = {**SCORING_FIELDS, **ADVANCED_SCORING_FIELDS}
 
 RANKING_PRESETS: Dict[str, Dict[str, float]] = {
     "R1 — Leverage":              {"avg_pnl_levrage": 1.0},
-    "R2 — Roll":                  {"roll_quarterly": 1.0},
+    "R2 — Roll":                  {"roll": 1.0},
     "R3 — Dynamic Life":          {"avg_intra_life_pnl": 1.0},
-    "R4 — Balanced (L/R/D)":      {"avg_pnl_levrage": 0.33, "roll_quarterly": 0.33, "avg_intra_life_pnl": 0.34},
-    "R5 — Roll + Leverage":       {"roll_quarterly": 0.50, "avg_pnl_levrage": 0.50},
+    "R4 — Balanced (L/R/D)":      {"avg_pnl_levrage": 0.33, "roll": 0.33, "avg_intra_life_pnl": 0.34},
+    "R5 — Roll + Leverage":       {"roll": 0.50, "avg_pnl_levrage": 0.50},
     "R6 — Leverage + Dynamic":    {"avg_pnl_levrage": 0.50, "avg_intra_life_pnl": 0.50},
     "R7 — Dynamic + Leverage":    {"avg_intra_life_pnl": 0.50, "avg_pnl_levrage": 0.50},
 }

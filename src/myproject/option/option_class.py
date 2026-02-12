@@ -151,9 +151,7 @@ class Option:
     ask: Optional[float] = None
     last: Optional[float] = None
     mid: Optional[float] = None
-    roll: Optional[float] = None  # Roll moyen (normalisé par nombre de trimestres)
-    roll_quarterly: Optional[float] = None  # Roll Q-1 (trimestre précédent)
-    roll_sum: Optional[float] = None  # Roll brut (prix_roll - prix_courant, non normalisé)
+    roll: List[float] = field(default_factory=list)  # Tous les rolls calculés (ordre des expiries utilisateur)
     rolls_detail: Dict[str, float] = field(default_factory=dict)  # Rolls par expiry (ex: {"H6": 0.5, "M6": 0.3})
 
     # ============ GREEKS ============

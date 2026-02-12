@@ -112,7 +112,7 @@ def run():
                 st.session_state["multi_ranking"] = multi_result
                 st.session_state["mixture"] = mixture
                 st.session_state["future_data"] = future_data
-                st.session_state["stats"] = stats
+                st.session_state["stats"] = stats 
 
                 # Save to history
                 from myproject.app.pages.history import add_to_history
@@ -172,7 +172,6 @@ def run():
             "max_legs": params.max_legs,
             "scoring_weights": scoring_weights,
             "scenarios": scenarios,
-
             "filter": filter,
             "roll_expiries": params.roll_expiries,
         }

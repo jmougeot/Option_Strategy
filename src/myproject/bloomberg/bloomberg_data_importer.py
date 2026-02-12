@@ -179,13 +179,9 @@ class OptionProcessor:
                     rolls_detail[label] = roll_value
             
             if rolls:
-                # Roll = moyenne des rolls calculés
-                option.roll = sum(rolls) / len(rolls)
-                option.roll_sum = sum(rolls)
+                # Roll = série complète dans l'ordre des expiries fournies par l'utilisateur
+                option.roll = rolls
                 option.rolls_detail = rolls_detail
-                
-                # Roll quarterly = premier roll (Q-1)
-                option.roll_quarterly = rolls[0] if rolls else None
                 
         except Exception as e:
             print(f"  ⚠️ Erreur calcul roll: {e}")
@@ -242,10 +238,9 @@ class OptionProcessor:
     def _print_option(option: Option):
         """Affiche le résumé d'une option."""
         sym = "C" if option.option_type == "call" else "P"
-        roll_q = f", RollQ1={option.roll_quarterly:.4f}" if option.roll_quarterly else ""
-        roll = f", Roll={option.roll:.4f}" if option.roll else ""
+        roll = f", Roll0={option.roll[0]:.4f}" if option.roll else ""
         print(f"✓ {sym} {option.strike}: Premium={option.premium}, "
-              f"Delta={option.delta}, IV={option.implied_volatility}{roll_q}{roll}")
+              f"Delta={option.delta}, IV={option.implied_volatility}{roll}")
 
 
 # ============================================================================
