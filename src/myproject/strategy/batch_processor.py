@@ -11,7 +11,7 @@ from myproject.strategy.strategy_class import StrategyComparison
 from myproject.strategy.multi_ranking import MultiRankingResult
 from myproject.strategy.strategy_naming import generate_strategy_name
 from myproject.option.option_utils_v2 import get_expiration_info
-from myproject.app.filter_widget import FilterData
+from myproject.app.widget_filter import FilterData
 
 
 # Cache global pour stocker les options (nécessaire pour batch_to_strategies)

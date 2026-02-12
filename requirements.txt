@@ -26,13 +26,9 @@ reportlab
 pywin32; sys_platform == 'win32'
 
 # Export images Plotly (pour génération de PNG)
-kaleido
+kaleido >=1.2.0
 
 # Compilation C++ bindings
 pybind11>=2.11.0
 
-# Pour créer un exécutable (optionnel)
-# pyinstaller>=6.0.0
-
-# Bloomberg API (installé séparément avec index-url spécial)
-# blpapi>=3.20.0
+scipy>=1.17.0

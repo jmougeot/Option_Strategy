@@ -1,20 +1,8 @@
-﻿"""
-GÃ©nÃ©rateur V2 de StratÃ©gies d'Options
-======================================
-
-GÃ©nÃ¨re toutes les combinaisons de stratÃ©gies d'options via le module C++.
-Le traitement est entiÃ¨rement dÃ©lÃ©guÃ© au batch processor C++ pour des performances optimales.
-"""
-
-from typing import List, Tuple, Optional, Dict
+﻿from typing import List, Optional, Dict
 from myproject.option.option_class import Option
-from myproject.strategy.strategy_class import StrategyComparison
 from myproject.strategy.multi_ranking import MultiRankingResult
-from myproject.strategy.batch_processor import (
-    process_batch_cpp_with_multi_scoring,
-    init_cpp_cache,
-)
-from myproject.app.filter_widget import FilterData
+from myproject.strategy.batch_processor import (process_batch_cpp_with_multi_scoring,init_cpp_cache,)
+from myproject.app.widget_filter import FilterData
 
 def sort_options_by_expiration(options: List[Option]) -> List[Option]:
     """
@@ -57,23 +45,7 @@ class OptionStrategyGeneratorV2:
         top_n: int = 10,
         weight_sets: Optional[List[Dict[str, float]]] = None,
     ) -> MultiRankingResult:
-        """
-        Génère les meilleures stratégies avec N jeux de poids simultanés.
-
-        Le C++ normalise une seule fois toutes les métriques, puis score
-        chaque combinaison contre chaque jeu de poids et construit :
-          - Un top_n par jeu de poids
-          - Un classement consensus (moyenne des rangs)
-
-        Args:
-            filter: Filtres de la stratégie (pertes max, delta, etc.)
-            max_legs: Nombre maximal de legs
-            top_n: Nombre de stratégies à garder par classement
-            weight_sets: Liste de dicts {metric_name: weight}
-
-        Returns:
-            MultiRankingResult
-        """
+  
         if not weight_sets:
             raise ValueError("weight_sets requis pour generate_top_strategies_multi")
 

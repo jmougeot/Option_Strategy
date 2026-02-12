@@ -1,4 +1,3 @@
-﻿
 from myproject.app.utils import format_currency, format_expiration_date
 from myproject.strategy.strategy_class import StrategyComparison
 from typing import List, Optional
@@ -36,4 +35,3 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
         data.append(row)
     
     return pd.DataFrame(data)
-

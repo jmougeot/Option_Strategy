@@ -52,7 +52,7 @@ def run_processing_worker(session_id: str, params_dict: Dict[str, Any]):
     """
     try:
         # Import here to avoid issues with multiprocessing
-        from myproject.app.main import process_bloomberg_to_strategies
+        from myproject.main import process_bloomberg_to_strategies
         
         # Reconstruct filter and scenarios from dict if needed
         filter_data = params_dict["filter"]

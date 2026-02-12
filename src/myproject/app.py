@@ -5,21 +5,17 @@ Description: Web user interface to compare options strategies
 
 import streamlit as st
 from datetime import datetime
-from typing import Dict, List
-
 from myproject.app.styles import inject_css
-from myproject.app.params_widget import sidebar_params
-from myproject.app.scenarios_widget import scenario_params
-from myproject.app.scoring_widget import scoring_weights_block
-from myproject.app.filter_widget import filter_params
-from myproject.app.history_tab import init_history, apply_pending_restore
-from myproject.share_result.email_utils import build_email_template_data, StrategyEmailData, create_email_with_images
+from myproject.app.widget_params import sidebar_params
+from myproject.app.widget_scenario import scenario_params
+from myproject.app.widget_scoring import scoring_weights_block
+from myproject.app.widget_filter import filter_params
+from myproject.share_result.email_utils import build_email_template_data, create_email_with_images
 from myproject.share_result.generate_pdf import create_pdf_report
 from myproject.app.pages.overview import run as overview_run
 from myproject.app.pages.history import run as history_run
 from myproject.app.pages.help import run as help_run
-
-
+from myproject.app.pages.history import init_history, apply_pending_restore
 # ============================================================================
 # PAGE CONFIGURATION
 # ============================================================================

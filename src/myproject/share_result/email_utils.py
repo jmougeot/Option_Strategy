@@ -5,7 +5,7 @@ Provides clean pipelines for Outlook email and PDF generation.
 from typing import List, Optional
 import streamlit as st
 from myproject.app.data_types import FutureData
-from myproject.share_result.utils import StrategyEmailData, EmailTemplateData
+from myproject.share_result.utils import EmailTemplateData
 from myproject.share_result.generate_email import (open_outlook_with_email,)
 
 def build_email_template_data(params, filter, scoring_weights) -> EmailTemplateData:
@@ -88,7 +88,7 @@ def build_email_template_data(params, filter, scoring_weights) -> EmailTemplateD
 
 def create_email_with_images(
     template_data: EmailTemplateData,
-    mixture: Optional[tuple],
+    mixture: tuple,
     comparisons: Optional[List] = None,
 ) -> bool:
     """
@@ -108,7 +108,7 @@ def create_email_with_images(
     # Generate images if we have the data
     if comparisons:
         try:
-            from myproject.app.image_saver import save_all_diagrams
+            from myproject.share_result.image_saver import save_all_diagrams
             print("[Email DEBUG] image_saver imported")
             
             saved_images = save_all_diagrams(comparisons, mixture)

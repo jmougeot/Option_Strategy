@@ -6,7 +6,7 @@ import streamlit as st
 from typing import List, Optional
 from myproject.strategy.strategy_class import StrategyComparison
 from myproject.app.utils import format_currency, format_expiration_date
-from myproject.app.comparison_table import create_comparison_table
+from myproject.app.widget_comparison import create_comparison_table
 
 
 def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Optional[List[str]] = None):
@@ -18,8 +18,6 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
         roll_labels: List of roll expiry labels (ex: ["H6", "M6"]) for dynamic columns.
                     If None, no roll columns are shown.
     """
-    st.header("Strategies Overview")
-
     if not comparisons:
         st.info("No strategies to display for this ranking.")
         return
@@ -28,12 +26,11 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
     winner = comparisons[0]
     expiry_str = format_expiration_date(winner.expiration_month, winner.expiration_year)
 
-    col1, col2, col3, col4 = st.columns([10, 4, 4, 4])
+    col1, col2, col3, col4 = st.columns([6, 4, 4, 4])
     with col1:
         st.metric(
             f"🥇 Best Strategy ({expiry_str})", 
             winner.strategy_name, 
-            f"Score: {winner.score:.3f}"
         )
     with col2:
         st.metric("Max Profit", format_currency(winner.max_profit), "")

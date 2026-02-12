@@ -199,9 +199,9 @@ def generate_pdf_report(
 
 
 def create_pdf_report(
+    mixture: tuple,
     template_data: EmailTemplateData,
     comparisons: Optional[List] = None,
-    mixture: Optional[tuple] = None,
 ) -> Optional[bytes]:
     """
     Create a PDF report with images.
@@ -220,7 +220,7 @@ def create_pdf_report(
     # Generate images if we have the data
     if comparisons:
         try:
-            from myproject.app.image_saver import save_all_diagrams
+            from myproject.share_result.image_saver import save_all_diagrams
             print("[PDF DEBUG] image_saver imported")
             
             saved_images = save_all_diagrams(comparisons, mixture)

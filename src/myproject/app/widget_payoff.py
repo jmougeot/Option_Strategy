@@ -1,63 +1,11 @@
-﻿import plotly.graph_objects as go
+from typing import List, Optional, Tuple
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+import numpy as np
 import streamlit as st
 
-from typing import Dict, List, Optional, Tuple
 from myproject.strategy.strategy_class import StrategyComparison
-from myproject.option.option_class import Option
-from myproject.app.image_saver import save_top10_summary
-from plotly.subplots import make_subplots
-import numpy as np
 
-
-def prepare_options_data(options: List[Option]) -> Dict[str, List[Option]]:
-    """Separates calls and puts."""
-    calls = [opt for opt in options if opt.option_type == "call"]
-    puts = [opt for opt in options if opt.option_type == "put"]
-
-    return {"calls": calls, "puts": puts}
-
-
-def format_currency(value: float) -> str:
-    """Formats a value as currency."""
-    if value == float("inf"):
-        return "Unlimited"
-    return f"${value:.2f}"
-
-
-def format_percentage(value: float) -> str:
-    """Formats a percentage."""
-    return f"{value:.1f}%"
-
-
-def format_expiration_date(month: str, year: int) -> str:
-    """
-    Formats expiration date from Bloomberg month and year.
-
-    Args:
-        month: Bloomberg month code (F, G, H, K, M, N, Q, U, V, X, Z)
-        year: Year (6 = 2026)
-
-    Returns:
-        Formatted date (ex: "Jun 2026")
-    """
-    month_names = {
-        "F": "Jan",
-        "G": "Feb",
-        "H": "Mar",
-        "K": "Apr",
-        "M": "Jun",
-        "N": "Jul",
-        "Q": "Aug",
-        "U": "Sep",
-        "V": "Oct",
-        "X": "Nov",
-        "Z": "Dec",
-    }
-
-    month_name = month_names.get(month, month)
-    full_year = 2020 + year
-
-    return f"{month_name} {full_year}"
 
 
 def create_payoff_diagram(
@@ -295,83 +243,3 @@ def create_payoff_diagram(
     
     st.plotly_chart(fig, width="stretch", key=key)
     return fig
-
-   
-
-def save_top5_summary_png(
-    comparisons: List[StrategyComparison],
-    output_dir: Optional[str] = None,
-    filename: Optional[str] = None,
-) -> Optional[str]:
-    """
-    Saves a summary table of top 5 strategies as a PNG file.
-    Utilise le module image_saver pour une sauvegarde robuste.
-    
-    Args:
-        comparisons: List of strategies (top 5 will be used)
-        output_dir: Directory to save the file (ignorÃ©, utilise image_saver)
-        filename: Custom filename (default: top5_summary.png)
-    
-    Returns:
-        Path to the saved PNG file, or None if failed
-    """
-    try:
-        return save_top10_summary(comparisons, filename or "top5_summary.png")
-    except ImportError:
-        # Fallback si image_saver n'est pas disponible
-        import os
-        
-        top5 = comparisons[:5]
-        
-        headers = ["Rank", "Strategy", "Premium", "Max Profit", "Avg P&L", "Delta", "Gamma", "IV"]
-        
-        cells_data = [
-            [str(i) for i in range(1, len(top5) + 1)],
-            [c.strategy_name[:35] for c in top5],
-            [f"${c.premium:.4f}" for c in top5],
-            [f"${c.max_profit:.4f}" for c in top5],
-            [f"${c.average_pnl:.4f}" if c.average_pnl else "N/A" for c in top5],
-            [f"{c.total_delta:.3f}" for c in top5],
-            [f"{c.total_gamma:.3f}" for c in top5],
-            [f"{c.avg_implied_volatility:.1%}" for c in top5],
-        ]
-        
-        fig = go.Figure(data=[go.Table(
-            header=dict(
-                values=[f"<b>{h}</b>" for h in headers],
-                fill_color='#1f77b4',
-                font=dict(color='white', size=12),
-                align='center',
-                height=35
-            ),
-            cells=dict(
-                values=cells_data,
-                fill_color=[['#f9f9f9', 'white'] * 3],
-                font=dict(size=11),
-                align=['center', 'left', 'center', 'right', 'right', 'right', 'center', 'center', 'center'],
-                height=30
-            )
-        )])
-        
-        fig.update_layout(
-            title=dict(text="<b>Top 5 Strategies Summary</b>", font=dict(size=16), x=0.5),
-            width=1000,
-            height=250,
-            margin=dict(l=20, r=20, t=50, b=20),
-            paper_bgcolor='white'
-        )
-        
-        if output_dir is None:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-            output_dir = os.path.join(project_root, "assets", "payoff_diagrams")
-        
-        os.makedirs(output_dir, exist_ok=True)
-        filepath = os.path.join(output_dir, filename or "top5_summary.png")
-        
-        try:
-            fig.write_image(filepath, width=1000, height=250, scale=2)
-            return filepath
-        except Exception:
-            return None
-

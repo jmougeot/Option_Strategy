@@ -4,7 +4,7 @@ Generates HTML emails with the new template format.
 """
 import os
 import sys
-from typing import Dict, Any, List, Optional
+from typing import List, Optional
 from datetime import datetime
 from myproject.share_result.utils import (
     EmailTemplateData,
@@ -261,9 +261,5 @@ def open_outlook_with_email(
         print(f"[Email] Outlook error: {e}")
         import traceback
         traceback.print_exc()
-        try:
-            pythoncom.CoUninitialize()
-        except:
-            pass
         return False
 

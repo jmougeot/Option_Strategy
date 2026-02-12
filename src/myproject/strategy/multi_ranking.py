@@ -7,7 +7,7 @@ Le C++ retourne N classements (un par jeu de poids) + un classement consensus.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from myproject.strategy.strategy_class import StrategyComparison
 
