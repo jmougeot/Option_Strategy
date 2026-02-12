@@ -159,6 +159,7 @@ def process_batch_cpp_with_multi_scoring(
         filter.delta_max,
         filter.limit_left,
         filter.limit_right,
+        filter.premium_only,
         top_n,
         weight_dicts,
     )

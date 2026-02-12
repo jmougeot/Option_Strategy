@@ -31,7 +31,11 @@ def filter_params() -> FilterData:
     # Retrieve current values from session_state
     current_filter = st.session_state.filter
 
-    unlimited_loss = st.checkbox(label="unlimited loss", value=False)
+    unlimited_col, prem_only_col = st.columns(2)
+    with unlimited_col:
+        unlimited_loss = st.checkbox(label="unlimited loss", value=False)
+    with prem_only_col: 
+        premium_only = st.checkbox(label="Premium only", help= "Accept to loose only the strtegie's premium" )
 
     if unlimited_loss:
         max_loss_left=10
@@ -169,4 +173,5 @@ def filter_params() -> FilterData:
         delta_max=delta_max,
         limit_left=limit_left,
         limit_right=limit_right,
+        premium_only=premium_only,
     )

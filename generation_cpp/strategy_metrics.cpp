@@ -55,7 +55,8 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     double delta_min,
     double delta_max,
     double limit_left,
-    double limit_right
+    double limit_right,
+    bool premium_only
 ) {
     const size_t n_options = options.size();
     
@@ -142,14 +143,22 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     
     double max_loss_left = 0.0;
     double max_loss_right = 0.0;
+    const double premium_limit = std::abs(total_premium);
     
     for (size_t i = 0; i < prices.size() && i < total_pnl.size(); ++i) {
         double price = prices[i];
         double pnl = total_pnl[i];
         
+        if (premium_only) {
+            // Premium only: la perte ne doit jamais dépasser le premium payé
+            if (pnl < -premium_limit) {
+                return std::nullopt;
+            }
+        }
+        
         if (price < limit_left) {
             // Zone gauche: vérifier contre max_loss_left_param
-            if (pnl < -max_loss_left_param) {
+            if (!premium_only && pnl < -max_loss_left_param) {
                 return std::nullopt;
             }
             if (pnl < max_loss_left) {
@@ -157,7 +166,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
             }
         } else if (price > limit_right) {
             // Zone droite: vérifier contre max_loss_right_param
-            if (pnl < -max_loss_right_param) {
+            if (!premium_only && pnl < -max_loss_right_param) {
                 return std::nullopt;
             }
             if (pnl < max_loss_right) {
@@ -165,7 +174,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
             }
         } else {
             // Zone centrale: la perte ne doit pas dépasser le premium payé
-            if (pnl < -std::abs(total_premium)) {
+            if (pnl < -premium_limit) {
                 return std::nullopt;
             }
         }

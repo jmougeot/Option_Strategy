@@ -49,6 +49,7 @@ class FilterData:
     delta_max: float
     limit_left: float
     limit_right: float
+    premium_only: bool = False
 
 
 # Patterns de signes par type de stratégie (triés par strike croissant)
