@@ -143,22 +143,14 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     
     double max_loss_left = 0.0;
     double max_loss_right = 0.0;
-    const double premium_limit = std::abs(total_premium);
     
     for (size_t i = 0; i < prices.size() && i < total_pnl.size(); ++i) {
         double price = prices[i];
         double pnl = total_pnl[i];
         
-        if (premium_only) {
-            // Premium only: la perte ne doit jamais dépasser le premium payé
-            if (pnl < -premium_limit) {
-                return std::nullopt;
-            }
-        }
-        
         if (price < limit_left) {
             // Zone gauche: vérifier contre max_loss_left_param
-            if (!premium_only && pnl < -max_loss_left_param) {
+            if (pnl < -max_loss_left_param) {
                 return std::nullopt;
             }
             if (pnl < max_loss_left) {
@@ -166,7 +158,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
             }
         } else if (price > limit_right) {
             // Zone droite: vérifier contre max_loss_right_param
-            if (!premium_only && pnl < -max_loss_right_param) {
+            if (pnl < -max_loss_right_param) {
                 return std::nullopt;
             }
             if (pnl < max_loss_right) {
@@ -174,7 +166,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
             }
         } else {
             // Zone centrale: la perte ne doit pas dépasser le premium payé
-            if (pnl < -premium_limit) {
+            if (pnl < -std::abs(total_premium)) {
                 return std::nullopt;
             }
         }
@@ -184,6 +176,11 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     auto [min_it, max_it] = std::minmax_element(total_pnl.begin(), total_pnl.end());
     double max_profit = *max_it;
     double max_loss = *min_it;
+    
+    // Filtre premium_only: |max_loss| doit être < |premium|
+    if (premium_only && std::abs(max_loss) > std::abs(total_premium)) {
+        return std::nullopt;
+    }
     
     // Breakeven points
     std::vector<double> breakeven_points = calculate_breakeven_points(total_pnl, prices);
