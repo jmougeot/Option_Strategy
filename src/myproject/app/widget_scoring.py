@@ -1,17 +1,6 @@
-"""
-Scoring Widget — Multi-weight ranking presets (R1–R7) + custom sets
-====================================================================
-
-Architecture:
-  • RANKING_PRESETS  — 7 predefined weight configurations exposed as checkboxes.
-    At least one must be active. Selecting several triggers multi-scoring in C++.
-  • Custom sets      — unlimited user-defined weight sets (optional expander).
-  • Return value     — ``List[Dict[str, float]]`` containing all *active* weight
-    dicts (presets checked + custom sets).
-"""
-
 import streamlit as st
 from typing import Dict, List
+import uuid
 
 
 # ============================================================================
@@ -27,17 +16,7 @@ SCORING_FIELDS: Dict[str, str] = {
     "premium":           "Premium",
 }
 
-ADVANCED_SCORING_FIELDS: Dict[str, str] = {
-    "sigma_pnl":            "Std Dev",
-    "delta_neutral":        "Delta Neutral",
-    "gamma_low":            "Gamma Low",
-    "vega_low":             "Vega Low",
-    "theta_positive":       "Theta Positive",
-    "implied_vol_moderate": "Moderate IV",
-    "delta_levrage":        "Leverage (delta)",
-}
-
-ALL_FIELDS = {**SCORING_FIELDS, **ADVANCED_SCORING_FIELDS}
+ALL_FIELDS = {**SCORING_FIELDS}
 
 
 # ============================================================================
@@ -59,6 +38,17 @@ midpoint= len(fields_list)//2
 # ============================================================================
 # Helpers
 # ============================================================================
+def delete_weight(weight_id: str):
+    """Delete custom weight set with given id from session state."""
+    if len(st.session_state.custom_weight_sets) > 0:
+        st.session_state.custom_weight_sets = [s for s in st.session_state.custom_weight_sets if s["id"] != weight_id]
+
+def add_weight():
+    """Add a new custom weight set with default values."""
+    new_ws: Dict[str, object] = {"id": str(uuid.uuid4())}
+    for k in ALL_FIELDS:
+        new_ws[k] = 0.0
+    st.session_state.custom_weight_sets.append(new_ws)
 
 def _make_full_weights(sparse: Dict[str, float]) -> Dict[str, float]:
     """Expand a sparse preset dict into a full dict with 0.0 for missing keys."""
@@ -67,7 +57,7 @@ def _make_full_weights(sparse: Dict[str, float]) -> Dict[str, float]:
     return full
 
 
-def _weight_row_editor(index: int, defaults: Dict[str, float]) -> Dict[str, float]:
+def _weight_row_editor(weight_id: float, defaults: Dict[str, float]) -> Dict[str, float]:
     """Render editable number inputs for one custom weight set."""
     weights: Dict[str, float] = {}
 
@@ -82,7 +72,7 @@ def _weight_row_editor(index: int, defaults: Dict[str, float]) -> Dict[str, floa
                 max_value=100,
                 value=default_val,
                 step=1,
-                key=f"custom_ws_{index}_{field_name}",
+                key=f"custom_ws_{weight_id}_{field_name}",
             ) / 100
             weights[field_name] = val
 
@@ -97,13 +87,10 @@ def _weight_row_editor(index: int, defaults: Dict[str, float]) -> Dict[str, floa
                 max_value=100,
                 value=default_val,
                 step=1,
-                key=f"custom_ws_{index}_{field_name}",
+                key=f"custom_ws_{weight_id}_{field_name}",
             ) / 100
             weights[field_name] = val
 
-    # Advanced fields — keep existing value or 0
-    for field_name in ADVANCED_SCORING_FIELDS:
-        weights[field_name] = defaults.get(field_name, 0.0)
 
     return weights
 
@@ -113,7 +100,7 @@ def _preset_summary(preset: Dict[str, float]) -> str:
     parts = []
     for k, v in preset.items():
         if v > 0:
-            label = SCORING_FIELDS.get(k) or ADVANCED_SCORING_FIELDS.get(k, k)
+            label = SCORING_FIELDS.get(k)
             parts.append(f"{label} {v:.0%}")
     return ", ".join(parts) if parts else "—"
 
@@ -125,22 +112,20 @@ def _preset_summary(preset: Dict[str, float]) -> str:
 def scoring_weights_block() -> List[Dict[str, float]]:
     """
     Renders the scoring panel in the Streamlit sidebar.
-
-    Layout:
-      1. Checkboxes for R1-R7 predefined rankings (at least one active).
-      2. Optional expander for unlimited custom weight sets.
-
-    Returns:
-        List of active weight dicts (presets + custom sets).
     """
-    st.subheader("Ranking Presets")
+    st.header("Ranking Presets")
 
-    # ---- Bootstrap session state ----
+    # ---- Bootstrap session strate ----
     if "preset_active" not in st.session_state:
         # Default: only R1 active
         st.session_state.preset_active = {name: (i == 0) for i, name in enumerate(RANKING_PRESETS)}
     if "custom_weight_sets" not in st.session_state:
         st.session_state.custom_weight_sets = []
+
+    # Migration: add an id to existing weight sets that don't have one
+    for ws in st.session_state.custom_weight_sets:
+        if "id" not in ws:
+            ws["id"] = str(uuid.uuid4())
 
     # ---- Render preset checkboxes ----
     active: Dict[str, bool] = {}
@@ -163,39 +148,27 @@ def scoring_weights_block() -> List[Dict[str, float]]:
 
     # ---- Custom weight sets (optional) ----
     custom_sets: List[Dict[str, float]] = st.session_state.custom_weight_sets
+    edited_custom: List[Dict[str, float]] = []
 
-    with st.expander(f"Custom weight sets ({len(custom_sets)})", expanded=False):
-        edited_custom: List[Dict[str, float]] = []
-        indices_to_remove: List[int] = []
+    for i, ws in enumerate(custom_sets):
+        weight_id = ws["id"]
+        cols_header = st.columns([6, 1])
+        with cols_header[0]:
+            st.markdown(f"**Custom {i + 1}**")
+        with cols_header[1]:
+            st.button("🗑️", key=f"delete_weight_{weight_id}", help="Delete this weight set", on_click=delete_weight, args=(weight_id,))
+        edited = _weight_row_editor(weight_id, ws)
+        edited["id"] = weight_id
+        edited_custom.append(edited)
+    st.button("➕ Add custom weight set", on_click=add_weight)
 
-        for i, ws in enumerate(custom_sets):
-            st.markdown(f"**Custom #{i + 1}**")
-            edited = _weight_row_editor(i, ws)
-            edited_custom.append(edited)
+    # Persist edited values
+    if edited_custom:
+        st.session_state.custom_weight_sets = edited_custom
 
-            if st.button(f"Remove {i + 1}", key=f"rm_custom_{i}"):
-                indices_to_remove.append(i)
-
-        # Handle removals
-        if indices_to_remove:
-            for idx in sorted(indices_to_remove, reverse=True):
-                custom_sets.pop(idx)
-            st.session_state.custom_weight_sets = custom_sets
-            st.rerun()
-
-        # Add button
-        if st.button("Add custom weight set"):
-            base = _make_full_weights({"average_pnl": 1.0})
-            custom_sets.append(base)
-            st.session_state.custom_weight_sets = custom_sets
-            st.rerun()
-
-        # Persist edited values
-        if edited_custom:
-            st.session_state.custom_weight_sets = edited_custom
-
-    # Add custom sets to result
-    result.extend(st.session_state.custom_weight_sets)
+    # Add custom sets to result (exclude 'id' key for downstream use)
+    for ws in st.session_state.custom_weight_sets:
+        result.append({k: v for k, v in ws.items() if k != "id"})
 
     # Fallback: if nothing is selected, default to R1
     if not result:

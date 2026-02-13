@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Dict, Any, List
 from dataclasses import dataclass, field
 import json
+import uuid
 from pathlib import Path
 
 
@@ -242,11 +243,15 @@ def apply_pending_restore():
         # Copier les nouveaux scénarios
         st.session_state.scenarios = [s.copy() for s in entry.scenarios]
         
+        # Migration: ajouter un id aux scénarios qui n'en ont pas
+        for scenario in st.session_state.scenarios:
+            if "id" not in scenario:
+                scenario["id"] = str(uuid.uuid4())
+        
         # Mettre à jour les clés des widgets pour chaque scénario
         for scenario in st.session_state.scenarios:
             scenario_id = scenario.get("id", "")
             if scenario_id:
-                # Mettre à jour les clés de widget directement
                 st.session_state[f"price_{scenario_id}"] = float(scenario.get("price", 98.0))
                 st.session_state[f"std_{scenario_id}"] = float(scenario.get("std", 0.10))
                 st.session_state[f"std_l_{scenario_id}"] = float(scenario.get("std", 0.10))
@@ -257,11 +262,23 @@ def apply_pending_restore():
     # RESTAURER LES FILTRES
     # =========================================================================
     if entry.filter_data:
-        # Mettre à jour le dict filter
-        st.session_state.filter = entry.filter_data.copy()
-        
-        # Mettre à jour les clés de widget des filtres directement
         filter_data = entry.filter_data
+        
+        # Reconstruire un dict filter complet avec les defaults pour les clés manquantes
+        defaults = {
+            "max_loss_right": 0.1,
+            "max_loss_left": 0.1, 
+            "max_premium": 5.0, 
+            "ouvert_gauche": 0, 
+            "ouvert_droite": 0, 
+            "min_premium_sell": 0.005,
+            "delta_min": -0.75,
+            "delta_max": 0.75,
+            "limit_left_filter": 98.5,
+            "limit_right_filter": 98,
+        }
+        full_filter = {**defaults, **filter_data}
+        st.session_state.filter = full_filter
         
         # Mapping: clé du dict filter -> clé du widget streamlit
         filter_widget_keys = {
@@ -278,20 +295,37 @@ def apply_pending_restore():
         }
         
         for filter_key, widget_key in filter_widget_keys.items():
-            if filter_key in filter_data:
-                st.session_state[widget_key] = filter_data[filter_key]
+            if filter_key in full_filter:
+                st.session_state[widget_key] = full_filter[filter_key]
     
     # =========================================================================
     # RESTAURER LES POIDS DE SCORING
     # =========================================================================
     if entry.scoring_weights:
+        from myproject.app.widget_scoring import RANKING_PRESETS, ALL_FIELDS
+        
         # Support both old Dict and new List[Dict] format
         ws_list = entry.scoring_weights if isinstance(entry.scoring_weights, list) else [entry.scoring_weights]
-        # Store as custom weight sets (history entries may not map to presets)
+        
+        # Ajouter un id à chaque weight set pour compatibilité avec le widget
+        for ws in ws_list:
+            if "id" not in ws:
+                ws["id"] = str(uuid.uuid4())
+        
+        # Stocker comme custom weight sets
         st.session_state["custom_weight_sets"] = ws_list
-        # Deactivate all presets when restoring from history
-        from myproject.app.widget_scoring import RANKING_PRESETS
+        
+        # Désactiver tous les presets : mettre à jour le dict ET les clés widget
         st.session_state["preset_active"] = {name: False for name in RANKING_PRESETS}
+        for name in RANKING_PRESETS:
+            st.session_state[f"preset_cb_{name}"] = False
+        
+        # Mettre à jour les widget keys des custom weight sets
+        for ws in ws_list:
+            weight_id = ws["id"]
+            for field_name in ALL_FIELDS:
+                val = ws.get(field_name, 0.0)
+                st.session_state[f"custom_ws_{weight_id}_{field_name}"] = int(float(val) * 100)
     
     # =========================================================================
     # RESTAURER LES PARAMÈTRES (underlying, price, max_legs, etc.)
@@ -315,15 +349,38 @@ def apply_pending_restore():
             if isinstance(months_list, list):
                 st.session_state["param_months"] = ", ".join(months_list)
         
-        # Price min/max
+        # Price min/max/step
         if "price_min" in params:
             st.session_state["param_price_min"] = float(params["price_min"])
         if "price_max" in params:
             st.session_state["param_price_max"] = float(params["price_max"])
+        if "price_step" in params:
+            st.session_state["param_price_step"] = float(params["price_step"])
         
         # Max legs
         if "max_legs" in params:
             st.session_state["param_max_legs"] = int(params["max_legs"])
+        
+        # Brut code
+        brut_code = params.get("brut_code")
+        if brut_code and isinstance(brut_code, list) and len(brut_code) > 0:
+            st.session_state["brut_code_check"] = True
+            st.session_state["param_brut_code"] = ", ".join(brut_code)
+        else:
+            st.session_state["brut_code_check"] = False
+        
+        # Roll expiries
+        roll_expiries = params.get("roll_expiries")
+        if roll_expiries and isinstance(roll_expiries, list) and len(roll_expiries) > 0:
+            st.session_state["param_custom_roll"] = True
+            # Reconstruire le string "H6, Z5" à partir de [["H", 6], ["Z", 5]]
+            roll_parts = []
+            for roll in roll_expiries:
+                if isinstance(roll, (list, tuple)) and len(roll) == 2:
+                    roll_parts.append(f"{roll[0]}{roll[1]}")
+            st.session_state["param_roll_input"] = ", ".join(roll_parts)
+        else:
+            st.session_state["param_custom_roll"] = False
     
     # =========================================================================
     # RESTAURER LES RÉSULTATS (si disponibles)

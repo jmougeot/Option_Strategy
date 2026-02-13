@@ -123,8 +123,10 @@ def run():
                     "years": params.years,
                     "price_min": params.price_min,
                     "price_max": params.price_max,
+                    "price_step": params.price_step,
                     "max_legs": params.max_legs,
                     "roll_expiries": params.roll_expiries,
+                    "brut_code": params.brut_code,
                 }
                 _filter_for_history = {
                     "max_loss_left": filter.max_loss_left,
@@ -134,6 +136,10 @@ def run():
                     "delta_max": filter.delta_max,
                     "ouvert_gauche": filter.ouvert_gauche,
                     "ouvert_droite": filter.ouvert_droite,
+                    "min_premium_sell": filter.min_premium_sell,
+                    "limit_left_filter": filter.limit_left,
+                    "limit_right_filter": filter.limit_right,
+                    "premium_only": filter.premium_only,
                 }
                 add_to_history(
                     params=_params_for_history,
