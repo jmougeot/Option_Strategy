@@ -149,13 +149,11 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
                 continue
             bid = data.get("PX_BID")
             ask = data.get("PX_ASK")
-            has_bid = bid is not None and bid > 0
-            has_ask = ask is not None and ask > 0
-            if not has_bid and not has_ask:
+            if bid is None and ask is None:
                 missing_both.append(ticker)
-            if not has_ask and bid > 0.1:
+            if ask and bid is None and ask > 0.1:
                 wide_spread.append(ticker)
-            if has_bid and has_ask:
+            if ask and bid:
                 spread = ask - bid
                 if spread > 0.1:
                     wide_spread.append(f"{ticker} (spread={spread:.4f})")
