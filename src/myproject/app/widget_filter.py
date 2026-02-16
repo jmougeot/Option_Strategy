@@ -40,6 +40,7 @@ def filter_params() -> FilterData:
         limit_right=98
 
     else: 
+        # Manage loss on downside
         max_loss_left_col,limit_left_col, premium_only_left_col= st.columns(3)
         with max_loss_left_col:
             max_loss_left = st.number_input("Max loss downside",
@@ -55,7 +56,15 @@ def filter_params() -> FilterData:
                                                     format="%.3f",
                                                     key="limit_left_filter_key",
                                                     help="imit to filter_max_loss_right where the max loss left is applied") 
-
+        with premium_only_left_col:
+            premium_only_left = st.number_input("Premium only",
+                                                    value = float(current_filter.get("limit_right_filter", 98.0)),
+                                                    step=0.001,
+                                                    format="%.3f",
+                                                    key="premium_left_filter_key",
+                                                    help= "Premium only")
+            
+        # Manage loss on upside
         max_loss_right_col, limit_right_col, premium_only_right_col = st.columns(3)
         with max_loss_right_col:
             max_loss_right= st.number_input("Max loss upside",
@@ -74,15 +83,12 @@ def filter_params() -> FilterData:
                                                     help= "limit to filter_max_loss_right where the max loss right is applied")
         
         with premium_only_right_col:
-            premium_only_left = st.number_input("Premium only",
-                                                    value = float(current_filter.get("limit_right_filter", 98.0)),
-                                                    step=0.001,
-                                                    format="%.3f",
-                                                    key="premium_left_filter_key",
-                                                    help= "Premium only")
-
-        
-    max_premium_col, min_premium_col = st.columns([1.5, 1.5])
+            premium_only_right = st.checkbox("Premium only",
+                                             value=False,
+                                             help="Only loss your premium on upside"
+            )
+    # Manage premium
+    max_premium_col, min_premium_col , premium_only_left_col= st.columns(3)
     with max_premium_col:
         max_premium = st.number_input("Max premium",
                                                value=float(current_filter.get("max_premium", 5.0)),
@@ -93,13 +99,17 @@ def filter_params() -> FilterData:
 
     with min_premium_col:
         min_premium_sell = st.number_input("Min price for short",
-                                        value=float(current_filter.get("min_premium_sell", 0.005)),
-                                        step=0.001,
-                                        format="%.3f",
-                                        key="filter_min_premium_sell",
-                                        help="Minimum price to sell an option")
+                                                value=float(current_filter.get("min_premium_sell", 0.005)),
+                                                step=0.001,
+                                                format="%.3f",
+                                                key="filter_min_premium_sell",
+                                                help="Minimum price to sell an option")
+    with premium_only_left_col:
+        premium_only_left = st.checkbox("Premium only",
+                                             value=False,
+                                             help="Only loss your premium on upside")
 
-    
+    # Manage the number of leg you can sell
     ouvert_gauche_col, ouvert_droite_col = st.columns([2,2])
     with ouvert_gauche_col:
         ouvert_gauche = st.number_input("PUT: Short-Long",
@@ -130,8 +140,8 @@ def filter_params() -> FilterData:
         
     
     filter_type = st.checkbox(label="Select strategy Type",
-                                    value= False,
-                                    help= "Select the type of strategies you want to compare")
+                                            value= False,
+                                            help= "Select the type of strategies you want to compare")
                         
     strat_include = None
 

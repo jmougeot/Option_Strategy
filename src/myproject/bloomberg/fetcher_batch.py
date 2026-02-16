@@ -5,8 +5,7 @@ Récupère les données d'options depuis Bloomberg.
 """
 
 import blpapi
-import streamlit as st
-from typing import Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 from myproject.bloomberg.connection import get_session, get_service
 from myproject.app.data_types import FutureData
 
@@ -51,7 +50,7 @@ def _compute_mid(bid: float, ask: float, mid: float) -> Optional[float]:
         return ask / 2
     return None
 
-def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyings: Optional[str] = None) -> Tuple[dict[str, dict[str, Any]], FutureData]:
+def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyings: Optional[str] = None) -> Tuple[dict[str, dict[str, Any]], FutureData, List[str]]:
     """
     Récupère les données pour plusieurs tickers Bloomberg.
 
@@ -61,7 +60,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         underlyings: Ticker du sous-jacent pour récupérer son prix (optionnel)
 
     Returns:
-        Tuple (résultats options, FutureData avec prix sous-jacent et date)
+        Tuple (résultats options, FutureData avec prix sous-jacent et date, warnings)
     """
     results = {ticker: {} for ticker in tickers}
 
@@ -146,6 +145,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         missing_bid = []
         missing_ask = []
         missing_both = []
+        wide_spread = []
         for ticker, data in results.items():
             if not data:
                 continue
@@ -159,30 +159,31 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
                 missing_bid.append(ticker)
             elif not has_ask:
                 missing_ask.append(ticker)
+            
+            # Vérifier le spread bid-ask > 10 ticks (0.1)
+            if has_bid and has_ask:
+                spread = ask - bid
+                if spread > 0.1:
+                    wide_spread.append(f"{ticker} (spread={spread:.4f})")
 
+        warnings: List[str] = []
         if missing_both or missing_bid or missing_ask:
-            lines = ["**⚠️ Options avec données de prix manquantes :**"]
             if missing_both:
-                lines.append(f"\n**Sans Bid ni Ask ({len(missing_both)}):**")
-                for t in missing_both:
-                    lines.append(f"- `{t}`")
+                warnings.append(f"Sans Bid ni Ask ({len(missing_both)}): " + ", ".join(missing_both))
             if missing_bid:
-                lines.append(f"\n**Sans Bid ({len(missing_bid)}):**")
-                for t in missing_bid:
-                    lines.append(f"- `{t}`")
+                warnings.append(f"Sans Bid ({len(missing_bid)}): " + ", ".join(missing_bid))
             if missing_ask:
-                lines.append(f"\n**Sans Ask ({len(missing_ask)}):**")
-                for t in missing_ask:
-                    lines.append(f"- `{t}`")
-            st.warning("\n".join(lines))
+                warnings.append(f"Sans Ask ({len(missing_ask)}): " + ", ".join(missing_ask))
+        if wide_spread:
+            warnings.append(f"Spread Bid-Ask > 10 ticks ({len(wide_spread)}): " + ", ".join(wide_spread))
 
-        return results, FutureData(underlying_price, last_tradable_date)
+        return results, FutureData(underlying_price, last_tradable_date), warnings
 
     except Exception as e:
         print(f"✗ Erreur fetch: {e}")
         import traceback
         traceback.print_exc()
-        return results, FutureData(98.0, None)
+        return results, FutureData(98.0, None), []
 
 
 def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:

@@ -119,16 +119,19 @@ class PremiumFetcher:
         self.main_data: Dict[str, Any] = {}
         self.roll_premiums: Dict[PremiumKey, float] = {}
         self.future_data: FutureData = FutureData(98.0, None)
+        self.warnings: List[str] = []
     
     def fetch_all(self):
         """Fetch toutes les données en batch."""
-        self.main_data, self.future_data = fetch_options_batch(
+        self.main_data, self.future_data, warnings = fetch_options_batch(
             self.builder.main_tickers, 
             underlyings=self.builder.underlying_ticker
         )
+        self.warnings.extend(warnings)
         
         if self.builder.roll_tickers:
-            roll_data, _ = fetch_options_batch(self.builder.roll_tickers, use_overrides=True)
+            roll_data, _, roll_warnings = fetch_options_batch(self.builder.roll_tickers, use_overrides=True)
+            self.warnings.extend(roll_warnings)
             self._extract_premiums(roll_data, self.builder.roll_metadata)
     
     def _extract_premiums(self, batch_data: Dict, metadata: Dict[str, TickerMeta]):
@@ -257,11 +260,11 @@ def import_options(
     brut_code: Optional[List[str]] = None,
     suffix: str = "Comdty",
     default_position: PositionType = "long",
-) -> Tuple[List[Option], FutureData]:
+) -> Tuple[List[Option], FutureData, List[str]]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne des objets Option.
     Returns:
-        Tuple (liste d'objets Option, FutureData avec prix et date)
+        Tuple (liste d'objets Option, FutureData avec prix et date, warnings)
     """
     print("\n🔨 Construction des tickers...")
     
@@ -279,10 +282,12 @@ def import_options(
     # 2. Fetch des données
     future_data = FutureData(98.0, None)
     options: List[Option] = []
+    fetch_warnings: List[str] = []
     
     try:
         fetcher = PremiumFetcher(builder)
         fetcher.fetch_all()
+        fetch_warnings = fetcher.warnings
         
         # 3. Traitement des options
         processor = OptionProcessor(builder, fetcher, mixture, default_position)
@@ -305,4 +310,4 @@ def import_options(
         traceback.print_exc()
 
 
-    return options, future_data
+    return options, future_data, fetch_warnings

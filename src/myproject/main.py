@@ -77,7 +77,7 @@ def process_bloomberg_to_strategies(
         default_expiry_date = (datetime.now() + relativedelta(months=5)).strftime("%Y-%m-%d")
         future_data = FutureData(underlying_price, default_expiry_date)
     else:
-        options, future_data = import_options(
+        options, future_data, fetch_warnings = import_options(
             mixture=mixture,
             underlying=underlying,
             months=months,
@@ -91,6 +91,8 @@ def process_bloomberg_to_strategies(
     # Tracker du fetch
     stats["nb_options"] = len(options)
     stats["future_data"] = future_data
+    if not offline and fetch_warnings:
+        stats["fetch_warnings"] = fetch_warnings
 
 
     if not options:

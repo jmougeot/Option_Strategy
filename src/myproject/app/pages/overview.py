@@ -158,6 +158,13 @@ def run():
                     f"Processing complete! Screened **{format_large_number(nb_screened)}** "
                     f"strategies from {nb_options} options → Kept **{nb_kept}** best"
                 )
+                
+                # Afficher les warnings de prix manquants (bid/ask)
+                fetch_warnings = stats.get("fetch_warnings", [])
+                if fetch_warnings:
+                    warning_text = "**⚠️ Options avec données de prix manquantes :**\n\n"
+                    warning_text += "\n\n".join(f"- {w}" for w in fetch_warnings)
+                    st.warning(warning_text)
             else:
                 st.warning("Processing was terminated")
                 return
