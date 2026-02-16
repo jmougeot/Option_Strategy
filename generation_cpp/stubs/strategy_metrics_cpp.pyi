@@ -11,7 +11,7 @@ def init_options_cache(premiums: typing.Annotated[numpy.typing.ArrayLike, numpy.
                   Initialise le cache global avec toutes les données des options.
                   Doit être appelé une seule fois avant process_combinations_batch.
     """
-def process_combinations_batch_with_multi_scoring(n_legs: typing.SupportsInt, max_loss_left: typing.SupportsFloat, max_loss_right: typing.SupportsFloat, max_premium_params: typing.SupportsFloat, ouvert_gauche: typing.SupportsInt, ouvert_droite: typing.SupportsInt, min_premium_sell: typing.SupportsFloat, delta_min: typing.SupportsFloat, delta_max: typing.SupportsFloat, limit_left: typing.SupportsFloat, limit_right: typing.SupportsFloat, top_n: typing.SupportsInt = 10, weight_sets: list = []) -> dict:
+def process_combinations_batch_with_multi_scoring(n_legs: typing.SupportsInt, max_loss_left: typing.SupportsFloat, max_loss_right: typing.SupportsFloat, max_premium_params: typing.SupportsFloat, ouvert_gauche: typing.SupportsInt, ouvert_droite: typing.SupportsInt, min_premium_sell: typing.SupportsFloat, delta_min: typing.SupportsFloat, delta_max: typing.SupportsFloat, limit_left: typing.SupportsFloat, limit_right: typing.SupportsFloat, premium_only: bool = False, premium_only_left: bool = False, premium_only_right: bool = False, top_n: typing.SupportsInt = 10, weight_sets: list = []) -> dict:
     """
                   Génère les combinaisons et applique N systèmes de poids simultanément.
                   Retourne un dict avec per_set, consensus, n_weight_sets, n_candidates.

@@ -160,6 +160,8 @@ def process_batch_cpp_with_multi_scoring(
         filter.limit_left,
         filter.limit_right,
         filter.premium_only,
+        filter.premium_only_left,
+        filter.premium_only_right,
         top_n,
         weight_dicts,
     )

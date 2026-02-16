@@ -103,7 +103,9 @@ public:
         double delta_max,
         double limit_left,
         double limit_right,
-        bool premium_only = false
+        bool premium_only = false,
+        bool premium_only_left = false,
+        bool premium_only_right = false
     );
 
     static bool next_combination(

@@ -216,6 +216,8 @@ py::dict process_combinations_batch_with_multi_scoring(
     double limit_left,
     double limit_right,
     bool premium_only,
+    bool premium_only_left,
+    bool premium_only_right,
     int top_n,
     py::list weight_sets_py
 ) {
@@ -301,7 +303,8 @@ py::dict process_combinations_batch_with_multi_scoring(
                     combo_options, combo_signs, combo_pnl, g_cache.prices, g_cache.mixture,
                     g_cache.average_mix, max_loss_left, max_loss_right, max_premium_params,
                     ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max,
-                    limit_left, limit_right, premium_only
+                    limit_left, limit_right, premium_only,
+                    premium_only_left, premium_only_right
                 );
 
                 if (result.has_value()) {
@@ -439,6 +442,8 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("limit_left"),
           py::arg("limit_right"),
           py::arg("premium_only") = false,
+          py::arg("premium_only_left") = false,
+          py::arg("premium_only_right") = false,
           py::arg("top_n") = 10,
           py::arg("weight_sets") = py::list()
     );

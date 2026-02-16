@@ -153,10 +153,12 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
                 missing_both.append(ticker)
             if ask and bid is None and ask > 0.1:
                 wide_spread.append(ticker)
+                results[ticker] = {}
             if ask and bid:
                 spread = ask - bid
                 if spread > 0.1:
                     wide_spread.append(f"{ticker} (spread={spread:.4f})")
+                    results[ticker] = {}
 
         warnings: List[str] = []
         if missing_both:

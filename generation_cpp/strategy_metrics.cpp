@@ -56,7 +56,9 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     double delta_max,
     double limit_left,
     double limit_right,
-    bool premium_only
+    bool premium_only,
+    bool premium_only_left,
+    bool premium_only_right
 ) {
     const size_t n_options = options.size();
     
@@ -149,20 +151,34 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         double pnl = total_pnl[i];
         
         if (price < limit_left) {
-            // Zone gauche: vérifier contre max_loss_left_param
-            if (pnl < -max_loss_left_param) {
-                return std::nullopt;
-            }
+            // Zone gauche: tracker la perte max
             if (pnl < max_loss_left) {
                 max_loss_left = pnl;
             }
-        } else if (price > limit_right) {
-            // Zone droite: vérifier contre max_loss_right_param
-            if (pnl < -max_loss_right_param) {
-                return std::nullopt;
+            // Filtre: premium_only_left OU max_loss_left_param
+            if (premium_only_left) {
+                if (pnl < -std::abs(total_premium)) {
+                    return std::nullopt;
+                }
+            } else {
+                if (pnl < -max_loss_left_param) {
+                    return std::nullopt;
+                }
             }
+        } else if (price > limit_right) {
+            // Zone droite: tracker la perte max
             if (pnl < max_loss_right) {
                 max_loss_right = pnl;
+            }
+            // Filtre: premium_only_right OU max_loss_right_param
+            if (premium_only_right) {
+                if (pnl < -std::abs(total_premium)) {
+                    return std::nullopt;
+                }
+            } else {
+                if (pnl < -max_loss_right_param) {
+                    return std::nullopt;
+                }
             }
         } else {
             // Zone centrale: la perte ne doit pas dépasser le premium payé
