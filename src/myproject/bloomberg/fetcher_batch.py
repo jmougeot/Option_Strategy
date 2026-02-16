@@ -153,10 +153,8 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
             has_ask = ask is not None and ask > 0
             if not has_bid and not has_ask:
                 missing_both.append(ticker)
-            elif not has_ask and bid > 0.1:
+            if not has_ask and bid > 0.1:
                 wide_spread.append(ticker)
-            
-            # Vérifier le spread bid-ask > 10 ticks (0.1)
             if has_bid and has_ask:
                 spread = ask - bid
                 if spread > 0.1:
