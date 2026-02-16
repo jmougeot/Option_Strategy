@@ -85,6 +85,7 @@ def filter_params() -> FilterData:
         with premium_only_right_col:
             premium_only_right = st.checkbox("Premium only",
                                              value=False,
+                                             key="premium_only_right",
                                              help="Only loss your premium on upside"
             )
     # Manage premium
@@ -107,6 +108,7 @@ def filter_params() -> FilterData:
     with premium_only_left_col:
         premium_only_left = st.checkbox("Premium only",
                                              value=False,
+                                             key="premium_only_left",
                                              help="Only loss your premium on upside")
 
     # Manage the number of leg you can sell
