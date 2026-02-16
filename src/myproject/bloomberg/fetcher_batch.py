@@ -142,8 +142,6 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
                 break
 
         # Vérifier les options sans bid/ask et afficher un warning Streamlit
-        missing_bid = []
-        missing_ask = []
         missing_both = []
         wide_spread = []
         for ticker, data in results.items():
@@ -155,10 +153,8 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
             has_ask = ask is not None and ask > 0
             if not has_bid and not has_ask:
                 missing_both.append(ticker)
-            elif not has_bid:
-                missing_bid.append(ticker)
-            elif not has_ask:
-                missing_ask.append(ticker)
+            elif not has_ask and bid > 0.1:
+                wide_spread.append(ticker)
             
             # Vérifier le spread bid-ask > 10 ticks (0.1)
             if has_bid and has_ask:
@@ -167,13 +163,8 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
                     wide_spread.append(f"{ticker} (spread={spread:.4f})")
 
         warnings: List[str] = []
-        if missing_both or missing_bid or missing_ask:
-            if missing_both:
-                warnings.append(f"Sans Bid ni Ask ({len(missing_both)}): " + ", ".join(missing_both))
-            if missing_bid:
-                warnings.append(f"Sans Bid ({len(missing_bid)}): " + ", ".join(missing_bid))
-            if missing_ask:
-                warnings.append(f"Sans Ask ({len(missing_ask)}): " + ", ".join(missing_ask))
+        if missing_both:
+            warnings.append(f"Sans Bid ni Ask ({len(missing_both)}): " + ", ".join(missing_both))
         if wide_spread:
             warnings.append(f"Spread Bid-Ask > 10 ticks ({len(wide_spread)}): " + ", ".join(wide_spread))
 
