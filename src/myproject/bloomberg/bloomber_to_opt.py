@@ -134,35 +134,24 @@ def create_option_from_bloomberg(
             premium=premium,
             expiration_month=month_code,
             expiration_year=exp_year,
-            # Position
             position=position,
-            # Identification
             ticker=ticker,
             underlying_symbol=underlying,
             bloomberg_ticker=ticker,
-            # Prix
             bid=bid,
             ask=ask,
-            # Greeks
             delta=delta,
             gamma=gamma,
             vega=vega,
             theta=theta,
             rho=rho,
-            # Volatilité
             implied_volatility=iv,
-            # Liquidité
             open_interest=oi,
             volume=vol,
-            # Sous-jacent
             underlying_price=underlying_price,
-            # Timestamp
         )
 
-        # 1. Stocker la mixture et la grille de prix
         option.prices, option.mixture, average_mix = mixture
-
-        # 2. Calculer toutes les surfaces et métriques
         option._calcul_all_surface()
         option.average_mix=average_mix
         

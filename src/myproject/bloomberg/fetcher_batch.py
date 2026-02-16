@@ -5,9 +5,8 @@ Récupère les données d'options depuis Bloomberg.
 """
 
 import blpapi
+import streamlit as st
 from typing import Any, Optional, Tuple
-
-from matplotlib.colors import BivarColormap
 from myproject.bloomberg.connection import get_session, get_service
 from myproject.app.data_types import FutureData
 
@@ -142,6 +141,41 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
 
             if event.eventType() == blpapi.event.Event.RESPONSE:
                 break
+
+        # Vérifier les options sans bid/ask et afficher un warning Streamlit
+        missing_bid = []
+        missing_ask = []
+        missing_both = []
+        for ticker, data in results.items():
+            if not data:
+                continue
+            bid = data.get("PX_BID")
+            ask = data.get("PX_ASK")
+            has_bid = bid is not None and bid > 0
+            has_ask = ask is not None and ask > 0
+            if not has_bid and not has_ask:
+                missing_both.append(ticker)
+            elif not has_bid:
+                missing_bid.append(ticker)
+            elif not has_ask:
+                missing_ask.append(ticker)
+
+        if missing_both or missing_bid or missing_ask:
+            lines = ["**⚠️ Options avec données de prix manquantes :**"]
+            if missing_both:
+                lines.append(f"\n**Sans Bid ni Ask ({len(missing_both)}):**")
+                for t in missing_both:
+                    lines.append(f"- `{t}`")
+            if missing_bid:
+                lines.append(f"\n**Sans Bid ({len(missing_bid)}):**")
+                for t in missing_bid:
+                    lines.append(f"- `{t}`")
+            if missing_ask:
+                lines.append(f"\n**Sans Ask ({len(missing_ask)}):**")
+                for t in missing_ask:
+                    lines.append(f"- `{t}`")
+            st.warning("\n".join(lines))
+
         return results, FutureData(underlying_price, last_tradable_date)
 
     except Exception as e:

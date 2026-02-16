@@ -31,47 +31,55 @@ def filter_params() -> FilterData:
     # Retrieve current values from session_state
     current_filter = st.session_state.filter
 
-    unlimited_col, prem_only_col = st.columns(2)
-    with unlimited_col:
-        unlimited_loss = st.checkbox(label="unlimited loss", value=False)
-    with prem_only_col: 
-        premium_only = st.checkbox(label="Premium only", help= "Accept to loose only the strtegie's premium" )
-
-    if unlimited_loss:
-        max_loss_left=10
-        max_loss_right=10
+    premium_only = st.checkbox(label="Risk Premium only", help= "Accept to loose only the strtegie's premium" )
+    
+    if premium_only:
+        max_loss_left=100
+        max_loss_right=100
         limit_left=98
         limit_right=98
+
     else: 
-        max_loss_left_col, max_loss_right_col, limit_left_col, limit_right_col = st.columns([1.5, 1.5, 1.5, 1.5])
+        max_loss_left_col,limit_left_col, premium_only_left_col= st.columns(3)
         with max_loss_left_col:
-            max_loss_left = st.number_input("Max loss left",
+            max_loss_left = st.number_input("Max loss downside",
                                                     value=float(current_filter.get("max_loss_left", 0.1)),
                                                     step=0.001,
                                                     format="%.3f",
                                                     key="filter_max_loss",
-                                                    help="Max loss left")       
-        with max_loss_right_col:
-            max_loss_right= st.number_input("Max loss right",
-                                                    value = float(current_filter.get("max_loss_right", 0.1)),
-                                                    step=0.001,
-                                                    format="%.3f",
-                                                    key="filter_max_loss_right",
-                                                    help= "Choose the max on the right of the target")
+                                                    help="Premium is included : if you pay 2 and entered 25 ticks, you're authorized to loose 23 ticks and if you received 2 you're autorized 27 ticks")       
         with limit_left_col:
-            limit_left = st.number_input("Limit left",
+            limit_left = st.number_input("Starting from",
                                                     value=float(current_filter.get("limit_left_filter", 98.5)),
                                                     step=0.001,
                                                     format="%.3f",
                                                     key="limit_left_filter_key",
                                                     help="imit to filter_max_loss_right where the max loss left is applied") 
+
+        max_loss_right_col, limit_right_col, premium_only_right_col = st.columns(3)
+        with max_loss_right_col:
+            max_loss_right= st.number_input("Max loss upside",
+                                                    value = float(current_filter.get("max_loss_right", 0.1)),
+                                                    step=0.001,
+                                                    format="%.3f",
+                                                    key="filter_max_loss_right",
+                                                    help= "Choose the max on the right of the target")
+
         with limit_right_col:
-            limit_right= st.number_input("Limit right",
+            limit_right= st.number_input("Starting from",
                                                     value = float(current_filter.get("limit_right_filter", 98.0)),
                                                     step=0.001,
                                                     format="%.3f",
                                                     key="limit_right_filter_key",
                                                     help= "limit to filter_max_loss_right where the max loss right is applied")
+        
+        with premium_only_right_col:
+            premium_only_left = st.number_input("Premium only",
+                                                    value = float(current_filter.get("limit_right_filter", 98.0)),
+                                                    step=0.001,
+                                                    format="%.3f",
+                                                    key="premium_left_filter_key",
+                                                    help= "Premium only")
 
         
     max_premium_col, min_premium_col = st.columns([1.5, 1.5])

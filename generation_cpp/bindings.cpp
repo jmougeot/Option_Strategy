@@ -384,7 +384,7 @@ py::dict process_combinations_batch_with_multi_scoring(
     result["n_weight_sets"] = static_cast<int>(weight_sets.size());
     result["n_candidates"] = static_cast<int>(valid_strategies.size());
 
-    std::cout << "Multi-scoring terminé: "
+    std::cout << "Multi-scoring termine: "
               << valid_strategies.size() << " candidats, "
               << per_set.size() << " rankings, "
               << consensus.size() << " consensus" << std::endl;

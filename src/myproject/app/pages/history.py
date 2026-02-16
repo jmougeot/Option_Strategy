@@ -503,7 +503,7 @@ def run():
                         st.rerun()
             
             # Détails supplémentaires dans un expander
-            with st.expander("📋 Voir les détails"):
+            with st.expander("Voir les détails"):
                 detail_col1, detail_col2 = st.columns(2)
                 
                 with detail_col1:
@@ -535,10 +535,15 @@ def run():
                 if entry.scoring_weights:
                     ws_list = entry.scoring_weights if isinstance(entry.scoring_weights, list) else [entry.scoring_weights]
                     for wi, ws in enumerate(ws_list):
-                        ws_str = ", ".join(f"{k}: {v:.0%}" for k, v in ws.items() if v > 0)
+                        def _safe_float(x):
+                            try:
+                                return float(x)
+                            except (ValueError, TypeError):
+                                return 0.0
+                        ws_str = ", ".join(f"{k}: {_safe_float(v):.0%}" for k, v in ws.items() if _safe_float(v) > 0)
                         label = f"Set {wi+1}: " if len(ws_list) > 1 else ""
                         st.markdown(f"- {label}{ws_str}" if ws_str else "- Aucun poids actif")
-                
+
                 # Top stratégies (depuis résumé JSON ou comparisons en mémoire)
                 st.markdown("**Top 5 des stratégies:**")
                 if entry.comparisons and len(entry.comparisons) > 0:
