@@ -31,16 +31,30 @@ enum class NormalizerType {
 };
 
 /**
+ * Identifiant numérique des métriques (évite les comparaisons de strings dans le hot path)
+ */
+enum class MetricId : int {
+    PREMIUM = 0,
+    AVERAGE_PNL,
+    ROLL,
+    AVG_PNL_LEVRAGE,
+    TAIL_PENALTY,
+    AVG_INTRA_LIFE_PNL,
+    METRIC_COUNT  // Nombre total de métriques
+};
+
+/**
  * Configuration d'une métrique de scoring
  */
 struct MetricConfig {
     std::string name;
+    MetricId id;        // Identifiant numérique pour accès rapide
     double weight;
     NormalizerType normalizer;
     ScorerType scorer;
     
-    MetricConfig(const std::string& n, double w, NormalizerType norm, ScorerType sc)
-        : name(n), weight(w), normalizer(norm), scorer(sc) {}
+    MetricConfig(const std::string& n, MetricId mid, double w, NormalizerType norm, ScorerType sc)
+        : name(n), id(mid), weight(w), normalizer(norm), scorer(sc) {}
 };
 
 /**

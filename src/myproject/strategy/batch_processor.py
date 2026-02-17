@@ -18,6 +18,16 @@ from myproject.app.widget_filter import FilterData
 _options_cache: List[Option] = []
 
 
+def clear_caches():
+    """Libère la mémoire des caches Python et C++ après traitement."""
+    global _options_cache
+    _options_cache = []
+    try:
+        strategy_metrics_cpp.clear_options_cache()  # type: ignore
+    except Exception:
+        pass
+
+
 # =============================================================================
 # INITIALISATION DU CACHE C++
 # =============================================================================

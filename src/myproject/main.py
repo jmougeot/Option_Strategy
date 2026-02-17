@@ -27,6 +27,7 @@ from myproject.bloomberg.bloomberg_data_importer_offline import (
     is_offline_mode
 )
 from myproject.app.data_types import ScenarioData, FilterData, FutureData
+from myproject.strategy.batch_processor import clear_caches
 from myproject.mixture.mixture_utils import create_mixture_from_scenarios
 import numpy as np
 
@@ -126,6 +127,8 @@ def process_bloomberg_to_strategies(
     stats["nb_strategies_possibles"] = total_combinations
     stats["nb_strategies_classees"] = len(best_strategies.consensus_strategies)
 
+    # Libérer les caches (les résultats sont déjà dans best_strategies)
+    clear_caches()
 
     return best_strategies, stats, mixture, future_data
 

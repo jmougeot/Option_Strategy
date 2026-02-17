@@ -42,7 +42,9 @@ bool is_stop_requested() {
 // Structure pour stocker le cache des options côté C++
 struct OptionsCache {
     std::vector<OptionData> options;
-    std::vector<std::vector<double>> pnl_matrix;
+    // PnL stocké en buffer contigu pour localité mémoire (cache-friendly)
+    std::vector<double> pnl_flat;          // n_options * pnl_length doubles contigus
+    std::vector<const double*> pnl_rows;   // pointeurs vers chaque ligne
     std::vector<double> prices;
     std::vector<double> mixture;  // Distribution de probabilité du sous-jacent
     double average_mix;  // Point de séparation left/right
@@ -53,6 +55,25 @@ struct OptionsCache {
 
 // Cache global (sera initialisé par Python)
 static OptionsCache g_cache;
+
+/**
+ * Libère la mémoire du cache C++ (appelé après traitement)
+ */
+void clear_options_cache() {
+    g_cache.options.clear();
+    g_cache.options.shrink_to_fit();
+    g_cache.pnl_flat.clear();
+    g_cache.pnl_flat.shrink_to_fit();
+    g_cache.pnl_rows.clear();
+    g_cache.pnl_rows.shrink_to_fit();
+    g_cache.prices.clear();
+    g_cache.prices.shrink_to_fit();
+    g_cache.mixture.clear();
+    g_cache.mixture.shrink_to_fit();
+    g_cache.n_options = 0;
+    g_cache.pnl_length = 0;
+    g_cache.valid = false;
+}
 
 /**
  * Initialise le cache avec toutes les données des options
@@ -92,7 +113,9 @@ void init_options_cache(
     g_cache.average_mix = average_mix;
     
     g_cache.options.resize(g_cache.n_options);
-    g_cache.pnl_matrix.resize(g_cache.n_options);
+    // Buffer PnL contigu: n_options * pnl_length doubles
+    g_cache.pnl_flat.resize(g_cache.n_options * g_cache.pnl_length);
+    g_cache.pnl_rows.resize(g_cache.n_options);
     g_cache.prices.resize(g_cache.pnl_length);
 
     stop_flag.store(false);
@@ -112,9 +135,11 @@ void init_options_cache(
             g_cache.options[i].intra_life_pnl[t] = intra_life_pnl_buf(i, t);
         }
         
-        g_cache.pnl_matrix[i].resize(g_cache.pnl_length);
+        // Copier le PnL dans le buffer contigu
+        double* row_ptr = g_cache.pnl_flat.data() + i * g_cache.pnl_length;
+        g_cache.pnl_rows[i] = row_ptr;
         for (size_t j = 0; j < g_cache.pnl_length; ++j) {
-            g_cache.pnl_matrix[i][j] = pnl_buf(i, j);
+            row_ptr[j] = pnl_buf(i, j);
         }
     }
     
@@ -251,12 +276,22 @@ py::dict process_combinations_batch_with_multi_scoring(
         throw std::invalid_argument("weight_sets ne peut pas être vide");
     }
 
-    // ====== Génération des combinaisons (identique à la version single) ======
+    // ====== Génération des combinaisons ======
     std::vector<ScoredStrategy> valid_strategies;
-    valid_strategies.reserve(1000000);
+    valid_strategies.reserve(100000);
 
     for (int n_legs = 1; n_legs <= max_legs; ++n_legs) {
         size_t count_before = valid_strategies.size();
+
+        // Pré-calculer les masques de signes comme doubles
+        // pour éviter la conversion int→double à chaque itération
+        const int n_masks = 1 << n_legs;
+        std::vector<std::vector<int>> sign_masks(n_masks, std::vector<int>(n_legs));
+        for (int mask = 0; mask < n_masks; ++mask) {
+            for (int i = 0; i < n_legs; ++i) {
+                sign_masks[mask][i] = (mask & (1 << i)) ? 1 : -1;
+            }
+        }
 
         std::vector<std::vector<int>> all_combinations;
         all_combinations.reserve(10000);
@@ -266,7 +301,6 @@ py::dict process_combinations_batch_with_multi_scoring(
         } while (StrategyCalculator::next_combination(c, g_cache.n_options));
 
         const size_t n_combos = all_combinations.size();
-        const int n_masks = 1 << n_legs;
         const size_t total_tasks = n_combos * n_masks;
 
         std::mutex mtx;
@@ -275,33 +309,39 @@ py::dict process_combinations_batch_with_multi_scoring(
         #pragma omp parallel
         {
             std::vector<ScoredStrategy> thread_results;
-            thread_results.reserve(1000);
+            thread_results.reserve(2000);
 
-            // Pré-allouer les buffers par thread (évite allocation à chaque itération)
-            std::vector<OptionData> combo_options(n_legs);
-            std::vector<int> combo_signs(n_legs);
-            std::vector<std::vector<double>> combo_pnl(n_legs);
+            // Buffers par thread — zéro allocation dans la boucle chaude
+            // Pointeurs vers OptionData (zéro-copie, remplace la copie de 136 bytes/option)
+            std::vector<const OptionData*> combo_option_ptrs(n_legs);
+            // Raw pointers vers les rows PnL du cache (zéro-copie)
+            std::vector<const double*> combo_pnl_ptrs(n_legs);
+            // Buffer pré-alloué pour le total_pnl (évite allocation dans calculate())
+            std::vector<double> total_pnl_buf(g_cache.pnl_length);
 
-            #pragma omp for schedule(dynamic, 64) nowait
+            #pragma omp for schedule(dynamic, 256) nowait
             for (int64_t task_id = 0; task_id < total_tasks_signed; ++task_id) {
                 if (stop_flag.load(std::memory_order_relaxed)) continue;
 
                 size_t combo_idx = static_cast<size_t>(task_id) / n_masks;
                 int mask = static_cast<int>(task_id) % n_masks;
                 const auto& indices = all_combinations[combo_idx];
+                const auto& signs = sign_masks[mask];
 
                 for (int i = 0; i < n_legs; ++i) {
                     int idx = indices[i];
-                    combo_options[i] = g_cache.options[idx];
-                    combo_signs[i] = (mask & (1 << i)) ? 1 : -1;
-                    combo_pnl[i] = g_cache.pnl_matrix[idx];
+                    combo_option_ptrs[i] = &g_cache.options[idx];  // Pointeur, pas copie!
+                    combo_pnl_ptrs[i] = g_cache.pnl_rows[idx];
                 }
 
                 auto result = StrategyCalculator::calculate(
-                    combo_options, combo_signs, combo_pnl, g_cache.prices, g_cache.mixture,
+                    combo_option_ptrs.data(), signs.data(), n_legs,
+                    combo_pnl_ptrs.data(),
+                    g_cache.pnl_length,
+                    g_cache.prices.data(),
                     g_cache.average_mix, max_loss_left, max_loss_right, max_premium_params,
                     ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max,
-                    limit_left, limit_right, premium_only,
+                    limit_left, limit_right, total_pnl_buf.data(), premium_only,
                     premium_only_left, premium_only_right
                 );
 
@@ -322,23 +362,25 @@ py::dict process_combinations_batch_with_multi_scoring(
                     strat.profit_zone_width = metrics.profit_zone_width;
                     strat.call_count = metrics.call_count;
                     strat.put_count = metrics.put_count;
-                    strat.breakeven_points = metrics.breakeven_points;
-                    strat.total_pnl_array = metrics.total_pnl_array;
+                    // Breakeven: copie depuis buffer inline
+                    strat.breakeven_points.assign(
+                        metrics.breakeven_points.begin(),
+                        metrics.breakeven_points.begin() + metrics.breakeven_count);
                     strat.avg_pnl_levrage = metrics.avg_pnl_levrage;
                     strat.intra_life_prices = metrics.intra_life_prices;
                     strat.intra_life_pnl = metrics.intra_life_pnl;
                     strat.avg_intra_life_pnl = metrics.avg_intra_life_pnl;
 
-                    strat.option_indices.reserve(n_legs);
-                    strat.signs.reserve(n_legs);
-                    strat.strikes.reserve(n_legs);
-                    strat.is_calls.reserve(n_legs);
+                    strat.option_indices.resize(n_legs);
+                    strat.signs.resize(n_legs);
+                    strat.strikes.resize(n_legs);
+                    strat.is_calls.resize(n_legs);
 
                     for (int i = 0; i < n_legs; ++i) {
-                        strat.option_indices.push_back(indices[i]);
-                        strat.signs.push_back((mask & (1 << i)) ? 1 : -1);
-                        strat.strikes.push_back(g_cache.options[indices[i]].strike);
-                        strat.is_calls.push_back(g_cache.options[indices[i]].is_call);
+                        strat.option_indices[i] = indices[i];
+                        strat.signs[i] = signs[i];
+                        strat.strikes[i] = g_cache.options[indices[i]].strike;
+                        strat.is_calls[i] = g_cache.options[indices[i]].is_call;
                     }
                     thread_results.push_back(std::move(strat));
                 }
@@ -367,11 +409,46 @@ py::dict process_combinations_batch_with_multi_scoring(
     }
 
     // ====== Multi-scoring et ranking ======
-    std::cout << "Multi-scoring avec " << weight_sets.size() << " jeux de poids..." << std::endl;
+    const size_t n_candidates = valid_strategies.size();
+    std::cout << "Multi-scoring avec " << weight_sets.size() << " jeux de poids..."
+              << " (" << n_candidates << " candidats)" << std::endl;
 
     auto [per_set, consensus] = StrategyScorer::multi_score_and_rank(
         valid_strategies, weight_sets, top_n
     );
+
+    // Libérer la mémoire des candidats (seuls per_set + consensus sont gardés)
+    valid_strategies.clear();
+    valid_strategies.shrink_to_fit();
+
+    // Recalculer total_pnl_array uniquement pour les résultats finaux
+    auto recompute_pnl = [&](std::vector<ScoredStrategy>& strategies) {
+        for (auto& strat : strategies) {
+            const size_t n_legs = strat.option_indices.size();
+            const size_t pnl_length = g_cache.pnl_length;
+            strat.total_pnl_array.assign(pnl_length, 0.0);
+            for (size_t i = 0; i < n_legs; ++i) {
+                const double s = static_cast<double>(strat.signs[i]);
+                const double* row = g_cache.pnl_rows[strat.option_indices[i]];
+                for (size_t j = 0; j < pnl_length; ++j) {
+                    strat.total_pnl_array[j] += s * row[j];
+                }
+            }
+            // Inline breakeven detection
+            strat.breakeven_points.clear();
+            for (size_t j = 1; j < pnl_length; ++j) {
+                if (strat.total_pnl_array[j] * strat.total_pnl_array[j - 1] < 0.0) {
+                    double t = -strat.total_pnl_array[j - 1] / (strat.total_pnl_array[j] - strat.total_pnl_array[j - 1]);
+                    strat.breakeven_points.push_back(g_cache.prices[j - 1] + (g_cache.prices[j] - g_cache.prices[j - 1]) * t);
+                }
+            }
+        }
+    };
+
+    for (auto& set_result : per_set) {
+        recompute_pnl(set_result);
+    }
+    recompute_pnl(consensus);
 
     // ====== Conversion en Python ======
     py::dict result;
@@ -383,10 +460,10 @@ py::dict process_combinations_batch_with_multi_scoring(
     result["per_set"] = per_set_py;
     result["consensus"] = scored_list_to_python(consensus);
     result["n_weight_sets"] = static_cast<int>(weight_sets.size());
-    result["n_candidates"] = static_cast<int>(valid_strategies.size());
+    result["n_candidates"] = static_cast<int>(n_candidates);
 
     std::cout << "Multi-scoring termine: "
-              << valid_strategies.size() << " candidats, "
+              << n_candidates << " candidats, "
               << per_set.size() << " rankings, "
               << consensus.size() << " consensus" << std::endl;
 
@@ -444,6 +521,13 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("premium_only_right") = false,
           py::arg("top_n") = 10,
           py::arg("weight_sets") = py::list()
+    );
+
+    m.def("clear_options_cache", &clear_options_cache,
+        R"pbdoc(
+            Libère la mémoire du cache C++ des options.
+            À appeler après le traitement pour économiser la RAM.
+        )pbdoc"
     );
 
     m.def("stop", &stop,

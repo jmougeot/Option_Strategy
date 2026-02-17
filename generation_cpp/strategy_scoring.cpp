@@ -19,12 +19,12 @@ namespace strategy {
 
 std::vector<MetricConfig> StrategyScorer::create_default_metrics() {
     std::vector<MetricConfig> metrics;
-    metrics.emplace_back("premium", 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER); 
-    metrics.emplace_back("average_pnl", 0.00 , NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
-    metrics.emplace_back("roll", 0.00, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
-    metrics.emplace_back("avg_pnl_levrage", 0.0, NormalizerType::MAX, ScorerType::HIGHER_BETTER);    
-    metrics.emplace_back("tail_penalty", 0.0, NormalizerType::MIN_MAX, ScorerType::LOWER_BETTER);
-    metrics.emplace_back("avg_intra_life_pnl", 0.0, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
+    metrics.emplace_back("premium", MetricId::PREMIUM, 0.0, NormalizerType::MAX, ScorerType::LOWER_BETTER); 
+    metrics.emplace_back("average_pnl", MetricId::AVERAGE_PNL, 0.00 , NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
+    metrics.emplace_back("roll", MetricId::ROLL, 0.00, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
+    metrics.emplace_back("avg_pnl_levrage", MetricId::AVG_PNL_LEVRAGE, 0.0, NormalizerType::MAX, ScorerType::HIGHER_BETTER);    
+    metrics.emplace_back("tail_penalty", MetricId::TAIL_PENALTY, 0.0, NormalizerType::MIN_MAX, ScorerType::LOWER_BETTER);
+    metrics.emplace_back("avg_intra_life_pnl", MetricId::AVG_INTRA_LIFE_PNL, 0.0, NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER);
     
     return metrics;
 }
@@ -281,6 +281,22 @@ static double extract_single_metric_value(const ScoredStrategy& strat, const std
     return 0.0;
 }
 
+/**
+ * Version rapide par MetricId — évite les comparaisons de std::string 
+ * dans les boucles chaudes du scoring (appelée N_strats × N_metrics fois)
+ */
+static inline double extract_metric_by_id(const ScoredStrategy& strat, MetricId id) {
+    switch (id) {
+        case MetricId::PREMIUM:           return std::abs(strat.total_premium);
+        case MetricId::AVERAGE_PNL:       return strat.average_pnl;
+        case MetricId::ROLL:              return strat.roll;
+        case MetricId::AVG_PNL_LEVRAGE:   return strat.avg_pnl_levrage;
+        case MetricId::TAIL_PENALTY:      return 0.0; // placeholder
+        case MetricId::AVG_INTRA_LIFE_PNL: return strat.avg_intra_life_pnl;
+        default:                          return 0.0;
+    }
+}
+
 // ============================================================================
 // MULTI-WEIGHT SCORING — normalisation commune, N rankings
 // ============================================================================
@@ -302,20 +318,22 @@ std::pair<
     const size_t n_strats = strategies.size();
     const size_t n_sets = weight_sets.size();
 
-    // ====== 1. Collect ALL metric names across every weight set ======
-    std::vector<std::string> all_metric_names;
+    // ====== 1. Collect ALL metric IDs across every weight set ======
+    // Utiliser MetricId (enum int) au lieu de strings pour les lookups
+    std::vector<MetricId> all_metric_ids;
     {
-        std::unordered_map<std::string, bool> seen;
+        bool seen[static_cast<int>(MetricId::METRIC_COUNT)] = {};
         for (const auto& ws : weight_sets) {
             for (const auto& mc : ws) {
-                if (!seen[mc.name]) {
-                    seen[mc.name] = true;
-                    all_metric_names.push_back(mc.name);
+                int mid = static_cast<int>(mc.id);
+                if (mid < static_cast<int>(MetricId::METRIC_COUNT) && !seen[mid]) {
+                    seen[mid] = true;
+                    all_metric_ids.push_back(mc.id);
                 }
             }
         }
     }
-    const size_t n_metrics = all_metric_names.size();
+    const size_t n_metrics = all_metric_ids.size();
 
     // ====== 2. Common normalisation: compute min/max for every metric ======
     struct NormInfo {
@@ -324,39 +342,33 @@ std::pair<
         double min_val;
         double max_val;
     };
-    std::unordered_map<std::string, NormInfo> norm_map;
-
+    // Tableau fixe indexé par MetricId (pas de hash map)
+    NormInfo norm_table[static_cast<int>(MetricId::METRIC_COUNT)];
+    
     // First pass: figure out normalizer / scorer from the default metrics
     auto defaults = create_default_metrics();
-    std::unordered_map<std::string, MetricConfig*> default_lookup;
-    for (auto& d : defaults) default_lookup[d.name] = &d;
-
-    for (const auto& name : all_metric_names) {
-        NormInfo ni{NormalizerType::MIN_MAX, ScorerType::HIGHER_BETTER,
-                    std::numeric_limits<double>::max(),
-                    std::numeric_limits<double>::lowest()};
-        auto it = default_lookup.find(name);
-        if (it != default_lookup.end()) {
-            ni.normalizer = it->second->normalizer;
-            ni.scorer = it->second->scorer;
-        }
-        norm_map[name] = ni;
+    for (auto& d : defaults) {
+        int mid = static_cast<int>(d.id);
+        norm_table[mid] = {d.normalizer, d.scorer,
+                           std::numeric_limits<double>::max(),
+                           std::numeric_limits<double>::lowest()};
     }
 
     // Second pass: scan ALL strategies to find global min/max
     for (const auto& strat : strategies) {
-        for (const auto& name : all_metric_names) {
-            double v = extract_single_metric_value(strat, name);
+        for (auto mid : all_metric_ids) {
+            double v = extract_metric_by_id(strat, mid);
             if (std::isfinite(v)) {
-                auto& ni = norm_map[name];
-                ni.min_val = std::min(ni.min_val, v);
-                ni.max_val = std::max(ni.max_val, v);
+                auto& ni = norm_table[static_cast<int>(mid)];
+                if (v < ni.min_val) ni.min_val = v;
+                if (v > ni.max_val) ni.max_val = v;
             }
         }
     }
 
     // Fix degenerate ranges
-    for (auto& [name, ni] : norm_map) {
+    for (auto mid : all_metric_ids) {
+        auto& ni = norm_table[static_cast<int>(mid)];
         if (ni.min_val == std::numeric_limits<double>::max()) {
             ni.min_val = 0.0;
             ni.max_val = 1.0;
@@ -367,13 +379,16 @@ std::pair<
     }
 
     // ====== 3. Pre-compute normalised metric scores per strategy ======
-    std::unordered_map<std::string, std::vector<double>> metric_scores;
-    for (const auto& name : all_metric_names) {
-        auto& ni = norm_map[name];
-        auto& scores = metric_scores[name];
+    // Tableau contigu [MetricId][strat] — pas de hash map
+    constexpr int N_METRIC_IDS = static_cast<int>(MetricId::METRIC_COUNT);
+    std::vector<std::vector<double>> metric_scores_table(N_METRIC_IDS);
+    for (auto mid : all_metric_ids) {
+        int midx = static_cast<int>(mid);
+        auto& ni = norm_table[midx];
+        auto& scores = metric_scores_table[midx];
         scores.resize(n_strats);
         for (size_t i = 0; i < n_strats; ++i) {
-            double v = extract_single_metric_value(strategies[i], name);
+            double v = extract_metric_by_id(strategies[i], mid);
             scores[i] = calculate_score(v, ni.min_val, ni.max_val, ni.scorer);
         }
     }
@@ -399,10 +414,10 @@ std::pair<
             for (const auto& mc : ws) {
                 if (mc.weight <= 0.0) continue;
                 double w_norm = mc.weight / total_w;
+                int midx = static_cast<int>(mc.id);
                 double ms = 0.0;
-                auto it = metric_scores.find(mc.name);
-                if (it != metric_scores.end()) {
-                    ms = it->second[i];
+                if (midx < N_METRIC_IDS && !metric_scores_table[midx].empty()) {
+                    ms = metric_scores_table[midx][i];
                 }
                 log_sum += w_norm * std::log(epsilon + ms);
             }

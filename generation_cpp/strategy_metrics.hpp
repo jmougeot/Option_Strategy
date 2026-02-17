@@ -53,8 +53,10 @@ struct StrategyMetrics {
     std::array<double, N_INTRA_DATES> intra_life_pnl;     // P&L moyen à chaque date
     double avg_intra_life_pnl;                            // Moyenne des P&L intra-vie
     
-    // Breakeven points (max 10 pour éviter allocation dynamique)
-    std::vector<double> breakeven_points;
+    // Breakeven points (inline buffer — évite allocation dynamique dans le hot path)
+    static constexpr int MAX_BREAKEVEN = 10;
+    std::array<double, MAX_BREAKEVEN> breakeven_points;
+    int breakeven_count = 0;
     
     // P&L array complet
     std::vector<double> total_pnl_array;
@@ -86,12 +88,17 @@ struct OptionData {
 class StrategyCalculator {
 public:
 
+    /**
+     * Calcule les métriques d'une stratégie.
+     * Interface optimisée : pointeurs vers OptionData (zéro-copie depuis le cache).
+     */
     static std::optional<StrategyMetrics> calculate(
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs,
-        const std::vector<std::vector<double>>& pnl_matrix,
-        const std::vector<double>& prices,
-        const std::vector<double>& mixture,
+        const OptionData* const* options,
+        const int* signs,
+        size_t n_options,
+        const double* const* pnl_rows,
+        size_t pnl_length,
+        const double* prices,
         double average_mix,
         double max_loss_left,
         double max_loss_right,
@@ -103,6 +110,7 @@ public:
         double delta_max,
         double limit_left,
         double limit_right,
+        double* __restrict total_pnl_buf,
         bool premium_only = false,
         bool premium_only_left = false,
         bool premium_only_right = false
@@ -113,78 +121,79 @@ public:
         const int N
     );
 
+
+
 private:
     // Filtres (retourne false si la stratégie doit être rejetée)
+    // Interface pointer pour zéro-copie
 
     static bool filter_useless_sell(
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs,
+        const OptionData* const* options,
+        const int* signs,
+        size_t n_options,
         double min_premium_sell
     );
     
     static bool filter_same_option_buy_sell(
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs
+        const OptionData* const* options,
+        const int* signs,
+        size_t n_options
     );
     
     static bool filter_put_open(
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs,
+        const OptionData* const* options,
+        const int* signs,
+        size_t n_options,
         int ouvert_gauche
     );
     
     static bool filter_call_open(
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs,
+        const OptionData* const* options,
+        const int* signs,
+        size_t n_options,
         int ouvert_droite
     );
     
     static bool filter_premium(
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs,
+        const OptionData* const* options,
+        const int* signs,
+        size_t n_options,
         double max_premium_params,
         double& total_premium
     );
     
     static bool filter_delta(
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs,
+        const OptionData* const* options,
+        const int* signs,
+        size_t n_options,
         double delta_min,
         double delta_max,
         double& total_delta
     );
     
     static bool filter_average_pnl(
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs,
+        const OptionData* const* options,
+        const int* signs,
+        size_t n_options,
         double& total_average_pnl
     );
     
     // Calculs
     static void calculate_greeks(
-        const std::vector<OptionData>& options,
-        const std::vector<int>& signs,
+        const OptionData* const* options,
+        const int* signs,
+        size_t n_options,
         double& total_iv
     );
     
+    // Legacy: gardé pour compatibilité
     static std::vector<double> calculate_total_pnl(
         const std::vector<std::vector<double>>& pnl_matrix,
         const std::vector<int>& signs
     );
     
-    static void calculate_profit_zone(
-        const std::vector<double>& total_pnl,
-        const std::vector<double>& prices,
-        double& min_profit_price,
-        double& max_profit_price,
-        double& profit_zone_width
-    );
-    
-    static std::vector<double> calculate_breakeven_points(
-        const std::vector<double>& total_pnl,
-        const std::vector<double>& prices
-    );
 
+    
     static double avg_pnl_levrage(
         const double total_average_pnl, 
         const double premium

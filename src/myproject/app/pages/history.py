@@ -199,6 +199,13 @@ def add_to_history(
         top_strategies_summary=top_strategies_summary,
     )
     
+    # Libérer les données lourdes des anciennes entrées
+    # (seule l'entrée la plus récente garde comparisons/mixture/future_data)
+    for old_entry in st.session_state.search_history:
+        old_entry.comparisons = []
+        old_entry.mixture = None
+        old_entry.future_data = None
+
     # Ajouter en tête de liste (plus récent en premier)
     st.session_state.search_history.insert(0, entry)
     

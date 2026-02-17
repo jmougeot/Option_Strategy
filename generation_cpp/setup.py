@@ -11,13 +11,13 @@ __version__ = "1.0.0"
 
 # Flags de compilation avec OpenMP
 if sys.platform == "win32":
-    # MSVC: /O2 optimisation, /openmp pour parallélisation, /arch:AVX2 pour SIMD
-    compile_args = ["/O2", "/openmp", "/arch:AVX2", "/fp:fast"]
-    link_args = []
+    # MSVC: /O2 optimisation, /GL whole-program opt, /openmp, /arch:AVX2 SIMD
+    compile_args = ["/O2", "/GL", "/openmp", "/arch:AVX2", "/fp:fast", "/Oi"]
+    link_args = ["/LTCG"]
 else:
     # GCC/Clang: -O3 optimisation, -fopenmp pour parallélisation
-    compile_args = ["-O3", "-ffast-math", "-fopenmp"]
-    link_args = ["-fopenmp"]
+    compile_args = ["-O3", "-ffast-math", "-fopenmp", "-march=native", "-flto"]
+    link_args = ["-fopenmp", "-flto"]
 
 ext_modules = [
     Pybind11Extension(
