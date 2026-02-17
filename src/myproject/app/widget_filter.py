@@ -103,7 +103,7 @@ def filter_params() -> FilterData:
         min_premium_sell = st.number_input("Min price for short",
                                                 value=float(current_filter.get("min_premium_sell", 0.005)),
                                                 step=0.001,
-                                                format="%.3f",
+                                                format="%.4f",
                                                 key="filter_min_premium_sell",
                                                 help="Minimum price to sell an option")
 
