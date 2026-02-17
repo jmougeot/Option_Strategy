@@ -133,68 +133,62 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     double total_iv;
     calculate_greeks(options, signs, total_iv);
     
-    // P&L total
-    std::vector<double> total_pnl = calculate_total_pnl(pnl_matrix, signs);
+    // P&L total — calcul fusionné avec filtres de perte pour early-exit
+    const size_t pnl_length = pnl_matrix[0].size();
+    std::vector<double> total_pnl(pnl_length, 0.0);
+    
+    // Dot product: signs @ pnl_matrix
+    for (size_t i = 0; i < n_options; ++i) {
+        const double s = static_cast<double>(signs[i]);
+        const auto& row = pnl_matrix[i];
+        for (size_t j = 0; j < pnl_length; ++j) {
+            total_pnl[j] += s * row[j];
+        }
+    }
     
     if (total_pnl.empty()) {
         return std::nullopt;
     }
 
     double avg_pnl_lvg = avg_pnl_levrage(total_average_pnl, total_premium);
-    // ========== FILTRES DE PERTE BASÉS SUR LES LIMITES DE PRIX ==========
+    
+    // ========== FILTRES DE PERTE + MAX/MIN en une seule passe ==========
     
     double max_loss_left = 0.0;
     double max_loss_right = 0.0;
+    double max_profit = total_pnl[0];
+    double max_loss = total_pnl[0];
+    const double abs_premium = std::abs(total_premium);
     
-    for (size_t i = 0; i < prices.size() && i < total_pnl.size(); ++i) {
-        double price = prices[i];
-        double pnl = total_pnl[i];
+    for (size_t i = 0; i < pnl_length; ++i) {
+        const double price = prices[i];
+        const double pnl = total_pnl[i];
+        
+        // Track global min/max
+        if (pnl > max_profit) max_profit = pnl;
+        if (pnl < max_loss) max_loss = pnl;
         
         if (price < limit_left) {
-            // Zone gauche: tracker la perte max
-            if (pnl < max_loss_left) {
-                max_loss_left = pnl;
-            }
-            // Filtre: premium_only_left OU max_loss_left_param
+            if (pnl < max_loss_left) max_loss_left = pnl;
             if (premium_only_left) {
-                if (pnl < -std::abs(total_premium)) {
-                    return std::nullopt;
-                }
+                if (pnl < -abs_premium) return std::nullopt;
             } else {
-                if (pnl < -max_loss_left_param) {
-                    return std::nullopt;
-                }
+                if (pnl < -max_loss_left_param) return std::nullopt;
             }
         } else if (price > limit_right) {
-            // Zone droite: tracker la perte max
-            if (pnl < max_loss_right) {
-                max_loss_right = pnl;
-            }
-            // Filtre: premium_only_right OU max_loss_right_param
+            if (pnl < max_loss_right) max_loss_right = pnl;
             if (premium_only_right) {
-                if (pnl < -std::abs(total_premium)) {
-                    return std::nullopt;
-                }
+                if (pnl < -abs_premium) return std::nullopt;
             } else {
-                if (pnl < -max_loss_right_param) {
-                    return std::nullopt;
-                }
+                if (pnl < -max_loss_right_param) return std::nullopt;
             }
         } else {
-            // Zone centrale: la perte ne doit pas dépasser le premium payé
-            if (pnl < -std::abs(total_premium)) {
-                return std::nullopt;
-            }
+            if (pnl < -abs_premium) return std::nullopt;
         }
     }
     
-    // Max profit / max loss global
-    auto [min_it, max_it] = std::minmax_element(total_pnl.begin(), total_pnl.end());
-    double max_profit = *max_it;
-    double max_loss = *min_it;
-    
     // Filtre premium_only: |max_loss| doit être < |premium|
-    if (premium_only && std::abs(max_loss) > std::abs(total_premium)) {
+    if (premium_only && std::abs(max_loss) > abs_premium) {
         return std::nullopt;
     }
     

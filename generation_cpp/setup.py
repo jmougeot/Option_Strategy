@@ -11,8 +11,8 @@ __version__ = "1.0.0"
 
 # Flags de compilation avec OpenMP
 if sys.platform == "win32":
-    # MSVC: /O2 optimisation, /openmp pour parallélisation
-    compile_args = ["/O2", "/openmp"]
+    # MSVC: /O2 optimisation, /openmp pour parallélisation, /arch:AVX2 pour SIMD
+    compile_args = ["/O2", "/openmp", "/arch:AVX2", "/fp:fast"]
     link_args = []
 else:
     # GCC/Clang: -O3 optimisation, -fopenmp pour parallélisation

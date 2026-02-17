@@ -277,26 +277,24 @@ py::dict process_combinations_batch_with_multi_scoring(
             std::vector<ScoredStrategy> thread_results;
             thread_results.reserve(1000);
 
+            // Pré-allouer les buffers par thread (évite allocation à chaque itération)
+            std::vector<OptionData> combo_options(n_legs);
+            std::vector<int> combo_signs(n_legs);
+            std::vector<std::vector<double>> combo_pnl(n_legs);
+
             #pragma omp for schedule(dynamic, 64) nowait
             for (int64_t task_id = 0; task_id < total_tasks_signed; ++task_id) {
-                if (stop_flag.load()) continue;
+                if (stop_flag.load(std::memory_order_relaxed)) continue;
 
                 size_t combo_idx = static_cast<size_t>(task_id) / n_masks;
                 int mask = static_cast<int>(task_id) % n_masks;
                 const auto& indices = all_combinations[combo_idx];
 
-                std::vector<OptionData> combo_options;
-                std::vector<int> combo_signs;
-                std::vector<std::vector<double>> combo_pnl;
-                combo_options.reserve(n_legs);
-                combo_signs.reserve(n_legs);
-                combo_pnl.reserve(n_legs);
-
                 for (int i = 0; i < n_legs; ++i) {
                     int idx = indices[i];
-                    combo_options.push_back(g_cache.options[idx]);
-                    combo_signs.push_back((mask & (1 << i)) ? 1 : -1);
-                    combo_pnl.push_back(g_cache.pnl_matrix[idx]);
+                    combo_options[i] = g_cache.options[idx];
+                    combo_signs[i] = (mask & (1 << i)) ? 1 : -1;
+                    combo_pnl[i] = g_cache.pnl_matrix[idx];
                 }
 
                 auto result = StrategyCalculator::calculate(

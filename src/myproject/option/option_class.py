@@ -53,6 +53,28 @@ def bachelier_price(F: float, K: float, sigma: float, T: float, is_call: bool) -
     return max(price, 0.0)
 
 
+def bachelier_price_vec(F: np.ndarray, K: float, sigma: float, T: float, is_call: bool) -> np.ndarray:
+    """
+    Version vectorisée de bachelier_price.
+    F peut être un array numpy de prix forward.
+    """
+    if T <= 0 or sigma <= 0:
+        if is_call:
+            return np.maximum(F - K, 0.0)
+        else:
+            return np.maximum(K - F, 0.0)
+
+    sigma_sqrt_T = sigma * np.sqrt(T)
+    d = (F - K) / sigma_sqrt_T
+
+    if is_call:
+        prices = (F - K) * norm.cdf(d) + sigma_sqrt_T * norm.pdf(d)
+    else:
+        prices = (K - F) * norm.cdf(-d) + sigma_sqrt_T * norm.pdf(d)
+
+    return np.maximum(prices, 0.0)
+
+
 def breeden_litzenberger_density(
     strikes: np.ndarray,
     call_prices: np.ndarray,
@@ -536,13 +558,10 @@ class Option:
             # Temps restant jusqu'à expiration
             T_remaining = time_to_expiry * (1.0 - t_frac)
             
-            for j, F in enumerate(underlying_prices):
-                # Prix Bachelier pour ce (date, prix_sous_jacent)
-                price = bachelier_price(F, K, sigma_normal, T_remaining, is_call)
-                self.intra_life_prices[i, j] = price
-                
-                # P&L = valeur actuelle - coût initial
-                self.intra_life_pnl[i, j] = price - initial_cost
+            # Calcul vectorisé sur tous les prix en une seule fois
+            prices_vec = bachelier_price_vec(underlying_prices, K, sigma_normal, T_remaining, is_call)
+            self.intra_life_prices[i, :] = prices_vec
+            self.intra_life_pnl[i, :] = prices_vec - initial_cost
         
         return self.intra_life_prices
     
