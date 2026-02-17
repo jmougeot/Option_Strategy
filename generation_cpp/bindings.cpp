@@ -220,6 +220,239 @@ static py::list scored_list_to_python(const std::vector<ScoredStrategy>& strateg
     return results;
 }
 
+// ============================================================================
+// Branch-and-bound : exploration récursive avec élagage
+// ============================================================================
+
+constexpr int BNB_MAX_LEGS = 10;
+
+/**
+ * Paramètres fixes pour l'exploration (partagés par tous les threads)
+ */
+struct BnBParams {
+    int max_legs;
+    int n_options;
+    double max_premium_params;
+    double delta_min, delta_max;
+    int ouvert_gauche, ouvert_droite;
+    double min_premium_sell;
+    double max_loss_left, max_loss_right;
+    double limit_left, limit_right;
+    bool premium_only, premium_only_left, premium_only_right;
+    // Bornes pré-calculées pour le pruning
+    double bound_max_premium;   // max(option.premium) sur toutes les options
+    double bound_max_delta;     // max(|option.delta|) sur toutes les options
+    double bound_max_avg_pnl;   // max(|option.average_pnl|) sur toutes les options
+};
+
+/**
+ * Buffers par thread (réutilisés à chaque appel récursif)
+ */
+struct BnBBuffers {
+    const OptionData* option_ptrs[BNB_MAX_LEGS];
+    const double* pnl_ptrs[BNB_MAX_LEGS];
+    int indices[BNB_MAX_LEGS];
+    int signs[BNB_MAX_LEGS];
+    std::vector<double> total_pnl_buf;
+};
+
+/**
+ * Stocke un résultat valide dans le vecteur de résultats du thread.
+ */
+static void bnb_store_result(
+    const BnBBuffers& buf,
+    const StrategyMetrics& metrics,
+    int depth,
+    std::vector<ScoredStrategy>& results
+) {
+    ScoredStrategy strat;
+    strat.total_premium = metrics.total_premium;
+    strat.total_delta = metrics.total_delta;
+    strat.total_iv = metrics.total_iv;
+    strat.average_pnl = metrics.total_average_pnl;
+    strat.roll = metrics.total_roll;
+    strat.max_profit = metrics.max_profit;
+    strat.max_loss = std::min(metrics.max_loss_left, metrics.max_loss_right);
+    strat.max_loss_left = metrics.max_loss_left;
+    strat.max_loss_right = metrics.max_loss_right;
+    strat.min_profit_price = metrics.min_profit_price;
+    strat.max_profit_price = metrics.max_profit_price;
+    strat.profit_zone_width = metrics.profit_zone_width;
+    strat.call_count = metrics.call_count;
+    strat.put_count = metrics.put_count;
+    strat.breakeven_points.assign(
+        metrics.breakeven_points.begin(),
+        metrics.breakeven_points.begin() + metrics.breakeven_count);
+    strat.avg_pnl_levrage = metrics.avg_pnl_levrage;
+    strat.intra_life_prices = metrics.intra_life_prices;
+    strat.intra_life_pnl = metrics.intra_life_pnl;
+    strat.avg_intra_life_pnl = metrics.avg_intra_life_pnl;
+
+    strat.option_indices.resize(depth);
+    strat.signs.resize(depth);
+    strat.strikes.resize(depth);
+    strat.is_calls.resize(depth);
+    for (int i = 0; i < depth; ++i) {
+        strat.option_indices[i] = buf.indices[i];
+        strat.signs[i] = buf.signs[i];
+        strat.strikes[i] = g_cache.options[buf.indices[i]].strike;
+        strat.is_calls[i] = g_cache.options[buf.indices[i]].is_call;
+    }
+    results.push_back(std::move(strat));
+}
+
+/**
+ * Exploration récursive avec élagage (branch-and-bound).
+ *
+ * À chaque profondeur depth >= 1, évalue la combinaison partielle comme
+ * stratégie à depth pattes si les contraintes scalaires sont satisfaites.
+ *
+ * Avant de descendre plus profond, vérifie si TOUTE extension (depth+1 à max_legs)
+ * peut mener à une stratégie valide en utilisant des bornes conservatives.
+ *
+ * Garantie de correction : seules les branches PROVABLEMENT invalides sont élaguées.
+ *
+ * Bornes utilisées pour l'élagage :
+ *   - Premium:  |prem_partial| > max_premium + remaining * max_abs_premium  → impossible
+ *   - Delta:    delta_partial ± remaining * max_abs_delta hors [delta_min, delta_max] → impossible
+ *   - Avg P&L:  avg_partial + remaining * max_abs_avg_pnl < 0               → impossible
+ *   - Net short: net_short - remaining > ouvert                              → impossible
+ *   - Vente inutile: sign=-1 et premium < min_premium_sell                   → élagué immédiat
+ *   - Achat+vente même option: même strike+type, signes opposés              → élagué immédiat
+ */
+static void bnb_explore(
+    const BnBParams& params,
+    BnBBuffers& buf,
+    int depth,
+    int start_idx,
+    double partial_premium,
+    double partial_delta,
+    double partial_avg_pnl,
+    double partial_roll,
+    double partial_iv,
+    int net_short_put,
+    int net_short_call,
+    int call_count,
+    int put_count,
+    std::vector<ScoredStrategy>& results
+) {
+    if (stop_flag.load(std::memory_order_relaxed)) return;
+
+    // === Évaluation à la profondeur courante (depth >= 1) ===
+    if (depth >= 1) {
+        // Vérifications scalaires rapides (évite le calcul P&L coûteux)
+        if (std::abs(partial_premium) <= params.max_premium_params &&
+            partial_delta >= params.delta_min && partial_delta <= params.delta_max &&
+            partial_avg_pnl >= 0.0 &&
+            net_short_put <= params.ouvert_gauche &&
+            net_short_call <= params.ouvert_droite)
+        {
+            // Contraintes scalaires OK → lancer le calcul P&L complet + filtres de perte
+            auto result = StrategyCalculator::calculate(
+                buf.option_ptrs, buf.signs, static_cast<size_t>(depth),
+                buf.pnl_ptrs, g_cache.pnl_length, g_cache.prices.data(),
+                g_cache.average_mix, params.max_loss_left, params.max_loss_right,
+                params.max_premium_params, params.ouvert_gauche, params.ouvert_droite,
+                params.min_premium_sell, params.delta_min, params.delta_max,
+                params.limit_left, params.limit_right, buf.total_pnl_buf.data(),
+                params.premium_only, params.premium_only_left, params.premium_only_right
+            );
+            if (result.has_value()) {
+                bnb_store_result(buf, result.value(), depth, results);
+            }
+        }
+    }
+
+    // === Extension : essayer d'ajouter une jambe supplémentaire ===
+    if (depth >= params.max_legs) return;
+
+    // remaining_after = pattes possibles APRÈS la nouvelle jambe qu'on va ajouter
+    const int remaining_after = params.max_legs - depth - 1;
+    const double R_prem  = remaining_after * params.bound_max_premium;
+    const double R_delta = remaining_after * params.bound_max_delta;
+    const double R_avg   = remaining_after * params.bound_max_avg_pnl;
+
+    for (int opt_idx = start_idx; opt_idx < params.n_options; ++opt_idx) {
+        const OptionData& opt = g_cache.options[opt_idx];
+
+        for (int sign = 1; sign >= -1; sign -= 2) {
+            // --- Filtre immédiat : vente inutile ---
+            if (sign == -1 && opt.premium < params.min_premium_sell) continue;
+
+            // --- Filtre immédiat : achat+vente même option ---
+            bool conflict = false;
+            for (int j = 0; j < depth; ++j) {
+                if (buf.option_ptrs[j]->is_call == opt.is_call &&
+                    buf.option_ptrs[j]->strike == opt.strike &&
+                    buf.signs[j] != sign) {
+                    conflict = true;
+                    break;
+                }
+            }
+            if (conflict) continue;
+
+            // --- Calcul des valeurs partielles mises à jour ---
+            const double s = static_cast<double>(sign);
+            const double new_prem  = partial_premium + s * opt.premium;
+            const double new_delta = partial_delta   + s * opt.delta;
+            const double new_avg   = partial_avg_pnl + s * opt.average_pnl;
+
+            int new_nsp = net_short_put;
+            int new_nsc = net_short_call;
+            if (opt.is_call) {
+                new_nsc += (sign < 0) ? 1 : -1;
+            } else {
+                new_nsp += (sign < 0) ? 1 : -1;
+            }
+
+            // ==========================================================
+            // ÉLAGAGE PAR BORNES (branch-and-bound)
+            // Peut-on atteindre une feuille valide en ajoutant
+            // 0 à remaining_after jambes supplémentaires ?
+            // Si aucune profondeur de depth+1 à max_legs ne peut donner
+            // une stratégie valide, on élague toute la branche.
+            // ==========================================================
+
+            // Premium: |prem_final| ≤ max_premium
+            // Le minimum possible de |prem_final| = |new_prem| - R_prem
+            // Si |new_prem| - R_prem > max_premium → impossible
+            if (std::abs(new_prem) > params.max_premium_params + R_prem) continue;
+
+            // Delta: delta_min ≤ delta_final ≤ delta_max
+            // Intervalle atteignable: [new_delta - R_delta, new_delta + R_delta]
+            // Si disjoint de [delta_min, delta_max] → impossible
+            if (new_delta + R_delta < params.delta_min) continue;
+            if (new_delta - R_delta > params.delta_max) continue;
+
+            // Average P&L: avg_pnl_final ≥ 0
+            // Maximum atteignable: new_avg + R_avg
+            // Si max < 0 → impossible
+            if (new_avg + R_avg < 0.0) continue;
+
+            // Net short put/call: chaque jambe restante peut au mieux réduire de 1
+            // Minimum atteignable: new_nsp - remaining_after
+            // Si min > ouvert → impossible
+            if (new_nsp - remaining_after > params.ouvert_gauche) continue;
+            if (new_nsc - remaining_after > params.ouvert_droite) continue;
+
+            // --- Passe tous les tests → descendre dans l'arbre ---
+            buf.option_ptrs[depth] = &opt;
+            buf.pnl_ptrs[depth]    = g_cache.pnl_rows[opt_idx];
+            buf.indices[depth]     = opt_idx;
+            buf.signs[depth]       = sign;
+
+            bnb_explore(params, buf, depth + 1, opt_idx,
+                        new_prem, new_delta, new_avg,
+                        partial_roll + s * opt.roll,
+                        partial_iv   + s * opt.implied_volatility,
+                        new_nsp, new_nsc,
+                        call_count + (opt.is_call ? 1 : 0),
+                        put_count  + (opt.is_call ? 0 : 1),
+                        results);
+        }
+    }
+}
+
 /**
  * Génère les combinaisons, applique N systèmes de poids,
  * retourne les top_n de chaque + un classement consensus.
@@ -276,114 +509,107 @@ py::dict process_combinations_batch_with_multi_scoring(
         throw std::invalid_argument("weight_sets ne peut pas être vide");
     }
 
-    // ====== Génération des combinaisons ======
+    // ====== Génération des combinaisons (Branch-and-Bound) ======
     std::vector<ScoredStrategy> valid_strategies;
     valid_strategies.reserve(100000);
 
-    for (int n_legs = 1; n_legs <= max_legs; ++n_legs) {
-        size_t count_before = valid_strategies.size();
+    // Pré-calculer les bornes pour l'élagage
+    BnBParams bnb_params;
+    bnb_params.max_legs = max_legs;
+    bnb_params.n_options = static_cast<int>(g_cache.n_options);
+    bnb_params.max_premium_params = max_premium_params;
+    bnb_params.delta_min = delta_min;
+    bnb_params.delta_max = delta_max;
+    bnb_params.ouvert_gauche = ouvert_gauche;
+    bnb_params.ouvert_droite = ouvert_droite;
+    bnb_params.min_premium_sell = min_premium_sell;
+    bnb_params.max_loss_left = max_loss_left;
+    bnb_params.max_loss_right = max_loss_right;
+    bnb_params.limit_left = limit_left;
+    bnb_params.limit_right = limit_right;
+    bnb_params.premium_only = premium_only;
+    bnb_params.premium_only_left = premium_only_left;
+    bnb_params.premium_only_right = premium_only_right;
 
-        // Pré-calculer les masques de signes comme doubles
-        // pour éviter la conversion int→double à chaque itération
-        const int n_masks = 1 << n_legs;
-        std::vector<std::vector<int>> sign_masks(n_masks, std::vector<int>(n_legs));
-        for (int mask = 0; mask < n_masks; ++mask) {
-            for (int i = 0; i < n_legs; ++i) {
-                sign_masks[mask][i] = (mask & (1 << i)) ? 1 : -1;
-            }
-        }
+    // Bornes maximum par option (pour l'élagage conservatif)
+    bnb_params.bound_max_premium = 0.0;
+    bnb_params.bound_max_delta = 0.0;
+    bnb_params.bound_max_avg_pnl = 0.0;
+    for (size_t i = 0; i < g_cache.n_options; ++i) {
+        bnb_params.bound_max_premium = std::max(bnb_params.bound_max_premium,
+                                                 g_cache.options[i].premium);
+        bnb_params.bound_max_delta = std::max(bnb_params.bound_max_delta,
+                                               std::abs(g_cache.options[i].delta));
+        bnb_params.bound_max_avg_pnl = std::max(bnb_params.bound_max_avg_pnl,
+                                                  std::abs(g_cache.options[i].average_pnl));
+    }
 
-        std::vector<std::vector<int>> all_combinations;
-        all_combinations.reserve(10000);
-        std::vector<int> c(n_legs, 0);
-        do {
-            all_combinations.push_back(c);
-        } while (StrategyCalculator::next_combination(c, g_cache.n_options));
+    if (max_legs > BNB_MAX_LEGS) {
+        throw std::invalid_argument("max_legs > BNB_MAX_LEGS (" + std::to_string(BNB_MAX_LEGS) + ")");
+    }
 
-        const size_t n_combos = all_combinations.size();
-        const size_t total_tasks = n_combos * n_masks;
+    std::cout << "Branch-and-bound: " << bnb_params.n_options << " options, max_legs=" << max_legs
+              << " bounds(prem=" << bnb_params.bound_max_premium
+              << " delta=" << bnb_params.bound_max_delta
+              << " avg=" << bnb_params.bound_max_avg_pnl << ")" << std::endl;
 
+    {
         std::mutex mtx;
-        const int64_t total_tasks_signed = static_cast<int64_t>(total_tasks);
+        const int n_first_tasks = bnb_params.n_options * 2;  // option × {+1, -1}
 
         #pragma omp parallel
         {
+            BnBBuffers buf;
+            buf.total_pnl_buf.resize(g_cache.pnl_length);
             std::vector<ScoredStrategy> thread_results;
             thread_results.reserve(2000);
 
-            // Buffers par thread — zéro allocation dans la boucle chaude
-            // Pointeurs vers OptionData (zéro-copie, remplace la copie de 136 bytes/option)
-            std::vector<const OptionData*> combo_option_ptrs(n_legs);
-            // Raw pointers vers les rows PnL du cache (zéro-copie)
-            std::vector<const double*> combo_pnl_ptrs(n_legs);
-            // Buffer pré-alloué pour le total_pnl (évite allocation dans calculate())
-            std::vector<double> total_pnl_buf(g_cache.pnl_length);
-
-            #pragma omp for schedule(dynamic, 256) nowait
-            for (int64_t task_id = 0; task_id < total_tasks_signed; ++task_id) {
+            #pragma omp for schedule(dynamic) nowait
+            for (int task = 0; task < n_first_tasks; ++task) {
                 if (stop_flag.load(std::memory_order_relaxed)) continue;
 
-                size_t combo_idx = static_cast<size_t>(task_id) / n_masks;
-                int mask = static_cast<int>(task_id) % n_masks;
-                const auto& indices = all_combinations[combo_idx];
-                const auto& signs = sign_masks[mask];
+                const int opt_idx = task / 2;
+                const int sign = (task % 2 == 0) ? 1 : -1;
+                const OptionData& opt = g_cache.options[opt_idx];
 
-                for (int i = 0; i < n_legs; ++i) {
-                    int idx = indices[i];
-                    combo_option_ptrs[i] = &g_cache.options[idx];  // Pointeur, pas copie!
-                    combo_pnl_ptrs[i] = g_cache.pnl_rows[idx];
-                }
+                // Filtre immédiat : vente inutile
+                if (sign == -1 && opt.premium < bnb_params.min_premium_sell) continue;
 
-                auto result = StrategyCalculator::calculate(
-                    combo_option_ptrs.data(), signs.data(), n_legs,
-                    combo_pnl_ptrs.data(),
-                    g_cache.pnl_length,
-                    g_cache.prices.data(),
-                    g_cache.average_mix, max_loss_left, max_loss_right, max_premium_params,
-                    ouvert_gauche, ouvert_droite, min_premium_sell, delta_min, delta_max,
-                    limit_left, limit_right, total_pnl_buf.data(), premium_only,
-                    premium_only_left, premium_only_right
-                );
+                // Valeurs partielles pour la première jambe
+                const double s = static_cast<double>(sign);
+                const double prem = s * opt.premium;
+                const double delt = s * opt.delta;
+                const double avg  = s * opt.average_pnl;
+                const double roll_v = s * opt.roll;
+                const double iv   = s * opt.implied_volatility;
+                int nsp = 0, nsc = 0, cc = 0, pc = 0;
+                if (opt.is_call) { cc = 1; nsc = (sign < 0) ? 1 : -1; }
+                else             { pc = 1; nsp = (sign < 0) ? 1 : -1; }
 
-                if (result.has_value()) {
-                    const auto& metrics = result.value();
-                    ScoredStrategy strat;
-                    strat.total_premium = metrics.total_premium;
-                    strat.total_delta = metrics.total_delta;
-                    strat.total_iv = metrics.total_iv;
-                    strat.average_pnl = metrics.total_average_pnl;
-                    strat.roll = metrics.total_roll;
-                    strat.max_profit = metrics.max_profit;
-                    strat.max_loss = std::min(metrics.max_loss_left, metrics.max_loss_right);
-                    strat.max_loss_left = metrics.max_loss_left;
-                    strat.max_loss_right = metrics.max_loss_right;
-                    strat.min_profit_price = metrics.min_profit_price;
-                    strat.max_profit_price = metrics.max_profit_price;
-                    strat.profit_zone_width = metrics.profit_zone_width;
-                    strat.call_count = metrics.call_count;
-                    strat.put_count = metrics.put_count;
-                    // Breakeven: copie depuis buffer inline
-                    strat.breakeven_points.assign(
-                        metrics.breakeven_points.begin(),
-                        metrics.breakeven_points.begin() + metrics.breakeven_count);
-                    strat.avg_pnl_levrage = metrics.avg_pnl_levrage;
-                    strat.intra_life_prices = metrics.intra_life_prices;
-                    strat.intra_life_pnl = metrics.intra_life_pnl;
-                    strat.avg_intra_life_pnl = metrics.avg_intra_life_pnl;
+                // Élagage par bornes pour la première jambe
+                const int remaining = max_legs - 1;
+                const double R_prem  = remaining * bnb_params.bound_max_premium;
+                const double R_delta = remaining * bnb_params.bound_max_delta;
+                const double R_avg   = remaining * bnb_params.bound_max_avg_pnl;
 
-                    strat.option_indices.resize(n_legs);
-                    strat.signs.resize(n_legs);
-                    strat.strikes.resize(n_legs);
-                    strat.is_calls.resize(n_legs);
+                if (std::abs(prem) > max_premium_params + R_prem) continue;
+                if (delt + R_delta < delta_min) continue;
+                if (delt - R_delta > delta_max) continue;
+                if (avg + R_avg < 0.0) continue;
+                if (nsp - remaining > ouvert_gauche) continue;
+                if (nsc - remaining > ouvert_droite) continue;
 
-                    for (int i = 0; i < n_legs; ++i) {
-                        strat.option_indices[i] = indices[i];
-                        strat.signs[i] = signs[i];
-                        strat.strikes[i] = g_cache.options[indices[i]].strike;
-                        strat.is_calls[i] = g_cache.options[indices[i]].is_call;
-                    }
-                    thread_results.push_back(std::move(strat));
-                }
+                // Initialiser le premier slot
+                buf.option_ptrs[0] = &opt;
+                buf.pnl_ptrs[0]    = g_cache.pnl_rows[opt_idx];
+                buf.indices[0]     = opt_idx;
+                buf.signs[0]       = sign;
+
+                // Explorer depuis depth=1 (évalue 1-jambe + extensions 2..max_legs)
+                bnb_explore(bnb_params, buf, 1, opt_idx,
+                            prem, delt, avg, roll_v, iv,
+                            nsp, nsc, cc, pc,
+                            thread_results);
             }
 
             {
@@ -393,20 +619,14 @@ py::dict process_combinations_batch_with_multi_scoring(
                     std::make_move_iterator(thread_results.end()));
             }
         }
-
-        if (stop_flag.load()) {
-            throw std::runtime_error("Cancelled by user");
-        }
-
-        size_t count_after = valid_strategies.size();
-        std::cout << "n_legs=" << n_legs << " combos=" << n_combos
-                  << " taches=" << total_tasks
-                  << " valides=" << (count_after - count_before) << std::endl;
     }
 
     if (stop_flag.load()) {
         throw std::runtime_error("Cancelled by user");
     }
+
+    std::cout << "Branch-and-bound: " << valid_strategies.size()
+              << " strategies valides" << std::endl;
 
     // ====== Multi-scoring et ranking ======
     const size_t n_candidates = valid_strategies.size();
