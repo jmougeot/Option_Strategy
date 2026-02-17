@@ -37,6 +37,31 @@ def parse_roll_input(roll_input: str) -> Optional[List[RollExpiry]]:
     
     return roll_expiries if roll_expiries else None
 
+UNDERLYING_PARAMS = {
+    'ER' : {'Short': 0.0025, 'Step' : 0.0625, 'Min_price': 97, 'Max_price': 99, 'max_premium': 0.1},
+    'SFR': {'Short': 0.0025, 'Step' : 0.0625, 'Min_price': 96, 'Max_price': 99, 'max_premium': 0.1},
+    'SFI': {'Short': 0.0025, 'Step' : 0.0500, 'Min_price': 96, 'Max_price': 99, 'max_premium': 0.1},
+    'RX' : {'Short': 0.0200, 'Step' : 0.5000, 'Min_price': 126, 'Max_price': 132, 'max_premium': 0.5},
+    'DU' : {'Short': 0.0100, 'Step' : 0.1000, 'Min_price': 106, 'Max_price': 108, 'max_premium': 0.2},
+    'OE' : {'Short': 0.0200, 'Step' : 0.2500, 'Min_price': 115, 'Max_price': 119, 'max_premium': 0.2},
+    'UB' : {'Short': 0.0500, 'Step' : 1.0000, 'Min_price': 105, 'Max_price': 115, 'max_premium': 0.5},
+    '0R' : {'Short': 0.0500, 'Step' : 0.0625, 'Min_price': 97, 'Max_price': 99, 'max_premium': 0.1},
+    '0N' : {'Short': 0.0500, 'Step' : 0.100, 'Min_price': 96, 'Max_price': 99, 'max_premium': 0.1},
+    '0Q' : {'Short': 0.0500, 'Step' : 0.0625, 'Min_price': 96, 'Max_price': 99, 'max_premium': 0.1},
+    'Other': {}
+}
+
+def on_underlying_change():
+    """Callback: met à jour price_step, price_min, price_max et min_premium_sell quand l'underlying change."""
+    und = st.session_state.param_underlying
+    if und in UNDERLYING_PARAMS and und != "Other":
+        p = UNDERLYING_PARAMS[und]
+        st.session_state.param_price_step = p['Step']
+        st.session_state.param_price_min = float(p['Min_price'])
+        st.session_state.param_price_max = float(p['Max_price'])
+        st.session_state.filter_min_premium_sell = p['Short']
+        st.session_state.filter_max_premium= p['max_premium']
+
 
 @dataclass
 class UIParams:
@@ -67,17 +92,33 @@ def sidebar_params() -> UIParams:
     code_brut = None  # None by default, list if raw mode
     
     
+    default_und = 'ER'
+    default_params = UNDERLYING_PARAMS[default_und]
+
     if brut_code_check is False : 
         c1, c2 = st.columns(2)
         with c1:
-            underlying = st.text_input(
-                "Underlying:", value="ER", help="Bloomberg Code (ER = EURIBOR)",
-                key="param_underlying"
+            underlying = st.selectbox(
+                "Underlying:",
+                options=list(UNDERLYING_PARAMS.keys()),
+                index=0,
+                help="Bloomberg Code (ER = EURIBOR)",
+                key="param_underlying",
+                on_change=on_underlying_change,
             )
         with c2:
             years_input = st.text_input(
                 "Years:", value="6", help="6=2026, 7=2027 (comma separated)",
                 key="param_years"
+            )
+
+        # Si "Other" est sélectionné, afficher un text_input pour saisir le code
+        if underlying == "Other":
+            underlying = st.text_input(
+                "Custom underlying code:",
+                value="",
+                help="Enter the Bloomberg underlying code",
+                key="param_custom_underlying"
             )
 
         c1 , c2= st.columns(2)
@@ -90,10 +131,10 @@ def sidebar_params() -> UIParams:
             )
     
         with c2:
-                price_step = st.number_input(
-            "Price Step ($)", value=0.0625, step=0.0001, format="%.4f",
-            key="param_price_step"
-        )
+            price_step = st.number_input(
+                "Price Step ($)", value=default_params['Step'], step=0.0001, format="%.4f",
+                key="param_price_step"
+            )
 
     else:
         c1 , c2= st.columns(2)
@@ -106,19 +147,19 @@ def sidebar_params() -> UIParams:
             )
         with c2:
             price_step = st.number_input(
-            "Price Step ($)", value=0.0625, step=0.0001, format="%.4f",
-            key="param_price_step"
-        )
+                "Price Step ($)", value=default_params['Step'], step=0.0001, format="%.4f",
+                key="param_price_step"
+            )
 
     c1, c2 = st.columns(2)
     with c1:
         price_min = st.number_input(
-            "Min Price ($)", value=97.750, step=0.0001, format="%.4f",
+            "Min Price ($)", value=float(default_params['Min_price']), step=0.0001, format="%.4f",
             key="param_price_min"
         )
     with c2:
         price_max = st.number_input(
-            "Max Price ($)", value=98.750, step=0.0001, format="%.4f",
+            "Max Price ($)", value=float(default_params['Max_price']), step=0.0001, format="%.4f",
             key="param_price_max"
             )
     
