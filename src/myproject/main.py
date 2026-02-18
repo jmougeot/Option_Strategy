@@ -95,9 +95,7 @@ def process_bloomberg_to_strategies(
 
     if not offline and fetch_warnings: #type: ignore
         stats["fetch_warnings"] = fetch_warnings
-    
-
-
+        
     if not options:
         return [], stats, mixture, future_data
 

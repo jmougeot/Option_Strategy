@@ -232,13 +232,13 @@ def run():
         ]
         sub_tabs = st.tabs(sub_tab_names)
         with sub_tabs[0]:
-            display_overview_tab(all_comparisons, roll_labels=roll_labels)
+            display_overview_tab(all_comparisons, roll_labels=roll_labels, unit=params.unit)
             create_payoff_diagram(all_comparisons[:5], mixture, underlying_price, key="payoff_consensus")
         for i in range(multi_ranking.n_sets):
             with sub_tabs[i + 1]:
                 set_comps = multi_ranking.per_set_strategies[i]
-                display_overview_tab(set_comps, roll_labels=roll_labels)
+                display_overview_tab(set_comps, roll_labels=roll_labels, unit=params.unit)
                 create_payoff_diagram(set_comps[:5], mixture, underlying_price, key=f"payoff_set_{i}")
     else:
-        display_overview_tab(all_comparisons, roll_labels=roll_labels)
+        display_overview_tab(all_comparisons, roll_labels=roll_labels, unit=params.unit)
         create_payoff_diagram(all_comparisons[:5], mixture, underlying_price, key="payoff_single")
