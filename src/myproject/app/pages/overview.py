@@ -209,8 +209,10 @@ def run():
     if future_data or stats:
         col_price, col_date, col_screened = st.columns(3)
         with col_price:
-            if future_data:
+            if future_data and future_data.underlying_price is not None:
                 st.metric("Underlying Price", f"{future_data.underlying_price:.4f}")
+            elif future_data:
+                st.metric("Underlying Price", "N/A")
         with col_date:
             if future_data:
                 date_str = future_data.last_tradable_date if future_data.last_tradable_date else "N/A"

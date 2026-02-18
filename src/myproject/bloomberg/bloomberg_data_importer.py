@@ -118,7 +118,7 @@ class PremiumFetcher:
         self.builder = builder
         self.main_data: Dict[str, Any] = {}
         self.roll_premiums: Dict[PremiumKey, float] = {}
-        self.future_data: FutureData = FutureData(98.0, None)
+        self.future_data: FutureData = FutureData(None, None)
         self.warnings: List[str] = []
     
     def fetch_all(self):
@@ -280,7 +280,7 @@ def import_options(
 
 
     # 2. Fetch des données
-    future_data = FutureData(98.0, None)
+    future_data = FutureData(None, None)
     options: List[Option] = []
     fetch_warnings: List[str] = []
     

@@ -97,7 +97,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
 
         # Envoyer
         session.sendRequest(request)
-        underlying_price : float = 98.0
+        underlying_price : Optional[float] = None
         last_tradable_date : Optional[str] = None
         # Lire la réponse
         while True:
@@ -172,7 +172,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         print(f"✗ Erreur fetch: {e}")
         import traceback
         traceback.print_exc()
-        return results, FutureData(98.0, None), []
+        return results, FutureData(None, None), []
 
 
 def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:

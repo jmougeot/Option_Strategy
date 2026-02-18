@@ -66,9 +66,9 @@ def build_email_template_data(params, filter, scoring_weights) -> EmailTemplateD
     best = comparisons_list[0] if comparisons_list else None
     
     # ─── Future data & ref price ───
-    future_data_email = st.session_state.get("future_data", FutureData(0, None))
-    ref_price = future_data_email.underlying_price if future_data_email else 0
-    ref_price_str = f"{ref_price:.4f}" if isinstance(ref_price, (int, float)) else str(ref_price)
+    future_data_email = st.session_state.get("future_data", FutureData(None, None))
+    ref_price = future_data_email.underlying_price if future_data_email else None
+    ref_price_str = f"{ref_price:.4f}" if isinstance(ref_price, (int, float)) and ref_price is not None else "N/A"
     
     # ─── Strategy result, market data, risk, payoff commentary ───
     if best:

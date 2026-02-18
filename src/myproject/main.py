@@ -53,7 +53,7 @@ def process_bloomberg_to_strategies(
     """
 
     stats = {}
-    future_data = FutureData(98.0, None)
+    future_data = FutureData(None, None)
     
     # Verifier le mode offline
     offline = is_offline_mode()
@@ -96,7 +96,7 @@ def process_bloomberg_to_strategies(
     if not offline and fetch_warnings: #type: ignore
         stats["fetch_warnings"] = fetch_warnings
     
-    
+
 
     if not options:
         return [], stats, mixture, future_data
