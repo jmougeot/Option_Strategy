@@ -54,10 +54,10 @@ def main():
         filter = filter_params()
         scoring_weights = scoring_weights_block()
         if params.unit == "64ème":
-            filter.max_premium = (filter.max_premium/64)/100
-            filter.max_loss_right = (filter.max_premium/64)/100
-            filter.max_loss_left = (filter.max_premium/64)/100
-            filter.min_premium_sell = (filter.min_premium_sell/64)/100
+            filter.max_premium = (filter.max_premium/64)
+            filter.max_loss_right = (filter.max_premium/64)
+            filter.max_loss_left = (filter.max_premium/64)
+            filter.min_premium_sell = (filter.min_premium_sell/64)
 
         elif params.unit == "100ème" :
             filter.max_premium = filter.max_premium/100
