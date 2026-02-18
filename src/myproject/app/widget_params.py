@@ -73,6 +73,7 @@ class UIParams:
     price_step: float
     max_legs: int
     strikes: List[float]
+    unit : str
     brut_code: Optional[List[str]] = None
     roll_expiries: Optional[List[RollExpiry]] = None
 
@@ -89,9 +90,8 @@ def sidebar_params() -> UIParams:
     underlying = "ER"
     years_input = "6"
     months_input = "F"
-    code_brut = None  # None by default, list if raw mode
-    
-    
+    code_brut = None
+    unit = "100ème" 
     default_und = 'ER'
     default_params = UNDERLYING_PARAMS[default_und]
 
@@ -131,15 +131,23 @@ def sidebar_params() -> UIParams:
         if "param_price_step" not in st.session_state:
             st.session_state["param_price_step"] = default_params['Step']
         
-        c1 , c2= st.columns(2)
+        c1 , c2, c3= st.columns(3)
         with c1:
             months_input = st.text_input(
                 "Expiration Month:",
                 help="H=Mar, M=Jun, U=Sep, Z=Dec",
                 key="param_months"
             )
-    
-        with c2:
+        with c2: 
+            unit = st.selectbox(
+                "Unit",
+                help = "Choose the unit for the price",
+                options = ["100ème", "64ème"],
+                index=0,
+                key="unit_key"
+            )
+
+        with c3:
             price_step = st.number_input(
                 "Price Step ($)", step=0.0001, format="%.4f",
                 key="param_price_step"
@@ -221,6 +229,7 @@ def sidebar_params() -> UIParams:
         underlying=underlying,
         months=months,
         years=years,
+        unit=unit,
         price_min=price_min,
         price_max=price_max,
         price_step=price_step,

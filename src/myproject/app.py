@@ -53,6 +53,17 @@ def main():
         params = sidebar_params()
         filter = filter_params()
         scoring_weights = scoring_weights_block()
+        if params.unit == "64ème":
+            filter.max_premium = (filter.max_premium/64)/100
+            filter.max_loss_right = (filter.max_premium/64)/100
+            filter.max_loss_left = (filter.max_premium/64)/100
+            filter.min_premium_sell = (filter.min_premium_sell/64)/100
+
+        elif params.unit == "100ème" :
+            filter.max_premium = filter.max_premium/100
+            filter.max_loss_left = filter.max_loss_left/100
+            filter.max_loss_right = filter.max_loss_right/100
+            filter.min_premium_sell = filter.min_premium_sell/100
 
         # Store widget outputs in session_state for the pages
         st.session_state["_params_widget"] = params
@@ -72,9 +83,9 @@ def main():
                 mixture=mixture_for_email,
             )
             if success:
-                st.success("✅ Email opened in Outlook with images!")
+                st.success("Email opened in Outlook with images!")
             else:
-                st.error("❌ Error opening Outlook. See console for details.")
+                st.error("Error opening Outlook. See console for details.")
 
         if st.button("Generate PDF Report"):
             comparisons_for_pdf = st.session_state.get("comparisons", None)

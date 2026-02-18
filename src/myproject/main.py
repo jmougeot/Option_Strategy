@@ -51,6 +51,7 @@ def process_bloomberg_to_strategies(
     Fonction principale simplifiee pour Streamlit.
     Importe les options depuis Bloomberg (ou simulation offline) et retourne les meilleures strategies + stats.
     """
+
     stats = {}
     future_data = FutureData(98.0, None)
     
@@ -91,9 +92,11 @@ def process_bloomberg_to_strategies(
     # Tracker du fetch
     stats["nb_options"] = len(options)
     stats["future_data"] = future_data
-    if not offline and fetch_warnings:
-        stats["fetch_warnings"] = fetch_warnings
 
+    if not offline and fetch_warnings: #type: ignore
+        stats["fetch_warnings"] = fetch_warnings
+    
+    
 
     if not options:
         return [], stats, mixture, future_data
