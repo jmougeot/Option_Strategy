@@ -33,7 +33,7 @@ def format_price(value: float, unit: str = "100ème") -> str:
     if value == float("inf") or value == float("-inf"):
         return "Unlimited"
     if unit == "64ème":
-        ticks_64 = value * 100 / 64
+        ticks_64 = value * 64 / 100
         return f"{ticks_64:.2f}"
     return f"{value:.3f}"
 
