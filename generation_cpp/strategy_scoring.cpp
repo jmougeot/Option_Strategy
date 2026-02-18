@@ -46,40 +46,6 @@ void StrategyScorer::normalize_weights(std::vector<MetricConfig>& metrics) {
 }
 
 // ============================================================================
-// EXTRACTION DES VALEURS
-// ============================================================================
-
-std::vector<double> StrategyScorer::extract_metric_values(
-    const std::vector<ScoredStrategy>& strategies,
-    const std::string& metric_name
-) {
-    std::vector<double> values;
-    values.reserve(strategies.size());
-    
-    for (const auto& strat : strategies) {
-        double value = 0.0;
-        if (metric_name == "average_pnl") {
-            value = strat.average_pnl;
-        } else if (metric_name == "roll") {
-            value = strat.roll;
-        } else if (metric_name == "delta_levrage") {
-            value = strat.avg_pnl_levrage;
-        } else if (metric_name == "premium") {
-            value = std::abs(strat.total_premium);
-        } else if (metric_name == "avg_intra_life_pnl") {
-            value = strat.avg_intra_life_pnl;
-        }
-        if (std::isfinite(value)) {
-            values.push_back(value);
-        } else {
-            values.push_back(0.0);
-        }
-    }
-    
-    return values;
-}
-
-// ============================================================================
 // NORMALISATION
 // ============================================================================
 
@@ -260,25 +226,6 @@ std::vector<ScoredStrategy> StrategyScorer::remove_duplicates(
     }
     
     return uniques;
-}
-
-// ============================================================================
-// EXTRACTION DE VALEUR PAR MÉTRIQUE
-// ============================================================================
-
-static double extract_single_metric_value(const ScoredStrategy& strat, const std::string& metric_name) {
-    if (metric_name == "average_pnl") {
-        return strat.average_pnl;
-    } else if (metric_name == "roll") {
-        return strat.roll;
-    } else if (metric_name == "avg_pnl_levrage") {
-        return strat.avg_pnl_levrage;
-    } else if (metric_name == "premium") {
-        return std::abs(strat.total_premium);
-    } else if (metric_name == "avg_intra_life_pnl") {
-        return strat.avg_intra_life_pnl;
-    }
-    return 0.0;
 }
 
 /**

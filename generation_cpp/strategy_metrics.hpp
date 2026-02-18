@@ -140,60 +140,6 @@ private:
         size_t n_options
     );
     
-    static bool filter_put_open(
-        const OptionData* const* options,
-        const int* signs,
-        size_t n_options,
-        int ouvert_gauche
-    );
-    
-    static bool filter_call_open(
-        const OptionData* const* options,
-        const int* signs,
-        size_t n_options,
-        int ouvert_droite
-    );
-    
-    static bool filter_premium(
-        const OptionData* const* options,
-        const int* signs,
-        size_t n_options,
-        double max_premium_params,
-        double& total_premium
-    );
-    
-    static bool filter_delta(
-        const OptionData* const* options,
-        const int* signs,
-        size_t n_options,
-        double delta_min,
-        double delta_max,
-        double& total_delta
-    );
-    
-    static bool filter_average_pnl(
-        const OptionData* const* options,
-        const int* signs,
-        size_t n_options,
-        double& total_average_pnl
-    );
-    
-    // Calculs
-    static void calculate_greeks(
-        const OptionData* const* options,
-        const int* signs,
-        size_t n_options,
-        double& total_iv
-    );
-    
-    // Legacy: gardé pour compatibilité
-    static std::vector<double> calculate_total_pnl(
-        const std::vector<std::vector<double>>& pnl_matrix,
-        const std::vector<int>& signs
-    );
-    
-
-    
     static double avg_pnl_levrage(
         const double total_average_pnl, 
         const double premium

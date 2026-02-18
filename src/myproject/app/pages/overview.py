@@ -110,6 +110,7 @@ def run():
                 multi_result.weight_set_names = _build_weight_set_names(scoring_weights)
                 all_comparisons = multi_result.all_strategies_flat()
                 st.session_state["multi_ranking"] = multi_result
+                st.session_state["comparisons"] = all_comparisons
                 st.session_state["mixture"] = mixture
                 st.session_state["future_data"] = future_data
                 st.session_state["stats"] = stats 

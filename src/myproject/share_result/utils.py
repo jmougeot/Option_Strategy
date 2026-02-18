@@ -30,25 +30,30 @@ class StrategyEmailData:
 
 @dataclass
 class EmailTemplateData:
-    """Data structure for the new email template format."""
-    underlying: str
-    reference_price: str  # e.g. "96.745"
+    """Data structure for the email template format."""
+    underlying: str  # e.g. "ERU6"
+    reference_price: str  # e.g. "98.025"
     
-    # Criteria descriptions (free text)
-    target_description: str  # e.g. "9633 target with a poss range between 9629 and 9636 for SFRZ6."
-    tail_risk_description: str  # e.g. "(close to zero but not zero) of z6 below 9629..."
+    # ─── Strategy result ───
+    strategy_result: str  # e.g. "ERU6 97.62/97.87/98.18 Broken Call Fly vs 98.06 Put"
+    market_data: str  # e.g. "Mkt is 0.25/1.25, +13d, ref 98.025"
+    risk_description: str  # e.g. "Unlimited loss on downside and risk 6 ticks above 98.125 at exp"
+    
+    # ─── Selection criteria (why this strategy was chosen) ───
+    selection_criteria: List[str]  # e.g. ["ROLLS THE BEST", "WITH THE HIGHEST LEVERAGE PnL (...)"]
+    roll_description: str  # e.g. "This was chosen because it has the highest roll into M6 of 3.5 ticks"
+    leverage_description: str  # e.g. "The highest leverage p&l of 1 for 11.5 ticks, for a 0.5 MID (...)"
+    payoff_commentary: str  # e.g. "We love the payoff below where we make the max (6.25 ticks) between ..."
+    
+    # ─── Criteria section (filter parameters) ───
+    target_description: str  # e.g. "9797 (+/- 3 ticks)"
+    tail_risk_description: str  # e.g. "unlimited loss below 97.875; 6 ticks loss max on the upside"
     max_risk_description: str  # e.g. "1x2 ps allowed (no 1x3), No 1x2 cs."
-    strikes_screened_description: str  # e.g. "It's looking at all options between 9600 and 9700..."
-    delta_description: str  # e.g. "limited from -50 to +50d"
-    premium_max_description: str  # e.g. "4 TICKS"
-    max_loss_description: str  # e.g. "100 ticks included premium below 96.29 / 25 ticks..."
-    weighting_description: str  # e.g. "33 pct the best expected gain at exp, 33 pct..."
+    strikes_screened_description: str  # e.g. "It's looking at all options between 97.625 and 98.25. Every 6 ticks."
+    delta_description: str  # e.g. "limited from -50 to +25d"
+    premium_max_description: str  # e.g. "2 TICKS"
     
-    max_legs: int  # e.g. 6
-    
-    # Best strategies list with label and description
-    # e.g. [{"label": "Best strategy overall with the weighted score", "description": "SFRZ6 96.56/..."}]
-    best_strategies: List[Dict[str, str]]
+    max_legs: int  # e.g. 5
 
 
 def _format_months(months: List[str]) -> str:

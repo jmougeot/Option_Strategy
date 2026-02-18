@@ -24,8 +24,7 @@ from myproject.strategy.multi_ranking import MultiRankingResult
 from myproject.bloomberg.bloomberg_data_importer import import_options
 from myproject.bloomberg.bloomberg_data_importer_offline import (
     import_options_offline, 
-    is_offline_mode
-)
+    is_offline_mode)
 from myproject.app.data_types import ScenarioData, FilterData, FutureData
 from myproject.strategy.batch_processor import clear_caches
 from myproject.mixture.mixture_utils import create_mixture_from_scenarios
