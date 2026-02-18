@@ -5,10 +5,8 @@ Importe les données d'options depuis Bloomberg et les convertit en objets Optio
 """
 
 from typing import Any, Dict, List, Literal, Optional, Tuple, cast
-from git import Reference
 import numpy as np
 
-from myproject.bloomberg.expiry_utils import MONTH_NAMES
 from myproject.bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
 from myproject.bloomberg.ticker_builder import (
     build_option_ticker, build_option_ticker_brut, parse_brut_code, MonthCode)
@@ -22,11 +20,24 @@ from myproject.app.data_types import FutureData
 # ============================================================================
 
 TickerMeta = Dict[str, Any]
-PremiumKey = Tuple[float, str, str, int]  # (strike, option_type, month, year)
+PremiumKey = Tuple[float, str, str, int]
 OptionTypeChar = Literal["C", "P"]
 PositionType = Literal["long", "short"]
-RollExpiry = Tuple[str, int]  # (month, year)
+RollExpiry = Tuple[str, int] 
 
+UNDERLYING_REF = {
+    "F" : "H",
+    "G" : "H",
+    "H" : "H",
+    "J":"M",
+    "K":"M",
+    "M":"M",
+    "N":"U",
+    "Q":"U",
+    "U":"U",
+    "V":"Z",
+    "X":"Z",
+    "Z":"Z"}
 
 # ============================================================================
 # CLASSES INTERNES
@@ -47,7 +58,7 @@ class TickerBuilder:
         self.underlying_ticker: str =""
 
     def _build_underlying(self, underlying, months, years):
-        month=months[0]
+        month=UNDERLYING_REF[months[0]]
         year=years[0]
         self.underlying_ticker = f"{underlying}{month}{year} {self.suffix}"
 
