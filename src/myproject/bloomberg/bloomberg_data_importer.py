@@ -308,7 +308,10 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         if not opt.underlying_price or opt.underlying_price <= 0:
             opt.underlying_price = F
         
-        if opt.premium and opt.premium > 0:
+        # Options avec warning -> à recalculer par interpolation
+        if not opt.status:
+            needs_interpolation.append(opt)
+        elif opt.premium and opt.premium > 0:
             # Calcul direct de la volatilité Bachelier
             sigma_n = bachelier_implied_vol(F, opt.strike, opt.premium, time_to_expiry, opt.is_call())
             if sigma_n > 0:

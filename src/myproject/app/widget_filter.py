@@ -15,12 +15,12 @@ def filter_params() -> FilterData:
     # Initialize default values in session_state
     if "filter" not in st.session_state:
         st.session_state.filter = {
-            "max_loss_right": 10,
-            "max_loss_left":10, 
-            "max_premium": 10, 
+            "max_loss_right": 0.1,
+            "max_loss_left":0.1, 
+            "max_premium": 0.010, 
             "ouvert_gauche": 0, 
             "ouvert_droite": 0, 
-            "min_premium_sell": 0.5,
+            "min_premium_sell": 0.005,
             "delta_min": -0.75,
             "delta_max": 0.75,
             "limit_left_filter": 98.5,
@@ -48,14 +48,14 @@ def filter_params() -> FilterData:
             max_loss_left = st.number_input("Max loss downside",
                                             value=float(current_filter.get("max_loss_left", 0.1)),
                                             step=0.1,
-                                            format="%.1f",
+                                            format="%.5f",
                                             key="filter_max_loss",
                                             help="Premium is included : if you pay 2 and entered 25 ticks, you're authorized to loose 23 ticks and if you received 2 you're autorized 27 ticks")       
         with limit_left_col:
             limit_left = st.number_input("Starting from",
                                             value=float(current_filter.get("limit_left_filter", 98.5)),
                                             step=0.001,
-                                            format="%.3f",
+                                            format="%.5f",
                                             key="limit_left_filter_key",
                                             help="imit to filter_max_loss_right where the max loss left is applied") 
         with premium_only_left_col:
@@ -71,7 +71,7 @@ def filter_params() -> FilterData:
             max_loss_right= st.number_input("Max loss upside",
                                             value = float(current_filter.get("max_loss_right", 0.1)),
                                             step=0.1,
-                                            format="%.1f",
+                                            format="%.5f",
                                             key="filter_max_loss_right",
                                             help= "Choose the max on the right of the target")
 
@@ -79,7 +79,7 @@ def filter_params() -> FilterData:
             limit_right= st.number_input("Starting from",
                                             value = float(current_filter.get("limit_right_filter", 98.0)),
                                             step=0.1,
-                                            format="%.1f",
+                                            format="%.5f",
                                             key="limit_right_filter_key",
                                             help= "limit to filter_max_loss_right where the max loss right is applied")
         
@@ -95,7 +95,7 @@ def filter_params() -> FilterData:
         max_premium = st.number_input("Max premium",
                                                value=float(current_filter.get("max_premium", 5.0)),
                                                step=0.1,
-                                               format="%.1f",
+                                               format="%.5f",
                                                key="filter_max_premium",
                                                help="Max strategy price (absolute value)")
 
@@ -103,7 +103,7 @@ def filter_params() -> FilterData:
         min_premium_sell = st.number_input("Min price for short",
                                                 value=float(current_filter.get("min_premium_sell", 0.005)),
                                                 step=0.1,
-                                                format="%.1f",
+                                                format="%.5f",
                                                 key="filter_min_premium_sell",
                                                 help="Minimum price to sell an option")
 
