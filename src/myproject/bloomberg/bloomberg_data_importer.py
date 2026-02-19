@@ -271,103 +271,106 @@ class OptionProcessor:
 
 
 # ============================================================================
-# CORRECTION DES OPTIONS AVEC WARNING VIA BACHELIER
+# CALCUL DE LA VOLATILITÉ BACHELIER POUR TOUTES LES OPTIONS
 # ============================================================================
 
-def _fix_warned_options(options: List[Option], time_to_expiry: float = 0.25) -> None:
+def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float = 0.25) -> None:
     """
-    Corrige les options avec warning (status=False) via interpolation Bachelier.
+    Calcule la volatilité Bachelier pour TOUTES les options.
     
     Méthode:
-    1. Calcule la volatilité normale Bachelier pour chaque option bien cotée (status=True)
-    2. Ajuste un slope linéaire σ(K) = a·K + b pour les calls et les puts séparément
-    3. Interpole la σ pour les options en warning via le slope de leur type
-       (calls → slope calls pour l'upside, puts → slope puts pour le downside)
-    4. Recalcule le premium avec bachelier_price(F, K, σ_interp, T, is_call)
+    1. Pour les options avec un premium valide: calcul direct de σ_n via bachelier_implied_vol
+    2. Pour les options sans premium (warning): interpolation via slope linéaire σ(K) = a·K + b
+    3. Pour les options interpolées: recalcul du premium via bachelier_price
     
     Args:
-        options: Liste complète d'options (bonnes + warning)
+        options: Liste complète d'options
         time_to_expiry: Temps jusqu'à expiration (en années)
     """
-    warned = [opt for opt in options if not opt.status]
-    if not warned:
+    if not options:
         return
     
-    good = [opt for opt in options if opt.status and opt.premium > 0]
-    if not good:
-        print("Pas assez d'options bien cotées pour interpoler les warnings")
-        return
-    
-    # Forward price depuis les options bien cotées
-    F = next((opt.underlying_price for opt in good if opt.underlying_price and opt.underlying_price > 0), None)
+    # Forward price depuis les options disponibles
+    F = next((opt.underlying_price for opt in options if opt.underlying_price and opt.underlying_price > 0), None)
     if F is None:
-        print("Pas de prix sous-jacent disponible pour l'interpolation Bachelier")
+        print("Pas de prix sous-jacent disponible pour le calcul Bachelier")
         return
     
-    # 1. Calculer la volatilité normale Bachelier pour les options bien cotées
+    print(f"\n📐 Calcul volatilité Bachelier (F={F:.2f}, T={time_to_expiry:.3f})")
+    
+    # 1. Calculer la volatilité Bachelier pour toutes les options avec premium valide
     call_data: List[Tuple[float, float]] = []
     put_data: List[Tuple[float, float]] = []
+    needs_interpolation: List[Option] = []
     
-    for opt in good:
-        sigma_n = bachelier_implied_vol(F, opt.strike, opt.premium, time_to_expiry, opt.is_call())
-        if sigma_n > 0:
-            if opt.is_call():
-                call_data.append((opt.strike, sigma_n))
-            else:
-                put_data.append((opt.strike, sigma_n))
-    
-    # 2. Ajuster un slope linéaire σ(K) pour calls et puts séparément
-    call_slope = None
-    put_slope = None
-    
-    if len(call_data) >= 2:
-        strikes_c = np.array([d[0] for d in call_data])
-        vols_c = np.array([d[1] for d in call_data])
-        call_slope = np.polyfit(strikes_c, vols_c, 1)
-        print(f"Slope calls: σ(K) = {call_slope[0]:.6f}·K + {call_slope[1]:.4f} ({len(call_data)} points)")
-    elif len(call_data) == 1:
-        call_slope = np.array([0.0, call_data[0][1]])  # vol constante
-        print(f"Calls: σ constante = {call_data[0][1]:.4f} (1 point)")
-    
-    if len(put_data) >= 2:
-        strikes_p = np.array([d[0] for d in put_data])
-        vols_p = np.array([d[1] for d in put_data])
-        put_slope = np.polyfit(strikes_p, vols_p, 1)
-        print(f"Slope puts: σ(K) = {put_slope[0]:.6f}·K + {put_slope[1]:.4f} ({len(put_data)} points)")
-    elif len(put_data) == 1:
-        put_slope = np.array([0.0, put_data[0][1]])
-        print(f"Puts: σ constante = {put_data[0][1]:.4f} (1 point)")
-    
-    # 3. Interpoler et recalculer pour chaque option en warning
-    fixed_count = 0
-    for opt in warned:
-        # Slope du même type: calls pour upside, puts pour downside
-        slope = call_slope if opt.is_call() else put_slope
-        if slope is None:
-            continue
-        
+    for opt in options:
         # Assurer le underlying_price
         if not opt.underlying_price or opt.underlying_price <= 0:
             opt.underlying_price = F
         
-        sigma_interp = max(float(np.polyval(slope, opt.strike)), 1e-6)
-        
-        # 4. Recalculer le premium avec Bachelier
-        new_premium = bachelier_price(F, opt.strike, sigma_interp, time_to_expiry, opt.is_call())
-        opt.premium = new_premium
-        
-        # Mettre à jour la IV (conversion σ_normal → IV% approximative)
-        opt.implied_volatility = (sigma_interp / F) * 100.0 if F > 0 else 0.0
-        
-        # Recalculer toutes les surfaces avec le nouveau premium
-        opt._calcul_all_surface()
-        
-        fixed_count += 1
-        sym = "C" if opt.is_call() else "P"
-        print(f"  ✓ Corrigé {sym} K={opt.strike}: σ_n={sigma_interp:.4f}, "f"Premium={new_premium:.6f}, IV≈{opt.implied_volatility:.2f}%")
+        if opt.premium and opt.premium > 0:
+            # Calcul direct de la volatilité Bachelier
+            sigma_n = bachelier_implied_vol(F, opt.strike, opt.premium, time_to_expiry, opt.is_call())
+            if sigma_n > 0:
+                # Stocker la volatilité normale (en %)
+                opt.implied_volatility = (sigma_n / F) * 100.0 if F > 0 else 0.0
+                
+                # Collecter pour le slope d'interpolation
+                if opt.is_call():
+                    call_data.append((opt.strike, sigma_n))
+                else:
+                    put_data.append((opt.strike, sigma_n))
+            else:
+                needs_interpolation.append(opt)
+        else:
+            needs_interpolation.append(opt)
     
-    if fixed_count > 0:
-        print(f" {fixed_count}/{len(warned)} options corrigées par interpolation Bachelier")
+    print(f"  • {len(call_data)} calls + {len(put_data)} puts avec σ_n calculée directement")
+    
+    # 2. Si des options nécessitent interpolation, calculer les slopes
+    if needs_interpolation:
+        call_slope = None
+        put_slope = None
+        
+        if len(call_data) >= 2:
+            strikes_c = np.array([d[0] for d in call_data])
+            vols_c = np.array([d[1] for d in call_data])
+            call_slope = np.polyfit(strikes_c, vols_c, 1)
+            print(f"  • Slope calls: σ(K) = {call_slope[0]:.6f}·K + {call_slope[1]:.4f}")
+        elif len(call_data) == 1:
+            call_slope = np.array([0.0, call_data[0][1]])
+        
+        if len(put_data) >= 2:
+            strikes_p = np.array([d[0] for d in put_data])
+            vols_p = np.array([d[1] for d in put_data])
+            put_slope = np.polyfit(strikes_p, vols_p, 1)
+            print(f"  • Slope puts: σ(K) = {put_slope[0]:.6f}·K + {put_slope[1]:.4f}")
+        elif len(put_data) == 1:
+            put_slope = np.array([0.0, put_data[0][1]])
+        
+        # 3. Interpoler pour les options sans premium valide
+        fixed_count = 0
+        for opt in needs_interpolation:
+            slope = call_slope if opt.is_call() else put_slope
+            if slope is None:
+                continue
+            
+            sigma_interp = max(float(np.polyval(slope, opt.strike)), 1e-6)
+            
+            # Recalculer le premium avec Bachelier
+            new_premium = bachelier_price(F, opt.strike, sigma_interp, time_to_expiry, opt.is_call())
+            opt.premium = new_premium
+            opt.implied_volatility = (sigma_interp / F) * 100.0 if F > 0 else 0.0
+            
+            # Recalculer toutes les surfaces avec le nouveau premium
+            opt._calcul_all_surface()
+            
+            fixed_count += 1
+            sym = "C" if opt.is_call() else "P"
+            print(f"  ✓ Interpolé {sym} K={opt.strike}: σ_n={sigma_interp:.4f}, Premium={new_premium:.6f}, IV≈{opt.implied_volatility:.2f}%")
+        
+        if fixed_count > 0:
+            print(f"  • {fixed_count}/{len(needs_interpolation)} options interpolées")
 
 
 # ============================================================================
@@ -389,9 +392,7 @@ def import_options(
     Importe un ensemble d'options depuis Bloomberg et retourne des objets Option.
     Returns:
         Tuple (liste d'objets Option, FutureData avec prix et date, warnings)
-    """
-    print("\n🔨 Construction des tickers...")
-    
+    """    
     # 1. Construction des tickers
     builder = TickerBuilder(suffix, roll_expiries)
 
@@ -418,10 +419,9 @@ def import_options(
         options = processor.process_all()
         future_data = fetcher.future_data
         
-        # 3.5. Corriger les options avec warning via interpolation Bachelier
-        if any(not opt.status for opt in options):
-            print("\n🔧 Correction des options avec warning via Bachelier...")
-            _fix_warned_options(options, time_to_expiry=0.25)
+        # 3.5. Calculer la volatilité Bachelier pour TOUTES les options
+        if options:
+            _compute_bachelier_volatility(options, time_to_expiry=0.25)
         
         # 4. Calculer les prix intra-vie pour toutes les options (avec Bachelier)
         if options:
@@ -429,9 +429,6 @@ def import_options(
             time_to_expiry = 0.25  # ~3 mois par défaut
             for option in options:
                 option.calculate_all_intra_life(all_options=options, time_to_expiry=time_to_expiry)
-            print(f"  • Prix intra-vie calculés pour {len(options)} options")
-        
-        print(f"📊 Future: price={future_data.underlying_price}, last_trade={future_data.last_tradable_date}")
         
     except Exception as e:
         print(f"\n✗ Erreur lors du fetch batch: {e}")

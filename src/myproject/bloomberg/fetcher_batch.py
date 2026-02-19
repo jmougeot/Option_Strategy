@@ -154,7 +154,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
                 results[ticker]["_warning"] = True
             if ask and bid:
                 spread = ask - bid
-                if spread > 0.1:
+                if spread > 0.08:
                     wide_spread.append(f"{ticker} (spread={spread:.4f})")
                     results[ticker]["_warning"] = True
 
@@ -162,7 +162,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         if missing_both:
             warnings.append(f"Sans Bid ni Ask ({len(missing_both)}): " + ", ".join(missing_both))
         if wide_spread:
-            warnings.append(f"Spread Bid-Ask > 10 ticks ({len(wide_spread)}): " + ", ".join(wide_spread))
+            warnings.append(f"Spread Bid-Ask > 8 ticks ({len(wide_spread)}): " + ", ".join(wide_spread))
 
         return results, FutureData(underlying_price, last_tradable_date), warnings
 
