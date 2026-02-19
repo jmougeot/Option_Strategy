@@ -328,36 +328,31 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
     call_raw: List[Tuple[float, float, Option]] = []
     put_raw: List[Tuple[float, float, Option]] = []
     needs_interpolation: List[Option] = []  # status=False → premium + IV recalculés
-    needs_iv_only: List[Option] = []        # status=True mais σ_n pas fiable → IV seule interpolée
-    
+
     for opt in options:
-        # Assurer le underlying_price
         if not opt.underlying_price or opt.underlying_price <= 0:
             opt.underlying_price = F
-        
-        # Options avec warning (status=False) -> premium à recalculer par interpolation
+
         if not opt.status:
+            # Warning Bloomberg (pas de bid/ask) → premium à recalculer
             needs_interpolation.append(opt)
         elif opt.premium and opt.premium > 0:
-            # status=True avec premium valide: calcul direct de σ_n
+            # Premium Bloomberg valide → σ_n directe, on stocke l'IV telle quelle
             sigma_n = bachelier_implied_vol(F, opt.strike, opt.premium, time_to_expiry, opt.is_call())
+            opt.implied_volatility = (sigma_n / F) * 100.0 if (sigma_n > 0 and F > 0) else 0.0
             if sigma_n > 0:
                 if opt.is_call():
                     call_raw.append((opt.strike, sigma_n, opt))
                 else:
                     put_raw.append((opt.strike, sigma_n, opt))
-            else:
-                # σ_n ≤ 0: IV à interpoler mais premium conservé
-                needs_iv_only.append(opt)
-        else:
-            # status=True mais pas de premium: IV à interpoler, premium conservé
-            needs_iv_only.append(opt)
+        # else: status=True, premium=0 → on laisse tel quel
     
-    # 2. Filtrer les σ_n aberrantes (deep ITM → σ ≈ 0, pas fiable)
-    #    On rejette les σ_n < 20% de la médiane du même type
+    # 2. Filtrer les σ_n aberrantes pour la courbe d'interpolation
+    #    (deep ITM → σ_n ≈ 0, peu représentative du smile) — on les exclut de combined
+    #    mais on NE TOUCHE PAS à leur IV déjà calculée en étape 1.
     call_data: List[Tuple[float, float]] = []
     put_data: List[Tuple[float, float]] = []
-    
+
     for raw_list, data_list, label in [
         (call_raw, call_data, "calls"),
         (put_raw, put_data, "puts"),
@@ -366,68 +361,49 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
             continue
         sigmas = [s for _, s, _ in raw_list]
         median_sigma = float(np.median(sigmas))
-        threshold = median_sigma * 0.20  # 20% de la médiane
-        
+        threshold = median_sigma * 0.20
+
         for strike, sigma_n, opt in raw_list:
             if sigma_n >= threshold:
-                opt.implied_volatility = (sigma_n / F) * 100.0 if F > 0 else 0.0
                 data_list.append((strike, sigma_n))
             else:
-                # σ_n trop basse → deep ITM, pas fiable → IV à interpoler (premium conservé)
-                needs_iv_only.append(opt)
-                print(f"  ⚠ {label[:-1].title()} K={strike}: σ_n={sigma_n:.6f} < seuil {threshold:.6f} → IV interpolée")
-    
-    print(f"  • {len(call_data)} calls + {len(put_data)} puts avec σ_n fiable (médiane filtrée)")
+                print(f"  ⚠ {label[:-1].title()} K={strike}: σ_n={sigma_n:.6f} < seuil {threshold:.6f} → exclu de la courbe d'interpolation")
+
+    print(f"  • {len(call_data)} calls + {len(put_data)} puts dans la courbe d'interpolation")
     
     # 3. Courbe σ_n commune : fusionner calls et puts par strike
     #    En Bachelier, σ_n(K, call) = σ_n(K, put) pour le même strike (parité put-call).
-    #    On construit donc un seul dictionnaire {K → σ_n} en moyennant si les deux existent.
-    all_to_interpolate = needs_interpolation + needs_iv_only
-    if all_to_interpolate:
+    #    On construit donc un seul dictionnaire {K → σ_n} pour interpoler les options warning.
+    if needs_interpolation:
         sigma_by_strike: dict = {}
         for K, s in call_data:
             sigma_by_strike[K] = s
         for K, s in put_data:
             if K in sigma_by_strike:
-                sigma_by_strike[K] = (sigma_by_strike[K] + s) / 2.0  # moyenne call/put
+                sigma_by_strike[K] = (sigma_by_strike[K] + s) / 2.0
             else:
                 sigma_by_strike[K] = s
 
         combined: List[Tuple[float, float]] = sorted(sigma_by_strike.items())
 
         if not combined:
-            print("  ⚠️ Aucune σ_n disponible pour interpoler")
+            print("  ⚠️ Aucune σ_n disponible pour interpoler les options warning")
             return
 
         def _interp_sigma(K_target: float) -> float:
-            """
-            Interpole σ_n sur la courbe commune (triée par strike).
-            - Dans le range  : pente locale entre les deux voisins encadrants
-                               a = (σ_{n+1} - σ_{n-1}) / (K_{n+1} - K_{n-1})
-            - Hors du range  : pente de bord (entre les 2 premiers ou 2 derniers points)
-            Ancrage sur le voisin le plus proche dans tous les cas.
-            """
             strikes = [d[0] for d in combined]
             sigmas  = [d[1] for d in combined]
             n = len(combined)
-
             if n == 1:
                 return sigmas[0]
-
             idx_right = next((i for i, k in enumerate(strikes) if k >= K_target), n)
-
             if idx_right == 0:
-                # Extrapole à gauche : pente entre les 2 premiers points connus
                 a = (sigmas[1] - sigmas[0]) / (strikes[1] - strikes[0]) if abs(strikes[1] - strikes[0]) > 1e-10 else 0.0
                 return max(sigmas[0] + a * (K_target - strikes[0]), 1e-6)
-
             elif idx_right == n:
-                # Extrapole à droite : pente entre les 2 derniers points connus
                 a = (sigmas[-1] - sigmas[-2]) / (strikes[-1] - strikes[-2]) if abs(strikes[-1] - strikes[-2]) > 1e-10 else 0.0
                 return max(sigmas[-1] + a * (K_target - strikes[-1]), 1e-6)
-
             else:
-                # Interpolation entre les deux voisins encadrants
                 idx_left = idx_right - 1
                 K_minus, s_minus = strikes[idx_left],  sigmas[idx_left]
                 K_plus,  s_plus  = strikes[idx_right], sigmas[idx_right]
@@ -440,31 +416,20 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
                 else:
                     return max(s_plus  + a * (K_target - K_plus),  1e-6)
 
-        # 4. Interpoler
+        # 4. Recalculer premium + IV pour les options warning uniquement
         fixed_count = 0
-        iv_only_count = 0
-        needs_iv_only_set = set(id(o) for o in needs_iv_only)
-
-        for opt in all_to_interpolate:
+        for opt in needs_interpolation:
             sigma_interp = _interp_sigma(opt.strike)
             opt.implied_volatility = (sigma_interp / F) * 100.0 if F > 0 else 0.0
-
+            new_premium = bachelier_price(F, opt.strike, sigma_interp, time_to_expiry, opt.is_call())
+            opt.premium = new_premium
+            opt._calcul_all_surface()
+            fixed_count += 1
             sym = "C" if opt.is_call() else "P"
+            print(f"  ✓ Corrigé {sym} K={opt.strike}: σ_n={sigma_interp:.4f}, Premium={new_premium:.6f}, IV≈{opt.implied_volatility:.2f}%")
 
-            if id(opt) in needs_iv_only_set:
-                iv_only_count += 1
-                print(f"  ✓ IV interpolée {sym} K={opt.strike}: σ_n={sigma_interp:.4f}, IV≈{opt.implied_volatility:.2f}% (premium conservé={opt.premium:.6f})")
-            else:
-                new_premium = bachelier_price(F, opt.strike, sigma_interp, time_to_expiry, opt.is_call())
-                opt.premium = new_premium
-                opt._calcul_all_surface()
-                fixed_count += 1
-                print(f"  ✓ Corrigé {sym} K={opt.strike}: σ_n={sigma_interp:.4f}, Premium={new_premium:.6f}, IV≈{opt.implied_volatility:.2f}%")
-        
         if fixed_count > 0:
             print(f"  • {fixed_count}/{len(needs_interpolation)} options warning corrigées (premium recalculé)")
-        if iv_only_count > 0:
-            print(f"  • {iv_only_count}/{len(needs_iv_only)} options deep ITM: IV interpolée, premium conservé")
 
 
 # ============================================================================

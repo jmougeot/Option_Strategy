@@ -143,6 +143,9 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         wide_spread = []
         for ticker, data in results.items():
             if not data:
+                # Pas de données du tout (securityError ou ticker non retourné) → warning
+                results[ticker] = {"_warning": True}
+                missing_both.append(ticker)
                 continue
             bid = data.get("PX_BID")
             ask = data.get("PX_ASK")
