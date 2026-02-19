@@ -113,7 +113,9 @@ def run():
                 st.session_state["comparisons"] = all_comparisons
                 st.session_state["mixture"] = mixture
                 st.session_state["future_data"] = future_data
-                st.session_state["stats"] = stats 
+                st.session_state["stats"] = stats
+                if "all_options" in stats:
+                    st.session_state["all_imported_options"] = stats["all_options"]
 
                 # Save to history
                 from myproject.app.pages.history import add_to_history

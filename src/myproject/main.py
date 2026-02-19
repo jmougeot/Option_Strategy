@@ -92,6 +92,7 @@ def process_bloomberg_to_strategies(
     # Tracker du fetch
     stats["nb_options"] = len(options)
     stats["future_data"] = future_data
+    stats["all_options"] = options  # Toutes les options importées (pour page Volatility)
 
     if not offline and fetch_warnings: #type: ignore
         stats["fetch_warnings"] = fetch_warnings

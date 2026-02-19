@@ -15,6 +15,7 @@ from myproject.share_result.generate_pdf import create_pdf_report
 from myproject.app.pages.overview import run as overview_run
 from myproject.app.pages.history import run as history_run
 from myproject.app.pages.help import run as help_run
+from myproject.app.pages.volatility import run as volatility_run
 from myproject.app.pages.history import init_history, apply_pending_restore
 # ============================================================================
 # PAGE CONFIGURATION
@@ -125,6 +126,7 @@ def main():
     pages = st.navigation(
         [
             st.Page(overview_run, title="Overview", icon="📊", default=True, url_path="overview"),
+            st.Page(volatility_run, title="Volatility", icon="📈", url_path="volatility"),
             st.Page(history_run, title="History", icon="📜", url_path="history"),
             st.Page(help_run, title="Help", icon="📚", url_path="help"),
         ],
