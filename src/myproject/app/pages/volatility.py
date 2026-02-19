@@ -55,38 +55,75 @@ def _split_calls_puts(options: List[Option]):
 # ============================================================================
 # GRAPHIQUES
 # ============================================================================
-def _plot_skew(calls: List[Option], puts: List[Option], underlying_price: Optional[float]):
-    """Skew de volatilité: différence put IV - call IV au même strike."""
 
-    # Trouver les strikes communs
-    call_dict = {o.strike: o.implied_volatility for o in calls if o.implied_volatility > 0}
-    put_dict = {o.strike: o.implied_volatility for o in puts if o.implied_volatility > 0}
-
-    common_strikes = sorted(set(call_dict.keys()) & set(put_dict.keys()))
-    if not common_strikes:
-        st.info("Pas assez de données pour le skew (besoin de calls + puts aux mêmes strikes).")
-        return
-
-    skew = [put_dict[k] - call_dict[k] for k in common_strikes]
+def _plot_smile(calls: List[Option], puts: List[Option], underlying_price: Optional[float]):
+    """Smile de volatilité: IV vs Strike, séparé calls/puts, avec status warning."""
 
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=common_strikes,
-        y=skew,
-        marker_color=["#F44336" if s > 0 else "#2196F3" for s in skew],
-        name="Skew (Put IV − Call IV)",
-    ))
 
+    # Calls bien cotés
+    good_calls = [o for o in calls if o.status and o.implied_volatility > 0]
+    warn_calls = [o for o in calls if not o.status and o.implied_volatility > 0]
+
+    # Puts bien cotés
+    good_puts = [o for o in puts if o.status and o.implied_volatility > 0]
+    warn_puts = [o for o in puts if not o.status and o.implied_volatility > 0]
+
+    if good_calls:
+        fig.add_trace(go.Scatter(
+            x=[o.strike for o in good_calls],
+            y=[o.implied_volatility for o in good_calls],
+            mode="markers+lines",
+            name="Calls",
+            marker=dict(color="#2196F3", size=8, symbol="circle"),
+            line=dict(color="#2196F3", width=1, dash="dot"),
+        ))
+
+    if warn_calls:
+        fig.add_trace(go.Scatter(
+            x=[o.strike for o in warn_calls],
+            y=[o.implied_volatility for o in warn_calls],
+            mode="markers",
+            name="Calls (corrigés)",
+            marker=dict(color="#2196F3", size=10, symbol="x", line=dict(width=2, color="#FF9800")),
+        ))
+
+    if good_puts:
+        fig.add_trace(go.Scatter(
+            x=[o.strike for o in good_puts],
+            y=[o.implied_volatility for o in good_puts],
+            mode="markers+lines",
+            name="Puts",
+            marker=dict(color="#F44336", size=8, symbol="diamond"),
+            line=dict(color="#F44336", width=1, dash="dot"),
+        ))
+
+    if warn_puts:
+        fig.add_trace(go.Scatter(
+            x=[o.strike for o in warn_puts],
+            y=[o.implied_volatility for o in warn_puts],
+            mode="markers",
+            name="Puts (corrigés)",
+            marker=dict(color="#F44336", size=10, symbol="x", line=dict(width=2, color="#FF9800")),
+        ))
+
+    # Ligne verticale pour le prix du sous-jacent
     if underlying_price and underlying_price > 0:
-        fig.add_vline(x=underlying_price, line_dash="dash", line_color="gray")
+        fig.add_vline(
+            x=underlying_price, line_dash="dash", line_color="gray",
+            annotation_text=f"Forward {underlying_price:.2f}",
+            annotation_position="top right",
+        )
 
     fig.update_layout(
-        title="Volatility Skew — Put IV − Call IV",
+        title="Volatility Smile — IV vs Strike",
         xaxis_title="Strike",
-        yaxis_title="Skew (pp)",
+        yaxis_title="Implied Volatility (%)",
         template="plotly_dark",
-        height=400,
+        height=500,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
+
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -253,12 +290,12 @@ def run():
         calls, puts = _split_calls_puts(options)
 
     # Onglets
-    tab_smile, tab_skew, tab_premium, tab_greeks, tab_table = st.tabs(
+    tab_smile, tab_premium, tab_greeks, tab_table = st.tabs(
         ["Smile", "Premium", "Greeks", "Table"]
     )
 
-    with tab_skew:
-        _plot_skew(calls, puts, underlying_price)
+    with tab_smile:
+        _plot_smile(calls, puts, underlying_price)
 
     with tab_premium:
         _plot_premium_vs_strike(calls, puts, underlying_price)
