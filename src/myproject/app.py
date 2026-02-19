@@ -60,12 +60,6 @@ def main():
             filter.max_loss_left = filter.max_loss_left / 64
             filter.min_premium_sell = filter.min_premium_sell / 64
 
-        elif params.unit == "100ème" :
-            filter.max_premium = filter.max_premium/100
-            filter.max_loss_left = filter.max_loss_left/100
-            filter.max_loss_right = filter.max_loss_right/100
-            filter.min_premium_sell = filter.min_premium_sell/100
-
         # Store widget outputs in session_state for the pages
         st.session_state["_params_widget"] = params
         st.session_state["_scenarios_widget"] = scenarios

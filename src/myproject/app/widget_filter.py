@@ -71,7 +71,7 @@ def filter_params() -> FilterData:
             max_loss_right= st.number_input("Max loss upside",
                                             value = float(current_filter.get("max_loss_right", 0.1)),
                                             step=0.1,
-                                            format="%.5f",
+                                            format="%.4f",
                                             key="filter_max_loss_right",
                                             help= "Choose the max on the right of the target")
 
@@ -79,7 +79,7 @@ def filter_params() -> FilterData:
             limit_right= st.number_input("Starting from",
                                             value = float(current_filter.get("limit_right_filter", 98.0)),
                                             step=0.1,
-                                            format="%.5f",
+                                            format="%.4f",
                                             key="limit_right_filter_key",
                                             help= "limit to filter_max_loss_right where the max loss right is applied")
         
@@ -95,7 +95,7 @@ def filter_params() -> FilterData:
         max_premium = st.number_input("Max premium",
                                                value=float(current_filter.get("max_premium", 5.0)),
                                                step=0.1,
-                                               format="%.5f",
+                                               format="%.4f",
                                                key="filter_max_premium",
                                                help="Max strategy price (absolute value)")
 
@@ -103,7 +103,7 @@ def filter_params() -> FilterData:
         min_premium_sell = st.number_input("Min price for short",
                                                 value=float(current_filter.get("min_premium_sell", 0.005)),
                                                 step=0.1,
-                                                format="%.5f",
+                                                format="%.4f",
                                                 key="filter_min_premium_sell",
                                                 help="Minimum price to sell an option")
 

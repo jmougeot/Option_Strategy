@@ -62,8 +62,8 @@ def generate_html_email_from_template(
 <head>
 <style>
 body {{
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 10pt;
+    font-family: Aptos, Arial, Helvetica, sans-serif;
+    font-size: 12pt;
     line-height: 1.5;
     color: #333;
     max-width: 800px;
@@ -71,7 +71,7 @@ body {{
     padding: 15px;
 }}
 .intro {{
-    font-size: 10pt;
+    font-size: 12pt;
     margin-bottom: 4px;
 }}
 .section-title {{
@@ -103,10 +103,6 @@ body {{
     border: 1px solid #e2e8f0;
     border-radius: 5px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}}
-.signature {{
-    margin-top: 20px;
-    color: #4a5568;
 }}
 </style>
 </head>
@@ -146,11 +142,6 @@ body {{
 <p><span class="section-title">DELTA:</span> <span class="param-value">{template_data.delta_description}</span></p>
 <p><span class="section-title">PREMIUM SPENT MAX:</span> <span class="param-value">{template_data.premium_max_description}</span></p>
 </div>
-
-<p class="signature">
-Best regards,<br>
-<strong>BGC's team of rates derivatives</strong>
-</p>
 
 </body>
 </html>
