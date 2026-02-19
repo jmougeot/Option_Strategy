@@ -383,61 +383,92 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
     all_to_interpolate = needs_interpolation + needs_iv_only
     if all_to_interpolate:
 
-        def _local_slope_interp(K_target: float, data: List[Tuple[float, float]]) -> Optional[float]:
+        def _edge_slopes(data: List[Tuple[float, float]]) -> Tuple[Optional[float], Optional[float]]:
             """
-            Interpole σ_n(K_target) via pente locale entre voisins.
+            Pré-calcule les pentes de bord gauche et droite d'une liste (K, σ) triée.
+            Retourne (slope_left, slope_right).
+            slope_left  = pente entre les 2 premiers points
+            slope_right = pente entre les 2 derniers points
+            None si pas assez de points.
+            """
+            if len(data) < 2:
+                return None, None
+            sd = sorted(data, key=lambda x: x[0])
+            sl = (sd[1][1]  - sd[0][1])  / (sd[1][0]  - sd[0][0])   if abs(sd[1][0]  - sd[0][0])  > 1e-10 else 0.0
+            sr = (sd[-1][1] - sd[-2][1]) / (sd[-1][0] - sd[-2][0])  if abs(sd[-1][0] - sd[-2][0]) > 1e-10 else 0.0
+            return sl, sr
 
-            Pour chaque K cible, on cherche les voisins K_{n-1} < K_target < K_{n+1}
-            dans les données connues (triées par strike).
-            - Pente locale: a = (σ_{n+1} - σ_{n-1}) / (K_{n+1} - K_{n-1})
-            - Ancrage sur le voisin le plus proche: σ = σ_voisin + a * (K - K_voisin)
-            - Si K hors intervalle (extrapolation): même logique avec les 2 points extrêmes.
+        # Pentes de bord pré-calculées pour calls et puts
+        call_slope_left,  call_slope_right  = _edge_slopes(call_data)
+        put_slope_left,   put_slope_right   = _edge_slopes(put_data)
+
+        # Fallback croisé : si un type n'a pas de pente de bord, on emprunte l'autre
+        eff_call_slope_left  = call_slope_left  if call_slope_left  is not None else put_slope_left
+        eff_call_slope_right = call_slope_right if call_slope_right is not None else put_slope_right
+        eff_put_slope_left   = put_slope_left   if put_slope_left   is not None else call_slope_left
+        eff_put_slope_right  = put_slope_right  if put_slope_right  is not None else call_slope_right
+
+        if call_data:
+            call_sorted = sorted(call_data, key=lambda x: x[0])
+        if put_data:
+            put_sorted  = sorted(put_data,  key=lambda x: x[0])
+
+        def _local_slope_interp(K_target: float,
+                                data: List[Tuple[float, float]],
+                                slope_left: Optional[float],
+                                slope_right: Optional[float]) -> Optional[float]:
+            """
+            Interpole σ_n(K_target) via pente locale entre voisins encadrants.
+
+            - Dans le range  → pente locale  = (σ_{n+1} - σ_{n-1}) / (K_{n+1} - K_{n-1})
+            - Hors du range  → pente de bord pré-calculée (gauche ou droite)
+                               en fallback croisé calls ↔ puts si nécessaire.
+            Ancrage toujours sur le voisin le plus proche.
             """
             if not data:
                 return None
-            
-            # Trier par strike
-            sorted_data = sorted(data, key=lambda x: x[0])
-            strikes = [d[0] for d in sorted_data]
-            sigmas  = [d[1] for d in sorted_data]
-            n = len(sorted_data)
-            
+
+            sd = sorted(data, key=lambda x: x[0])
+            strikes = [d[0] for d in sd]
+            sigmas  = [d[1] for d in sd]
+            n = len(sd)
+
             if n == 1:
-                # Un seul point connu → σ constante
                 return sigmas[0]
-            
-            # Trouver les voisins encadrants
-            # idx_right = premier indice dont le strike > K_target
-            idx_right = next((i for i, k in enumerate(strikes) if k > K_target), n)
-            idx_left  = idx_right - 1
+
+            # idx_right = premier indice dont le strike >= K_target
+            idx_right = next((i for i, k in enumerate(strikes) if k >= K_target), n)
 
             if idx_right == 0:
-                # K_target < tous les strikes connus → extrapolation gauche avec les 2 premiers
-                K_n_minus = strikes[0]; s_n_minus = sigmas[0]
-                K_n_plus  = strikes[1]; s_n_plus  = sigmas[1]
+                # Extrapole à gauche : pente de bord gauche
+                a = slope_left if slope_left is not None else 0.0
+                return max(sigmas[0] + a * (K_target - strikes[0]), 1e-6)
+
             elif idx_right == n:
-                # K_target > tous les strikes connus → extrapolation droite avec les 2 derniers
-                K_n_minus = strikes[-2]; s_n_minus = sigmas[-2]
-                K_n_plus  = strikes[-1]; s_n_plus  = sigmas[-1]
-            else:
-                # Interpolation: voisins gauche et droite
-                K_n_minus = strikes[idx_left];  s_n_minus = sigmas[idx_left]
-                K_n_plus  = strikes[idx_right]; s_n_plus  = sigmas[idx_right]
-            
-            # Pente locale par différence finie
-            dK = K_n_plus - K_n_minus
-            if abs(dK) < 1e-10:
-                return s_n_minus  # strikes identiques → σ constante
+                # Extrapole à droite : pente de bord droite
+                a = slope_right if slope_right is not None else 0.0
+                return max(sigmas[-1] + a * (K_target - strikes[-1]), 1e-6)
 
-            a = (s_n_plus - s_n_minus) / dK
-            
-            # Ancrage sur le voisin le plus proche
-            if abs(K_target - K_n_minus) <= abs(K_target - K_n_plus):
-                return s_n_minus + a * (K_target - K_n_minus)
             else:
-                return s_n_plus + a * (K_target - K_n_plus)
+                # Interpolation entre voisins encadrants
+                idx_left  = idx_right - 1
+                K_minus, s_minus = strikes[idx_left],  sigmas[idx_left]
+                K_plus,  s_plus  = strikes[idx_right], sigmas[idx_right]
+                dK = K_plus - K_minus
+                if abs(dK) < 1e-10:
+                    return s_minus
+                a = (s_plus - s_minus) / dK
+                # Ancrage sur le voisin le plus proche
+                if abs(K_target - K_minus) <= abs(K_target - K_plus):
+                    return max(s_minus + a * (K_target - K_minus), 1e-6)
+                else:
+                    return max(s_plus  + a * (K_target - K_plus),  1e-6)
 
-        # Fallback: si call_data ou put_data vide, on emprunte l'autre
+        # Fallback total : si aucune donnée disponible
+        if not call_data and not put_data:
+            print("  ⚠️ Aucune σ_n disponible pour interpoler")
+            return
+
         effective_call_data = call_data if call_data else put_data
         effective_put_data  = put_data  if put_data  else call_data
 
@@ -447,11 +478,16 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         needs_iv_only_set = set(id(o) for o in needs_iv_only)
         
         for opt in all_to_interpolate:
-            data_ref = effective_call_data if opt.is_call() else effective_put_data
+            if opt.is_call():
+                data_ref   = effective_call_data
+                sl, sr     = eff_call_slope_left, eff_call_slope_right
+            else:
+                data_ref   = effective_put_data
+                sl, sr     = eff_put_slope_left, eff_put_slope_right
             if not data_ref:
                 continue
-            
-            sigma_interp = _local_slope_interp(opt.strike, data_ref)
+
+            sigma_interp = _local_slope_interp(opt.strike, data_ref, sl, sr)
             if sigma_interp is None:
                 continue
             sigma_interp = max(sigma_interp, 1e-6)
