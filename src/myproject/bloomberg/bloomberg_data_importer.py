@@ -322,7 +322,7 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         if not opt.underlying_price or opt.underlying_price <= 0:
             opt.underlying_price = F
     
-    print(f"\n📐 Calcul volatilité Bachelier (F={F:.2f}, T={time_to_expiry:.3f})")
+    print(f"\n Calcul volatilité Bachelier (F={F:.2f}, T={time_to_expiry:.3f})")
     
     # 1. Première passe: calculer σ_n pour toutes les options avec premium valide et status OK
     call_raw: List[Tuple[float, float, Option]] = []
@@ -379,128 +379,82 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
     
     print(f"  • {len(call_data)} calls + {len(put_data)} puts avec σ_n fiable (médiane filtrée)")
     
-    # 3. Si des options nécessitent interpolation, interpolation locale par différence finie
+    # 3. Courbe σ_n commune : fusionner calls et puts par strike
+    #    En Bachelier, σ_n(K, call) = σ_n(K, put) pour le même strike (parité put-call).
+    #    On construit donc un seul dictionnaire {K → σ_n} en moyennant si les deux existent.
     all_to_interpolate = needs_interpolation + needs_iv_only
     if all_to_interpolate:
+        sigma_by_strike: dict = {}
+        for K, s in call_data:
+            sigma_by_strike[K] = s
+        for K, s in put_data:
+            if K in sigma_by_strike:
+                sigma_by_strike[K] = (sigma_by_strike[K] + s) / 2.0  # moyenne call/put
+            else:
+                sigma_by_strike[K] = s
 
-        def _edge_slopes(data: List[Tuple[float, float]]) -> Tuple[Optional[float], Optional[float]]:
+        combined: List[Tuple[float, float]] = sorted(sigma_by_strike.items())
+
+        if not combined:
+            print("  ⚠️ Aucune σ_n disponible pour interpoler")
+            return
+
+        def _interp_sigma(K_target: float) -> float:
             """
-            Pré-calcule les pentes de bord gauche et droite d'une liste (K, σ) triée.
-            Retourne (slope_left, slope_right).
-            slope_left  = pente entre les 2 premiers points
-            slope_right = pente entre les 2 derniers points
-            None si pas assez de points.
+            Interpole σ_n sur la courbe commune (triée par strike).
+            - Dans le range  : pente locale entre les deux voisins encadrants
+                               a = (σ_{n+1} - σ_{n-1}) / (K_{n+1} - K_{n-1})
+            - Hors du range  : pente de bord (entre les 2 premiers ou 2 derniers points)
+            Ancrage sur le voisin le plus proche dans tous les cas.
             """
-            if len(data) < 2:
-                return None, None
-            sd = sorted(data, key=lambda x: x[0])
-            sl = (sd[1][1]  - sd[0][1])  / (sd[1][0]  - sd[0][0])   if abs(sd[1][0]  - sd[0][0])  > 1e-10 else 0.0
-            sr = (sd[-1][1] - sd[-2][1]) / (sd[-1][0] - sd[-2][0])  if abs(sd[-1][0] - sd[-2][0]) > 1e-10 else 0.0
-            return sl, sr
-
-        # Pentes de bord pré-calculées pour calls et puts
-        call_slope_left,  call_slope_right  = _edge_slopes(call_data)
-        put_slope_left,   put_slope_right   = _edge_slopes(put_data)
-
-        # Fallback croisé : si un type n'a pas de pente de bord, on emprunte l'autre
-        eff_call_slope_left  = call_slope_left  if call_slope_left  is not None else put_slope_left
-        eff_call_slope_right = call_slope_right if call_slope_right is not None else put_slope_right
-        eff_put_slope_left   = put_slope_left   if put_slope_left   is not None else call_slope_left
-        eff_put_slope_right  = put_slope_right  if put_slope_right  is not None else call_slope_right
-
-        if call_data:
-            call_sorted = sorted(call_data, key=lambda x: x[0])
-        if put_data:
-            put_sorted  = sorted(put_data,  key=lambda x: x[0])
-
-        def _local_slope_interp(K_target: float,
-                                data: List[Tuple[float, float]],
-                                slope_left: Optional[float],
-                                slope_right: Optional[float]) -> Optional[float]:
-            """
-            Interpole σ_n(K_target) via pente locale entre voisins encadrants.
-
-            - Dans le range  → pente locale  = (σ_{n+1} - σ_{n-1}) / (K_{n+1} - K_{n-1})
-            - Hors du range  → pente de bord pré-calculée (gauche ou droite)
-                               en fallback croisé calls ↔ puts si nécessaire.
-            Ancrage toujours sur le voisin le plus proche.
-            """
-            if not data:
-                return None
-
-            sd = sorted(data, key=lambda x: x[0])
-            strikes = [d[0] for d in sd]
-            sigmas  = [d[1] for d in sd]
-            n = len(sd)
+            strikes = [d[0] for d in combined]
+            sigmas  = [d[1] for d in combined]
+            n = len(combined)
 
             if n == 1:
                 return sigmas[0]
 
-            # idx_right = premier indice dont le strike >= K_target
             idx_right = next((i for i, k in enumerate(strikes) if k >= K_target), n)
 
             if idx_right == 0:
-                # Extrapole à gauche : pente de bord gauche
-                a = slope_left if slope_left is not None else 0.0
+                # Extrapole à gauche : pente entre les 2 premiers points connus
+                a = (sigmas[1] - sigmas[0]) / (strikes[1] - strikes[0]) if abs(strikes[1] - strikes[0]) > 1e-10 else 0.0
                 return max(sigmas[0] + a * (K_target - strikes[0]), 1e-6)
 
             elif idx_right == n:
-                # Extrapole à droite : pente de bord droite
-                a = slope_right if slope_right is not None else 0.0
+                # Extrapole à droite : pente entre les 2 derniers points connus
+                a = (sigmas[-1] - sigmas[-2]) / (strikes[-1] - strikes[-2]) if abs(strikes[-1] - strikes[-2]) > 1e-10 else 0.0
                 return max(sigmas[-1] + a * (K_target - strikes[-1]), 1e-6)
 
             else:
-                # Interpolation entre voisins encadrants
-                idx_left  = idx_right - 1
+                # Interpolation entre les deux voisins encadrants
+                idx_left = idx_right - 1
                 K_minus, s_minus = strikes[idx_left],  sigmas[idx_left]
                 K_plus,  s_plus  = strikes[idx_right], sigmas[idx_right]
                 dK = K_plus - K_minus
                 if abs(dK) < 1e-10:
                     return s_minus
                 a = (s_plus - s_minus) / dK
-                # Ancrage sur le voisin le plus proche
                 if abs(K_target - K_minus) <= abs(K_target - K_plus):
                     return max(s_minus + a * (K_target - K_minus), 1e-6)
                 else:
                     return max(s_plus  + a * (K_target - K_plus),  1e-6)
 
-        # Fallback total : si aucune donnée disponible
-        if not call_data and not put_data:
-            print("  ⚠️ Aucune σ_n disponible pour interpoler")
-            return
-
-        effective_call_data = call_data if call_data else put_data
-        effective_put_data  = put_data  if put_data  else call_data
-
         # 4. Interpoler
         fixed_count = 0
         iv_only_count = 0
         needs_iv_only_set = set(id(o) for o in needs_iv_only)
-        
-        for opt in all_to_interpolate:
-            if opt.is_call():
-                data_ref   = effective_call_data
-                sl, sr     = eff_call_slope_left, eff_call_slope_right
-            else:
-                data_ref   = effective_put_data
-                sl, sr     = eff_put_slope_left, eff_put_slope_right
-            if not data_ref:
-                continue
 
-            sigma_interp = _local_slope_interp(opt.strike, data_ref, sl, sr)
-            if sigma_interp is None:
-                continue
-            sigma_interp = max(sigma_interp, 1e-6)
+        for opt in all_to_interpolate:
+            sigma_interp = _interp_sigma(opt.strike)
             opt.implied_volatility = (sigma_interp / F) * 100.0 if F > 0 else 0.0
-            
+
             sym = "C" if opt.is_call() else "P"
-            
+
             if id(opt) in needs_iv_only_set:
-                # status=True, deep ITM: on garde le premium Bloomberg, juste IV interpolée
                 iv_only_count += 1
                 print(f"  ✓ IV interpolée {sym} K={opt.strike}: σ_n={sigma_interp:.4f}, IV≈{opt.implied_volatility:.2f}% (premium conservé={opt.premium:.6f})")
             else:
-                # status=False (warning): recalculer le premium avec Bachelier
                 new_premium = bachelier_price(F, opt.strike, sigma_interp, time_to_expiry, opt.is_call())
                 opt.premium = new_premium
                 opt._calcul_all_surface()
