@@ -149,7 +149,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
             if bid is None and ask is None:
                 missing_both.append(ticker)
                 results[ticker]["_warning"] = True
-            if ask and bid is None and ask > 0.8:
+            if ask and bid is None and ask > 0.08:
                 wide_spread.append(ticker)
                 results[ticker]["_warning"] = True
             if ask and bid:
