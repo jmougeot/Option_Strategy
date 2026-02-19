@@ -181,7 +181,7 @@ def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:
     ask = data.get("PX_ASK") or 0.0
     mid = data.get("PX_MID") or 0.0
     iv_bid = data.get("IVOL_BID") or 0.0
-    iv_ask = data.get("IVOL_MID") or 0.0
+    iv_ask = data.get("IVOL_ASK") or 0.0
     iv_mid = data.get("IVOL_MID") or 0.0
 
     return {

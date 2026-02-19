@@ -291,7 +291,7 @@ class OptionProcessor:
 # CALCUL DE LA VOLATILITÉ BACHELIER POUR TOUTES LES OPTIONS
 # ============================================================================
 
-def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float = 0.25) -> None:
+def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float = 0.25, future_price: Optional[float] = None) -> None:
     """
     Calcule la volatilité Bachelier pour TOUTES les options.
     
@@ -303,15 +303,24 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
     Args:
         options: Liste complète d'options
         time_to_expiry: Temps jusqu'à expiration (en années)
+        future_price: Prix du futures (utilisé si OPT_UNDL_PX absent des options)
     """
     if not options:
         return
     
-    # Forward price depuis les options disponibles
+    # Forward price: depuis les options, sinon fallback sur le futures récupéré
     F = next((opt.underlying_price for opt in options if opt.underlying_price and opt.underlying_price > 0), None)
+    if F is None and future_price and future_price > 0:
+        F = future_price
+        print(f"  ℹ OPT_UNDL_PX absent des options → utilisation du prix futures: {F:.4f}")
     if F is None:
         print("Pas de prix sous-jacent disponible pour le calcul Bachelier")
         return
+    
+    # Propager le prix sous-jacent aux options qui ne l'ont pas
+    for opt in options:
+        if not opt.underlying_price or opt.underlying_price <= 0:
+            opt.underlying_price = F
     
     print(f"\n📐 Calcul volatilité Bachelier (F={F:.2f}, T={time_to_expiry:.3f})")
     
@@ -370,57 +379,82 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
     
     print(f"  • {len(call_data)} calls + {len(put_data)} puts avec σ_n fiable (médiane filtrée)")
     
-    # 3. Si des options nécessitent interpolation, calculer les slopes
+    # 3. Si des options nécessitent interpolation, interpolation locale par différence finie
     all_to_interpolate = needs_interpolation + needs_iv_only
     if all_to_interpolate:
-        call_slope = None
-        put_slope = None
-        
-        if len(call_data) >= 2:
-            strikes_c = np.array([d[0] for d in call_data])
-            vols_c = np.array([d[1] for d in call_data])
-            call_slope = np.polyfit(strikes_c, vols_c, 1)
-            print(f"  • Slope calls: σ(K) = {call_slope[0]:.6f}·K + {call_slope[1]:.4f}")
-        elif len(call_data) == 1:
-            call_slope = np.array([0.0, call_data[0][1]])
-        
-        if len(put_data) >= 2:
-            strikes_p = np.array([d[0] for d in put_data])
-            vols_p = np.array([d[1] for d in put_data])
-            put_slope = np.polyfit(strikes_p, vols_p, 1)
-            print(f"  • Slope puts: σ(K) = {put_slope[0]:.6f}·K + {put_slope[1]:.4f}")
-        elif len(put_data) == 1:
-            put_slope = np.array([0.0, put_data[0][1]])
-        
-        # Fallback: si un slope manque, utiliser celui de l'autre type
-        if call_slope is None and put_slope is not None:
-            call_slope = put_slope
-            print(f"  • Fallback: slope puts utilisé pour les calls")
-        elif put_slope is None and call_slope is not None:
-            put_slope = call_slope
-            print(f"  • Fallback: slope calls utilisé pour les puts")
-        elif call_slope is None and put_slope is None:
-            # Aucun slope disponible → σ constante = moyenne de toutes les σ connues
-            all_sigmas = [d[1] for d in call_data + put_data]
-            if all_sigmas:
-                avg_sigma = np.mean(all_sigmas)
-                call_slope = np.array([0.0, avg_sigma])
-                put_slope = np.array([0.0, avg_sigma])
-                print(f"  • Fallback: σ constante = {avg_sigma:.4f} (moyenne globale)")
+
+        def _local_slope_interp(K_target: float, data: List[Tuple[float, float]]) -> Optional[float]:
+            """
+            Interpole σ_n(K_target) via pente locale entre voisins.
+
+            Pour chaque K cible, on cherche les voisins K_{n-1} < K_target < K_{n+1}
+            dans les données connues (triées par strike).
+            - Pente locale: a = (σ_{n+1} - σ_{n-1}) / (K_{n+1} - K_{n-1})
+            - Ancrage sur le voisin le plus proche: σ = σ_voisin + a * (K - K_voisin)
+            - Si K hors intervalle (extrapolation): même logique avec les 2 points extrêmes.
+            """
+            if not data:
+                return None
+            
+            # Trier par strike
+            sorted_data = sorted(data, key=lambda x: x[0])
+            strikes = [d[0] for d in sorted_data]
+            sigmas  = [d[1] for d in sorted_data]
+            n = len(sorted_data)
+            
+            if n == 1:
+                # Un seul point connu → σ constante
+                return sigmas[0]
+            
+            # Trouver les voisins encadrants
+            # idx_right = premier indice dont le strike > K_target
+            idx_right = next((i for i, k in enumerate(strikes) if k > K_target), n)
+            idx_left  = idx_right - 1
+
+            if idx_right == 0:
+                # K_target < tous les strikes connus → extrapolation gauche avec les 2 premiers
+                K_n_minus = strikes[0]; s_n_minus = sigmas[0]
+                K_n_plus  = strikes[1]; s_n_plus  = sigmas[1]
+            elif idx_right == n:
+                # K_target > tous les strikes connus → extrapolation droite avec les 2 derniers
+                K_n_minus = strikes[-2]; s_n_minus = sigmas[-2]
+                K_n_plus  = strikes[-1]; s_n_plus  = sigmas[-1]
             else:
-                print("  ⚠️ Aucune donnée pour interpoler")
-        
+                # Interpolation: voisins gauche et droite
+                K_n_minus = strikes[idx_left];  s_n_minus = sigmas[idx_left]
+                K_n_plus  = strikes[idx_right]; s_n_plus  = sigmas[idx_right]
+            
+            # Pente locale par différence finie
+            dK = K_n_plus - K_n_minus
+            if abs(dK) < 1e-10:
+                return s_n_minus  # strikes identiques → σ constante
+
+            a = (s_n_plus - s_n_minus) / dK
+            
+            # Ancrage sur le voisin le plus proche
+            if abs(K_target - K_n_minus) <= abs(K_target - K_n_plus):
+                return s_n_minus + a * (K_target - K_n_minus)
+            else:
+                return s_n_plus + a * (K_target - K_n_plus)
+
+        # Fallback: si call_data ou put_data vide, on emprunte l'autre
+        effective_call_data = call_data if call_data else put_data
+        effective_put_data  = put_data  if put_data  else call_data
+
         # 4. Interpoler
         fixed_count = 0
         iv_only_count = 0
         needs_iv_only_set = set(id(o) for o in needs_iv_only)
         
         for opt in all_to_interpolate:
-            slope = call_slope if opt.is_call() else put_slope
-            if slope is None:
+            data_ref = effective_call_data if opt.is_call() else effective_put_data
+            if not data_ref:
                 continue
             
-            sigma_interp = max(float(np.polyval(slope, opt.strike)), 1e-6)
+            sigma_interp = _local_slope_interp(opt.strike, data_ref)
+            if sigma_interp is None:
+                continue
+            sigma_interp = max(sigma_interp, 1e-6)
             opt.implied_volatility = (sigma_interp / F) * 100.0 if F > 0 else 0.0
             
             sym = "C" if opt.is_call() else "P"
@@ -491,7 +525,7 @@ def import_options(
         
         # 3.5. Calculer la volatilité Bachelier pour TOUTES les options
         if options:
-            _compute_bachelier_volatility(options, time_to_expiry=0.25)
+            _compute_bachelier_volatility(options, time_to_expiry=0.25, future_price=future_data.price)
         
         # 4. Calculer les prix intra-vie pour toutes les options (avec Bachelier)
         if options:
