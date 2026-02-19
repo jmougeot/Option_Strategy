@@ -39,6 +39,11 @@ UNDERLYING_REF = {
     "X":"Z",
     "Z":"Z"}
 
+MID_CURVE = {
+    "R":"ER",
+    "N":"SFI",
+    "Q":"SFR"}
+
 # ============================================================================
 # CLASSES INTERNES
 # ============================================================================
@@ -57,9 +62,21 @@ class TickerBuilder:
         self.roll_metadata: Dict[str, TickerMeta] = {}
         self.underlying_ticker: str =""
 
-    def _build_underlying(self, underlying, months, years):
-        month=UNDERLYING_REF[months[0]]
-        year=years[0]
+    def _build_underlying(self, underlying:str, months:str, years:List[int]):
+        if underlying[0] == "0":
+            year = years[0] + 1
+            month=UNDERLYING_REF[months[0]]
+            underlying = MID_CURVE[underlying[1]] 
+
+        elif underlying[0] == "2":
+            year = years[0] + 2
+            month=UNDERLYING_REF[months[0]]
+            underlying = MID_CURVE[underlying[1]]
+
+        else: 
+            month=UNDERLYING_REF[months[0]]
+            year= years[0]
+
         self.underlying_ticker = f"{underlying}{month}{year} {self.suffix}"
 
     

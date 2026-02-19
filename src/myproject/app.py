@@ -68,7 +68,7 @@ def main():
 
         st.markdown("---")
 
-        if st.button("📧 Send Email with Images (Outlook)"):
+        if st.button("Send Email with Images (Outlook)"):
             comparisons_for_email = st.session_state.get("comparisons", None)
             mixture_for_email = st.session_state.get("mixture", None)
             template_data = build_email_template_data(params, filter, scoring_weights)
@@ -126,7 +126,6 @@ def main():
         ],
         position="top"
     )
-
     # Render navigation selector in main area
     pages.run()
 

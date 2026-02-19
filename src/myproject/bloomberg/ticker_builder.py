@@ -94,23 +94,6 @@ def build_option_ticker(
     Construit un ticker Bloomberg pour options EURIBOR.
 
     Format Bloomberg: [UNDERLYING][MONTH][YEAR][TYPE] [STRIKE] [SUFFIX]
-
-    Args:
-        underlying: Symbole du sous-jacent (ex: "ER" pour EURIBOR)
-        expiry_month: Code mois Bloomberg ('F', 'G', 'H', 'K', 'M', 'N', 'Q', 'U', 'V', 'X', 'Z')
-        expiry_year: Année sur 1 chiffre (ex: 5 pour 2025)
-        option_type: 'C' pour Call ou 'P' pour Put
-        strike: Prix d'exercice (ex: 97.5)
-        suffix: Suffixe Bloomberg (ex: "Comdty" pour commodités)
-
-    Returns:
-        Ticker Bloomberg formaté (ex: "ERH5C 97.5 Comdty")
-
-    Examples:
-        >>> build_option_ticker("ER", "H", 5, "C", 97.5, "Comdty")
-        'ERH5C 97.5 Comdty'
-        >>> build_option_ticker("ER", "M", 5, "P", 98.0, "Comdty")
-        'ERM5P 98.0 Comdty'
     """
     # Arrondir le strike pour éviter les problèmes de précision flottante
     # (ex: 107.09999999999997 → 107.1)
