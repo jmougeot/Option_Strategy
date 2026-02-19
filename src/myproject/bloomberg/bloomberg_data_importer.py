@@ -368,6 +368,24 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         elif len(put_data) == 1:
             put_slope = np.array([0.0, put_data[0][1]])
         
+        # Fallback: si un slope manque, utiliser celui de l'autre type
+        if call_slope is None and put_slope is not None:
+            call_slope = put_slope
+            print(f"  • Fallback: slope puts utilisé pour les calls")
+        elif put_slope is None and call_slope is not None:
+            put_slope = call_slope
+            print(f"  • Fallback: slope calls utilisé pour les puts")
+        elif call_slope is None and put_slope is None:
+            # Aucun slope disponible → σ constante = moyenne de toutes les σ connues
+            all_sigmas = [d[1] for d in call_data + put_data]
+            if all_sigmas:
+                avg_sigma = np.mean(all_sigmas)
+                call_slope = np.array([0.0, avg_sigma])
+                put_slope = np.array([0.0, avg_sigma])
+                print(f"  • Fallback: σ constante = {avg_sigma:.4f} (moyenne globale)")
+            else:
+                print("  ⚠️ Aucune donnée pour interpoler")
+        
         # 3. Interpoler pour les options sans premium valide
         fixed_count = 0
         for opt in needs_interpolation:
