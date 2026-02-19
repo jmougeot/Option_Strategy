@@ -86,6 +86,9 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         for field in OPTION_FIELDS:
             request.append(fields, field)
         
+
+
+        # Ajouter les overrides si demandé
         if use_overrides:
             overrides = request.getElement(overrid)
             override1 = overrides.appendElement()
@@ -94,7 +97,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
 
         # Envoyer
         session.sendRequest(request)
-        underlying_price : Optional[float] = None
+        underlying_price : float = 98.0
         last_tradable_date : Optional[str] = None
         # Lire la réponse
         while True:
@@ -148,21 +151,20 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
             ask = data.get("PX_ASK")
             if bid is None and ask is None:
                 missing_both.append(ticker)
-                results[ticker]["_warning"] = True
-            if ask and bid is None and ask > 0.08:
+            if ask and bid is None and ask > 0.1:
                 wide_spread.append(ticker)
-                results[ticker]["_warning"] = True
+                results[ticker] = {}
             if ask and bid:
                 spread = ask - bid
-                if spread > 0.08:
+                if spread > 0.1:
                     wide_spread.append(f"{ticker} (spread={spread:.4f})")
-                    results[ticker]["_warning"] = True
+                    results[ticker] = {}
 
         warnings: List[str] = []
         if missing_both:
             warnings.append(f"Sans Bid ni Ask ({len(missing_both)}): " + ", ".join(missing_both))
         if wide_spread:
-            warnings.append(f"Spread Bid-Ask > 8 ticks ({len(wide_spread)}): " + ", ".join(wide_spread))
+            warnings.append(f"Spread Bid-Ask > 10 ticks ({len(wide_spread)}): " + ", ".join(wide_spread))
 
         return results, FutureData(underlying_price, last_tradable_date), warnings
 
@@ -170,7 +172,7 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         print(f"✗ Erreur fetch: {e}")
         import traceback
         traceback.print_exc()
-        return results, FutureData(None, None), []
+        return results, FutureData(98.0, None), []
 
 
 def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:

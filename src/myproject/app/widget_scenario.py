@@ -177,13 +177,9 @@ def scenario_params() -> Optional[ScenarioData]:
 
     # Calculer les poids normalisés
     total_weight = sum(s["weight"] for s in st.session_state.scenarios)
-    if total_weight > 0:
-        normalized_weights = [
-            s["weight"] / total_weight for s in st.session_state.scenarios
-        ]
-    else:
-        n = len(st.session_state.scenarios)
-        normalized_weights = [1.0 / n for _ in st.session_state.scenarios] if n > 0 else [1.0]
+    normalized_weights = [
+        s["weight"] / total_weight for s in st.session_state.scenarios
+    ]
 
     # Préparer les données pour le retour
     centers = [s["price"] for s in st.session_state.scenarios]

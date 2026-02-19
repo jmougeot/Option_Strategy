@@ -5,11 +5,11 @@ Module pour gÃ©rer les diffÃ©rents tabs de l'application Streamlit
 import streamlit as st
 from typing import List, Optional
 from myproject.strategy.strategy_class import StrategyComparison
-from myproject.app.utils import format_currency, format_expiration_date, format_price
+from myproject.app.utils import format_currency, format_expiration_date
 from myproject.app.widget_comparison import create_comparison_table
 
 
-def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Optional[List[str]] = None, unit: str = "100ème"):
+def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Optional[List[str]] = None):
     """
     Displays the Overview tab with metrics and the comparison table.
 
@@ -17,7 +17,6 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
         comparisons: List of strategies to display
         roll_labels: List of roll expiry labels (ex: ["H6", "M6"]) for dynamic columns.
                     If None, no roll columns are shown.
-        unit: "64ème" to display prices in 64ths, otherwise decimal
     """
     if not comparisons:
         st.info("No strategies to display for this ranking.")
@@ -34,10 +33,10 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
             winner.strategy_name, 
         )
     with col2:
-        st.metric("Max Profit", format_price(winner.max_profit, unit), "")
+        st.metric("Max Profit", format_currency(winner.max_profit), "")
     with col3:
         max_loss_str = (
-            format_price(winner.max_loss, unit)
+            format_currency(winner.max_loss)
             if winner.max_loss != float("inf")
             else "Unlimited"
         )
@@ -45,7 +44,7 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
     with col4:
         st.metric(
             "Expected gain at expiry",
-            format_price(winner.average_pnl, unit),
+            format_currency(winner.average_pnl),
             f"{winner.profit_at_target_pct:.1f}% of max",
         )
 
@@ -53,7 +52,7 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
 
     # Comparison Table avec style amélioré
     st.subheader("Top 5 Strategies")
-    df = create_comparison_table(comparisons, roll_labels=roll_labels, max_rows=10, unit=unit)
+    df = create_comparison_table(comparisons, roll_labels=roll_labels, max_rows=10)
 
     # Vérifier que le DataFrame n'est pas vide
     if df.empty:

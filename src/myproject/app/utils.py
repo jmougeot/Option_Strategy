@@ -21,23 +21,6 @@ def format_currency(value: float) -> str:
     return f"{value:.2f}"
 
 
-def format_price(value: float, unit: str = "100ème") -> str:
-    """Formats a price value, converting to 64ths if needed.
-    
-    Args:
-        value: The price value (in decimal, e.g. 0.0625)
-        unit: "64ème" to display in 64ths, otherwise decimal
-    """
-    if value is None:
-        return "-"
-    if value == float("inf") or value == float("-inf"):
-        return "Unlimited"
-    if unit == "64ème":
-        ticks_64 = value * 64 / 100
-        return f"{ticks_64:.2f}"
-    return f"{value:.3f}"
-
-
 def format_percentage(value: float) -> str:
     """Formats a percentage."""
     return f"{value:.1f}%"

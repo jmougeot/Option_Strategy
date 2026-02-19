@@ -7,7 +7,6 @@
 
 #include <vector>
 #include <string>
-#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -68,6 +67,7 @@ struct ScoredStrategy {
     double total_iv;
     double average_pnl;
     double roll;
+    double sigma_pnl;
     double max_profit;
     double max_loss;
     double max_loss_left;
@@ -104,7 +104,7 @@ struct ScoredStrategy {
     
     ScoredStrategy() 
         : total_premium(0), total_delta(0), total_iv(0), average_pnl(0),
-          roll(0), max_profit(0), max_loss(0),
+                    roll(0), max_profit(0), max_loss(0),
           max_loss_left(0), max_loss_right(0),
           min_profit_price(0), max_profit_price(0), profit_zone_width(0),
           delta_levrage(0), avg_pnl_levrage(0), call_count(0), put_count(0),
@@ -121,6 +121,11 @@ public:
     
     static void normalize_weights(std::vector<MetricConfig>& metrics);
 
+    static std::vector<double> extract_metric_values(
+        const std::vector<ScoredStrategy>& strategies,
+        const std::string& metric_name
+    );
+    
     static std::pair<double, double> normalize_values(
         const std::vector<double>& values,
         NormalizerType normalizer

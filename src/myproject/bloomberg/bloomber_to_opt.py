@@ -55,7 +55,23 @@ MONTH_EXPIRY_DAY = {
     "U": 17,
     "V": 15,
     "X": 19,
-    "Z": 17,}
+    "Z": 17,
+}
+
+
+def get_expiration_components(month: str, year: int) -> tuple[MonthCode, int]:
+    """
+    Calcule les composants d'expiration pour une option.
+
+    Args:
+        month: Code du mois Bloomberg (F, G, H, etc.)
+        year: Année sur 1 chiffre (6 = 2026)
+
+    Returns:
+        (month_code, year)
+    """
+    return cast(MonthCode, month), year
+
 
 def create_option_from_bloomberg(
     ticker: str,
@@ -67,14 +83,29 @@ def create_option_from_bloomberg(
     bloomberg_data: dict,
     mixture: Tuple[np.ndarray, np.ndarray, float],
     position: Literal["long", "short"] = "long",
-    warning: bool = False,
 ) -> Option:
     """
     Crée un objet Option directement depuis les données Bloomberg.
+
+    Args:
+        ticker: Ticker Bloomberg
+        underlying: Symbole du sous-jacent
+        strike: Prix d'exercice
+        month: Code du mois d'expiration
+        year: Année d'expiration (1 chiffre)
+        option_type_str: "call" ou "put"
+        bloomberg_data: Données brutes Bloomberg
+        position: 'long' ou 'short'
+        quantity: Quantité
+        price_min: Prix min pour surfaces
+        price_max: Prix max pour surfaces
+        num_points: Nombre de points pour les surfaces
+
+    Returns:
+        Objet Option
     """
     try:
-        month_code, exp_year = cast(MonthCode, month), year
-
+        month_code, exp_year = get_expiration_components(month, year)
 
         # Extraire les valeurs avec gestion des None
         premium = _safe_float(bloomberg_data.get("premium"))
@@ -90,15 +121,17 @@ def create_option_from_bloomberg(
         vol = _safe_int(bloomberg_data.get("volume"))
         underlying_price = _safe_float(bloomberg_data.get("underlying_price"))
 
-        # Vérifier que les données essentielles sont présentes (sauf si warning)
-        if premium == 0.0 and bid == 0.0 and ask == 0.0 and not warning:
+        # Vérifier que les données essentielles sont présentes
+        if premium == 0.0 and bid == 0.0 and ask == 0.0:
+            # Option sans prix valide, retourner une option vide
             return Option.empyOption()
 
+        # Créer l'option directement
         option = Option(
+            # Obligatoires
             option_type=option_type_str,
             strike=float(strike),
             premium=premium,
-            status=not warning,
             expiration_month=month_code,
             expiration_year=exp_year,
             position=position,
@@ -117,9 +150,13 @@ def create_option_from_bloomberg(
             volume=vol,
             underlying_price=underlying_price,
         )
+
         option.prices, option.mixture, average_mix = mixture
         option._calcul_all_surface()
         option.average_mix=average_mix
+        
+        # Note: intra_life sera calculé après avoir créé toutes les options
+        # car on a besoin de tous les strikes pour le calcul Bachelier
 
         return option
 

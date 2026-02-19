@@ -15,7 +15,6 @@ from myproject.share_result.generate_pdf import create_pdf_report
 from myproject.app.pages.overview import run as overview_run
 from myproject.app.pages.history import run as history_run
 from myproject.app.pages.help import run as help_run
-from myproject.app.pages.volatility import run as volatility_run
 from myproject.app.pages.history import init_history, apply_pending_restore
 # ============================================================================
 # PAGE CONFIGURATION
@@ -54,11 +53,6 @@ def main():
         params = sidebar_params()
         filter = filter_params()
         scoring_weights = scoring_weights_block()
-        if params.unit == "64ème":
-            filter.max_premium = filter.max_premium / 64
-            filter.max_loss_right = filter.max_loss_right / 64
-            filter.max_loss_left = filter.max_loss_left / 64
-            filter.min_premium_sell = filter.min_premium_sell / 64
 
         # Store widget outputs in session_state for the pages
         st.session_state["_params_widget"] = params
@@ -68,7 +62,7 @@ def main():
 
         st.markdown("---")
 
-        if st.button("Send Email with Images (Outlook)"):
+        if st.button("📧 Send Email with Images (Outlook)"):
             comparisons_for_email = st.session_state.get("comparisons", None)
             mixture_for_email = st.session_state.get("mixture", None)
             template_data = build_email_template_data(params, filter, scoring_weights)
@@ -78,9 +72,9 @@ def main():
                 mixture=mixture_for_email,
             )
             if success:
-                st.success("Email opened in Outlook with images!")
+                st.success("✅ Email opened in Outlook with images!")
             else:
-                st.error("Error opening Outlook. See console for details.")
+                st.error("❌ Error opening Outlook. See console for details.")
 
         if st.button("Generate PDF Report"):
             comparisons_for_pdf = st.session_state.get("comparisons", None)
@@ -120,12 +114,12 @@ def main():
     pages = st.navigation(
         [
             st.Page(overview_run, title="Overview", icon="📊", default=True, url_path="overview"),
-            st.Page(volatility_run, title="Volatility", icon="📈", url_path="volatility"),
             st.Page(history_run, title="History", icon="📜", url_path="history"),
             st.Page(help_run, title="Help", icon="📚", url_path="help"),
         ],
         position="top"
     )
+
     # Render navigation selector in main area
     pages.run()
 

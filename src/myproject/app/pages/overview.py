@@ -110,12 +110,9 @@ def run():
                 multi_result.weight_set_names = _build_weight_set_names(scoring_weights)
                 all_comparisons = multi_result.all_strategies_flat()
                 st.session_state["multi_ranking"] = multi_result
-                st.session_state["comparisons"] = all_comparisons
                 st.session_state["mixture"] = mixture
                 st.session_state["future_data"] = future_data
-                st.session_state["stats"] = stats
-                if "all_options" in stats:
-                    st.session_state["all_imported_options"] = stats["all_options"]
+                st.session_state["stats"] = stats 
 
                 # Save to history
                 from myproject.app.pages.history import add_to_history
@@ -211,10 +208,8 @@ def run():
     if future_data or stats:
         col_price, col_date, col_screened = st.columns(3)
         with col_price:
-            if future_data and future_data.underlying_price is not None:
+            if future_data:
                 st.metric("Underlying Price", f"{future_data.underlying_price:.4f}")
-            elif future_data:
-                st.metric("Underlying Price", "N/A")
         with col_date:
             if future_data:
                 date_str = future_data.last_tradable_date if future_data.last_tradable_date else "N/A"
@@ -234,13 +229,13 @@ def run():
         ]
         sub_tabs = st.tabs(sub_tab_names)
         with sub_tabs[0]:
-            display_overview_tab(all_comparisons, roll_labels=roll_labels, unit=params.unit)
+            display_overview_tab(all_comparisons, roll_labels=roll_labels)
             create_payoff_diagram(all_comparisons[:5], mixture, underlying_price, key="payoff_consensus")
         for i in range(multi_ranking.n_sets):
             with sub_tabs[i + 1]:
                 set_comps = multi_ranking.per_set_strategies[i]
-                display_overview_tab(set_comps, roll_labels=roll_labels, unit=params.unit)
+                display_overview_tab(set_comps, roll_labels=roll_labels)
                 create_payoff_diagram(set_comps[:5], mixture, underlying_price, key=f"payoff_set_{i}")
     else:
-        display_overview_tab(all_comparisons, roll_labels=roll_labels, unit=params.unit)
+        display_overview_tab(all_comparisons, roll_labels=roll_labels)
         create_payoff_diagram(all_comparisons[:5], mixture, underlying_price, key="payoff_single")

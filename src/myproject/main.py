@@ -24,7 +24,8 @@ from myproject.strategy.multi_ranking import MultiRankingResult
 from myproject.bloomberg.bloomberg_data_importer import import_options
 from myproject.bloomberg.bloomberg_data_importer_offline import (
     import_options_offline, 
-    is_offline_mode)
+    is_offline_mode
+)
 from myproject.app.data_types import ScenarioData, FilterData, FutureData
 from myproject.strategy.batch_processor import clear_caches
 from myproject.mixture.mixture_utils import create_mixture_from_scenarios
@@ -51,9 +52,8 @@ def process_bloomberg_to_strategies(
     Fonction principale simplifiee pour Streamlit.
     Importe les options depuis Bloomberg (ou simulation offline) et retourne les meilleures strategies + stats.
     """
-
     stats = {}
-    future_data = FutureData(None, None)
+    future_data = FutureData(98.0, None)
     
     # Verifier le mode offline
     offline = is_offline_mode()
@@ -92,11 +92,10 @@ def process_bloomberg_to_strategies(
     # Tracker du fetch
     stats["nb_options"] = len(options)
     stats["future_data"] = future_data
-    stats["all_options"] = options  # Toutes les options importées (pour page Volatility)
-
-    if not offline and fetch_warnings: #type: ignore
+    if not offline and fetch_warnings:
         stats["fetch_warnings"] = fetch_warnings
-        
+
+
     if not options:
         return [], stats, mixture, future_data
 

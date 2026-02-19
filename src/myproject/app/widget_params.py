@@ -73,7 +73,6 @@ class UIParams:
     price_step: float
     max_legs: int
     strikes: List[float]
-    unit : str
     brut_code: Optional[List[str]] = None
     roll_expiries: Optional[List[RollExpiry]] = None
 
@@ -90,16 +89,13 @@ def sidebar_params() -> UIParams:
     underlying = "ER"
     years_input = "6"
     months_input = "F"
-    code_brut = None
-    unit = "100ème" 
+    code_brut = None  # None by default, list if raw mode
+    
+    
     default_und = 'ER'
     default_params = UNDERLYING_PARAMS[default_und]
 
     if brut_code_check is False : 
-        # Initialize session state defaults if not already set
-        if "param_years" not in st.session_state:
-            st.session_state["param_years"] = "6"
-        
         c1, c2 = st.columns(2)
         with c1:
             underlying = st.selectbox(
@@ -112,7 +108,7 @@ def sidebar_params() -> UIParams:
             )
         with c2:
             years_input = st.text_input(
-                "Years:", help="6=2026, 7=2027 (comma separated)",
+                "Years:", value="6", help="6=2026, 7=2027 (comma separated)",
                 key="param_years"
             )
 
@@ -125,31 +121,18 @@ def sidebar_params() -> UIParams:
                 key="param_custom_underlying"
             )
 
-        # Initialize session state defaults if not already set
-        if "param_months" not in st.session_state:
-            st.session_state["param_months"] = "F"
-        if "param_price_step" not in st.session_state:
-            st.session_state["param_price_step"] = default_params['Step']
-        
-        c1 , c2, c3= st.columns(3)
+        c1 , c2= st.columns(2)
         with c1:
             months_input = st.text_input(
                 "Expiration Month:",
+                value="F",
                 help="H=Mar, M=Jun, U=Sep, Z=Dec",
                 key="param_months"
             )
-        with c2: 
-            unit = st.selectbox(
-                "Unit",
-                help = "Choose the unit for the price",
-                options = ["100ème", "64ème"],
-                index=0,
-                key="unit_key"
-            )
-
-        with c3:
+    
+        with c2:
             price_step = st.number_input(
-                "Price Step ($)", step=0.0001, format="%.4f",
+                "Price Step ($)", value=default_params['Step'], step=0.0001, format="%.4f",
                 key="param_price_step"
             )
 
@@ -168,21 +151,15 @@ def sidebar_params() -> UIParams:
                 key="param_price_step"
             )
 
-    # Initialize session state defaults for price inputs if not already set
-    if "param_price_min" not in st.session_state:
-        st.session_state["param_price_min"] = float(default_params['Min_price'])
-    if "param_price_max" not in st.session_state:
-        st.session_state["param_price_max"] = float(default_params['Max_price'])
-    
     c1, c2 = st.columns(2)
     with c1:
         price_min = st.number_input(
-            "Min Price ($)", step=0.0001, format="%.4f",
+            "Min Price ($)", value=float(default_params['Min_price']), step=0.0001, format="%.4f",
             key="param_price_min"
         )
     with c2:
         price_max = st.number_input(
-            "Max Price ($)", step=0.0001, format="%.4f",
+            "Max Price ($)", value=float(default_params['Max_price']), step=0.0001, format="%.4f",
             key="param_price_max"
             )
     
@@ -209,11 +186,7 @@ def sidebar_params() -> UIParams:
 
     strikes = strike_list(price_min, price_max, price_step)
 
-    # Initialize session state default for max_legs if not already set
-    if "param_max_legs" not in st.session_state:
-        st.session_state["param_max_legs"] = 4
-    
-    max_legs = st.slider("Max legs per strategy:", 1, 9, key="param_max_legs")
+    max_legs = st.slider("Max legs per strategy:", 1, 9, 4, key="param_max_legs")
 
     years = [int(y.strip()) for y in years_input.split(",") if y.strip()]
     months = [m.strip() for m in months_input.split(",") if m.strip()]
@@ -229,7 +202,6 @@ def sidebar_params() -> UIParams:
         underlying=underlying,
         months=months,
         years=years,
-        unit=unit,
         price_min=price_min,
         price_max=price_max,
         price_step=price_step,

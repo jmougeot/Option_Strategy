@@ -18,7 +18,7 @@ class ScenarioData:
 @dataclass
 class FutureData:
     """Data on the future (underlying price and last tradeable date)"""
-    underlying_price: Optional[float] = None
+    underlying_price: float
     last_tradable_date: Optional[str] = None
     number_strategies: Optional[int] = None
 
