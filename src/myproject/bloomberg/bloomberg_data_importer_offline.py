@@ -244,11 +244,6 @@ def import_options_offline(
     prices_array = mixture[0]
     underlying_price = float(np.median(prices_array))
     
-    print(f"  • Sous-jacent: {underlying}")
-    print(f"  • Prix simulé: {underlying_price:.2f}")
-    print(f"  • Strikes: {len(strikes)} ({min(strikes):.1f} - {max(strikes):.1f})")
-    print(f"  • Expirations: {months} x {years}")
-    
     options: List[Option] = []
     
     # Jours jusqu'à expiration par mois (approximatif)
@@ -282,8 +277,6 @@ def import_options_offline(
                         sym = "C" if opt_type == "call" else "P"
                         print(f"  ✓ {sym} {strike}: Premium={option.premium:.4f}, "
                               f"Delta={option.delta:.4f}, IV={option.implied_volatility:.1f}%")
-    
-    print(f"\n✅ {len(options)} options simulées générées")
     
     # Calculer les prix intra-vie pour toutes les options (avec les strikes comme prix du sous-jacent)
     if options:

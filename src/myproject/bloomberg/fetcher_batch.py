@@ -86,9 +86,6 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
         for field in OPTION_FIELDS:
             request.append(fields, field)
         
-
-
-        # Ajouter les overrides si demandé
         if use_overrides:
             overrides = request.getElement(overrid)
             override1 = overrides.appendElement()
@@ -151,14 +148,15 @@ def fetch_options_batch(tickers: list[str], use_overrides: bool = True, underlyi
             ask = data.get("PX_ASK")
             if bid is None and ask is None:
                 missing_both.append(ticker)
+                results[ticker]["_warning"] = True
             if ask and bid is None and ask > 0.1:
                 wide_spread.append(ticker)
-                results[ticker] = {}
+                results[ticker]["_warning"] = True
             if ask and bid:
                 spread = ask - bid
                 if spread > 0.1:
                     wide_spread.append(f"{ticker} (spread={spread:.4f})")
-                    results[ticker] = {}
+                    results[ticker]["_warning"] = True
 
         warnings: List[str] = []
         if missing_both:

@@ -8,10 +8,10 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, cast
 import numpy as np
 
 from myproject.bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
-from myproject.bloomberg.ticker_builder import (
-    build_option_ticker, build_option_ticker_brut, parse_brut_code, MonthCode)
+from myproject.bloomberg.ticker_builder import (build_option_ticker, build_option_ticker_brut, parse_brut_code, MonthCode)
 from myproject.bloomberg.bloomber_to_opt import create_option_from_bloomberg
 from myproject.option.option_class import Option
+from myproject.option.bachelier import bachelier_implied_vol, bachelier_price
 from myproject.app.data_types import FutureData
 
 
@@ -78,7 +78,9 @@ class TickerBuilder:
                     "underlying": underlying, "strike": strike,
                     "option_type": option_type, "month": r_month, "year": r_year
                 }
-    
+
+
+    # Ajoute une option avec son roll dans le Builder
     def add_option(self, underlying: str, month: str, year: int, 
                    strike: float, option_type: str, 
                    use_brut: bool = False, brut_code: Optional[str] = None):
@@ -98,10 +100,11 @@ class TickerBuilder:
             "underlying": underlying, "strike": strike,
             "option_type": option_type, "month": month, "year": year
         }
-        
-        # Tickers de roll
         self._add_roll_tickers(underlying, strike, option_type, opt_char)
     
+
+    
+    # Construit les tickers en mode standard.
     def build_from_standard(self, underlying: str, months: List[str], 
                             years: List[int], strikes: List[float]):
         """Construit les tickers en mode standard."""
@@ -111,6 +114,8 @@ class TickerBuilder:
                     for opt_type in ["call", "put"]:
                         self.add_option(underlying, month, year, strike, opt_type)
     
+
+    # Construit les tickers à partir de codes bruts.
     def build_from_brut(self, brut_codes: List[str], strikes: List[float]):
         """Construit les tickers à partir de codes bruts."""
         for code in brut_codes:
@@ -120,6 +125,7 @@ class TickerBuilder:
                     meta["underlying"], meta["month"], meta["year"],
                     strike, meta["option_type"], use_brut=True, brut_code=code
                 )
+
 
 
 class PremiumFetcher:
@@ -157,6 +163,8 @@ class PremiumFetcher:
                     self.roll_premiums[key] = premium
 
 
+
+# Class por créer des options depuis les données blommberg : calcul de roll 
 class OptionProcessor:
     """Traite les données Bloomberg pour créer les objets Option."""
     
@@ -223,8 +231,11 @@ class OptionProcessor:
         """Traite une seule option."""
         try:
             raw_data = self.fetcher.main_data.get(ticker, {})
-            if not raw_data or all(v is None for v in raw_data.values()):
-                return None
+            has_warning = raw_data.get("_warning", False)
+            
+            if not has_warning:
+                if not raw_data or all(v is None for v in raw_data.values()):
+                    return None
             
             extracted = extract_best_values(raw_data)
             option = create_option_from_bloomberg(
@@ -237,6 +248,7 @@ class OptionProcessor:
                 bloomberg_data=extracted,
                 position=self.default_position,
                 mixture=self.mixture,
+                warning=has_warning,
             )
             
             self._compute_roll(option, meta)
@@ -253,8 +265,109 @@ class OptionProcessor:
         """Affiche le résumé d'une option."""
         sym = "C" if option.option_type == "call" else "P"
         roll = f", Roll0={option.roll[0]:.4f}" if option.roll else ""
+        warn = " ⚠️" if not option.status else ""
         print(f"✓ {sym} {option.strike}: Premium={option.premium}, "
-              f"Delta={option.delta}, IV={option.implied_volatility}{roll}")
+              f"Delta={option.delta}, IV={option.implied_volatility}{roll}{warn}")
+
+
+# ============================================================================
+# CORRECTION DES OPTIONS AVEC WARNING VIA BACHELIER
+# ============================================================================
+
+def _fix_warned_options(options: List[Option], time_to_expiry: float = 0.25) -> None:
+    """
+    Corrige les options avec warning (status=False) via interpolation Bachelier.
+    
+    Méthode:
+    1. Calcule la volatilité normale Bachelier pour chaque option bien cotée (status=True)
+    2. Ajuste un slope linéaire σ(K) = a·K + b pour les calls et les puts séparément
+    3. Interpole la σ pour les options en warning via le slope de leur type
+       (calls → slope calls pour l'upside, puts → slope puts pour le downside)
+    4. Recalcule le premium avec bachelier_price(F, K, σ_interp, T, is_call)
+    
+    Args:
+        options: Liste complète d'options (bonnes + warning)
+        time_to_expiry: Temps jusqu'à expiration (en années)
+    """
+    warned = [opt for opt in options if not opt.status]
+    if not warned:
+        return
+    
+    good = [opt for opt in options if opt.status and opt.premium > 0]
+    if not good:
+        print("Pas assez d'options bien cotées pour interpoler les warnings")
+        return
+    
+    # Forward price depuis les options bien cotées
+    F = next((opt.underlying_price for opt in good if opt.underlying_price and opt.underlying_price > 0), None)
+    if F is None:
+        print("Pas de prix sous-jacent disponible pour l'interpolation Bachelier")
+        return
+    
+    # 1. Calculer la volatilité normale Bachelier pour les options bien cotées
+    call_data: List[Tuple[float, float]] = []
+    put_data: List[Tuple[float, float]] = []
+    
+    for opt in good:
+        sigma_n = bachelier_implied_vol(F, opt.strike, opt.premium, time_to_expiry, opt.is_call())
+        if sigma_n > 0:
+            if opt.is_call():
+                call_data.append((opt.strike, sigma_n))
+            else:
+                put_data.append((opt.strike, sigma_n))
+    
+    # 2. Ajuster un slope linéaire σ(K) pour calls et puts séparément
+    call_slope = None
+    put_slope = None
+    
+    if len(call_data) >= 2:
+        strikes_c = np.array([d[0] for d in call_data])
+        vols_c = np.array([d[1] for d in call_data])
+        call_slope = np.polyfit(strikes_c, vols_c, 1)
+        print(f"Slope calls: σ(K) = {call_slope[0]:.6f}·K + {call_slope[1]:.4f} ({len(call_data)} points)")
+    elif len(call_data) == 1:
+        call_slope = np.array([0.0, call_data[0][1]])  # vol constante
+        print(f"Calls: σ constante = {call_data[0][1]:.4f} (1 point)")
+    
+    if len(put_data) >= 2:
+        strikes_p = np.array([d[0] for d in put_data])
+        vols_p = np.array([d[1] for d in put_data])
+        put_slope = np.polyfit(strikes_p, vols_p, 1)
+        print(f"Slope puts: σ(K) = {put_slope[0]:.6f}·K + {put_slope[1]:.4f} ({len(put_data)} points)")
+    elif len(put_data) == 1:
+        put_slope = np.array([0.0, put_data[0][1]])
+        print(f"Puts: σ constante = {put_data[0][1]:.4f} (1 point)")
+    
+    # 3. Interpoler et recalculer pour chaque option en warning
+    fixed_count = 0
+    for opt in warned:
+        # Slope du même type: calls pour upside, puts pour downside
+        slope = call_slope if opt.is_call() else put_slope
+        if slope is None:
+            continue
+        
+        # Assurer le underlying_price
+        if not opt.underlying_price or opt.underlying_price <= 0:
+            opt.underlying_price = F
+        
+        sigma_interp = max(float(np.polyval(slope, opt.strike)), 1e-6)
+        
+        # 4. Recalculer le premium avec Bachelier
+        new_premium = bachelier_price(F, opt.strike, sigma_interp, time_to_expiry, opt.is_call())
+        opt.premium = new_premium
+        
+        # Mettre à jour la IV (conversion σ_normal → IV% approximative)
+        opt.implied_volatility = (sigma_interp / F) * 100.0 if F > 0 else 0.0
+        
+        # Recalculer toutes les surfaces avec le nouveau premium
+        opt._calcul_all_surface()
+        
+        fixed_count += 1
+        sym = "C" if opt.is_call() else "P"
+        print(f"  ✓ Corrigé {sym} K={opt.strike}: σ_n={sigma_interp:.4f}, "f"Premium={new_premium:.6f}, IV≈{opt.implied_volatility:.2f}%")
+    
+    if fixed_count > 0:
+        print(f" {fixed_count}/{len(warned)} options corrigées par interpolation Bachelier")
 
 
 # ============================================================================
@@ -304,6 +417,11 @@ def import_options(
         processor = OptionProcessor(builder, fetcher, mixture, default_position)
         options = processor.process_all()
         future_data = fetcher.future_data
+        
+        # 3.5. Corriger les options avec warning via interpolation Bachelier
+        if any(not opt.status for opt in options):
+            print("\n🔧 Correction des options avec warning via Bachelier...")
+            _fix_warned_options(options, time_to_expiry=0.25)
         
         # 4. Calculer les prix intra-vie pour toutes les options (avec Bachelier)
         if options:
