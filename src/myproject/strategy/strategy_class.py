@@ -22,7 +22,7 @@ class StrategyComparison:
     breakeven_points: List[float]
     profit_range: Tuple[float, float]  # Range de prix profitable
     profit_zone_width: float  # Largeur de la zone profitable+
-    average_pnl: float  # Espérance du P&L avec mixture
+    average_pnl: Optional[float]  # Espérance du P&L avec mixture
     sigma_pnl: Optional[float]  # Écart-type du P&L avec mixture
     prices: np.ndarray
     pnl_array: np.ndarray

@@ -11,21 +11,11 @@ from myproject.strategy.strategy_class import StrategyComparison
 from myproject.strategy.multi_ranking import MultiRankingResult
 from myproject.strategy.strategy_naming import generate_strategy_name
 from myproject.option.option_utils_v2 import get_expiration_info
-from myproject.app.widget_filter import FilterData
+from myproject.app.filter_widget import FilterData
 
 
 # Cache global pour stocker les options (nécessaire pour batch_to_strategies)
 _options_cache: List[Option] = []
-
-
-def clear_caches():
-    """Libère la mémoire des caches Python et C++ après traitement."""
-    global _options_cache
-    _options_cache = []
-    try:
-        strategy_metrics_cpp.clear_options_cache()  # type: ignore
-    except Exception:
-        pass
 
 
 # =============================================================================
@@ -55,6 +45,9 @@ def init_cpp_cache(options: List[Option]) -> bool:
     # Extraction des données des options
     premiums = np.array([opt.premium for opt in options], dtype=np.float64)
     deltas = np.array([opt.delta for opt in options], dtype=np.float64)
+    gammas = np.array([opt.gamma for opt in options], dtype=np.float64)
+    vegas = np.array([opt.vega for opt in options], dtype=np.float64)
+    thetas = np.array([opt.theta for opt in options], dtype=np.float64)
     ivs = np.array([opt.implied_volatility for opt in options], dtype=np.float64)
     average_pnls = np.array([opt.average_pnl for opt in options], dtype=np.float64)
     sigma_pnls = np.array([opt.sigma_pnl for opt in options], dtype=np.float64)
@@ -62,7 +55,14 @@ def init_cpp_cache(options: List[Option]) -> bool:
     is_calls = np.array([opt.option_type.lower() == 'call' for opt in options], dtype=np.bool_)
     
     # Données de rolls
-    rolls = np.array([opt.roll[0] if opt.roll else 0.0 for opt in options], dtype=np.float64)
+    rolls = np.array([opt.roll or 0.0 for opt in options], dtype=np.float64)
+    rolls_quarterly = np.array([opt.roll_quarterly or 0.0 for opt in options], dtype=np.float64)
+    rolls_sum = np.array([opt.roll_sum or 0.0 for opt in options], dtype=np.float64)
+    
+    # Tail penalties (calculés dans Option._calcul_all_surface)
+    tail_penalties = np.array([opt.tail_penalty or 0.0 for opt in options], dtype=np.float64)
+    tail_penalties_short = np.array([opt.tail_penalty_short or 0.0 for opt in options], dtype=np.float64)
+    
     # Prix intra-vie et P&L intra-vie (calculés via Bachelier)
     # Le C++ attend une matrice (n_options x 5 dates) avec un seul prix par date
     # On calcule le prix moyen pondéré par la mixture si disponible
@@ -104,20 +104,10 @@ def init_cpp_cache(options: List[Option]) -> bool:
     
     # Initialiser le cache C++
     strategy_metrics_cpp.init_options_cache(  # type: ignore
-        premiums,
-        deltas,
-        ivs,
-        average_pnls,
-        sigma_pnls,
-        strikes,
-        is_calls,
-        rolls,
-        intra_life_prices,
-        intra_life_pnl,
-        pnl_matrix,
-        prices,
-        mixture,
-        average_mix,
+        premiums, deltas, gammas, vegas, thetas, ivs,
+        average_pnls, sigma_pnls, strikes,
+        is_calls, rolls, rolls_quarterly, rolls_sum, tail_penalties, tail_penalties_short,
+        intra_life_prices, intra_life_pnl, pnl_matrix, prices, mixture, average_mix
     )
     
     return True
@@ -169,9 +159,6 @@ def process_batch_cpp_with_multi_scoring(
         filter.delta_max,
         filter.limit_left,
         filter.limit_right,
-        filter.premium_only,
-        filter.premium_only_left,
-        filter.premium_only_right,
         top_n,
         weight_dicts,
     )
@@ -267,10 +254,10 @@ def batch_to_strategies(
             sigma_pnl=metrics.get('total_sigma_pnl', metrics.get('sigma_pnl', 0)),
             pnl_array=np.array(metrics.get('pnl_array', []), dtype=np.float64),
             prices=prices,
-            total_delta=metrics.get('total_delta', 0.0),
-            total_gamma=metrics.get('total_gamma', 0.0),
-            total_vega=metrics.get('total_vega', 0.0),
-            total_theta=metrics.get('total_theta', 0.0),
+            total_delta=metrics['total_delta'],
+            total_gamma=metrics['total_gamma'],
+            total_vega=metrics['total_vega'],
+            total_theta=metrics['total_theta'],
             avg_implied_volatility=metrics.get('total_iv', metrics.get('avg_implied_volatility', 0)),
             profit_at_target=0,
             score=metrics.get('score', 0.0),  # Score depuis C++ si disponible

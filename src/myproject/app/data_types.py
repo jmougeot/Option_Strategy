@@ -18,7 +18,7 @@ class ScenarioData:
 @dataclass
 class FutureData:
     """Data on the future (underlying price and last tradeable date)"""
-    underlying_price: Optional[float] = None
+    underlying_price: float
     last_tradable_date: Optional[str] = None
     number_strategies: Optional[int] = None
 
@@ -49,9 +49,6 @@ class FilterData:
     delta_max: float
     limit_left: float
     limit_right: float
-    premium_only: bool 
-    premium_only_right: bool 
-    premium_only_left: bool
 
 
 # Patterns de signes par type de stratégie (triés par strike croissant)

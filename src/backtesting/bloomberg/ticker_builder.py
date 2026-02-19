@@ -27,7 +27,7 @@ class TickerMeta:
     underlying: str
     expiry_month: str
     expiry_year: int
-    option_type: str
+    option_type: str     # "call" ou "put"
     strike: float
     suffix: str
 

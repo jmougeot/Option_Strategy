@@ -4,7 +4,7 @@ Generates HTML emails with the new template format.
 """
 import os
 import sys
-from typing import List, Optional
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from myproject.share_result.utils import (
     EmailTemplateData,
@@ -16,7 +16,7 @@ def generate_html_email_from_template(
 ) -> tuple:
     """
     Generate subject and HTML body for a professional email.
-    Matches the BGC rates derivatives template format.
+    Based on the new BGC template format.
     
     Args:
         template_data: EmailTemplateData with all parameters
@@ -26,44 +26,21 @@ def generate_html_email_from_template(
     """
     underlying = template_data.underlying or "Options"
     date_str = datetime.now().strftime('%Y-%m-%d')
-    subject = f"[Options Strategy] {underlying} - Recommended strategy ({date_str})"
+    subject = f"[Options Strategy] {underlying} - Recommended strategies ({date_str})"
     
-    # Build selection criteria section (e.g. "ROLLS THE BEST" and "WITH THE HIGHEST LEVERAGE PnL")
-    criteria_items = template_data.selection_criteria or []
-    if len(criteria_items) == 1:
-        selection_html = f'<p style="font-weight:bold; color:#1a365d; text-transform:uppercase; margin:4px 0;">{criteria_items[0]}</p>'
-    elif len(criteria_items) >= 2:
-        parts = [f'<p style="font-weight:bold; color:#1a365d; text-transform:uppercase; margin:4px 0;">{criteria_items[0]}</p>']
-        for c in criteria_items[1:]:
-            parts.append(f'<p style="margin:2px 0;">and</p>')
-            parts.append(f'<p style="font-weight:bold; color:#1a365d; text-transform:uppercase; margin:4px 0;">{c}</p>')
-        selection_html = "\n".join(parts)
-    else:
-        selection_html = ""
-    
-    # Roll description
-    roll_html = ""
-    if template_data.roll_description:
-        roll_html = f'<p style="margin:8px 0;">{template_data.roll_description}</p>'
-    
-    # Leverage description
-    leverage_html = ""
-    if template_data.leverage_description:
-        connector = "<p style='margin:4px 0;font-weight:bold;'>AND</p>" if template_data.roll_description else ""
-        leverage_html = f'{connector}<p style="margin:8px 0;">{template_data.leverage_description}</p>'
-    
-    # Payoff commentary
-    payoff_comment_html = ""
-    if template_data.payoff_commentary:
-        payoff_comment_html = f'<p style="margin:12px 0; font-style:italic;">{template_data.payoff_commentary}</p>'
+    # Build the strategies results section
+    best_strategies_html = ""
+    for i, strat_info in enumerate(template_data.best_strategies, 1):
+        best_strategies_html += f"""<p><strong>{i} : {strat_info['label']} :</strong> {strat_info['description']}</p>
+"""
     
     html = f"""<!DOCTYPE html>
 <html>
 <head>
 <style>
 body {{
-    font-family: Aptos, Arial, Helvetica, sans-serif;
-    font-size: 12pt;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10pt;
     line-height: 1.5;
     color: #333;
     max-width: 800px;
@@ -71,28 +48,22 @@ body {{
     padding: 15px;
 }}
 .intro {{
-    font-size: 12pt;
-    margin-bottom: 4px;
+    font-size: 10pt;
+    margin-bottom: 10px;
 }}
 .section-title {{
     font-weight: bold;
     color: #1a365d;
-    margin-top: 8px;
-    margin-bottom: 2px;
-    display: inline;
+    margin-top: 12px;
+    margin-bottom: 3px;
 }}
-.param-value {{
-    display: inline;
-    margin: 0;
+.param-line {{
+    margin: 3px 0;
+    padding-left: 0;
 }}
-.criteria-block {{
-    margin-top: 15px;
-    padding: 10px 15px;
-    background-color: #f7fafc;
-    border-left: 3px solid #1a365d;
-}}
-.result-block {{
-    margin: 15px 0;
+.strategy-result {{
+    margin: 8px 0;
+    padding-left: 0;
 }}
 .image-container {{
     margin: 15px 0;
@@ -104,48 +75,64 @@ body {{
     border-radius: 5px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }}
+.signature {{
+    margin-top: 20px;
+    color: #4a5568;
+}}
 </style>
 </head>
 <body>
 
-<p class="intro">Pls find below the strategy on {underlying} that</p>
+<p class="intro">Hi team,</p>
 
-{selection_html}
+<p class="intro">You will find below the strategies meeting the below criteria :</p>
 
-<div class="result-block">
-<p><strong>Result is</strong></p>
+<p class="section-title">TARGET:</p>
+<p class="param-line">{template_data.target_description}</p>
 
-<p><strong>{template_data.strategy_result}</strong></p>
-<p>{template_data.market_data}</p>
+<p class="section-title">TAIL RISK:</p>
+<p class="param-line">{template_data.tail_risk_description}</p>
 
-<p style="margin-top:8px;">{template_data.risk_description}</p>
+<p class="section-title">MAX RISK:</p>
+<p class="param-line">{template_data.max_risk_description}</p>
 
-{roll_html}
-{leverage_html}
+<p class="section-title">MAX LEGS:</p>
+<p class="param-line">{template_data.max_legs} legs ({template_data.max_legs} strikes)</p>
+
+<p class="section-title">STRIKES SCREENED:</p>
+<p class="param-line">{template_data.strikes_screened_description}</p>
+
+<p class="section-title">DELTA:</p>
+<p class="param-line">{template_data.delta_description}</p>
+
+<p class="section-title">PREMIUM SPENT MAX:</p>
+<p class="param-line">{template_data.premium_max_description}</p>
+
+<p class="section-title">MAX LOSS:</p>
+<p class="param-line">{template_data.max_loss_description}</p>
+
+<p class="section-title">WEIGHTING:</p>
+<p class="param-line">{template_data.weighting_description}</p>
+
+<p style="margin-top: 15px;"><em>Ref {template_data.reference_price} on {underlying},</em></p>
+
+<div style="margin-top: 15px;">
+{best_strategies_html}
 </div>
-
-{payoff_comment_html}
 
 <!-- PAYOFF_DIAGRAM_PLACEHOLDER -->
 
 <!-- TOP10_SUMMARY_PLACEHOLDER -->
 
-<div class="criteria-block">
-<p style="font-weight:bold; color:#1a365d; margin-bottom:8px;">CRITERIA:</p>
-
-<p><span class="section-title">FUTURE:</span> <span class="param-value">{underlying}</span></p>
-<p><span class="section-title">TARGET:</span> <span class="param-value">{template_data.target_description}</span></p>
-<p><span class="section-title">TAIL RISK:</span> <span class="param-value">{template_data.tail_risk_description}</span></p>
-<p><span class="section-title">MAX RISK:</span> <span class="param-value">{template_data.max_risk_description}</span></p>
-<p><span class="section-title">MAX LEGS:</span> <span class="param-value">{template_data.max_legs} legs ({template_data.max_legs} strikes)</span></p>
-<p><span class="section-title">STRIKES SCREENED:</span> <span class="param-value">{template_data.strikes_screened_description}</span></p>
-<p><span class="section-title">DELTA:</span> <span class="param-value">{template_data.delta_description}</span></p>
-<p><span class="section-title">PREMIUM SPENT MAX:</span> <span class="param-value">{template_data.premium_max_description}</span></p>
-</div>
+<p class="signature">
+Best regards,<br>
+<strong>BGC's team of rates derivatives</strong>
+</p>
 
 </body>
 </html>
 """
+    
     return subject, html
 
 
@@ -188,9 +175,14 @@ def open_outlook_with_email(
         import win32com.client as win32
         
         # Initialize COM for this thread (required with Streamlit)
-        pythoncom.CoInitialize()        
+        pythoncom.CoInitialize()
+        print("[Email DEBUG] COM initialized")
+        
         outlook = win32.Dispatch('Outlook.Application')
+        print("[Email DEBUG] Outlook.Application created")
+        
         mail = outlook.CreateItem(0)  # 0 = olMailItem
+        print("[Email DEBUG] Mail item created")
         
         # Generate email HTML
         subject, html_content = generate_html_email_from_template(template_data)
@@ -205,9 +197,9 @@ def open_outlook_with_email(
             if img_path and os.path.exists(img_path):
                 abs_path = os.path.abspath(img_path)
                 valid_images.append(abs_path)
-                print(f"[Email DEBUG] Valid image: {abs_path}")
+                print(f"[Email DEBUG] ✓ Valid image: {abs_path}")
             else:
-                print(f"[Email DEBUG] Invalid or missing image: {img_path}")
+                print(f"[Email DEBUG] ✗ Invalid or missing image: {img_path}")
                 
         # Replace placeholders with images
         payoff_html = ""
@@ -219,21 +211,24 @@ def open_outlook_with_email(
 <img src="cid:payoff_diagram" alt="Payoff Diagram">
 </div>
 '''
+        
         if len(valid_images) > 1:
             summary_html = '''
 <div class="image-container">
 <img src="cid:top10_summary" alt="Top 10 Summary">
 </div>
 '''
-
+        
         # Insert images into HTML
         html_content = html_content.replace("<!-- PAYOFF_DIAGRAM_PLACEHOLDER -->", payoff_html)
         html_content = html_content.replace("<!-- TOP10_SUMMARY_PLACEHOLDER -->", summary_html)
         
-        # Add images as attachments with CID BEFORE setting HTMLBody
-        # (Outlook COM requires attachments to exist before referencing them in HTML)
+        # Set HTMLBody
+        mail.HTMLBody = html_content
+        print("[Email DEBUG] HTMLBody set")
+        
+        # Add images as attachments with CID
         PR_ATTACH_CONTENT_ID = "http://schemas.microsoft.com/mapi/proptag/0x3712001F"
-        PR_ATTACH_FLAGS = "http://schemas.microsoft.com/mapi/proptag/0x37140003"
         
         cid_names = ["payoff_diagram", "top10_summary"]
         for i, img_path in enumerate(valid_images[:2]):
@@ -243,19 +238,17 @@ def open_outlook_with_email(
                 print(f"[Email DEBUG] Attachment added: {img_path}")
                 
                 attachment.PropertyAccessor.SetProperty(PR_ATTACH_CONTENT_ID, cid)
-                # Mark as inline attachment (hidden from attachment list)
-                attachment.PropertyAccessor.SetProperty(PR_ATTACH_FLAGS, 4)
                 print(f"[Email DEBUG] CID set: {cid}")
                 
             except Exception as att_err:
-                print(f"[Email DEBUG] Error adding attachment: {att_err}")
+                print(f"[Email DEBUG] ✗ Error adding attachment: {att_err}")
         
-        # Set HTMLBody AFTER adding attachments so CID references resolve
-        mail.HTMLBody = html_content
-        print("[Email DEBUG] HTMLBody set")
-        
+        # Display the email (non-modal)
+        print("[Email DEBUG] Calling mail.Display(False)...")
         mail.Display(False)
+        print("[Email DEBUG] ✓ Email displayed successfully")
         
+        # Release COM
         pythoncom.CoUninitialize()
         
         return True
@@ -268,5 +261,9 @@ def open_outlook_with_email(
         print(f"[Email] Outlook error: {e}")
         import traceback
         traceback.print_exc()
+        try:
+            pythoncom.CoUninitialize()
+        except:
+            pass
         return False
 

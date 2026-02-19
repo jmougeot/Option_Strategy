@@ -246,7 +246,7 @@ Itère sur **8 jeux de poids prédéfinis** (`DEFAULT_WEIGHT_GRID`) :
 | 4 | `{average_pnl: 0.5, max_loss: 0.2, avg_intra_life_pnl: 0.3}` | Équilibré |
 | 5 | `{avg_pnl_levrage: 0.6, average_pnl: 0.4}` | Levier |
 | 6 | `{premium: 0.5, average_pnl: 0.3, max_loss: 0.2}` | Revenu premium |
-| 7 | `{roll: 0.4, average_pnl: 0.6}` | Roll + P&L |
+| 7 | `{roll_quarterly: 0.4, average_pnl: 0.6}` | Roll + P&L |
 | 8 | `{average_pnl: 0.4, max_loss: 0.4, sigma_pnl: 0.2}` | Conservateur |
 
 **Optimisations** :

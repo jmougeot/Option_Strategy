@@ -156,7 +156,6 @@ def generate_pdf_report(
     elements.append(Paragraph("Search Criteria", section_style))
     
     criteria_data = [
-        ["FUTURE:", template_data.underlying],
         ["TARGET:", template_data.target_description],
         ["TAIL RISK:", template_data.tail_risk_description],
         ["MAX RISK:", template_data.max_risk_description],
@@ -164,6 +163,8 @@ def generate_pdf_report(
         ["STRIKES SCREENED:", template_data.strikes_screened_description],
         ["DELTA:", template_data.delta_description],
         ["PREMIUM SPENT MAX:", template_data.premium_max_description],
+        ["MAX LOSS:", template_data.max_loss_description],
+        ["WEIGHTING:", template_data.weighting_description],
     ]
     
     criteria_table = Table(criteria_data, colWidths=[4*cm, 16*cm])
@@ -184,22 +185,12 @@ def generate_pdf_report(
     elements.append(Paragraph(f"<i>Ref {template_data.reference_price} on {underlying}</i>", param_style))
     elements.append(Spacer(1, 10))
     
-    # Best strategy section
-    elements.append(Paragraph("Strategy Result", section_style))
+    # Best strategies section
+    elements.append(Paragraph("Best Strategies", section_style))
     
-    elements.append(Paragraph(f"<b>{template_data.strategy_result}</b>", strategy_style))
-    if template_data.market_data:
-        elements.append(Paragraph(template_data.market_data, param_style))
-    if template_data.risk_description:
-        elements.append(Paragraph(template_data.risk_description, param_style))
-    if template_data.roll_description:
-        elements.append(Spacer(1, 5))
-        elements.append(Paragraph(template_data.roll_description, param_style))
-    if template_data.leverage_description:
-        elements.append(Paragraph(template_data.leverage_description, param_style))
-    if template_data.payoff_commentary:
-        elements.append(Spacer(1, 5))
-        elements.append(Paragraph(f"<i>{template_data.payoff_commentary}</i>", param_style))
+    for i, strat_info in enumerate(template_data.best_strategies, 1):
+        strat_text = f"<b>{i} : {strat_info['label']} :</b> {strat_info['description']}"
+        elements.append(Paragraph(strat_text, strategy_style))
     
     # Build PDF
     doc.build(elements)
@@ -208,9 +199,9 @@ def generate_pdf_report(
 
 
 def create_pdf_report(
-    mixture: tuple,
     template_data: EmailTemplateData,
     comparisons: Optional[List] = None,
+    mixture: Optional[tuple] = None,
 ) -> Optional[bytes]:
     """
     Create a PDF report with images.
@@ -229,7 +220,7 @@ def create_pdf_report(
     # Generate images if we have the data
     if comparisons:
         try:
-            from myproject.share_result.image_saver import save_all_diagrams
+            from myproject.app.image_saver import save_all_diagrams
             print("[PDF DEBUG] image_saver imported")
             
             saved_images = save_all_diagrams(comparisons, mixture)

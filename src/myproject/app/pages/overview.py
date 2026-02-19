@@ -7,14 +7,15 @@ import uuid
 from typing import Dict, List
 from streamlit_autorefresh import st_autorefresh
 from myproject.app.tabs import display_overview_tab
-from myproject.app.widget_payoff import create_payoff_diagram
-from myproject.async_processing import start_processing, check_processing_status, stop_processing
+from myproject.app.payoff_diagram import create_payoff_diagram
+from myproject.app.processing import process_comparison_results, save_to_session_state
+from myproject.app.async_processing import start_processing, check_processing_status, stop_processing
 from myproject.app.data_types import FilterData, FutureData
-from myproject.app.widget_params import UIParams
+from myproject.app.params_widget import UIParams
 from myproject.strategy.multi_ranking import MultiRankingResult
 
 def _build_weight_set_names(weight_list: List[Dict[str, float]]) -> List[str]:
-    from myproject.app.widget_scoring import RANKING_PRESETS
+    from myproject.app.scoring_widget import RANKING_PRESETS
     names: List[str] = []
     custom_idx = 0
     for ws in weight_list:
@@ -33,9 +34,9 @@ def _build_weight_set_names(weight_list: List[Dict[str, float]]) -> List[str]:
 
 def format_large_number(n):
     if n >= 1_000_000_000:
-        return f"{n / 1_000_000_000:.1f}Billion"
+        return f"{n / 1_000_000_000:.1f}B"
     elif n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}Million"
+        return f"{n / 1_000_000:.1f}M"
     elif n >= 1_000:
         return f"{n / 1_000:.1f}K"
     else:
@@ -77,7 +78,7 @@ def run():
             disabled=st.session_state.processing,
         )
     with stop_col:
-        st.button("STOP", type="secondary", width="stretch", on_click=on_stop_click)
+        st.button("⛔ STOP", type="secondary", width="stretch", on_click=on_stop_click)
 
     all_comparisons = None
 
@@ -94,31 +95,29 @@ def run():
 
             if error:
                 if "terminated" in error.lower():
-                    st.warning("Processing was terminated by user")
+                    st.warning("⛔ Processing was terminated by user")
                 else:
-                    st.error(f"Error: {error}")
+                    st.error(f"❌ Error: {error}")
                 return
 
             if result:
                 best_strategies, stats, mixture, future_data = result
 
                 if not best_strategies:
-                    st.error("No strategy generated")
+                    st.error("❌ No strategy generated")
                     return
 
                 multi_result = best_strategies
                 multi_result.weight_set_names = _build_weight_set_names(scoring_weights)
                 all_comparisons = multi_result.all_strategies_flat()
                 st.session_state["multi_ranking"] = multi_result
-                st.session_state["comparisons"] = all_comparisons
+                save_to_session_state(all_comparisons, params, scenarios)
                 st.session_state["mixture"] = mixture
                 st.session_state["future_data"] = future_data
                 st.session_state["stats"] = stats
-                if "all_options" in stats:
-                    st.session_state["all_imported_options"] = stats["all_options"]
 
                 # Save to history
-                from myproject.app.pages.history import add_to_history
+                from myproject.app.history_tab import add_to_history
 
                 _params_for_history = {
                     "underlying": params.underlying,
@@ -126,10 +125,8 @@ def run():
                     "years": params.years,
                     "price_min": params.price_min,
                     "price_max": params.price_max,
-                    "price_step": params.price_step,
                     "max_legs": params.max_legs,
                     "roll_expiries": params.roll_expiries,
-                    "brut_code": params.brut_code,
                 }
                 _filter_for_history = {
                     "max_loss_left": filter.max_loss_left,
@@ -139,10 +136,6 @@ def run():
                     "delta_max": filter.delta_max,
                     "ouvert_gauche": filter.ouvert_gauche,
                     "ouvert_droite": filter.ouvert_droite,
-                    "min_premium_sell": filter.min_premium_sell,
-                    "limit_left_filter": filter.limit_left,
-                    "limit_right_filter": filter.limit_right,
-                    "premium_only": filter.premium_only,
                 }
                 add_to_history(
                     params=_params_for_history,
@@ -158,21 +151,14 @@ def run():
                 nb_options = stats.get("nb_options", 0)
                 nb_kept = stats.get("nb_strategies_classees", 0)
                 st.success(
-                    f"Processing complete! Screened **{format_large_number(nb_screened)}** "
+                    f"✅ Processing complete! Screened **{format_large_number(nb_screened)}** "
                     f"strategies from {nb_options} options → Kept **{nb_kept}** best"
                 )
-                
-                # Afficher les warnings de prix manquants (bid/ask)
-                fetch_warnings = stats.get("fetch_warnings", [])
-                if fetch_warnings:
-                    warning_text = "**⚠️ Options avec données de prix manquantes :**\n\n"
-                    warning_text += "\n\n".join(f"- {w}" for w in fetch_warnings)
-                    st.warning(warning_text)
             else:
-                st.warning("Processing was terminated")
+                st.warning("⛔ Processing was terminated")
                 return
         else:
-            st.info("Processing in progress... Click STOP to terminate immediately.")
+            st.info("⏳ Processing in progress... Click STOP to terminate immediately.")
             st_autorefresh(interval=1000, limit=None, key="processing_refresh")
 
     elif compare_button and not st.session_state.processing:
@@ -193,7 +179,7 @@ def run():
         }
         process = start_processing(st.session_state.session_id, _params)
         st.session_state.process = process
-        st.info("Starting processing...")
+        st.info("⏳ Starting processing...")
         st.rerun()
 
     # ------------------------------------------------------------------
@@ -202,6 +188,7 @@ def run():
     if not all_comparisons:
         return
 
+    comparisons, top_5_comparisons = process_comparison_results(all_comparisons)
     mixture = st.session_state.get("mixture")
 
     # Future / stats bar
@@ -211,36 +198,35 @@ def run():
     if future_data or stats:
         col_price, col_date, col_screened = st.columns(3)
         with col_price:
-            if future_data and future_data.underlying_price is not None:
-                st.metric("Underlying Price", f"{future_data.underlying_price:.4f}")
-            elif future_data:
-                st.metric("Underlying Price", "N/A")
+            if future_data:
+                st.metric("📊 Underlying Price", f"{future_data.underlying_price:.4f}")
         with col_date:
             if future_data:
                 date_str = future_data.last_tradable_date if future_data.last_tradable_date else "N/A"
-                st.metric("Last Tradeable Date", date_str)
+                st.metric("📅 Last Tradeable Date", date_str)
         with col_screened:
             if stats:
                 nb_screened = stats.get("nb_strategies_possibles", 0)
-                st.metric("Strategies Screened", format_large_number(nb_screened))
+                st.metric("🔍 Strategies Screened", format_large_number(nb_screened))
+        st.markdown("---")
 
     roll_labels = [f"{m}{y}" for m, y in params.roll_expiries] if params.roll_expiries else None
     underlying_price = future_data.underlying_price if future_data else 0
 
     multi_ranking: MultiRankingResult | None = st.session_state.get("multi_ranking", None)
     if multi_ranking is not None and multi_ranking.is_multi:
-        sub_tab_names = ["Meta Ranking"] + [
+        sub_tab_names = ["🏆 Consensus"] + [
             multi_ranking.get_set_label(i) for i in range(multi_ranking.n_sets)
         ]
         sub_tabs = st.tabs(sub_tab_names)
         with sub_tabs[0]:
-            display_overview_tab(all_comparisons, roll_labels=roll_labels, unit=params.unit)
-            create_payoff_diagram(all_comparisons[:5], mixture, underlying_price, key="payoff_consensus")
+            display_overview_tab(comparisons, roll_labels=roll_labels)
+            create_payoff_diagram(comparisons[:5], mixture, underlying_price, key="payoff_consensus")
         for i in range(multi_ranking.n_sets):
             with sub_tabs[i + 1]:
                 set_comps = multi_ranking.per_set_strategies[i]
-                display_overview_tab(set_comps, roll_labels=roll_labels, unit=params.unit)
+                display_overview_tab(set_comps, roll_labels=roll_labels)
                 create_payoff_diagram(set_comps[:5], mixture, underlying_price, key=f"payoff_set_{i}")
     else:
-        display_overview_tab(all_comparisons, roll_labels=roll_labels, unit=params.unit)
-        create_payoff_diagram(all_comparisons[:5], mixture, underlying_price, key="payoff_single")
+        display_overview_tab(comparisons, roll_labels=roll_labels)
+        create_payoff_diagram(top_5_comparisons, mixture, underlying_price, key="payoff_single")

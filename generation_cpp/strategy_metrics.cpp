@@ -7,7 +7,6 @@
 #include "strategy_scoring.hpp"
 #include <numeric>
 #include <cmath>
-#include <cstring>
 
 // Inclure les implémentations séparées (unity build)
 #include "strategy_filters.cpp"
@@ -41,12 +40,11 @@ bool StrategyCalculator::next_combination(
 }
 
 std::optional<StrategyMetrics> StrategyCalculator::calculate(
-    const OptionData* const* options,
-    const int* signs,
-    size_t n_options,
-    const double* const* pnl_rows,
-    size_t pnl_length,
-    const double* prices,
+    const std::vector<OptionData>& options,
+    const std::vector<int>& signs,
+    const std::vector<std::vector<double>>& pnl_matrix,
+    const std::vector<double>& prices,
+    const std::vector<double>& mixture,
     double average_mix,
     double max_loss_left_param,
     double max_loss_right_param,
@@ -57,188 +55,195 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     double delta_min,
     double delta_max,
     double limit_left,
-    double limit_right,
-    double* __restrict total_pnl,
-    bool premium_only,
-    bool premium_only_left,
-    bool premium_only_right
+    double limit_right
 ) {
+    const size_t n_options = options.size();
+    
     // Validation de base
-    if (n_options == 0 || pnl_length == 0) {
+    if (n_options == 0 || n_options != signs.size() || 
+        n_options != pnl_matrix.size() || prices.empty()) {
         return std::nullopt;
     }
     
     // ========== FILTRES (early exit) ==========
     
     // Filtre 1: Vente inutile (premium < min_premium_sell)
-    if (!filter_useless_sell(options, signs, n_options, min_premium_sell)) {
+    if (!filter_useless_sell(options, signs, min_premium_sell)) {
         return std::nullopt;
     }
     
     // Filtre 3: Achat et vente de la même option
-    if (!filter_same_option_buy_sell(options, signs, n_options)) {
+    if (!filter_same_option_buy_sell(options, signs)) {
         return std::nullopt;
     }
     
-    // Filtre 4+4b: Put/Call open (fusionné en une seule passe)
-    // + Agrégation fusionnée (premium, delta, avg_pnl, roll, IV, counts)
-    // → une seule boucle pour tout
-    double total_premium = 0.0;
-    double total_delta = 0.0;
-    double total_average_pnl = 0.0;
-    double total_roll = 0.0;
-    double total_iv = 0.0;
-    int call_count = 0;
-    int put_count = 0;
-    int net_short_put = 0;
-    int net_short_call = 0;
-
-    for (size_t i = 0; i < n_options; ++i) {
-        const double s = static_cast<double>(signs[i]);
-        const OptionData& opt = *options[i];
-        total_premium += s * opt.premium;
-        total_delta += s * opt.delta;
-        total_average_pnl += s * opt.average_pnl;
-        total_roll += s * opt.roll;
-        total_iv += s * opt.implied_volatility;
-
-        if (opt.is_call) {
-            ++call_count;
-            net_short_call += (signs[i] < 0) ? 1 : -1;
-        } else {
-            ++put_count;
-            net_short_put += (signs[i] < 0) ? 1 : -1;
+    // Filtre 4: Put count (ouvert_gauche)
+    int put_count;
+    int long_put_count = 0;
+    for (size_t i = 0; i < options.size(); ++i) {
+        if (!options[i].is_call && signs[i] > 0) {
+            ++long_put_count;
         }
     }
-
-    // Filtre 4: Put/Call open
-    if (net_short_put > ouvert_gauche || net_short_call > ouvert_droite) {
+    if (!filter_put_open(options, signs, ouvert_gauche)) {
         return std::nullopt;
     }
-
+    
+    // Filtre 4b: Call open (ouvert_droite)
+    int call_count_check;
+    if (!filter_call_open(options, signs, ouvert_droite)) {
+        return std::nullopt;
+    }
+    
     // Filtre 5: Premium
-    if (std::abs(total_premium) > max_premium_params) {
+    double total_premium;
+    if (!filter_premium(options, signs, max_premium_params, total_premium)) {
         return std::nullopt;
     }
-
+    
     // Filtre 6: Delta (avec bornes min/max)
-    if (total_delta < delta_min || total_delta > delta_max) {
+    double total_delta;
+    if (!filter_delta(options, signs, delta_min, delta_max, total_delta)) {
         return std::nullopt;
     }
-
+    
     // Filtre 7: Average P&L
-    if (total_average_pnl < 0.0) {
+    double total_average_pnl;
+    if (!filter_average_pnl(options, signs, total_average_pnl)) {
         return std::nullopt;
     }
     
-    // ========== P&L total via raw pointers (zéro-copie) ==========
-    // Optimisation: première ligne = assignment direct (évite memset),
-    // lignes suivantes = accumulation. __restrict pour auto-vectorisation.
+    // ========== CALCULS ==========
     
-    {
-        const double s0 = static_cast<double>(signs[0]);
-        const double* __restrict row0 = pnl_rows[0];
-        for (size_t j = 0; j < pnl_length; ++j) {
-            total_pnl[j] = s0 * row0[j];
-        }
-    }
-    for (size_t i = 1; i < n_options; ++i) {
-        const double s = static_cast<double>(signs[i]);
-        const double* __restrict row = pnl_rows[i];
-        for (size_t j = 0; j < pnl_length; ++j) {
-            total_pnl[j] += s * row[j];
-        }
+    // Greeks
+    double total_gamma, total_vega, total_theta, total_iv;
+    calculate_greeks(options, signs, total_gamma, total_vega, total_theta, total_iv);
+    
+    // P&L total
+    std::vector<double> total_pnl = calculate_total_pnl(pnl_matrix, signs);
+    
+    if (total_pnl.empty()) {
+        return std::nullopt;
     }
 
-    double avg_pnl_lvg = avg_pnl_levrage(total_average_pnl, total_premium);
-    
-    // ========== FILTRES DE PERTE + BREAKEVEN + PROFIT ZONE en une seule passe ==========
+    double delta_lvg = delta_levrage(total_delta, total_premium);
+    double avg_pnl_lvg= avg_pnl_levrage(total_average_pnl, total_premium);
+    // ========== FILTRES DE PERTE BASÉS SUR LES LIMITES DE PRIX ==========
     
     double max_loss_left = 0.0;
     double max_loss_right = 0.0;
-    double max_profit = total_pnl[0];
-    double max_loss = total_pnl[0];
-    const double abs_premium = std::abs(total_premium);
-    const double neg_abs_premium = -abs_premium;
     
-    // Breakeven avec buffer inline (pas d'allocation heap)
-    std::array<double, StrategyMetrics::MAX_BREAKEVEN> breakeven_buf;
-    int breakeven_count = 0;
-    double min_profit_price = 0.0;
-    double max_profit_price = 0.0;
-    bool found_profit = false;
-    double prev_pnl = total_pnl[0];
-    
-    for (size_t i = 0; i < pnl_length; ++i) {
-        const double price = prices[i];
-        const double pnl = total_pnl[i];
+    for (size_t i = 0; i < prices.size() && i < total_pnl.size(); ++i) {
+        double price = prices[i];
+        double pnl = total_pnl[i];
         
-        // Track global min/max
-        if (pnl > max_profit) max_profit = pnl;
-        if (pnl < max_loss) max_loss = pnl;
-        
-        // Breakeven: changement de signe entre i-1 et i
-        if (i > 0 && pnl * prev_pnl < 0.0) {
-            if (breakeven_count < StrategyMetrics::MAX_BREAKEVEN) {
-                double t = -prev_pnl / (pnl - prev_pnl);
-                breakeven_buf[breakeven_count++] = prices[i - 1] + (prices[i] - prices[i - 1]) * t;
-            }
-        }
-        prev_pnl = pnl;
-        
-        // Profit zone tracking
-        if (pnl > 0.0) {
-            if (!found_profit) {
-                min_profit_price = price;
-                max_profit_price = price;
-                found_profit = true;
-            } else {
-                if (price > max_profit_price) max_profit_price = price;
-            }
-        }
-        
-        // Filtres de perte
         if (price < limit_left) {
-            if (pnl < max_loss_left) max_loss_left = pnl;
-            if (premium_only_left) {
-                if (pnl < neg_abs_premium) return std::nullopt;
-            } else {
-                if (pnl < -max_loss_left_param) return std::nullopt;
+            // Zone gauche: vérifier contre max_loss_left_param
+            if (pnl < -max_loss_left_param) {
+                return std::nullopt;
+            }
+            if (pnl < max_loss_left) {
+                max_loss_left = pnl;
             }
         } else if (price > limit_right) {
-            if (pnl < max_loss_right) max_loss_right = pnl;
-            if (premium_only_right) {
-                if (pnl < neg_abs_premium) return std::nullopt;
-            } else {
-                if (pnl < -max_loss_right_param) return std::nullopt;
+            // Zone droite: vérifier contre max_loss_right_param
+            if (pnl < -max_loss_right_param) {
+                return std::nullopt;
+            }
+            if (pnl < max_loss_right) {
+                max_loss_right = pnl;
             }
         } else {
-            if (pnl < neg_abs_premium) return std::nullopt;
+            // Zone centrale: la perte ne doit pas dépasser le premium payé
+            if (pnl < -std::abs(total_premium)) {
+                return std::nullopt;
+            }
         }
     }
     
-    double profit_zone_width = found_profit ? (max_profit_price - min_profit_price) : 0.0;
+    // Trouver l'index de séparation basé sur average_mix (pour d'autres calculs)
+    size_t split_idx = 0;
+    for (size_t i = 0; i < prices.size(); ++i) {
+        if (prices[i] >= average_mix) {
+            split_idx = i;
+            break;
+        }
+    }
+    if (split_idx == 0) split_idx = prices.size() / 2;
     
-    // Filtre premium_only: |max_loss| doit être < |premium|
-    if (premium_only && std::abs(max_loss) > abs_premium) {
-        return std::nullopt;
+    // Max profit / max loss global
+    auto [min_it, max_it] = std::minmax_element(total_pnl.begin(), total_pnl.end());
+    double max_profit = *max_it;
+    double max_loss = *min_it;
+    
+    // Breakeven points
+    std::vector<double> breakeven_points = calculate_breakeven_points(total_pnl, prices);
+    
+    // Profit zone
+    double min_profit_price, max_profit_price, profit_zone_width;
+    calculate_profit_zone(total_pnl, prices, min_profit_price, max_profit_price, profit_zone_width);
+    
+    // Surfaces et sigma
+    double dx = (prices.size() > 1) ? (prices[1] - prices[0]) : 1.0;
+    double total_sigma_pnl = 0.0;
+    
+    // Calcul sigma avec mixture
+    if (!mixture.empty()) {
+        double mass = 0.0;
+        for (double m : mixture) mass += m;
+        mass *= dx;
+        
+        if (mass > 0.0) {
+            double var = 0.0;
+            for (size_t i = 0; i < total_pnl.size() && i < mixture.size(); ++i) {
+                double diff = total_pnl[i] - total_average_pnl;
+                var += mixture[i] * diff * diff;
+            }
+            var *= dx / mass;
+            total_sigma_pnl = std::sqrt(std::max(var, 0.0));
+        }
+    }
+    
+    // Calcul des rolls
+    double total_roll = 0.0;
+    double total_roll_quarterly = 0.0;
+    double total_roll_sum = 0.0;
+    for (size_t i = 0; i < options.size(); ++i) {
+        total_roll += signs[i] * options[i].roll;
+        total_roll_quarterly += signs[i] * options[i].roll_quarterly;
+        total_roll_sum += signs[i] * options[i].roll_sum;
+    }
+    
+    // Calcul du tail penalty
+    double tail_penalty = 0.0;
+    for (size_t i = 0; i < options.size(); ++i) {
+        if (signs[i] > 0) {
+            // Achat: la zone négative du P&L est la perte
+            tail_penalty += options[i].tail_penalty;
+        } else {
+            // Vente: la zone positive du P&L devient la perte
+            tail_penalty += options[i].tail_penalty_short;
+        }
     }
     
     // Calcul des prix intra-vie et P&L de la stratégie
     std::array<double, N_INTRA_DATES> strategy_intra_life_prices;
     std::array<double, N_INTRA_DATES> strategy_intra_life_pnl;
-    double sum_intra_pnl = 0.0;
     for (int t = 0; t < N_INTRA_DATES; ++t) {
         double total_value = 0.0;
         double total_pnl_t = 0.0;
-        for (size_t i = 0; i < n_options; ++i) {
-            const int s = signs[i];
-            total_value += s * options[i]->intra_life_prices[t];
-            total_pnl_t += s * options[i]->intra_life_pnl[t];
+        for (size_t i = 0; i < options.size(); ++i) {
+            total_value += signs[i] * options[i].intra_life_prices[t];
+            total_pnl_t += signs[i] * options[i].intra_life_pnl[t];
         }
         strategy_intra_life_prices[t] = total_value;
         strategy_intra_life_pnl[t] = total_pnl_t;
-        sum_intra_pnl += total_pnl_t;
+    }
+    
+    // Calcul de la moyenne des P&L intra-vie
+    double sum_intra_pnl = 0.0;
+    for (int t = 0; t < N_INTRA_DATES; ++t) {
+        sum_intra_pnl += strategy_intra_life_pnl[t];
     }
     double avg_intra_life_pnl = sum_intra_pnl / N_INTRA_DATES;
     
@@ -247,24 +252,29 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     StrategyMetrics result;
     result.total_premium = total_premium;
     result.total_delta = total_delta;
+    result.total_gamma = total_gamma;
+    result.total_vega = total_vega;
+    result.total_theta = total_theta;
     result.total_iv = total_iv;
     result.max_profit = max_profit;
     result.max_loss = max_loss;
     result.max_loss_left = max_loss_left;
     result.max_loss_right = max_loss_right;
     result.total_average_pnl = total_average_pnl;
+    result.total_sigma_pnl = total_sigma_pnl;
     result.min_profit_price = min_profit_price;
     result.max_profit_price = max_profit_price;
     result.profit_zone_width = profit_zone_width;
-    // Breakeven inline: copie depuis le buffer stack
-    result.breakeven_count = breakeven_count;
-    for (int b = 0; b < breakeven_count; ++b) {
-        result.breakeven_points[b] = breakeven_buf[b];
-    }
+    result.breakeven_points = std::move(breakeven_points);
+    result.total_pnl_array = std::move(total_pnl);
     result.total_roll = total_roll;
-    result.call_count = call_count;
+    result.total_roll_quarterly = total_roll_quarterly;
+    result.total_roll_sum = total_roll_sum;
+    result.call_count = call_count_check;
     result.put_count = put_count;
+    result.delta_levrage = delta_lvg;
     result.avg_pnl_levrage = avg_pnl_lvg;
+    result.tail_penalty = tail_penalty;
     result.intra_life_prices = strategy_intra_life_prices;
     result.intra_life_pnl = strategy_intra_life_pnl;
     result.avg_intra_life_pnl = avg_intra_life_pnl;

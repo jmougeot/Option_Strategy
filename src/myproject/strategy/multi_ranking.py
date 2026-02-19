@@ -7,14 +7,14 @@ Le C++ retourne N classements (un par jeu de poids) + un classement consensus.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from myproject.strategy.strategy_class import StrategyComparison
 
 # Metric key → short human label (used in summaries)
 _METRIC_LABELS: Dict[str, str] = {
     "avg_pnl_levrage": "Leverage",
-    "roll": "Roll",
+    "roll_quarterly": "Roll",
     "avg_intra_life_pnl": "Dynamic",
     "average_pnl": "Gain",
     "max_loss": "Tail Risk",

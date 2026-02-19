@@ -1,5 +1,5 @@
 from myproject.app.data_types import ScenarioData
-from myproject.mixture.mixture_utils import create_mixture_from_scenarios
+from myproject.app.mixture_utils import create_mixture_from_scenarios
 import streamlit as st
 from typing import Optional
 import uuid
@@ -59,55 +59,47 @@ def scenario_params() -> Optional[ScenarioData]:
                     st.markdown(f"**Scenario {i+1}**")
                 
                 with col_price:
-                    _key = f"price_{scenario_id}"
-                    if _key not in st.session_state:
-                        st.session_state[_key] = float(scenario["price"])
                     price = st.number_input(
                         "Target Price",
+                        value=float(scenario["price"]),
                         step=0.01,
                         format="%.4f",
-                        key=_key,
+                        key=f"price_{scenario_id}",
                         help="Expected price for this scenario",
                     )
                     scenario["price"] = price
                 
                 with col_std_l:
-                    _key = f"std_l_{scenario_id}"
-                    if _key not in st.session_state:
-                        st.session_state[_key] = float(scenario["std"])
                     std_l = st.number_input(
                         "σ left",
+                        value=float(scenario["std"]),
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
-                        key=_key,
+                        key=f"std_l_{scenario_id}",
                         help="Downside uncertainty",
                     )
                     scenario["std"] = std_l
                 
                 with col_std_r:
-                    _key = f"std_r_{scenario_id}"
-                    if _key not in st.session_state:
-                        st.session_state[_key] = float(scenario["std_r"])
                     std_r = st.number_input(
                         "σ right",
+                        value=float(scenario["std_r"]),
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
-                        key=_key,
+                        key=f"std_r_{scenario_id}",
                         help="Upside uncertainty",
                     )
                     scenario["std_r"] = std_r
                 
                 with col_weight:
-                    _key = f"weight_{scenario_id}"
-                    if _key not in st.session_state:
-                        st.session_state[_key] = float(scenario["weight"])
                     weight = st.number_input(
                         "Prob",
+                        value=float(scenario["weight"]),
                         step=1.0,
                         format="%.1f",
-                        key=_key,
+                        key=f"weight_{scenario_id}",
                         help="Scenario weight (will be normalized)",
                     )
                     scenario["weight"] = weight
@@ -127,43 +119,37 @@ def scenario_params() -> Optional[ScenarioData]:
                     st.markdown(f"**Scenario {i+1}**")
                 
                 with col_price:
-                    _key = f"price_{scenario_id}"
-                    if _key not in st.session_state:
-                        st.session_state[_key] = float(scenario["price"])
                     price = st.number_input(
                         "Target Price",
+                        value=float(scenario["price"]),
                         step=0.01,
                         format="%.4f",
-                        key=_key,
+                        key=f"price_{scenario_id}",
                         help="Expected price for this scenario",
                     )
                     scenario["price"] = price
                 
                 with col_std:
-                    _key = f"std_{scenario_id}"
-                    if _key not in st.session_state:
-                        st.session_state[_key] = float(scenario["std"])
                     std = st.number_input(
                         "Uncertainty",
+                        value=float(scenario["std"]),
                         min_value=0.001,
                         step=0.01,
                         format="%.4f",
-                        key=_key,
+                        key=f"std_{scenario_id}",
                         help="Standard deviation: larger means more uncertain",
                     )
                     scenario["std"] = std
                     scenario["std_r"] = std
                 
                 with col_weight:
-                    _key = f"weight_{scenario_id}"
-                    if _key not in st.session_state:
-                        st.session_state[_key] = float(scenario["weight"])
                     weight = st.number_input(
                         "Probability",
+                        value=float(scenario["weight"]),
                         max_value=100.0,
                         step=1.0,
                         format="%.1f",
-                        key=_key,
+                        key=f"weight_{scenario_id}",
                         help="Scenario weight (will be normalized)",
                     )
                     scenario["weight"] = weight
@@ -177,13 +163,9 @@ def scenario_params() -> Optional[ScenarioData]:
 
     # Calculer les poids normalisés
     total_weight = sum(s["weight"] for s in st.session_state.scenarios)
-    if total_weight > 0:
-        normalized_weights = [
-            s["weight"] / total_weight for s in st.session_state.scenarios
-        ]
-    else:
-        n = len(st.session_state.scenarios)
-        normalized_weights = [1.0 / n for _ in st.session_state.scenarios] if n > 0 else [1.0]
+    normalized_weights = [
+        s["weight"] / total_weight for s in st.session_state.scenarios
+    ]
 
     # Préparer les données pour le retour
     centers = [s["price"] for s in st.session_state.scenarios]

@@ -7,7 +7,6 @@
 
 #include <vector>
 #include <string>
-#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -32,30 +31,16 @@ enum class NormalizerType {
 };
 
 /**
- * Identifiant numérique des métriques (évite les comparaisons de strings dans le hot path)
- */
-enum class MetricId : int {
-    PREMIUM = 0,
-    AVERAGE_PNL,
-    ROLL,
-    AVG_PNL_LEVRAGE,
-    TAIL_PENALTY,
-    AVG_INTRA_LIFE_PNL,
-    METRIC_COUNT  // Nombre total de métriques
-};
-
-/**
  * Configuration d'une métrique de scoring
  */
 struct MetricConfig {
     std::string name;
-    MetricId id;        // Identifiant numérique pour accès rapide
     double weight;
     NormalizerType normalizer;
     ScorerType scorer;
     
-    MetricConfig(const std::string& n, MetricId mid, double w, NormalizerType norm, ScorerType sc)
-        : name(n), id(mid), weight(w), normalizer(norm), scorer(sc) {}
+    MetricConfig(const std::string& n, double w, NormalizerType norm, ScorerType sc)
+        : name(n), weight(w), normalizer(norm), scorer(sc) {}
 };
 
 /**
@@ -65,9 +50,16 @@ struct ScoredStrategy {
     // Métriques de la stratégie
     double total_premium;
     double total_delta;
-    double total_iv;
+    double total_gamma;
+    double total_vega;
+    double total_theta;
+    double total_iv;  // Total IV (somme des IV)
+    double avg_implied_volatility;
     double average_pnl;
     double roll;
+    double roll_quarterly;
+    double roll_sum;
+    double sigma_pnl;
     double max_profit;
     double max_loss;
     double max_loss_left;
@@ -77,6 +69,7 @@ struct ScoredStrategy {
     double profit_zone_width;
     double delta_levrage;
     double avg_pnl_levrage;
+    double tail_penalty;  // Tail penalty total
     int call_count;
     int put_count;
 
@@ -103,12 +96,13 @@ struct ScoredStrategy {
     int rank;
     
     ScoredStrategy() 
-        : total_premium(0), total_delta(0), total_iv(0), average_pnl(0),
-          roll(0), max_profit(0), max_loss(0),
-          max_loss_left(0), max_loss_right(0),
+        : total_premium(0), total_delta(0), total_gamma(0), total_vega(0),
+          total_iv(0), avg_implied_volatility(0), average_pnl(0),
+          roll(0), roll_quarterly(0), roll_sum(0), sigma_pnl(0),
+          max_profit(0), max_loss(0), max_loss_left(0), max_loss_right(0),
           min_profit_price(0), max_profit_price(0), profit_zone_width(0),
-          delta_levrage(0), avg_pnl_levrage(0), call_count(0), put_count(0),
-          intra_life_prices{}, intra_life_pnl{}, avg_intra_life_pnl(0), score(0), rank(0) {}
+          delta_levrage(0), avg_pnl_levrage(0), tail_penalty(0),
+          call_count(0), put_count(0), intra_life_prices{}, intra_life_pnl{}, avg_intra_life_pnl(0), score(0), rank(0) {}
 };
 
 // ============================================================================
@@ -121,6 +115,11 @@ public:
     
     static void normalize_weights(std::vector<MetricConfig>& metrics);
 
+    static std::vector<double> extract_metric_values(
+        const std::vector<ScoredStrategy>& strategies,
+        const std::string& metric_name
+    );
+    
     static std::pair<double, double> normalize_values(
         const std::vector<double>& values,
         NormalizerType normalizer
@@ -131,6 +130,15 @@ public:
         double min_val,
         double max_val,
         ScorerType scorer
+    );
+    
+    /**
+     * Vérifie que deux stratégies ont le même payoff
+     * Logique: même strikes triés + même signs triés + nombre pair de différences call/put
+     */
+    static bool are_same_payoff(
+        const ScoredStrategy& s1,
+        const ScoredStrategy& s2
     );
     
     /**
@@ -145,6 +153,16 @@ public:
     /**
      * Multi-weight scoring : normalise une seule fois, score N jeux de poids.
      *
+     * Pour chaque weight set :
+     *   - Calcule le score de chaque stratégie (normalisation commune)
+     *   - Garde le top_n par weight set
+     *
+     * Ensuite calcule un rang moyen (consensus) :
+     *   - Pour chaque stratégie apparaissant dans au moins un top_n,
+     *     son rang moyen = moyenne de ses rangs dans chaque weight set
+     *     (si absente d'un set, elle reçoit rang = top_n + 1)
+     *   - Retourne les top_n stratégies par rang moyen le plus bas.
+     *
      * @param strategies      Toutes les stratégies candidates (modifié in-place pour score)
      * @param weight_sets     Liste de vecteurs de MetricConfig (un par weight set)
      * @param top_n           Nombre de résultats par set
@@ -157,12 +175,6 @@ public:
         std::vector<ScoredStrategy>& strategies,
         const std::vector<std::vector<MetricConfig>>& weight_sets,
         int top_n = 10
-    );
-
-private:
-    static bool are_same_payoff(
-        const ScoredStrategy& s1,
-        const ScoredStrategy& s2
     );
 };
 

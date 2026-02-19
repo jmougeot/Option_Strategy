@@ -1,11 +1,127 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, Tuple
 import numpy as np
-from src.myproject.option.bachelier import breeden_litzenberger_density, bachelier_price_vec
+from scipy.stats import norm
 
 
 # Nombre de dates intermédiaires pour le pricing intra-vie
 N_INTRA_DATES = 5
+
+
+def bachelier_price(F: float, K: float, sigma: float, T: float, is_call: bool) -> float:
+    """
+    Calcule le prix d'une option avec le modèle de Bachelier (normal model).
+    
+    Formules:
+    - Call: V = (F - K) * Phi(d) + sigma * sqrt(T) * phi(d)
+    - Put:  V = (K - F) * Phi(-d) + sigma * sqrt(T) * phi(d)
+    
+    où d = (F - K) / (sigma * sqrt(T))
+    
+    Args:
+        F: Prix forward du sous-jacent
+        K: Strike de l'option
+        sigma: Volatilité normale (en unités absolues, pas en %)
+        T: Temps jusqu'à expiration (en années)
+        is_call: True pour call, False pour put
+        
+    Returns:
+        Prix de l'option
+    """
+    if T <= 0:
+        # À expiration, valeur intrinsèque
+        if is_call:
+            return max(F - K, 0.0)
+        else:
+            return max(K - F, 0.0)
+    
+    if sigma <= 0:
+        # Sans volatilité, valeur intrinsèque actualisée
+        if is_call:
+            return max(F - K, 0.0)
+        else:
+            return max(K - F, 0.0)
+    
+    sigma_sqrt_T = sigma * np.sqrt(T)
+    d = (F - K) / sigma_sqrt_T
+    
+    if is_call:
+        price = (F - K) * norm.cdf(d) + sigma_sqrt_T * norm.pdf(d)
+    else:
+        price = (K - F) * norm.cdf(-d) + sigma_sqrt_T * norm.pdf(d)
+    
+    return max(price, 0.0)
+
+
+def breeden_litzenberger_density(
+    strikes: np.ndarray,
+    call_prices: np.ndarray,
+    price_grid: np.ndarray,
+    risk_free_rate: float = 0.0,
+    time_to_expiry: float = 1.0
+) -> Optional[np.ndarray]:
+    """
+    Extrait la densité risque-neutre q_T(K) via la formule de Breeden-Litzenberger.
+    
+    La formule est : q_T(K) = e^{rT} * ∂²C/∂K²(K)
+    
+    Args:
+        strikes: Array des strikes triés (croissants)
+        call_prices: Array des prix des calls correspondants
+        price_grid: Grille de prix sur laquelle interpoler la densité
+        risk_free_rate: Taux sans risque annuel
+        time_to_expiry: Temps jusqu'à expiration (en années)
+        
+    Returns:
+        Densité risque-neutre q_T(x) sur la grille price_grid, ou None si échec
+    """
+    if len(strikes) < 4:
+        # Pas assez de strikes pour calculer une dérivée seconde fiable
+        return None
+    
+    # Trier par strike
+    sort_idx = np.argsort(strikes)
+    K = strikes[sort_idx]
+    C = call_prices[sort_idx]
+    
+    # Filtrer les prix valides (> 0)
+    valid_mask = C > 0
+    if np.sum(valid_mask) < 4:
+        return None
+    
+    K = K[valid_mask]
+    C = C[valid_mask]
+    
+    # Interpolation cubique des prix de calls
+    try:
+        from scipy.interpolate import CubicSpline as CS
+        cs = CS(K, C)
+        
+        # Dérivée seconde = d²C/dK²
+        # CubicSpline permet de calculer les dérivées directement
+        d2C_dK2 = cs(price_grid, 2)  # dérivée seconde
+        
+        # Formule de Breeden-Litzenberger: q_T(K) = e^{rT} * d²C/dK²
+        discount_factor = np.exp(risk_free_rate * time_to_expiry)
+        q_T = discount_factor * d2C_dK2
+        
+        # La densité doit être positive
+        q_T = np.maximum(q_T, 0.0)
+        
+        # Normaliser pour que l'intégrale = 1
+        dx = float(np.mean(np.diff(price_grid))) if len(price_grid) > 1 else 1.0
+        total_mass = np.sum(q_T) * dx
+        if total_mass > 1e-10:
+            q_T = q_T / total_mass
+        else:
+            return None
+            
+        return q_T
+        
+    except Exception as e:
+        print(f"⚠️ Erreur Breeden-Litzenberger: {e}")
+        return None
+
 
 @dataclass
 class Option:
@@ -14,32 +130,33 @@ class Option:
     strike: float
     premium: float
     timestamp: Optional[float] = None
-    status: bool = True
 
     # ============ CHAMPS OBLIGATOIRES ============
     expiration_month: Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"] = ("F")
     expiration_year: int = 6
 
-    # =========== STRUCTURE DE POSITION ===========
+    # ============ STRUCTURE DE POSITION ============
     quantity: Optional[int] = 1
     position: Literal["long", "short"] = "short"
 
-    # ============= IDENTIFICATION ================
+    # ============ IDENTIFICATION ============
     ticker: Optional[str] = None
     bloomberg_ticker: Optional[str] = None  # Ticker Bloomberg complet
     underlying_symbol: Optional[str] = None
     exchange: Optional[str] = None
     currency: Optional[str] = None
 
-    # ========== PRIX ET COTATIONS ================
+    # ============ PRIX ET COTATIONS ============
     bid: Optional[float] = None
     ask: Optional[float] = None
     last: Optional[float] = None
     mid: Optional[float] = None
-    roll: List[float] = field(default_factory=list)  # Tous les rolls calculés (ordre des expiries utilisateur)
+    roll: Optional[float] = None  # Roll moyen (normalisé par nombre de trimestres)
+    roll_quarterly: Optional[float] = None  # Roll Q-1 (trimestre précédent)
+    roll_sum: Optional[float] = None  # Roll brut (prix_roll - prix_courant, non normalisé)
     rolls_detail: Dict[str, float] = field(default_factory=dict)  # Rolls par expiry (ex: {"H6": 0.5, "M6": 0.3})
 
-    # ================== GREEKS ===================
+    # ============ GREEKS ============
     delta: float = 0.0
     gamma: float = 0.0
     vega: float = 0.0
@@ -180,8 +297,6 @@ class Option:
         self.average_pnl = mu
         return mu
 
-
-
     def _sigma_pnl(self):
         """
         Ecart-type du PnL sous la mixture:
@@ -214,8 +329,6 @@ class Option:
         sigma = float(np.sqrt(max(var, 0.0)))
         self.sigma_pnl = sigma
         return sigma
-
-
 
 
     def _calculate_tail_penalty(self) -> None:
@@ -253,7 +366,6 @@ class Option:
             self.tail_penalty_short = 0.0
 
     
-
     def _calcul_all_surface(self) -> None:
         # 1. Calculer le P&L array (utilise self.prices)
         self._calculate_pnl_array()
@@ -274,9 +386,6 @@ class Option:
     # INTRA-VIE - Pricing intermédiaire avec tilt terminal
     # ============================================================================
     
-
-
-
     def _build_market_density(self, 
                               sigma_market: Optional[float] = None,
                               all_options: Optional[List["Option"]] = None,
@@ -355,9 +464,6 @@ class Option:
         self.market_density = q_T
         return q_T
     
-
-
-
     def _calculate_tilt_weights(self) -> Optional[np.ndarray]:
         """
         Calcule les poids du tilt terminal L_T = p_T(x) / q_T(x).
@@ -385,9 +491,6 @@ class Option:
         self.tilt_weights = L_T
         return L_T
     
-
-
-
     def _calculate_intra_life_prices(self, 
                                      underlying_prices: np.ndarray,
                                      time_to_expiry: float = 1.0,
@@ -435,16 +538,16 @@ class Option:
             # Temps restant jusqu'à expiration
             T_remaining = time_to_expiry * (1.0 - t_frac)
             
-            # Calcul vectorisé sur tous les prix en une seule fois
-            prices_vec = bachelier_price_vec(underlying_prices, K, sigma_normal, T_remaining, is_call)
-            self.intra_life_prices[i, :] = prices_vec
-            self.intra_life_pnl[i, :] = prices_vec - initial_cost
+            for j, F in enumerate(underlying_prices):
+                # Prix Bachelier pour ce (date, prix_sous_jacent)
+                price = bachelier_price(F, K, sigma_normal, T_remaining, is_call)
+                self.intra_life_prices[i, j] = price
+                
+                # P&L = valeur actuelle - coût initial
+                self.intra_life_pnl[i, j] = price - initial_cost
         
         return self.intra_life_prices
     
-
-
-
     def calculate_all_intra_life(self, 
                                  n_dates: int = N_INTRA_DATES,
                                  all_options: Optional[List["Option"]] = None,
