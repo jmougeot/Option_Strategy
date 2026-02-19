@@ -416,7 +416,7 @@ def import_options(
     # 1. Construction des tickers
     builder = TickerBuilder(suffix, roll_expiries)
 
-    builder._build_underlying(underlying, months, years)
+    builder._build_underlying(underlying, months[0], years)
 
     if brut_code is None:
         builder.build_from_standard(underlying, months, years, strikes)
