@@ -46,6 +46,7 @@ def process_bloomberg_to_strategies(
     num_points: int = 200,
     brut_code: Optional[List[str]] = None,
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
+    use_bachelier: bool = True,
 ) -> Tuple[Union[List[StrategyComparison], MultiRankingResult], Dict, Tuple[np.ndarray, np.ndarray, float], FutureData]:
     """
     Fonction principale simplifiee pour Streamlit.
@@ -90,13 +91,20 @@ def process_bloomberg_to_strategies(
         )
 
     # Tracker du fetch
-    stats["nb_options"] = len(options)
     stats["future_data"] = future_data
     stats["all_options"] = options  # Toutes les options importées (pour page Volatility)
 
     if not offline and fetch_warnings: #type: ignore
         stats["fetch_warnings"] = fetch_warnings
-        
+
+    # Filtrer les options avec warning si Bachelier n'est pas utilisé
+    if not use_bachelier:
+        before = len(options)
+        options = [opt for opt in options if opt.status]
+        stats["nb_options_filtered_warnings"] = before - len(options)
+
+    stats["nb_options"] = len(options)
+
     if not options:
         return [], stats, mixture, future_data
 

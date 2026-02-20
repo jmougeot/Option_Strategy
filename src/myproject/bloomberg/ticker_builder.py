@@ -23,14 +23,7 @@ VALID_MONTHS = {"F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"}
 def parse_brut_code(brut_code: str) -> dict:
     """
     Parse un code brut Bloomberg pour extraire les métadonnées.
-    
-    Exemples de codes bruts:
-    - "ERF6C" → underlying="ER", month="F", year=6, option_type="call"
-    - "RXWF26C2" → underlying="RXW", month="F", year=26, option_type="call"
-    - "RXWF26P2" → underlying="RXW", month="F", year=26, option_type="put"
-    
     Format: [UNDERLYING][MONTH][YEAR][C/P][SUFFIX?]
-    
     Returns:
         Dict avec underlying, month, year, option_type
     """

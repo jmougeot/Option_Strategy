@@ -76,6 +76,8 @@ class UIParams:
     unit : str
     brut_code: Optional[List[str]] = None
     roll_expiries: Optional[List[RollExpiry]] = None
+    operation_penalisation : float = 0.0
+    use_bachelier: bool = True
 
 
 def sidebar_params() -> UIParams:
@@ -84,6 +86,12 @@ def sidebar_params() -> UIParams:
         value=False,
         help="Provide full Bloomberg code",
         key="brut_code_check"
+    )
+    use_bachelier = st.checkbox(
+        "Use Bachelier",
+        value=True,
+        help="If unchecked, options with missing price data (warnings) are ignored instead of being priced via Bachelier.",
+        key="use_bachelier_check"
     )
     
     # Defaults
@@ -237,4 +245,5 @@ def sidebar_params() -> UIParams:
         strikes=strikes,
         brut_code=brut_code_result,
         roll_expiries=roll_expiries,
+        use_bachelier=use_bachelier,
     )
