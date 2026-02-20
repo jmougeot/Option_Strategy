@@ -384,10 +384,13 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
             put.implied_volatility = prev_put.implied_volatility - put.left_slope
 
     # ── 5. Recalcul du premium pour les options extrapolées (premium=0, IV extrapolée) ──
+    print("\n--- Corrections IV/Premium (extrapolation par slope) ---")
     for _, call, put in datas:
         for opt in (call, put):
             if opt.premium <= 0 and opt.implied_volatility > 0:
                 opt.premium = bachelier_price(F, opt.strike, opt.implied_volatility, time_to_expiry, opt.is_call())
+                sym = "C" if opt.is_call() else "P"
+                print(f"  Corrige {sym} K={opt.strike}: IV={opt.implied_volatility:.4f}  Premium={opt.premium:.6f}")
 
 
 
