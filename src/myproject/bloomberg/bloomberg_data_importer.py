@@ -297,10 +297,11 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
     """
     options.sort(key=lambda x: (x.strike, x.option_type))
 
-    if FutureData.underlying_price:
-        F = FutureData.underlying_price
-    else:
+    F = future_price or FutureData.underlying_price
+    if not F:
+        print("[_compute_bachelier_volatility] Pas de prix future disponible, abandon.")
         return
+    print(f"[_compute_bachelier_volatility] Appel avec F={F}, {len(options)} options")
     datas: List[Tuple[float, Option, Option]] = []
 
     # ── Helpers ──────────────────────────────────────────────────────────────
