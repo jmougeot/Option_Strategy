@@ -322,7 +322,30 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         call.right_slope = right_c if right_c is not None else right_p
         put.left_slope   = left_p  if left_p  is not None else left_c
         put.right_slope  = right_p if right_p is not None else right_c
+    
+    def _wrong_vol_forward(call: Option, put: Option) -> None:
+        """Assigne left/right slope avec fallback call↔put si l'un est None."""
+        if abs(call.implied_volatility - put.implied_volatility) <= 0.3:
+            return
+        else: 
+            if call.left_slope and put.left_slope and call.left_slope > put.left_slope :
+                call.left_slope = put.left_slope
+                call.status = False
+            else :
+                put.left_slope = call.left_slope
+                put.status = False
 
+    def _wrong_vol_backward(call: Option, put: Option) -> None :
+        if abs(call.implied_volatility - put.implied_volatility) <= 0.3:
+            return
+        else: 
+            if call.right_slope and put.right_slope and call.right_slope > put.right_slope :
+                call.right_slope = put.right_slope
+                call.status = False
+            else :
+                put.right_slope = call.right_slope
+                put.status = False
+        
     # ── 1. Construction de datas + calcul IV de base ──────────────────────────
     for j in range(len(options) // 2):
         opt1 = options[2 * j]       # call  (sort: "call" < "put")
@@ -356,6 +379,12 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         right_p = 0.0 if i == n - 1 else _calc_slope(iv_p[i], iv_p[i + 1])
         _assign_slopes(call, put, left_c, right_c, left_p, right_p)
 
+
+    # ── 2b. Détection des mauvais prix Bloomberg (écart IV call/put > seuil) ──
+    for _, call, put in datas:
+        _wrong_vol_forward(call, put)
+        _wrong_vol_backward(call, put)
+
     # ── 3. Propagation des slopes si encore None ─────────────────────────────
     for i in range(1, n):
         call, put = datas[i][1], datas[i][2]
@@ -363,7 +392,7 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         if call.left_slope is None:
             call.left_slope = prev_call.left_slope
         if put.left_slope is None:
-            put.left_slope = prev_put.left_slope
+            put.left_slope = prev_put.left_slope        
 
     # Backward : right_slope hérite du strike supérieur
     for i in range(n - 2, -1, -1):
@@ -394,7 +423,6 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
             put.implied_volatility = prev_put.implied_volatility - put.left_slope
 
     # ── 5. Recalcul du premium pour les options extrapolées (premium=0, IV extrapolée) ──
-    print("\n--- Corrections IV/Premium (extrapolation par slope) ---")
     for _, call, put in datas:
         for opt in (call, put):
             if opt.premium <= 0 and opt.implied_volatility > 0:
