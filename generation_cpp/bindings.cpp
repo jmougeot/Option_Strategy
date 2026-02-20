@@ -267,7 +267,7 @@ static void bnb_store_result(
     std::vector<ScoredStrategy>& results
 ) {
     ScoredStrategy strat;
-    strat.total_premium = metrics.total_premium - static_cast<double>(depth) * params.leg_penalty;
+    strat.total_premium = metrics.total_premium + static_cast<double>(depth) * params.leg_penalty;
     strat.total_delta = metrics.total_delta;
     strat.total_iv = metrics.total_iv;
     strat.average_pnl = metrics.total_average_pnl;

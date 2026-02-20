@@ -81,7 +81,7 @@ class UIParams:
 
 
 def sidebar_params() -> UIParams:
-    col1, col2 , col3= st.columns(3)
+    col1, col2 = st.columns(2)
     with col1 :
         brut_code_check =st.checkbox(
             "Provide raw code",
@@ -95,13 +95,6 @@ def sidebar_params() -> UIParams:
             value=True,
             help="If unchecked, options with missing price data (warnings) are ignored instead of being priced via Bachelier.",
             key="use_bachelier_check"
-        )
-    with col3 :
-        leg_penality = st.number_input(
-            "Leg P1enality",
-            value=0.01,
-            help="Put a penality for bid/ask",
-            key="leg_penality"
         )
     
     underlying = "ER"
