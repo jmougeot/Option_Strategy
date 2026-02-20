@@ -301,93 +301,87 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         F = FutureData.underlying_price
     else:
         return
-    datas: List[Tuple[float, Option , Option]] = []
+    datas: List[Tuple[float, Option, Option]] = []
 
-    for i in range(len(options)//2):
-        opt1=options[i]
-        opt2=options[i+1]
+    # ── Helpers ──────────────────────────────────────────────────────────────
+
+    def _calc_slope(iv_a: float, iv_b: float) -> Optional[float]:
+        """Retourne iv_a - iv_b si les deux IV sont valides, sinon None."""
+        return iv_a - iv_b if iv_a > 0 and iv_b > 0 else None
+
+    def _assign_slopes(call: Option, put: Option,
+                       left_c: Optional[float], right_c: Optional[float],
+                       left_p: Optional[float], right_p: Optional[float]) -> None:
+        """Assigne left/right slope avec fallback call↔put si l'un est None."""
+        call.left_slope  = left_c  if left_c  is not None else left_p
+        call.right_slope = right_c if right_c is not None else right_p
+        put.left_slope   = left_p  if left_p  is not None else left_c
+        put.right_slope  = right_p if right_p is not None else right_c
+
+    # ── 1. Construction de datas + calcul IV de base ──────────────────────────
+    for j in range(len(options) // 2):
+        opt1 = options[j]
+        opt2 = options[j + 1]
         opt1.underlying_price = F
         opt2.underlying_price = F
 
-        if opt1.status and opt1.premium > 0 :
+        if opt1.status and opt1.premium > 0:
             opt1.implied_volatility = bachelier_implied_vol(F, opt1.strike, opt1.premium, time_to_expiry, opt1.is_call())
-        if opt2.status and opt2.premium >0:
+        if opt2.status and opt2.premium > 0:
             opt2.implied_volatility = bachelier_implied_vol(F, opt2.strike, opt2.premium, time_to_expiry, opt2.is_call())
-        
+
         datas.append((opt1.strike, opt1, opt2))
 
-        def _calc_slope(iv_a: float, iv_b: float) -> Optional[float]:
-            """Retourne iv_a - iv_b si les deux sont valides, sinon None."""
-            return iv_a - iv_b if iv_a > 0 and iv_b > 0 else None
+    # ── 2. Calcul des slopes (après que datas est complet) ───────────────────
+    n = len(datas)
+    iv_c = [d[1].implied_volatility for d in datas]
+    iv_p = [d[2].implied_volatility for d in datas]
 
-        def _set_slope(call: "Option", put: "Option", side: str, value: Optional[float]) -> None:
-            """Assigne la pente à call et put, avec fallback croisé si l'un est None."""
-            call_val = value if value is not None else None
-            put_val  = value if value is not None else None
-            # recalcule séparément si la valeur n'est pas partagée (cas where call/put divergent)
-            setattr(call, side, call_val if call_val is not None else put_val)
-            setattr(put,  side, put_val  if put_val  is not None else call_val)
+    for i, data in enumerate(datas):
+        call, put = data[1], data[2]
+        left_c  = 0.0 if i == 0     else _calc_slope(iv_c[i - 1], iv_c[i])
+        right_c = 0.0 if i == n - 1 else _calc_slope(iv_c[i], iv_c[i + 1])
+        left_p  = 0.0 if i == 0     else _calc_slope(iv_p[i - 1], iv_p[i])
+        right_p = 0.0 if i == n - 1 else _calc_slope(iv_p[i], iv_p[i + 1])
+        _assign_slopes(call, put, left_c, right_c, left_p, right_p)
 
-        def _assign_slopes(call: "Option", put: "Option",
-                           left_c: Optional[float], right_c: Optional[float],
-                           left_p: Optional[float], right_p: Optional[float]) -> None:
-            """Assigne left/right slope à call et put, avec fallback call↔put."""
-            call.left_slope  = left_c  if left_c  is not None else left_p
-            call.right_slope = right_c if right_c is not None else right_p
-            put.left_slope   = left_p  if left_p  is not None else left_c
-            put.right_slope  = right_p if right_p is not None else right_c
+    # ── 3. Propagation des slopes si encore None ─────────────────────────────
+    # Forward : left_slope hérite du strike inférieur
+    for i in range(1, n):
+        call, put = datas[i][1], datas[i][2]
+        prev_call, prev_put = datas[i - 1][1], datas[i - 1][2]
+        if call.left_slope is None:
+            call.left_slope = prev_call.left_slope
+        if put.left_slope is None:
+            put.left_slope = prev_put.left_slope
 
-        n = len(datas)
-        iv_c = [d[1].implied_volatility for d in datas]
-        iv_p = [d[2].implied_volatility for d in datas]
+    # Backward : right_slope hérite du strike supérieur
+    for i in range(n - 2, -1, -1):
+        call, put = datas[i][1], datas[i][2]
+        next_call, next_put = datas[i + 1][1], datas[i + 1][2]
+        if call.right_slope is None:
+            call.right_slope = next_call.right_slope
+        if put.right_slope is None:
+            put.right_slope = next_put.right_slope
 
-        for i, data in enumerate(datas):
-            call, put = data[1], data[2]
+    # ── 4. Extrapolation des IV manquantes ────────────────────────────────────
+    # Backward (droite→gauche) : strikes bas dont IV=0 → iv[i] = iv[i+1] + right_slope
+    for i in range(n - 2, -1, -1):
+        call, put = datas[i][1], datas[i][2]
+        next_call, next_put = datas[i + 1][1], datas[i + 1][2]
+        if call.implied_volatility <= 0 and next_call.implied_volatility > 0 and call.right_slope is not None:
+            call.implied_volatility = next_call.implied_volatility + call.right_slope
+        if put.implied_volatility <= 0 and next_put.implied_volatility > 0 and put.right_slope is not None:
+            put.implied_volatility = next_put.implied_volatility + put.right_slope
 
-            left_c  = 0.0 if i == 0     else _calc_slope(iv_c[i - 1], iv_c[i])
-            right_c = 0.0 if i == n - 1 else _calc_slope(iv_c[i], iv_c[i + 1])
-            left_p  = 0.0 if i == 0     else _calc_slope(iv_p[i - 1], iv_p[i])
-            right_p = 0.0 if i == n - 1 else _calc_slope(iv_p[i], iv_p[i + 1])
-
-            _assign_slopes(call, put, left_c, right_c, left_p, right_p)
-
-        # Forward pass : si left_slope toujours None, on continue la pente du strike inférieur
-        for i in range(1, n):
-            call, put = datas[i][1], datas[i][2]
-            prev_call, prev_put = datas[i - 1][1], datas[i - 1][2]
-            if call.left_slope is None:
-                call.left_slope = prev_call.left_slope
-            if put.left_slope is None:
-                put.left_slope = prev_put.left_slope
-
-        # Backward pass : si right_slope toujours None, on continue la pente du strike supérieur
-        for i in range(n - 2, -1, -1):
-            call, put = datas[i][1], datas[i][2]
-            next_call, next_put = datas[i + 1][1], datas[i + 1][2]
-            if call.right_slope is None:
-                call.right_slope = next_call.right_slope
-            if put.right_slope is None:
-                put.right_slope = next_put.right_slope
-
-        # Extrapolation des IV manquantes aux extrêmes gauches (strikes les plus bas)
-        # Backward pass (droite → gauche) : iv[i] = iv[i+1] + right_slope propagé
-        for i in range(n - 2, -1, -1):
-            call, put = datas[i][1], datas[i][2]
-            next_call, next_put = datas[i + 1][1], datas[i + 1][2]
-            if call.implied_volatility <= 0 and next_call.implied_volatility > 0 and call.right_slope is not None:
-                call.implied_volatility = next_call.implied_volatility + call.right_slope
-            if put.implied_volatility <= 0 and next_put.implied_volatility > 0 and put.right_slope is not None:
-                put.implied_volatility = next_put.implied_volatility + put.right_slope
-
-        # Extrapolation des IV manquantes aux extrêmes droits (strikes les plus hauts)
-        # Forward pass (gauche → droite) : iv[i] = iv[i-1] - left_slope propagé
-        for i in range(1, n):
-            call, put = datas[i][1], datas[i][2]
-            prev_call, prev_put = datas[i - 1][1], datas[i - 1][2]
-            if call.implied_volatility <= 0 and prev_call.implied_volatility > 0 and call.left_slope is not None:
-                call.implied_volatility = prev_call.implied_volatility - call.left_slope
-            if put.implied_volatility <= 0 and prev_put.implied_volatility > 0 and put.left_slope is not None:
-                put.implied_volatility = prev_put.implied_volatility - put.left_slope
+    # Forward (gauche→droite) : strikes hauts dont IV=0 → iv[i] = iv[i-1] - left_slope
+    for i in range(1, n):
+        call, put = datas[i][1], datas[i][2]
+        prev_call, prev_put = datas[i - 1][1], datas[i - 1][2]
+        if call.implied_volatility <= 0 and prev_call.implied_volatility > 0 and call.left_slope is not None:
+            call.implied_volatility = prev_call.implied_volatility - call.left_slope
+        if put.implied_volatility <= 0 and prev_put.implied_volatility > 0 and put.left_slope is not None:
+            put.implied_volatility = prev_put.implied_volatility - put.left_slope
 
 
 
