@@ -113,7 +113,8 @@ public:
         double* __restrict total_pnl_buf,
         bool premium_only = false,
         bool premium_only_left = false,
-        bool premium_only_right = false
+        bool premium_only_right = false,
+        double leg_penalty = 0.0
     );
 
     static bool next_combination(

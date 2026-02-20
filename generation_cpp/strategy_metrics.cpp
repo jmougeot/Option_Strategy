@@ -61,7 +61,8 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     double* __restrict total_pnl,
     bool premium_only,
     bool premium_only_left,
-    bool premium_only_right
+    bool premium_only_right,
+    double leg_penalty
 ) {
     // Validation de base
     if (n_options == 0 || pnl_length == 0) {
@@ -83,9 +84,9 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     // Filtre 4+4b: Put/Call open (fusionné en une seule passe)
     // + Agrégation fusionnée (premium, delta, avg_pnl, roll, IV, counts)
     // → une seule boucle pour tout
-    double total_premium = 0.0;
+    double total_premium = static_cast<double>(n_options) * leg_penalty;
     double total_delta = 0.0;
-    double total_average_pnl = 0.0;
+    double total_average_pnl = -static_cast<double>(n_options) * leg_penalty;
     double total_roll = 0.0;
     double total_iv = 0.0;
     int call_count = 0;
@@ -147,6 +148,14 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         const double* __restrict row = pnl_rows[i];
         for (size_t j = 0; j < pnl_length; ++j) {
             total_pnl[j] += s * row[j];
+        }
+    }
+
+    // apply penalty to every P&L point so loss filters see the real net cost
+    {
+        const double pen = static_cast<double>(n_options) * leg_penalty;
+        for (size_t j = 0; j < pnl_length; ++j) {
+            total_pnl[j] -= pen;
         }
     }
 

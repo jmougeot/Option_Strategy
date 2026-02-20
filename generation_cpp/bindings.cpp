@@ -267,7 +267,7 @@ static void bnb_store_result(
     std::vector<ScoredStrategy>& results
 ) {
     ScoredStrategy strat;
-    strat.total_premium = metrics.total_premium + static_cast<double>(depth) * params.leg_penalty;
+    strat.total_premium = metrics.total_premium;
     strat.total_delta = metrics.total_delta;
     strat.total_iv = metrics.total_iv;
     strat.average_pnl = metrics.total_average_pnl;
@@ -356,7 +356,8 @@ static void bnb_explore(
                 params.max_premium_params, params.ouvert_gauche, params.ouvert_droite,
                 params.min_premium_sell, params.delta_min, params.delta_max,
                 params.limit_left, params.limit_right, buf.total_pnl_buf.data(),
-                params.premium_only, params.premium_only_left, params.premium_only_right
+                params.premium_only, params.premium_only_left, params.premium_only_right,
+                params.leg_penalty
             );
             if (result.has_value()) {
                 bnb_store_result(buf, result.value(), depth, params, results);
@@ -649,7 +650,8 @@ py::dict process_combinations_batch_with_multi_scoring(
         for (auto& strat : strategies) {
             const size_t n_legs = strat.option_indices.size();
             const size_t pnl_length = g_cache.pnl_length;
-            strat.total_pnl_array.assign(pnl_length, 0.0);
+            const double pen = static_cast<double>(n_legs) * leg_penalty;
+            strat.total_pnl_array.assign(pnl_length, -pen);
             for (size_t i = 0; i < n_legs; ++i) {
                 const double s = static_cast<double>(strat.signs[i]);
                 const double* row = g_cache.pnl_rows[strat.option_indices[i]];
