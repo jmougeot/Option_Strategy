@@ -339,7 +339,26 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
             neighbors = [iv_list[j] for j in (idx - 1, idx + 1) if 0 <= j < n_local and iv_list[j] > 0]
             return sum(neighbors) / len(neighbors) if neighbors else None
 
+        def is_isolated(iv_list: list, idx: int) -> bool:
+            """True si aucun voisin valide ni à gauche ni à droite."""
+            left  = next((iv_list[j] for j in range(idx - 1, -1, -1)        if iv_list[j] > 0), None)
+            right = next((iv_list[j] for j in range(idx + 1, n_local)       if iv_list[j] > 0), None)
+            return left is None and right is None
+
+        # Passe 1 : supprimer les strikes isolés (aucun voisin valide des deux côtés)
         for i, (_, call, put) in enumerate(datas_local):
+            if iv_c_local[i] > 0 and is_isolated(iv_c_local, i):
+                print(f"  [isolated] C K={call.strike}: aucun voisin valide → ignoré")
+                call.status = False
+                call.implied_volatility = 0.0
+                iv_c_local[i] = 0.0
+            if iv_p_local[i] > 0 and is_isolated(iv_p_local, i):
+                print(f"  [isolated] P K={put.strike}: aucun voisin valide → ignoré")
+                put.status = False
+                put.implied_volatility = 0.0
+                iv_p_local[i] = 0.0
+
+        # Passe 2 : détecter les IVs aberrantes (écart call/put + distance voisins)
             iv_call = iv_c_local[i]
             iv_put  = iv_p_local[i]
 
@@ -449,9 +468,6 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
                 opt.premium = bachelier_price(F, opt.strike, opt.implied_volatility, time_to_expiry, opt.is_call())
                 sym = "C" if opt.is_call() else "P"
                 print(f"  Corrige {sym} K={opt.strike}: IV={opt.implied_volatility:.4f}  Premium={opt.premium:.6f}")
-
-
-
 
 # ============================================================================
 # FONCTION PRINCIPALE
