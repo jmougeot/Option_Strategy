@@ -454,11 +454,12 @@ def import_options(
         # 3.5. Calculer la volatilité Bachelier pour TOUTES les options
         if options:
             _compute_bachelier_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
-        
+            for option in options:
+                option._calcul_all_surface()
+
         # 4. Calculer les prix intra-vie pour toutes les options (avec Bachelier)
         if options:
-            # Estimer le temps jusqu'à expiration (en années)
-            time_to_expiry = 0.25  # ~3 mois par défaut
+            time_to_expiry = 0.25
             for option in options:
                 option.calculate_all_intra_life(all_options=options, time_to_expiry=time_to_expiry)
         
