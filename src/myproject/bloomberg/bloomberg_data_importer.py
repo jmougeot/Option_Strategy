@@ -323,28 +323,51 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         put.left_slope   = left_p  if left_p  is not None else left_c
         put.right_slope  = right_p if right_p is not None else right_c
     
-    def _wrong_vol_forward(call: Option, put: Option) -> None:
-        """Assigne left/right slope avec fallback call↔put si l'un est None."""
-        if abs(call.implied_volatility - put.implied_volatility) <= 0.3:
-            return
-        else: 
-            if call.left_slope and put.left_slope and call.left_slope > put.left_slope :
-                call.left_slope = put.left_slope
-                call.status = False
-            else :
-                put.left_slope = call.left_slope
-                put.status = False
+    IV_CALL_PUT_THRESHOLD = 0.30  # écart absolu max toléré entre IV call et IV put au même strike
 
-    def _wrong_vol_backward(call: Option, put: Option) -> None :
-        if abs(call.implied_volatility - put.implied_volatility) <= 0.3:
-            return
-        else: 
-            if call.right_slope and put.right_slope and call.right_slope > put.right_slope :
-                call.right_slope = put.right_slope
+    def _detect_and_fix_bad_iv(datas_local: list, iv_c_local: list, iv_p_local: list) -> None:
+        """
+        Détecte les IVs aberrantes (mauvais prix Bloomberg) en combinant :
+          1. Écart call/put au même strike > seuil
+          2. Écart de chacun par rapport à la moyenne de ses voisins (même type)
+        L'option la plus éloignée de ses voisins est marquée status=False et son IV remise à 0,
+        afin que l'étape d'extrapolation la reconstruise proprement.
+        """
+        n_local = len(datas_local)
+
+        def neighbor_avg(iv_list: list, idx: int) -> Optional[float]:
+            neighbors = [iv_list[j] for j in (idx - 1, idx + 1) if 0 <= j < n_local and iv_list[j] > 0]
+            return sum(neighbors) / len(neighbors) if neighbors else None
+
+        for i, (_, call, put) in enumerate(datas_local):
+            iv_call = iv_c_local[i]
+            iv_put  = iv_p_local[i]
+
+            # Ne traiter que quand les deux IVs sont valides
+            if iv_call <= 0 or iv_put <= 0:
+                continue
+            if abs(iv_call - iv_put) <= IV_CALL_PUT_THRESHOLD:
+                continue
+
+            # Identifier laquelle est la plus incohérente avec ses voisins
+            avg_c = neighbor_avg(iv_c_local, i)
+            avg_p = neighbor_avg(iv_p_local, i)
+            err_c = abs(iv_call - avg_c) if avg_c is not None else 0.0
+            err_p = abs(iv_put  - avg_p) if avg_p is not None else 0.0
+
+            sym_c = "C" if call.is_call() else "P"
+            sym_p = "P" if put.is_call() is False else "C"
+
+            if err_c >= err_p:
+                print(f"  [bad IV] {sym_c} K={call.strike}: IV={iv_call:.4f} écart voisins={err_c:.4f} → ignoré")
                 call.status = False
-            else :
-                put.right_slope = call.right_slope
+                call.implied_volatility = 0.0
+                iv_c_local[i] = 0.0
+            else:
+                print(f"  [bad IV] {sym_p} K={put.strike}: IV={iv_put:.4f} écart voisins={err_p:.4f} → ignoré")
                 put.status = False
+                put.implied_volatility = 0.0
+                iv_p_local[i] = 0.0
         
     # ── 1. Construction de datas + calcul IV de base ──────────────────────────
     for j in range(len(options) // 2):
@@ -366,11 +389,14 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
 
         datas.append((opt1.strike, opt1, opt2))
 
-    # ── 2. Calcul des slopes (après que datas est complet) ───────────────────
+    # ── 2. Détection des IVs aberrantes (avant calcul des slopes) ────────────────
     n = len(datas)
     iv_c = [d[1].implied_volatility for d in datas]
     iv_p = [d[2].implied_volatility for d in datas]
 
+    _detect_and_fix_bad_iv(datas, iv_c, iv_p)
+
+    # ── 3. Calcul des slopes sur IVs nettoyées ────────────────────────────────
     for i, data in enumerate(datas):
         call, put = data[1], data[2]
         left_c  = 0.0 if i == 0     else _calc_slope(iv_c[i - 1], iv_c[i])
@@ -379,13 +405,7 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         right_p = 0.0 if i == n - 1 else _calc_slope(iv_p[i], iv_p[i + 1])
         _assign_slopes(call, put, left_c, right_c, left_p, right_p)
 
-
-    # ── 2b. Détection des mauvais prix Bloomberg (écart IV call/put > seuil) ──
-    for _, call, put in datas:
-        _wrong_vol_forward(call, put)
-        _wrong_vol_backward(call, put)
-
-    # ── 3. Propagation des slopes si encore None ─────────────────────────────
+    # ── 4. Propagation des slopes si encore None ─────────────────────────────
     for i in range(1, n):
         call, put = datas[i][1], datas[i][2]
         prev_call, prev_put = datas[i - 1][1], datas[i - 1][2]
@@ -403,7 +423,7 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         if put.right_slope is None:
             put.right_slope = next_put.right_slope
 
-    # ── 4. Extrapolation des IV manquantes ────────────────────────────────────
+    # ── 5. Extrapolation des IV manquantes ──────────────────────────────────────
     # Backward (droite→gauche) : strikes bas dont IV=0 → iv[i] = iv[i+1] + right_slope
     for i in range(n - 2, -1, -1):
         call, put = datas[i][1], datas[i][2]
@@ -422,7 +442,7 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         if put.implied_volatility <= 0 and prev_put.implied_volatility > 0 and put.left_slope is not None:
             put.implied_volatility = prev_put.implied_volatility - put.left_slope
 
-    # ── 5. Recalcul du premium pour les options extrapolées (premium=0, IV extrapolée) ──
+    # ── 6. Recalcul du premium pour les options extrapolées (premium=0, IV extrapolée) ──
     for _, call, put in datas:
         for opt in (call, put):
             if opt.premium <= 0 and opt.implied_volatility > 0:
