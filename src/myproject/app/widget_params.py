@@ -81,20 +81,29 @@ class UIParams:
 
 
 def sidebar_params() -> UIParams:
-    brut_code_check =st.checkbox(
-        "Provide raw code",
-        value=False,
-        help="Provide full Bloomberg code",
-        key="brut_code_check"
-    )
-    use_bachelier = st.checkbox(
-        "Use Bachelier",
-        value=True,
-        help="If unchecked, options with missing price data (warnings) are ignored instead of being priced via Bachelier.",
-        key="use_bachelier_check"
-    )
+    col1, col2 , col3= st.columns(3)
+    with col1 :
+        brut_code_check =st.checkbox(
+            "Provide raw code",
+            value=False,
+            help="Provide full Bloomberg code",
+            key="brut_code_check"
+        )
+    with col2 :
+        use_bachelier = st.checkbox(
+            "Use Bachelier",
+            value=True,
+            help="If unchecked, options with missing price data (warnings) are ignored instead of being priced via Bachelier.",
+            key="use_bachelier_check"
+        )
+    with col3 :
+        leg_penality = st.number_input(
+            "Leg P1enality",
+            value=0.01,
+            help="Put a penality for bid/ask",
+            key="leg_penality"
+        )
     
-    # Defaults
     underlying = "ER"
     years_input = "6"
     months_input = "F"
@@ -223,6 +232,16 @@ def sidebar_params() -> UIParams:
     
     max_legs = st.slider("Max legs per strategy:", 1, 9, key="param_max_legs")
 
+    operation_penalisation = st.number_input(
+        "Leg penalty",
+        value=0.0,
+        min_value=0.0,
+        step=0.0001,
+        format="%.4f",
+        help="Cost subtracted per leg from the strategy total premium (nb_legs × penalty).",
+        key="param_operation_penalisation"
+    )
+
     years = [int(y.strip()) for y in years_input.split(",") if y.strip()]
     months = [m.strip() for m in months_input.split(",") if m.strip()]
     
@@ -246,4 +265,5 @@ def sidebar_params() -> UIParams:
         brut_code=brut_code_result,
         roll_expiries=roll_expiries,
         use_bachelier=use_bachelier,
+        operation_penalisation=operation_penalisation,
     )

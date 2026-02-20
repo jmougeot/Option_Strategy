@@ -191,6 +191,7 @@ def run():
             "filter": filter,
             "roll_expiries": params.roll_expiries,
             "use_bachelier": params.use_bachelier,
+            "operation_penalisation": params.operation_penalisation,
         }
         process = start_processing(st.session_state.session_id, _params)
         st.session_state.process = process

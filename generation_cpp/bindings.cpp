@@ -238,6 +238,7 @@ struct BnBParams {
     double max_loss_left, max_loss_right;
     double limit_left, limit_right;
     bool premium_only, premium_only_left, premium_only_right;
+    double leg_penalty;         // pénalité par jambe (soustrait du total_premium final)
     // Bornes pré-calculées pour le pruning
     double bound_max_premium;   // max(option.premium) sur toutes les options
     double bound_max_delta;     // max(|option.delta|) sur toutes les options
@@ -262,10 +263,11 @@ static void bnb_store_result(
     const BnBBuffers& buf,
     const StrategyMetrics& metrics,
     int depth,
+    const BnBParams& params,
     std::vector<ScoredStrategy>& results
 ) {
     ScoredStrategy strat;
-    strat.total_premium = metrics.total_premium;
+    strat.total_premium = metrics.total_premium - static_cast<double>(depth) * params.leg_penalty;
     strat.total_delta = metrics.total_delta;
     strat.total_iv = metrics.total_iv;
     strat.average_pnl = metrics.total_average_pnl;
@@ -357,7 +359,7 @@ static void bnb_explore(
                 params.premium_only, params.premium_only_left, params.premium_only_right
             );
             if (result.has_value()) {
-                bnb_store_result(buf, result.value(), depth, results);
+                bnb_store_result(buf, result.value(), depth, params, results);
             }
         }
     }
@@ -476,7 +478,8 @@ py::dict process_combinations_batch_with_multi_scoring(
     bool premium_only_left,
     bool premium_only_right,
     int top_n,
-    py::list weight_sets_py
+    py::list weight_sets_py,
+    double leg_penalty = 0.0
 ) {
     stop_flag.store(false);
 
@@ -529,6 +532,7 @@ py::dict process_combinations_batch_with_multi_scoring(
     bnb_params.premium_only = premium_only;
     bnb_params.premium_only_left = premium_only_left;
     bnb_params.premium_only_right = premium_only_right;
+    bnb_params.leg_penalty = leg_penalty;
 
     // Bornes maximum par option (pour l'élagage conservatif)
     bnb_params.bound_max_premium = 0.0;
@@ -739,7 +743,8 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("premium_only_left") = false,
           py::arg("premium_only_right") = false,
           py::arg("top_n") = 10,
-          py::arg("weight_sets") = py::list()
+          py::arg("weight_sets") = py::list(),
+          py::arg("leg_penalty") = 0.0
     );
 
     m.def("clear_options_cache", &clear_options_cache,

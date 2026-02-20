@@ -47,6 +47,7 @@ def process_bloomberg_to_strategies(
     brut_code: Optional[List[str]] = None,
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
     use_bachelier: bool = True,
+    leg_penalty: float = 0.0,
 ) -> Tuple[Union[List[StrategyComparison], MultiRankingResult], Dict, Tuple[np.ndarray, np.ndarray, float], FutureData]:
     """
     Fonction principale simplifiee pour Streamlit.
@@ -125,6 +126,7 @@ def process_bloomberg_to_strategies(
         max_legs=max_legs,
         top_n=top_n,
         weight_sets=weight_sets,
+        leg_penalty=leg_penalty,
     )
 
     # Estimer le nombre de combinaisons screened

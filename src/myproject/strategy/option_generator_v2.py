@@ -44,6 +44,7 @@ class OptionStrategyGeneratorV2:
         max_legs: int = 4,
         top_n: int = 10,
         weight_sets: Optional[List[Dict[str, float]]] = None,
+        leg_penalty: float = 0.0,
     ) -> MultiRankingResult:
   
         if not weight_sets:
@@ -54,5 +55,6 @@ class OptionStrategyGeneratorV2:
             filter,
             top_n=top_n,
             weight_sets=weight_sets,
+            leg_penalty=leg_penalty,
         )
 

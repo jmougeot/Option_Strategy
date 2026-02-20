@@ -131,6 +131,7 @@ def process_batch_cpp_with_multi_scoring(
     filter: FilterData,
     top_n: int = 10,
     weight_sets: Optional[List[Dict[str, float]]] = None,
+    leg_penalty: float = 0.0,
 ) -> MultiRankingResult:
     """
     Traite un batch via C++ avec N jeux de poids simultanés.
@@ -174,6 +175,7 @@ def process_batch_cpp_with_multi_scoring(
         filter.premium_only_right,
         top_n,
         weight_dicts,
+        leg_penalty,
     )
 
     # raw est un dict {"per_set": [...], "consensus": [...], "n_weight_sets": N, "n_candidates": M}
