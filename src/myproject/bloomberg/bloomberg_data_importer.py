@@ -302,6 +302,10 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         print("[_compute_bachelier_volatility] Pas de prix future disponible, abandon.")
         return
     print(f"[_compute_bachelier_volatility] Appel avec F={F}, {len(options)} options")
+    for o in options:
+        if not o.status or o.premium <= 0:
+            sym = "C" if o.is_call() else "P"
+            print(f"  [DEBUG] {sym} K={o.strike} | premium={o.premium} | status={o.status} | IV_entree={o.implied_volatility:.4f}")
     datas: List[Tuple[float, Option, Option]] = []
 
     # ── Helpers ──────────────────────────────────────────────────────────────
@@ -326,6 +330,12 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         opt1.underlying_price = F
         opt2.underlying_price = F
 
+        # Reset IV des options sans premium : l'IV Bloomberg est dans des unités
+        if not opt1.status or opt1.premium <= 0:
+            opt1.implied_volatility = 0.0
+        if not opt2.status or opt2.premium <= 0:
+            opt2.implied_volatility = 0.0
+
         if opt1.status and opt1.premium > 0:
             opt1.implied_volatility = bachelier_implied_vol(F, opt1.strike, opt1.premium, time_to_expiry, opt1.is_call())
         if opt2.status and opt2.premium > 0:
@@ -347,7 +357,6 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         _assign_slopes(call, put, left_c, right_c, left_p, right_p)
 
     # ── 3. Propagation des slopes si encore None ─────────────────────────────
-    # Forward : left_slope hérite du strike inférieur
     for i in range(1, n):
         call, put = datas[i][1], datas[i][2]
         prev_call, prev_put = datas[i - 1][1], datas[i - 1][2]
