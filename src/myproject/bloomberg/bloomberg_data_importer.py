@@ -294,142 +294,102 @@ class OptionProcessor:
 def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float = 0.25, future_price: Optional[float] = None) -> None:
     """
     Calcule la volatilité Bachelier pour TOUTES les options.
-    
-    Méthode:
-    1. Pour les options avec un premium valide: calcul direct de σ_n via bachelier_implied_vol
-    2. Pour les options sans premium (warning): interpolation via slope linéaire σ(K) = a·K + b
-    3. Pour les options interpolées: recalcul du premium via bachelier_price
-    
-    Args:
-        options: Liste complète d'options
-        time_to_expiry: Temps jusqu'à expiration (en années)
-        future_price: Prix du futures (utilisé si OPT_UNDL_PX absent des options)
     """
-    if not options:
+    options.sort(key=lambda x: (x.strike, x.option_type))
+
+    if FutureData.underlying_price:
+        F = FutureData.underlying_price
+    else:
         return
-    
-    # Forward price: depuis les options, sinon fallback sur le futures récupéré
-    F = next((opt.underlying_price for opt in options if opt.underlying_price and opt.underlying_price > 0), None)
-    if F is None and future_price and future_price > 0:
-        F = future_price
-        print(f"  ℹ OPT_UNDL_PX absent des options → utilisation du prix futures: {F:.4f}")
-    if F is None:
-        print("Pas de prix sous-jacent disponible pour le calcul Bachelier")
-        return
-    
-    # Propager le prix sous-jacent aux options qui ne l'ont pas
-    for opt in options:
-        if not opt.underlying_price or opt.underlying_price <= 0:
-            opt.underlying_price = F
-    
-    print(f"\n Calcul volatilité Bachelier (F={F:.2f}, T={time_to_expiry:.3f})")
-    
-    # 1. Première passe: calculer σ_n pour toutes les options avec premium valide et status OK
-    call_raw: List[Tuple[float, float, Option]] = []
-    put_raw: List[Tuple[float, float, Option]] = []
-    needs_interpolation: List[Option] = []  # status=False → premium + IV recalculés
+    datas: List[Tuple[float, Option , Option]] = []
 
-    for opt in options:
-        if not opt.underlying_price or opt.underlying_price <= 0:
-            opt.underlying_price = F
+    for i in range(len(options)//2):
+        opt1=options[i]
+        opt2=options[i+1]
+        opt1.underlying_price = F
+        opt2.underlying_price = F
 
-        if not opt.status:
-            # Warning Bloomberg (pas de bid/ask) → premium à recalculer
-            needs_interpolation.append(opt)
-        elif opt.premium and opt.premium > 0:
-            # Premium Bloomberg valide → σ_n directe, on stocke l'IV telle quelle
-            sigma_n = bachelier_implied_vol(F, opt.strike, opt.premium, time_to_expiry, opt.is_call())
-            opt.implied_volatility = (sigma_n / F) * 100.0 if (sigma_n > 0 and F > 0) else 0.0
-            if sigma_n > 0:
-                if opt.is_call():
-                    call_raw.append((opt.strike, sigma_n, opt))
-                else:
-                    put_raw.append((opt.strike, sigma_n, opt))
-        # else: status=True, premium=0 → on laisse tel quel
-    
-    # 2. Filtrer les σ_n aberrantes pour la courbe d'interpolation
-    #    (deep ITM → σ_n ≈ 0, peu représentative du smile) — on les exclut de combined
-    #    mais on NE TOUCHE PAS à leur IV déjà calculée en étape 1.
-    call_data: List[Tuple[float, float]] = []
-    put_data: List[Tuple[float, float]] = []
+        if opt1.status and opt1.premium > 0 :
+            opt1.implied_volatility = bachelier_implied_vol(F, opt1.strike, opt1.premium, time_to_expiry, opt1.is_call())
+        if opt2.status and opt2.premium >0:
+            opt2.implied_volatility = bachelier_implied_vol(F, opt2.strike, opt2.premium, time_to_expiry, opt2.is_call())
+        
+        datas.append((opt1.strike, opt1, opt2))
 
-    for raw_list, data_list, label in [
-        (call_raw, call_data, "calls"),
-        (put_raw, put_data, "puts"),
-    ]:
-        if not raw_list:
-            continue
-        sigmas = [s for _, s, _ in raw_list]
-        median_sigma = float(np.median(sigmas))
-        threshold = median_sigma * 0.20
+        def _calc_slope(iv_a: float, iv_b: float) -> Optional[float]:
+            """Retourne iv_a - iv_b si les deux sont valides, sinon None."""
+            return iv_a - iv_b if iv_a > 0 and iv_b > 0 else None
 
-        for strike, sigma_n, opt in raw_list:
-            if sigma_n >= threshold:
-                data_list.append((strike, sigma_n))
-            else:
-                print(f"  ⚠ {label[:-1].title()} K={strike}: σ_n={sigma_n:.6f} < seuil {threshold:.6f} → exclu de la courbe d'interpolation")
+        def _set_slope(call: "Option", put: "Option", side: str, value: Optional[float]) -> None:
+            """Assigne la pente à call et put, avec fallback croisé si l'un est None."""
+            call_val = value if value is not None else None
+            put_val  = value if value is not None else None
+            # recalcule séparément si la valeur n'est pas partagée (cas where call/put divergent)
+            setattr(call, side, call_val if call_val is not None else put_val)
+            setattr(put,  side, put_val  if put_val  is not None else call_val)
 
-    print(f"  • {len(call_data)} calls + {len(put_data)} puts dans la courbe d'interpolation")
-    
-    # 3. Courbe σ_n commune : fusionner calls et puts par strike
-    #    En Bachelier, σ_n(K, call) = σ_n(K, put) pour le même strike (parité put-call).
-    #    On construit donc un seul dictionnaire {K → σ_n} pour interpoler les options warning.
-    if needs_interpolation:
-        sigma_by_strike: dict = {}
-        for K, s in call_data:
-            sigma_by_strike[K] = s
-        for K, s in put_data:
-            if K in sigma_by_strike:
-                sigma_by_strike[K] = (sigma_by_strike[K] + s) / 2.0
-            else:
-                sigma_by_strike[K] = s
+        def _assign_slopes(call: "Option", put: "Option",
+                           left_c: Optional[float], right_c: Optional[float],
+                           left_p: Optional[float], right_p: Optional[float]) -> None:
+            """Assigne left/right slope à call et put, avec fallback call↔put."""
+            call.left_slope  = left_c  if left_c  is not None else left_p
+            call.right_slope = right_c if right_c is not None else right_p
+            put.left_slope   = left_p  if left_p  is not None else left_c
+            put.right_slope  = right_p if right_p is not None else right_c
 
-        combined: List[Tuple[float, float]] = sorted(sigma_by_strike.items())
+        n = len(datas)
+        iv_c = [d[1].implied_volatility for d in datas]
+        iv_p = [d[2].implied_volatility for d in datas]
 
-        if not combined:
-            print("  ⚠️ Aucune σ_n disponible pour interpoler les options warning")
-            return
+        for i, data in enumerate(datas):
+            call, put = data[1], data[2]
 
-        def _interp_sigma(K_target: float) -> float:
-            strikes = [d[0] for d in combined]
-            sigmas  = [d[1] for d in combined]
-            n = len(combined)
-            if n == 1:
-                return sigmas[0]
-            idx_right = next((i for i, k in enumerate(strikes) if k >= K_target), n)
-            if idx_right == 0:
-                a = (sigmas[1] - sigmas[0]) / (strikes[1] - strikes[0]) if abs(strikes[1] - strikes[0]) > 1e-10 else 0.0
-                return max(sigmas[0] + a * (K_target - strikes[0]), 1e-6)
-            elif idx_right == n:
-                a = (sigmas[-1] - sigmas[-2]) / (strikes[-1] - strikes[-2]) if abs(strikes[-1] - strikes[-2]) > 1e-10 else 0.0
-                return max(sigmas[-1] + a * (K_target - strikes[-1]), 1e-6)
-            else:
-                idx_left = idx_right - 1
-                K_minus, s_minus = strikes[idx_left],  sigmas[idx_left]
-                K_plus,  s_plus  = strikes[idx_right], sigmas[idx_right]
-                dK = K_plus - K_minus
-                if abs(dK) < 1e-10:
-                    return s_minus
-                a = (s_plus - s_minus) / dK
-                if abs(K_target - K_minus) <= abs(K_target - K_plus):
-                    return max(s_minus + a * (K_target - K_minus), 1e-6)
-                else:
-                    return max(s_plus  + a * (K_target - K_plus),  1e-6)
+            left_c  = 0.0 if i == 0     else _calc_slope(iv_c[i - 1], iv_c[i])
+            right_c = 0.0 if i == n - 1 else _calc_slope(iv_c[i], iv_c[i + 1])
+            left_p  = 0.0 if i == 0     else _calc_slope(iv_p[i - 1], iv_p[i])
+            right_p = 0.0 if i == n - 1 else _calc_slope(iv_p[i], iv_p[i + 1])
 
-        # 4. Recalculer premium + IV pour les options warning uniquement
-        fixed_count = 0
-        for opt in needs_interpolation:
-            sigma_interp = _interp_sigma(opt.strike)
-            opt.implied_volatility = (sigma_interp / F) * 100.0 if F > 0 else 0.0
-            new_premium = bachelier_price(F, opt.strike, sigma_interp, time_to_expiry, opt.is_call())
-            opt.premium = new_premium
-            opt._calcul_all_surface()
-            fixed_count += 1
-            sym = "C" if opt.is_call() else "P"
-            print(f"  ✓ Corrigé {sym} K={opt.strike}: σ_n={sigma_interp:.4f}, Premium={new_premium:.6f}, IV≈{opt.implied_volatility:.2f}%")
+            _assign_slopes(call, put, left_c, right_c, left_p, right_p)
 
-        if fixed_count > 0:
-            print(f"  • {fixed_count}/{len(needs_interpolation)} options warning corrigées (premium recalculé)")
+        # Forward pass : si left_slope toujours None, on continue la pente du strike inférieur
+        for i in range(1, n):
+            call, put = datas[i][1], datas[i][2]
+            prev_call, prev_put = datas[i - 1][1], datas[i - 1][2]
+            if call.left_slope is None:
+                call.left_slope = prev_call.left_slope
+            if put.left_slope is None:
+                put.left_slope = prev_put.left_slope
+
+        # Backward pass : si right_slope toujours None, on continue la pente du strike supérieur
+        for i in range(n - 2, -1, -1):
+            call, put = datas[i][1], datas[i][2]
+            next_call, next_put = datas[i + 1][1], datas[i + 1][2]
+            if call.right_slope is None:
+                call.right_slope = next_call.right_slope
+            if put.right_slope is None:
+                put.right_slope = next_put.right_slope
+
+        # Extrapolation des IV manquantes aux extrêmes gauches (strikes les plus bas)
+        # Backward pass (droite → gauche) : iv[i] = iv[i+1] + right_slope propagé
+        for i in range(n - 2, -1, -1):
+            call, put = datas[i][1], datas[i][2]
+            next_call, next_put = datas[i + 1][1], datas[i + 1][2]
+            if call.implied_volatility <= 0 and next_call.implied_volatility > 0 and call.right_slope is not None:
+                call.implied_volatility = next_call.implied_volatility + call.right_slope
+            if put.implied_volatility <= 0 and next_put.implied_volatility > 0 and put.right_slope is not None:
+                put.implied_volatility = next_put.implied_volatility + put.right_slope
+
+        # Extrapolation des IV manquantes aux extrêmes droits (strikes les plus hauts)
+        # Forward pass (gauche → droite) : iv[i] = iv[i-1] - left_slope propagé
+        for i in range(1, n):
+            call, put = datas[i][1], datas[i][2]
+            prev_call, prev_put = datas[i - 1][1], datas[i - 1][2]
+            if call.implied_volatility <= 0 and prev_call.implied_volatility > 0 and call.left_slope is not None:
+                call.implied_volatility = prev_call.implied_volatility - call.left_slope
+            if put.implied_volatility <= 0 and prev_put.implied_volatility > 0 and put.left_slope is not None:
+                put.implied_volatility = prev_put.implied_volatility - put.left_slope
+
+
 
 
 # ============================================================================
