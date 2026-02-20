@@ -320,8 +320,8 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
 
     # ── 1. Construction de datas + calcul IV de base ──────────────────────────
     for j in range(len(options) // 2):
-        opt1 = options[j]
-        opt2 = options[j + 1]
+        opt1 = options[2 * j]       # call  (sort: "call" < "put")
+        opt2 = options[2 * j + 1]   # put
         opt1.underlying_price = F
         opt2.underlying_price = F
 
@@ -382,6 +382,12 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
             call.implied_volatility = prev_call.implied_volatility - call.left_slope
         if put.implied_volatility <= 0 and prev_put.implied_volatility > 0 and put.left_slope is not None:
             put.implied_volatility = prev_put.implied_volatility - put.left_slope
+
+    # ── 5. Recalcul du premium pour les options extrapolées (premium=0, IV extrapolée) ──
+    for _, call, put in datas:
+        for opt in (call, put):
+            if opt.premium <= 0 and opt.implied_volatility > 0:
+                opt.premium = bachelier_price(F, opt.strike, opt.implied_volatility, time_to_expiry, opt.is_call())
 
 
 
