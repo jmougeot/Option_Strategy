@@ -86,6 +86,8 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     // → une seule boucle pour tout
     double total_premium = static_cast<double>(n_options) * leg_penalty;
     double total_delta = 0.0;
+    double total_gamma = 0.0;
+    double total_theta = 0.0;
     double total_average_pnl = -static_cast<double>(n_options) * leg_penalty;
     double total_roll = 0.0;
     double total_iv = 0.0;
@@ -99,6 +101,8 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         const OptionData& opt = *options[i];
         total_premium += s * opt.premium;
         total_delta += s * opt.delta;
+        total_gamma += s * opt.gamma;
+        total_theta += s * opt.theta;
         total_average_pnl += s * opt.average_pnl;
         total_roll += s * opt.roll;
         total_iv += s * opt.implied_volatility;
@@ -256,6 +260,8 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     StrategyMetrics result;
     result.total_premium = total_premium;
     result.total_delta = total_delta;
+    result.total_gamma = total_gamma;
+    result.total_theta = total_theta;
     result.total_iv = total_iv;
     result.max_profit = max_profit;
     result.max_loss = max_loss;

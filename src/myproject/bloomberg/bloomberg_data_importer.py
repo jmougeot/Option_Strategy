@@ -11,7 +11,7 @@ from myproject.bloomberg.fetcher_batch import fetch_options_batch, extract_best_
 from myproject.bloomberg.ticker_builder import (build_option_ticker, build_option_ticker_brut, parse_brut_code, MonthCode)
 from myproject.bloomberg.bloomber_to_opt import create_option_from_bloomberg
 from myproject.option.option_class import Option
-from myproject.option.bachelier import bachelier_implied_vol, bachelier_price
+from myproject.option.bachelier import bachelier_implied_vol, bachelier_price, bachelier_delta, bachelier_gamma, bachelier_theta
 from myproject.app.data_types import FutureData
 
 
@@ -468,6 +468,16 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
                 opt.premium = bachelier_price(F, opt.strike, opt.implied_volatility, time_to_expiry, opt.is_call())
                 sym = "C" if opt.is_call() else "P"
                 print(f"  Corrige {sym} K={opt.strike}: IV={opt.implied_volatility:.4f}  Premium={opt.premium:.6f}")
+
+    # ── 7. Calcul du delta, gamma et theta à partir de la volatilité recalculée ───
+    for _, call, put in datas:
+        for opt in (call, put):
+            if opt.implied_volatility > 0:
+                opt.delta = bachelier_delta(F, opt.strike, opt.implied_volatility, time_to_expiry, opt.is_call())
+                opt.gamma = bachelier_gamma(F, opt.strike, opt.implied_volatility, time_to_expiry)
+                opt.theta = bachelier_theta(F, opt.strike, opt.implied_volatility, time_to_expiry)
+                sym = "C" if opt.is_call() else "P"
+                print(f"  Greeks {sym} K={opt.strike}: Delta={opt.delta:.4f}  Gamma={opt.gamma:.6f}  Theta={opt.theta:.6f}")
 
 # ============================================================================
 # FONCTION PRINCIPALE

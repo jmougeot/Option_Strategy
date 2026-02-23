@@ -55,6 +55,8 @@ def init_cpp_cache(options: List[Option]) -> bool:
     # Extraction des données des options
     premiums = np.array([opt.premium for opt in options], dtype=np.float64)
     deltas = np.array([opt.delta for opt in options], dtype=np.float64)
+    gammas = np.array([opt.gamma for opt in options], dtype=np.float64)
+    thetas = np.array([opt.theta for opt in options], dtype=np.float64)
     ivs = np.array([opt.implied_volatility for opt in options], dtype=np.float64)
     average_pnls = np.array([opt.average_pnl for opt in options], dtype=np.float64)
     sigma_pnls = np.array([opt.sigma_pnl for opt in options], dtype=np.float64)
@@ -106,6 +108,8 @@ def init_cpp_cache(options: List[Option]) -> bool:
     strategy_metrics_cpp.init_options_cache(  # type: ignore
         premiums,
         deltas,
+        gammas,
+        thetas,
         ivs,
         average_pnls,
         sigma_pnls,

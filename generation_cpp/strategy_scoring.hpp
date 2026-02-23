@@ -65,6 +65,8 @@ struct ScoredStrategy {
     // Métriques de la stratégie
     double total_premium;
     double total_delta;
+    double total_gamma;
+    double total_theta;
     double total_iv;
     double average_pnl;
     double roll;

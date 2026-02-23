@@ -24,6 +24,8 @@ struct StrategyMetrics {
     // Greeks agrégés
     double total_premium;
     double total_delta;
+    double total_gamma;
+    double total_theta;
     double total_iv;
     
     // P&L metrics
@@ -69,6 +71,8 @@ struct StrategyMetrics {
 struct OptionData {
     double premium;
     double delta;
+    double gamma;
+    double theta;
     double implied_volatility;
     double average_pnl;
     double strike;

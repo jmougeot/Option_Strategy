@@ -90,6 +90,95 @@ def bachelier_implied_vol(F: float, K: float, market_price: float, T: float, is_
 
 
 
+def bachelier_delta(F: float, K: float, sigma: float, T: float, is_call: bool) -> float:
+    """
+    Calcule le delta d'une option via le modèle de Bachelier.
+
+    Formules:
+    - Call: Delta = Phi(d)
+    - Put:  Delta = Phi(d) - 1
+
+    où d = (F - K) / (sigma * sqrt(T))
+
+    Args:
+        F: Prix forward du sous-jacent
+        K: Strike de l'option
+        sigma: Volatilité normale
+        T: Temps jusqu'à expiration (en années)
+        is_call: True pour call, False pour put
+
+    Returns:
+        Delta de l'option
+    """
+    if T <= 0 or sigma <= 0:
+        if is_call:
+            return 1.0 if F > K else 0.0
+        else:
+            return -1.0 if F < K else 0.0
+
+    d = (F - K) / (sigma * np.sqrt(T))
+    if is_call:
+        return float(norm.cdf(d))
+    else:
+        return float(norm.cdf(d) - 1.0)
+
+
+def bachelier_gamma(F: float, K: float, sigma: float, T: float) -> float:
+    """
+    Calcule le gamma d'une option via le modèle de Bachelier.
+
+    Formule:
+    - Gamma = phi(d) / (sigma * sqrt(T))
+
+    où d = (F - K) / (sigma * sqrt(T))
+
+    Args:
+        F: Prix forward du sous-jacent
+        K: Strike de l'option
+        sigma: Volatilité normale
+        T: Temps jusqu'à expiration (en années)
+
+    Returns:
+        Gamma de l'option (identique pour call et put)
+    """
+    if T <= 0 or sigma <= 0:
+        return 0.0
+
+    sigma_sqrt_T = sigma * np.sqrt(T)
+    d = (F - K) / sigma_sqrt_T
+    return float(norm.pdf(d) / sigma_sqrt_T)
+
+
+def bachelier_theta(F: float, K: float, sigma: float, T: float) -> float:
+    """
+    Calcule le theta d'une option via le modèle de Bachelier (par jour calendaire).
+
+    Formule:
+    - Theta = -sigma * phi(d) / (2 * sqrt(T))   (annuel)
+    Divisé par (T * 365) pour obtenir la décroissance journalière en utilisant
+    le nombre de jours restants réels plutôt qu'un 365 fixe.
+
+    Identique pour call et put (pas de terme de taux dans le modèle normal pur).
+
+    Args:
+        F: Prix forward du sous-jacent
+        K: Strike de l'option
+        sigma: Volatilité normale
+        T: Temps jusqu'à expiration (en années)
+
+    Returns:
+        Theta journalier de l'option (valeur négative = décroissance du premium)
+    """
+    if T <= 0 or sigma <= 0:
+        return 0.0
+
+    sigma_sqrt_T = sigma * np.sqrt(T)
+    d = (F - K) / sigma_sqrt_T
+    theta_annual = -sigma * norm.pdf(d) / (2.0 * np.sqrt(T))
+    days_to_expiry = T * 365.0
+    return float(theta_annual / days_to_expiry)
+
+
 def bachelier_price_vec(F: np.ndarray, K: float, sigma: float, T: float, is_call: bool) -> np.ndarray:
     """
     Version vectorisée de bachelier_price.

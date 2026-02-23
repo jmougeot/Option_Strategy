@@ -80,6 +80,8 @@ void clear_options_cache() {
 void init_options_cache(      
     py::array_t<double> premiums,
     py::array_t<double> deltas,
+    py::array_t<double> gammas,
+    py::array_t<double> thetas,
     py::array_t<double> ivs,
     py::array_t<double> average_pnls,
     py::array_t<double> sigma_pnls,
@@ -95,6 +97,8 @@ void init_options_cache(
 ) {
     auto prem_buf = premiums.unchecked<1>();
     auto delta_buf = deltas.unchecked<1>();
+    auto gamma_buf = gammas.unchecked<1>();
+    auto theta_buf = thetas.unchecked<1>();
     auto iv_buf = ivs.unchecked<1>();
     auto avg_pnl_buf = average_pnls.unchecked<1>();
     auto sigma_buf = sigma_pnls.unchecked<1>();
@@ -122,6 +126,8 @@ void init_options_cache(
     for (size_t i = 0; i < g_cache.n_options; ++i) {
         g_cache.options[i].premium = prem_buf(i);
         g_cache.options[i].delta = delta_buf(i);
+        g_cache.options[i].gamma = gamma_buf(i);
+        g_cache.options[i].theta = theta_buf(i);
         g_cache.options[i].implied_volatility = iv_buf(i);
         g_cache.options[i].average_pnl = avg_pnl_buf(i);
         g_cache.options[i].strike = strike_buf(i);
@@ -169,6 +175,8 @@ static py::tuple scored_strategy_to_python(const ScoredStrategy& strat) {
     py::dict metrics_dict;
     metrics_dict["total_premium"] = strat.total_premium;
     metrics_dict["total_delta"] = strat.total_delta;
+    metrics_dict["total_gamma"] = strat.total_gamma;
+    metrics_dict["total_theta"] = strat.total_theta;
     metrics_dict["total_iv"] = strat.total_iv;
     metrics_dict["average_pnl"] = strat.average_pnl;
     metrics_dict["total_average_pnl"] = strat.average_pnl;
@@ -269,6 +277,8 @@ static void bnb_store_result(
     ScoredStrategy strat;
     strat.total_premium = metrics.total_premium;
     strat.total_delta = metrics.total_delta;
+    strat.total_gamma = metrics.total_gamma;
+    strat.total_theta = metrics.total_theta;
     strat.total_iv = metrics.total_iv;
     strat.average_pnl = metrics.total_average_pnl;
     strat.roll = metrics.total_roll;
@@ -706,6 +716,8 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           )pbdoc",
           py::arg("premiums"),
           py::arg("deltas"),
+          py::arg("gammas"),
+          py::arg("thetas"),
           py::arg("ivs"),
           py::arg("average_pnls"),
           py::arg("sigma_pnls"),
