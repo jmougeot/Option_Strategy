@@ -41,6 +41,9 @@ enum class MetricId : int {
     AVG_PNL_LEVRAGE,
     TAIL_PENALTY,
     AVG_INTRA_LIFE_PNL,
+    THETA_HIGHT,
+    GAMMA_HIGHT,
+    DELTA_HIGHT,
     METRIC_COUNT  // Nombre total de métriques
 };
 
@@ -105,7 +108,8 @@ struct ScoredStrategy {
     int rank;
     
     ScoredStrategy() 
-        : total_premium(0), total_delta(0), total_iv(0), average_pnl(0),
+        : total_premium(0), total_delta(0), total_gamma(0), total_theta(0),
+          total_iv(0), average_pnl(0),
           roll(0), max_profit(0), max_loss(0),
           max_loss_left(0), max_loss_right(0),
           min_profit_price(0), max_profit_price(0), profit_zone_width(0),

@@ -26,6 +26,8 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
             "Delta %": f"{comp.total_delta * 100:.2f}%",
             "Lvg P&L" : format_price(comp.avg_pnl_levrage, unit) if comp.avg_pnl_levrage is not None else "-",
             "Avg Intra P&L": format_price(comp.avg_intra_life_pnl, unit) if comp.avg_intra_life_pnl is not None else "-",
+            "Gamma" : f"{comp.total_gamma * 100:.2f}",
+            "Theta" : f"{comp.total_theta * 100:.2f}",
         }
         
         # Colonnes de roll dynamiques basées sur roll_labels (limité à 4 rolls max)

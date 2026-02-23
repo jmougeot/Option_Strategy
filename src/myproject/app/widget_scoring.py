@@ -14,10 +14,12 @@ SCORING_FIELDS: Dict[str, str] = {
     "average_pnl":       "Expected Gain",
     "max_loss":          "Tail Risk",
     "premium":           "Premium",
+    "Theta_hight" : "Theta",
+    "Gamma_hight" : "Gamma",
+    "Delta_hight" : "Delta Hight"
 }
 
 ALL_FIELDS = {**SCORING_FIELDS}
-
 
 # ============================================================================
 # Predefined ranking presets  (R1–R7)

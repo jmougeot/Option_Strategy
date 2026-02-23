@@ -178,6 +178,10 @@ static py::tuple scored_strategy_to_python(const ScoredStrategy& strat) {
     metrics_dict["total_gamma"] = strat.total_gamma;
     metrics_dict["total_theta"] = strat.total_theta;
     metrics_dict["total_iv"] = strat.total_iv;
+    // Clés scoring (correspondent aux SCORING_FIELDS Python)
+    metrics_dict["Theta_hight"] = strat.total_theta;
+    metrics_dict["Gamma_hight"] = strat.total_gamma;
+    metrics_dict["Delta_hight"] = std::abs(strat.total_delta);
     metrics_dict["average_pnl"] = strat.average_pnl;
     metrics_dict["total_average_pnl"] = strat.average_pnl;
     metrics_dict["total_roll"] = strat.roll;
