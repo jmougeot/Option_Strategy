@@ -42,7 +42,7 @@ class OptionStrategyGeneratorV2:
         self,
         filter: FilterData,
         max_legs: int = 4,
-        top_n: int = 10,
+        top_n: int = 30,
         weight_sets: Optional[List[Dict[str, float]]] = None,
         leg_penalty: float = 0.0,
     ) -> MultiRankingResult:

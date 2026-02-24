@@ -41,7 +41,7 @@ def process_bloomberg_to_strategies(
     price_min: float = 0.0,
     price_max: float = 100.0,
     max_legs: int = 4,
-    top_n: int = 10,
+    top_n: int = 30,
     scoring_weights: Optional[Union[Dict[str, float], List[Dict[str, float]]]] = None,
     num_points: int = 200,
     brut_code: Optional[List[str]] = None,
