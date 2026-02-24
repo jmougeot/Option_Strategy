@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import numpy as np
 from typing import Dict, List, Tuple, Literal, Optional, Any
-from myproject.option.option_class import Option, N_INTRA_DATES
+from myproject.option.option_class import Option
 
 
 @dataclass
@@ -9,7 +9,6 @@ class StrategyComparison:
     """Résultat de comparaison d'une stratégie"""
 
     strategy_name: str
-    strategy: Any  # OptionStrategy-like
     premium: float
     all_options: List[Option]  # Toutes les options
     signs: np.ndarray  # Signes (+1 pour long, -1 pour short) correspondant aux options
@@ -30,41 +29,10 @@ class StrategyComparison:
     total_gamma: float = 0.0  # Gamma de la stratégie
     total_vega: float = 0.0  # Vega de la stratégie
     total_theta: float = 0.0  # Theta de la stratégie
-    avg_implied_volatility: float = 0.0  # Volatilité implicite moyenne des options
+    total_iv: float = 0.0  # Volatilité implicite moyenne des options
     profit_at_target: float = 0.0
-    profit_at_target_pct: float = 0.0  # % du max profit
     score: float = 0.0
     rank: int = 0
     rolls_detail: Dict[str, float] = field(default_factory=dict)  # Rolls par expiry (ex: {"H6": 0.5, "M6": 0.3})
     delta_levrage : float = 0.0
     avg_pnl_levrage : float = 0.0 # avg/premium
-    tail_penalty: float = 0.0  # Risque de perte (∫ max(-pnl, 0)² dx)
-    
-    # Intra-vie pricing (valeur de la stratégie à dates intermédiaires)
-    # Calculé via le tilt terminal (voir intra_life.md)
-    intra_life_prices: Optional[List[float]] = None  # [V_t1, V_t2, V_t3, V_t4, V_t5]
-    intra_life_pnl: Optional[List[float]] = None     # P&L moyen à chaque date
-    intra_life_dates: Optional[List[float]] = None   # Fractions de temps [0.2, 0.4, 0.6, 0.8, 1.0]
-    avg_intra_life_pnl: Optional[float] = None       # Moyenne des P&L intra-vie
-
-
-    def get_positions(self) -> List[str]:
-        """
-        Retourne les positions ('long' ou 'short') pour chaque option.
-
-        Returns:
-            Liste des positions correspondant aux options dans all_options
-        """
-        return ["long" if sign > 0 else "short" for sign in self.signs]
-
-    def get_option_with_position(self, index: int) -> Tuple[Option, str]:
-        """
-        Retourne une option avec sa position.
-
-        Args:
-            index: Index de l'option
-
-        Returns:
-            Tuple (option, position)
-        """
-        return (self.all_options[index], "long" if self.signs[index] > 0 else "short")

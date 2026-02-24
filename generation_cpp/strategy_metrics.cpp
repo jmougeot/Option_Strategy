@@ -237,24 +237,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         return std::nullopt;
     }
     
-    // Calcul des prix intra-vie et P&L de la stratégie
-    std::array<double, N_INTRA_DATES> strategy_intra_life_prices;
-    std::array<double, N_INTRA_DATES> strategy_intra_life_pnl;
-    double sum_intra_pnl = 0.0;
-    for (int t = 0; t < N_INTRA_DATES; ++t) {
-        double total_value = 0.0;
-        double total_pnl_t = 0.0;
-        for (size_t i = 0; i < n_options; ++i) {
-            const int s = signs[i];
-            total_value += s * options[i]->intra_life_prices[t];
-            total_pnl_t += s * options[i]->intra_life_pnl[t];
-        }
-        strategy_intra_life_prices[t] = total_value;
-        strategy_intra_life_pnl[t] = total_pnl_t;
-        sum_intra_pnl += total_pnl_t;
-    }
-    double avg_intra_life_pnl = sum_intra_pnl / N_INTRA_DATES;
-    
     // ========== CONSTRUCTION DU RÉSULTAT ==========
     
     StrategyMetrics result;
@@ -280,9 +262,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     result.call_count = call_count;
     result.put_count = put_count;
     result.avg_pnl_levrage = avg_pnl_lvg;
-    result.intra_life_prices = strategy_intra_life_prices;
-    result.intra_life_pnl = strategy_intra_life_pnl;
-    result.avg_intra_life_pnl = avg_intra_life_pnl;
     
     return result;
 }

@@ -52,8 +52,7 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
     with col4:
         st.metric(
             "Expected gain at expiry",
-            format_price(winner.average_pnl, unit),
-            f"{winner.profit_at_target_pct:.1f}% of max",
+            f"{winner.average_pnl:.1f}% of max",
         )
 
     st.markdown("---")

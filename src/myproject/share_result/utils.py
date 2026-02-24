@@ -21,7 +21,7 @@ class StrategyEmailData:
     total_gamma: float
     total_vega: float
     total_theta: float
-    avg_implied_volatility: float
+    total_iv: float
     breakeven_points: List[float]
     legs_description: List[str]  # e.g. ["Long Call 98.00", "Short Put 97.50"]
     diagram_path: Optional[str] = None  # Path to saved payoff diagram PNG

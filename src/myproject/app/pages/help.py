@@ -370,43 +370,6 @@ def run():
         **Usage:** Useful for evaluating the cost of maintaining a position over time.
         """)
     
-    # Tail Risk Penalty (Max Loss)
-    with st.expander("⚠️ Tail Risk Penalty"):
-        st.markdown("""
-        **Definition:** Measures the risk of extreme losses in the distribution tails.
-        Penalizes strategies that lose heavily in unlikely but possible scenarios.
-        
-        **Formula:**
-        $$Tail\\ Penalty = \\int max(-P\\&L(S), 0)^2 \\cdot f(S) \\, dS$$
-        
-        **Interpretation:**
-        - **Tail Penalty = 0**: No loss risk in extremes
-        - **High Tail Penalty**: Significant losses possible in extreme scenarios
-        - **Lower = Better**
-        
-        **Example:** A naked put sale will have a very high Tail Penalty because losses 
-        can be unlimited if the market crashes.
-        """)
-    
-    # Average Intra-Life P&L
-    with st.expander("📊 Avg Intra-Life P&L"):
-        st.markdown("""
-        **Definition:** The average profit/loss of the strategy at intermediate dates 
-        before expiration, calculated using the Bachelier model.
-        
-        **Calculation:**
-        1. Divide the period into 5 dates: 20%, 40%, 60%, 80%, 100% of duration
-        2. For each date, calculate option price with Bachelier
-        3. Average P&L across all these dates
-        
-        **Interpretation:**
-        - **Avg Intra-Life > 0**: Strategy is profitable even before expiration
-        - **Avg Intra-Life < 0**: Strategy may lose money if exiting before expiration
-        - **Higher = Better**
-        
-        **Usage:** Important if you plan to potentially close the position before expiry.
-        """)
-    
     # Premium
     with st.expander("💰 Premium (Net Premium)"):
         st.markdown("""

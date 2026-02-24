@@ -65,34 +65,7 @@ def init_cpp_cache(options: List[Option]) -> bool:
     
     # Données de rolls
     rolls = np.array([opt.roll[0] if opt.roll else 0.0 for opt in options], dtype=np.float64)
-    # Prix intra-vie et P&L intra-vie (calculés via Bachelier)
-    # Le C++ attend une matrice (n_options x 5 dates) avec un seul prix par date
-    # On calcule le prix moyen pondéré par la mixture si disponible
-    n_intra_dates = 5
-    intra_life_prices = np.zeros((n, n_intra_dates), dtype=np.float64)
-    intra_life_pnl = np.zeros((n, n_intra_dates), dtype=np.float64)
-    
-    for i, opt in enumerate(options):
-        if opt.intra_life_prices is not None:
-            # intra_life_prices est maintenant une matrice (5 dates x N strikes)
-            if isinstance(opt.intra_life_prices, np.ndarray) and opt.intra_life_prices.ndim == 2:
-                # Calculer le prix moyen pour chaque date
-                # Si on a la mixture et les prix, pondérer par la mixture
-                for t in range(min(n_intra_dates, opt.intra_life_prices.shape[0])):
-                    # Prix moyen simple sur tous les strikes
-                    intra_life_prices[i, t] = np.mean(opt.intra_life_prices[t, :])
-                    if opt.intra_life_pnl is not None and opt.intra_life_pnl.ndim == 2:
-                        intra_life_pnl[i, t] = np.mean(opt.intra_life_pnl[t, :])
-            elif len(opt.intra_life_prices) == n_intra_dates:
-                # Ancienne structure: vecteur de 5 valeurs
-                intra_life_prices[i] = opt.intra_life_prices
-                if opt.intra_life_pnl is not None and len(opt.intra_life_pnl) == n_intra_dates:
-                    intra_life_pnl[i] = opt.intra_life_pnl
-        else:
-            # Valeur de repli: utiliser le premium comme approximation
-            intra_life_prices[i] = [opt.premium] * n_intra_dates
-            intra_life_pnl[i] = [0.0] * n_intra_dates
-    
+
     # Matrice P&L
     pnl_matrix = np.zeros((n, pnl_length), dtype=np.float64)
     for i, opt in enumerate(options):
@@ -116,8 +89,6 @@ def init_cpp_cache(options: List[Option]) -> bool:
         strikes,
         is_calls,
         rolls,
-        intra_life_prices,
-        intra_life_pnl,
         pnl_matrix,
         prices,
         mixture,
@@ -234,26 +205,9 @@ def batch_to_strategies(
                         total_rolls_detail[label] = 0.0
                     total_rolls_detail[label] += float(signs_arr[i]) * value
         
-        # Récupérer les prix intra-vie depuis les métriques C++
-        intra_life_prices = metrics.get('intra_life_prices', None)
-        if intra_life_prices is not None:
-            intra_life_prices = list(intra_life_prices)
-        
-        # Dates intermédiaires (fractions de temps: 0.2, 0.4, 0.6, 0.8, 1.0)
-        intra_life_dates = [0.2, 0.4, 0.6, 0.8, 1.0] if intra_life_prices else None
-        
-        # Récupérer le P&L intra-vie
-        intra_life_pnl = metrics.get('intra_life_pnl', None)
-        if intra_life_pnl is not None:
-            intra_life_pnl = list(intra_life_pnl)
-        
-        # Moyenne des P&L intra-vie
-        avg_intra_life_pnl = metrics.get('avg_intra_life_pnl', None)
-        
         # Créer la StrategyComparison
         strat = StrategyComparison(
             strategy_name=strategy_name,
-            strategy=None,
             premium=metrics['total_premium'],
             all_options=opts,
             signs=signs_arr,
@@ -277,18 +231,13 @@ def batch_to_strategies(
             total_gamma=metrics.get('total_gamma', 0.0),
             total_vega=metrics.get('total_vega', 0.0),
             total_theta=metrics.get('total_theta', 0.0),
-            avg_implied_volatility=metrics.get('total_iv', metrics.get('avg_implied_volatility', 0)),
+            total_iv=metrics.get('total_iv', metrics.get('avg_implied_volatility', 0)),
             profit_at_target=0,
             score=metrics.get('score', 0.0),  # Score depuis C++ si disponible
             rank=metrics.get('rank', 0),      # Rank depuis C++ si disponible
             rolls_detail=total_rolls_detail,
             delta_levrage=metrics.get('delta_levrage', 0.0),
             avg_pnl_levrage=metrics.get('avg_pnl_levrage', 0.0),
-            tail_penalty=metrics.get('tail_penalty', 0.0),
-            intra_life_prices=intra_life_prices,
-            intra_life_pnl=intra_life_pnl,
-            intra_life_dates=intra_life_dates,
-            avg_intra_life_pnl=avg_intra_life_pnl,
         )
                 
         strategies.append(strat)

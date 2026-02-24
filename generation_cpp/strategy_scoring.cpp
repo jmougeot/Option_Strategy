@@ -23,8 +23,6 @@ std::vector<MetricConfig> StrategyScorer::create_default_metrics() {
     metrics.emplace_back("average_pnl",        MetricId::AVERAGE_PNL,       0.0, NormalizerType::MIN_MAX,  ScorerType::HIGHER_BETTER);
     metrics.emplace_back("roll",               MetricId::ROLL,              0.0, NormalizerType::MIN_MAX,  ScorerType::HIGHER_BETTER);
     metrics.emplace_back("avg_pnl_levrage",    MetricId::AVG_PNL_LEVRAGE,   0.0, NormalizerType::MAX,      ScorerType::HIGHER_BETTER);    
-    metrics.emplace_back("tail_penalty",       MetricId::TAIL_PENALTY,      0.0, NormalizerType::MIN_MAX,  ScorerType::LOWER_BETTER);
-    metrics.emplace_back("avg_intra_life_pnl", MetricId::AVG_INTRA_LIFE_PNL,0.0, NormalizerType::MIN_MAX,  ScorerType::HIGHER_BETTER);
     metrics.emplace_back("Theta_hight",        MetricId::THETA_HIGHT,       0.0, NormalizerType::MIN_MAX,  ScorerType::HIGHER_BETTER);
     metrics.emplace_back("Gamma_hight",        MetricId::GAMMA_HIGHT,       0.0, NormalizerType::MIN_MAX,  ScorerType::HIGHER_BETTER);
     metrics.emplace_back("Delta_hight",        MetricId::DELTA_HIGHT,       0.0, NormalizerType::MIN_MAX,  ScorerType::HIGHER_BETTER);
@@ -241,8 +239,6 @@ static inline double extract_metric_by_id(const ScoredStrategy& strat, MetricId 
         case MetricId::AVERAGE_PNL:        return strat.average_pnl;
         case MetricId::ROLL:               return strat.roll;
         case MetricId::AVG_PNL_LEVRAGE:    return strat.avg_pnl_levrage;
-        case MetricId::TAIL_PENALTY:       return 0.0; // placeholder
-        case MetricId::AVG_INTRA_LIFE_PNL: return strat.avg_intra_life_pnl;
         case MetricId::THETA_HIGHT:        return strat.total_theta;
         case MetricId::GAMMA_HIGHT:        return strat.total_gamma;
         case MetricId::DELTA_HIGHT:        return std::abs(strat.total_delta);

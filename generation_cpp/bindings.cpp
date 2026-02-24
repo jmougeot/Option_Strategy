@@ -88,8 +88,6 @@ void init_options_cache(
     py::array_t<double> strikes,
     py::array_t<bool> is_calls,
     py::array_t<double> rolls,
-    py::array_t<double> intra_life_prices,  // Matrice (n_options, N_INTRA_DATES)
-    py::array_t<double> intra_life_pnl,     // Matrice (n_options, N_INTRA_DATES) - P&L moyen
     py::array_t<double> pnl_matrix,
     py::array_t<double> prices,
     py::array_t<double> mixture,
@@ -105,8 +103,6 @@ void init_options_cache(
     auto strike_buf = strikes.unchecked<1>();
     auto is_call_buf = is_calls.unchecked<1>();
     auto rolls_buf = rolls.unchecked<1>();
-    auto intra_life_buf = intra_life_prices.unchecked<2>();  // Matrice (n_options, N_INTRA_DATES)
-    auto intra_life_pnl_buf = intra_life_pnl.unchecked<2>(); // Matrice (n_options, N_INTRA_DATES)
     auto pnl_buf = pnl_matrix.unchecked<2>();
     auto prices_buf = prices.unchecked<1>();
     auto mixture_buf = mixture.unchecked<1>();
@@ -133,12 +129,6 @@ void init_options_cache(
         g_cache.options[i].strike = strike_buf(i);
         g_cache.options[i].is_call = is_call_buf(i);
         g_cache.options[i].roll = rolls_buf(i);
-        
-        // Copier les prix intra-vie et P&L intra-vie
-        for (int t = 0; t < N_INTRA_DATES; ++t) {
-            g_cache.options[i].intra_life_prices[t] = intra_life_buf(i, t);
-            g_cache.options[i].intra_life_pnl[t] = intra_life_pnl_buf(i, t);
-        }
         
         // Copier le PnL dans le buffer contigu
         double* row_ptr = g_cache.pnl_flat.data() + i * g_cache.pnl_length;
@@ -198,17 +188,6 @@ static py::tuple scored_strategy_to_python(const ScoredStrategy& strat) {
     metrics_dict["rank"] = strat.rank;
     metrics_dict["delta_levrage"] = strat.delta_levrage;
     metrics_dict["avg_pnl_levrage"] = strat.avg_pnl_levrage;
-
-    py::list intra_life_list;
-    for (int t = 0; t < 5; ++t) {intra_life_list.append(strat.intra_life_prices[t]);
-    }
-    metrics_dict["intra_life_prices"] = intra_life_list;
-
-    py::list intra_life_pnl_list;
-    for (int t = 0; t < 5; ++t) {intra_life_pnl_list.append(strat.intra_life_pnl[t]);
-    }
-    metrics_dict["intra_life_pnl"] = intra_life_pnl_list;
-    metrics_dict["avg_intra_life_pnl"] = strat.avg_intra_life_pnl;
 
     py::array_t<double> pnl_arr(strat.total_pnl_array.size());
     auto pnl_out = pnl_arr.mutable_unchecked<1>();
@@ -299,9 +278,6 @@ static void bnb_store_result(
         metrics.breakeven_points.begin(),
         metrics.breakeven_points.begin() + metrics.breakeven_count);
     strat.avg_pnl_levrage = metrics.avg_pnl_levrage;
-    strat.intra_life_prices = metrics.intra_life_prices;
-    strat.intra_life_pnl = metrics.intra_life_pnl;
-    strat.avg_intra_life_pnl = metrics.avg_intra_life_pnl;
 
     strat.option_indices.resize(depth);
     strat.signs.resize(depth);
@@ -728,8 +704,6 @@ PYBIND11_MODULE(strategy_metrics_cpp, m) {
           py::arg("strikes"),
           py::arg("is_calls"),
           py::arg("rolls"),
-          py::arg("intra_life_prices"),
-          py::arg("intra_life_pnl"),
           py::arg("pnl_matrix"),
           py::arg("prices"),
           py::arg("mixture"),
