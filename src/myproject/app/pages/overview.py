@@ -95,24 +95,10 @@ def run():
             for _k in list(st.session_state.keys()):
                 if _k.startswith("overview_table_"):
                     st.session_state.pop(_k, None)
-                    
-            _params = {
-                "brut_code": params.brut_code if params else None,
-                "underlying": params.underlying if params else "",
-                "months": params.months if params else [],
-                "years": params.years if params else [],
-                "strikes": params.strikes if params else [],
-                "price_min": params.price_min if params else 0.0,
-                "price_max": params.price_max if params else 100.0,
-                "max_legs": params.max_legs if params else 4,
-                "scoring_weights": scoring_weights,
-                "scenarios": scenarios,
-                "filter": filter,
-                "roll_expiries": params.roll_expiries if params else [],
-                "use_bachelier": params.use_bachelier if params else True,
-                "operation_penalisation": params.operation_penalisation if params else 0.0,
-                "prefilled_options": prefilled,
-            }
+
+            # Utiliser les params de la dernière comparaison (pas les valeurs actuelles de la sidebar)
+            _base = st.session_state.get("_last_comparison_params", {})
+            _params = {**_base, "prefilled_options": prefilled}
             process = start_processing(st.session_state.session_id, _params)
             st.session_state.process = process
             st.info("Starting rerun with updated option values...")
@@ -241,6 +227,7 @@ def run():
             "use_bachelier": params.use_bachelier,
             "operation_penalisation": params.operation_penalisation,
         }
+        st.session_state["_last_comparison_params"] = _params.copy()
         process = start_processing(st.session_state.session_id, _params)
         st.session_state.process = process
         st.info("Starting processing...")
