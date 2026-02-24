@@ -117,15 +117,23 @@ def main():
     # PAGE NAVIGATION  (replaces st.tabs)
     # ========================================================================
 
+    overview_page = st.Page(overview_run, title="Overview", icon="📊", default=True, url_path="overview")
+
     pages = st.navigation(
         [
-            st.Page(overview_run, title="Overview", icon="📊", default=True, url_path="overview"),
+            overview_page,
             st.Page(volatility_run, title="Volatility", icon="📈", url_path="volatility"),
             st.Page(history_run, title="History", icon="📜", url_path="history"),
             st.Page(help_run, title="Help", icon="📚", url_path="help"),
         ],
         position="top"
     )
+
+    # Redirection automatique vers Overview après "Rerun pipeline" depuis Volatility
+    # Flag séparé pour éviter la boucle : _redirect_to_overview est supprimé immédiatement
+    if st.session_state.pop("_redirect_to_overview", False):
+        st.switch_page(overview_page)
+
     # Render navigation selector in main area
     pages.run()
 

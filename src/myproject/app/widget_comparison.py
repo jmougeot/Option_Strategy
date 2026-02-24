@@ -4,7 +4,7 @@ from typing import List, Optional
 import pandas as pd 
 
 
-def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: Optional[List[str]] = None, max_rows: int = 5, unit: str = "100ème") -> pd.DataFrame:
+def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: Optional[List[str]] = None, max_rows: int = 15, unit: str = "100ème") -> pd.DataFrame:
     """Creates a DataFrame for displaying comparisons with ALL scoring criteria.
     
     Args:

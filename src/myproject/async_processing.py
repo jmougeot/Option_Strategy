@@ -73,6 +73,7 @@ def run_processing_worker(session_id: str, params_dict: Dict[str, Any]):
             roll_expiries=params_dict["roll_expiries"],
             use_bachelier=params_dict.get("use_bachelier", True),
             leg_penalty=params_dict.get("operation_penalisation", 0.0),
+            prefilled_options=params_dict.get("prefilled_options", None),
         )
         
         # Save result to file

@@ -186,60 +186,33 @@ def create_payoff_diagram(
                 underlying_label = f" - {first_opt.underlying_symbol}"
 
     # Configuration du layout
-    if mixture is not None:
-        fig.update_layout(
-            title=f"Diagramme de P&L à l'Expiration{underlying_label} avec Distribution Gaussienne",
-            xaxis_title="Prix du Sous-Jacent ($)",
-            yaxis_title="Profit / Perte ($)",
-            yaxis2_title="DensitÃ© de ProbabilitÃ©",
-            height=600,
-            hovermode="x unified",
-            legend=dict(
-                orientation="h", 
-                yanchor="bottom", 
-                y=1.02, 
-                xanchor="right", 
-                x=1,
-                font=dict(size=9),
-                itemwidth=30,
-            ),
-            plot_bgcolor="rgba(0,0,0,0)",  # Fond transparent
-            paper_bgcolor="rgba(0,0,0,0)",  # Papier transparent
-            xaxis=dict(gridcolor="rgba(128,128,128,0.2)"),
-            yaxis=dict(
-                gridcolor="rgba(128,128,128,0.2)",
-                zeroline=True,
-                zerolinecolor="rgba(128,128,128,0.3)",
-            ),
-            yaxis2=dict(
-                gridcolor="rgba(128,128,128,0.2)", overlaying="y", side="right"
-            ),
-        )
-    else:
-        fig.update_layout(
-            title=f"Diagramme de P&L à l'Expiration{underlying_label}",
-            xaxis_title="Prix du Sous-Jacent ($)",
-            yaxis_title="Profit / Perte ($)",
-            height=500,
-            hovermode="x unified",
-            legend=dict(
-                orientation="h", 
-                yanchor="bottom", 
-                y=1.02, 
-                xanchor="right", 
-                x=1,
-                font=dict(size=9),
-                itemwidth=30,
-            ),
-            plot_bgcolor="rgba(0,0,0,0)",  # Fond transparent
-            paper_bgcolor="rgba(0,0,0,0)",  # Papier transparent
-            xaxis=dict(gridcolor="rgba(128,128,128,0.2)"),
-            yaxis=dict(
-                gridcolor="rgba(128,128,128,0.2)",
-                zeroline=True,
-                zerolinecolor="rgba(128,128,128,0.3)",
-            ),
-        )
-    
+    fig.update_layout(
+        title=f"P&L Diagramm {underlying_label} with Gaussian Distribution",
+        xaxis_title="Prix du Sous-Jacent ($)",
+        yaxis_title="Profit",
+        yaxis2_title="Density of Probabiliy",
+        height=600,
+        hovermode="x unified",
+        legend=dict(
+            orientation="h", 
+            yanchor="bottom", 
+            y=1.02, 
+            xanchor="right", 
+            x=1,
+            font=dict(size=9),
+            itemwidth=30,
+        ),
+        plot_bgcolor="rgba(0,0,0,0)",  # Fond transparent
+        paper_bgcolor="rgba(0,0,0,0)",  # Papier transparent
+        xaxis=dict(gridcolor="rgba(128,128,128,0.2)"),
+        yaxis=dict(
+            gridcolor="rgba(128,128,128,0.2)",
+            zeroline=True,
+            zerolinecolor="rgba(128,128,128,0.3)",
+        ),
+        yaxis2=dict(
+            gridcolor="rgba(128,128,128,0.2)", overlaying="y", side="right"
+        ),
+    )
     st.plotly_chart(fig, width="stretch", key=key)
     return fig

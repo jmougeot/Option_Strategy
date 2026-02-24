@@ -45,10 +45,9 @@ def format_large_number(n):
 def run():
     """Main Overview page content."""
 
-    # Retrieve sidebar data stored in session_state by app.py
-    params: UIParams = st.session_state.get("_params_widget") #type: ignore
+    params: UIParams = st.session_state.get("_params_widget") 
     scenarios = st.session_state.get("_scenarios_widget")
-    filter: FilterData = st.session_state.get("_filter_widget") #type: ignore
+    filter: FilterData = st.session_state.get("_filter_widget")
     scoring_weights = st.session_state.get("_scoring_weights", [])
 
     # ========================================================================
@@ -79,7 +78,45 @@ def run():
     with stop_col:
         st.button("STOP", type="secondary", width="stretch", on_click=on_stop_click)
 
-    all_comparisons = None
+    all_comparisons = st.session_state.get("comparisons", None)
+
+    # ------------------------------------------------------------------
+    # Auto-trigger: rerun depuis la page Volatility avec options pre-remplies
+    # ------------------------------------------------------------------
+    if st.session_state.get("_trigger_rerun_with_prefilled") and not st.session_state.processing:
+        prefilled = st.session_state.pop("_prefilled_options", None)
+        st.session_state.pop("_trigger_rerun_with_prefilled", None)
+
+        if prefilled:
+            st.session_state.processing = True
+            st.session_state.pop("comparisons", None)
+            st.session_state.pop("multi_ranking", None)
+
+            for _k in list(st.session_state.keys()):
+                if _k.startswith("overview_table_"):
+                    st.session_state.pop(_k, None)
+                    
+            _params = {
+                "brut_code": params.brut_code if params else None,
+                "underlying": params.underlying if params else "",
+                "months": params.months if params else [],
+                "years": params.years if params else [],
+                "strikes": params.strikes if params else [],
+                "price_min": params.price_min if params else 0.0,
+                "price_max": params.price_max if params else 100.0,
+                "max_legs": params.max_legs if params else 4,
+                "scoring_weights": scoring_weights,
+                "scenarios": scenarios,
+                "filter": filter,
+                "roll_expiries": params.roll_expiries if params else [],
+                "use_bachelier": params.use_bachelier if params else True,
+                "operation_penalisation": params.operation_penalisation if params else 0.0,
+                "prefilled_options": prefilled,
+            }
+            process = start_processing(st.session_state.session_id, _params)
+            st.session_state.process = process
+            st.info("Starting rerun with updated option values...")
+            st.rerun()
 
     # ------------------------------------------------------------------
     # Check running process
@@ -112,7 +149,11 @@ def run():
                 st.session_state["multi_ranking"] = multi_result
                 st.session_state["comparisons"] = all_comparisons
                 st.session_state["mixture"] = mixture
-                st.session_state["future_data"] = future_data
+                # Conserver le future_data précédent si le nouveau est vide (ex: rerun avec prefilled_options)
+                if future_data and future_data.underlying_price is not None:
+                    st.session_state["future_data"] = future_data
+                elif "future_data" not in st.session_state:
+                    st.session_state["future_data"] = future_data
                 st.session_state["stats"] = stats
                 if "all_options" in stats:
                     st.session_state["all_imported_options"] = stats["all_options"]
@@ -177,6 +218,13 @@ def run():
 
     elif compare_button and not st.session_state.processing:
         st.session_state.processing = True
+        # Vider les résultats précédents dès le démarrage
+        st.session_state.pop("comparisons", None)
+        st.session_state.pop("multi_ranking", None)
+        for _k in list(st.session_state.keys()):
+            if _k.startswith("overview_table_"):
+                st.session_state.pop(_k, None)
+
         _params = {
             "brut_code": params.brut_code,
             "underlying": params.underlying,
@@ -236,13 +284,13 @@ def run():
         ]
         sub_tabs = st.tabs(sub_tab_names)
         with sub_tabs[0]:
-            display_overview_tab(all_comparisons, roll_labels=roll_labels, unit=params.unit)
-            create_payoff_diagram(all_comparisons[:5], mixture, underlying_price, key="payoff_consensus")
+            active = display_overview_tab(all_comparisons, roll_labels=roll_labels, unit=params.unit, tab_key="consensus")
+            create_payoff_diagram(active[:5], mixture, underlying_price, key="payoff_consensus") #type: ignore
         for i in range(multi_ranking.n_sets):
             with sub_tabs[i + 1]:
                 set_comps = multi_ranking.per_set_strategies[i]
-                display_overview_tab(set_comps, roll_labels=roll_labels, unit=params.unit)
-                create_payoff_diagram(set_comps[:5], mixture, underlying_price, key=f"payoff_set_{i}")
+                active_set = display_overview_tab(set_comps, roll_labels=roll_labels, unit=params.unit, tab_key=f"set_{i}")
+                create_payoff_diagram(active_set[:5], mixture, underlying_price, key=f"payoff_set_{i}") #type: ignore
     else:
-        display_overview_tab(all_comparisons, roll_labels=roll_labels, unit=params.unit)
-        create_payoff_diagram(all_comparisons[:5], mixture, underlying_price, key="payoff_single")
+        active = display_overview_tab(all_comparisons, roll_labels=roll_labels, unit=params.unit, tab_key="single")
+        create_payoff_diagram(active[:5], mixture, underlying_price, key="payoff_single") #type: ignore

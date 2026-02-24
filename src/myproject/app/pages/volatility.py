@@ -124,129 +124,66 @@ def _plot_smile(calls: List[Option], puts: List[Option], underlying_price: Optio
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
 
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def _plot_premium_vs_strike(calls: List[Option], puts: List[Option], underlying_price: Optional[float]):
-    """Premium (mid) vs Strike."""
-
-    fig = go.Figure()
-
-    for opts, name, color, symbol in [
-        (calls, "Calls", "#2196F3", "circle"),
-        (puts, "Puts", "#F44336", "diamond"),
-    ]:
-        good = [o for o in opts if o.status and o.premium > 0]
-        warn = [o for o in opts if not o.status and o.premium > 0]
-
-        if good:
-            fig.add_trace(go.Scatter(
-                x=[o.strike for o in good],
-                y=[o.premium for o in good],
-                mode="markers+lines",
-                name=name,
-                marker=dict(color=color, size=7, symbol=symbol),
-                line=dict(color=color, width=1, dash="dot"),
-            ))
-        if warn:
-            fig.add_trace(go.Scatter(
-                x=[o.strike for o in warn],
-                y=[o.premium for o in warn],
-                mode="markers",
-                name=f"{name} (corrigés)",
-                marker=dict(color=color, size=9, symbol="x", line=dict(width=2, color="#FF9800")),
-            ))
-
-    if underlying_price and underlying_price > 0:
-        fig.add_vline(x=underlying_price, line_dash="dash", line_color="gray")
-
-    fig.update_layout(
-        title="Premium vs Strike",
-        xaxis_title="Strike",
-        yaxis_title="Premium",
-        template="plotly_dark",
-        height=400,
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def _plot_greeks(options: List[Option], underlying_price: Optional[float]):
-    """Delta et Gamma vs Strike."""
-
-    if not options:
-        return
-
-    fig = make_subplots(rows=1, cols=2, subplot_titles=("Delta vs Strike", "Gamma vs Strike"))
-
-    calls = [o for o in options if o.is_call() and abs(o.delta) > 0]
-    puts = [o for o in options if o.is_put() and abs(o.delta) > 0]
-
-    for opts, name, color in [(calls, "Calls", "#2196F3"), (puts, "Puts", "#F44336")]:
-        if opts:
-            fig.add_trace(go.Scatter(
-                x=[o.strike for o in opts],
-                y=[o.delta for o in opts],
-                mode="markers+lines",
-                name=f"{name} Δ",
-                marker=dict(color=color, size=6),
-                line=dict(color=color, width=1),
-            ), row=1, col=1)
-
-            fig.add_trace(go.Scatter(
-                x=[o.strike for o in opts],
-                y=[o.gamma for o in opts],
-                mode="markers+lines",
-                name=f"{name} Γ",
-                marker=dict(color=color, size=6),
-                line=dict(color=color, width=1, dash="dash"),
-                showlegend=False,
-            ), row=1, col=2)
-
-    fig.update_layout(
-        template="plotly_dark",
-        height=400,
-        legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="right", x=1),
-    )
-    fig.update_xaxes(title_text="Strike", row=1, col=1)
-    fig.update_xaxes(title_text="Strike", row=1, col=2)
-    fig.update_yaxes(title_text="Delta", row=1, col=1)
-    fig.update_yaxes(title_text="Gamma", row=1, col=2)
-
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def _options_table(options: List[Option]):
-    """Tableau récapitulatif des options avec leurs IV et status."""
+    """Tableau récapitulatif des options — IV et Premium éditables, propagés aux objets Option."""
     import pandas as pd
 
     rows = []
     for o in options:
         rows.append({
-            "Type": "Call" if o.is_call() else "Put",
-            "Strike": o.strike,
+            "Type":    "Call" if o.is_call() else "Put",
+            "Expiry":  f"{o.expiration_month}{o.expiration_year}",
+            "Strike":  o.strike,
             "Premium": round(o.premium, 6) if o.premium else 0.0,
-            "Bid": round(o.bid, 6) if o.bid else 0.0,
-            "Ask": round(o.ask, 6) if o.ask else 0.0,
-            "IV (%)": round(o.implied_volatility, 2) if o.implied_volatility else 0.0,
-            "Delta": round(o.delta, 4) if o.delta else 0.0,
-            "Gamma": round(o.gamma, 6) if o.gamma else 0.0,
-            "Vega": round(o.vega, 4) if o.vega else 0.0,
-            "Theta": round(o.theta, 4) if o.theta else 0.0,
-            "Status": "✅" if o.status else "⚠️ Corrigé",
-            "Expiry": f"{o.expiration_month}{o.expiration_year}",
+            "Bid":     round(o.bid, 6) if o.bid else 0.0,
+            "Ask":     round(o.ask, 6) if o.ask else 0.0,
+            "IV (%)":  round(o.implied_volatility, 4) if o.implied_volatility else 0.0,
+            "Delta":   round(o.delta, 4) if o.delta else 0.0,
+            "Gamma":   round(o.gamma, 6) if o.gamma else 0.0,
+            "Theta":   round(o.theta, 6) if o.theta else 0.0,
+            "Status":  "✅" if o.status else "⚠️ Corrigé",
         })
 
     df = pd.DataFrame(rows)
-    st.dataframe(
+
+    # Colonnes éditables : IV et Premium uniquement
+    editable = {"IV (%)", "Premium"}
+    disabled_cols = [c for c in df.columns if c not in editable]
+    edited = st.data_editor(
         df,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
+        num_rows="fixed",
+        disabled=disabled_cols,
         column_config={
-            "IV (%)": st.column_config.NumberColumn(format="%.2f"),
-            "Premium": st.column_config.NumberColumn(format="%.6f"),
-            "Delta": st.column_config.NumberColumn(format="%.4f"),
+            "IV (%)":   st.column_config.NumberColumn("IV (%)", format="%.4f", min_value=0.0),
+            "Premium":  st.column_config.NumberColumn("Premium", format="%.6f", min_value=0.0),
+            "Delta":    st.column_config.NumberColumn(format="%.4f"),
+            "Gamma":    st.column_config.NumberColumn(format="%.4f"),
+            "Theta":    st.column_config.NumberColumn(format="%.4f"),
         },
+        key="volatility_table_editor",
     )
+
+    # Propager les modifications aux objets Option en session
+    if edited is not None:
+        changed = False
+        for idx, row in edited.iterrows():
+            o = options[idx]
+            new_iv  = float(row["IV (%)"])
+            new_prem = float(row["Premium"])
+            if abs(new_iv - (o.implied_volatility or 0.0)) > 1e-8:
+                o.implied_volatility = new_iv
+                changed = True
+            if abs(new_prem - (o.premium or 0.0)) > 1e-8:
+                o.premium = new_prem
+                changed = True
+        if changed:
+            # Forcer Streamlit à re-lire les options depuis session (smile se redessine)
+            st.session_state["all_imported_options"] = st.session_state.get("all_imported_options", options)
 
 
 # ============================================================================
@@ -290,18 +227,26 @@ def run():
         calls, puts = _split_calls_puts(options)
 
     # Onglets
-    tab_smile, tab_premium, tab_greeks, tab_table = st.tabs(
-        ["Smile", "Premium", "Greeks", "Table"]
+    tab_smile, tab_table = st.tabs(
+        ["Smile", "Table"]
     )
 
     with tab_smile:
         _plot_smile(calls, puts, underlying_price)
 
-    with tab_premium:
-        _plot_premium_vs_strike(calls, puts, underlying_price)
-
-    with tab_greeks:
-        _plot_greeks(options, underlying_price)
-
     with tab_table:
         _options_table(options)
+
+        rerun_btn = st.button(
+            "Rerun pipeline",
+            type="primary",
+            width="stretch",
+        )
+
+        if rerun_btn:
+            # Snapshot des options actuelles (déjà mutées par l'éditeur)
+            current_opts = st.session_state.get("all_imported_options", options)
+            st.session_state["_prefilled_options"] = list(current_opts)
+            st.session_state["_trigger_rerun_with_prefilled"] = True
+            st.session_state["_redirect_to_overview"] = True
+            st.rerun()

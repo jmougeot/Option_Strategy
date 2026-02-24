@@ -48,6 +48,7 @@ def process_bloomberg_to_strategies(
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
     use_bachelier: bool = True,
     leg_penalty: float = 0.0,
+    prefilled_options: Optional[List] = None,
 ) -> Tuple[Union[List[StrategyComparison], MultiRankingResult], Dict, Tuple[np.ndarray, np.ndarray, float], FutureData]:
     """
     Fonction principale simplifiee pour Streamlit.
@@ -56,15 +57,49 @@ def process_bloomberg_to_strategies(
 
     stats = {}
     future_data = FutureData(None, None)
-    
-    # Verifier le mode offline
-    offline = is_offline_mode()
 
     # Creer la mixture de scenarios
     mixture = create_mixture_from_scenarios(
         scenarios, price_min, price_max, num_points
     )
 
+    # ── Shortcut: options pré-chargées (rerun depuis page Volatility) ──
+    if prefilled_options is not None:
+        options = prefilled_options
+        stats["future_data"] = future_data
+        stats["all_options"] = options
+        stats["nb_options"] = len(options)
+        # Filtrer les options sans statut si Bachelier désactivé
+        if not use_bachelier:
+            options = [opt for opt in options if opt.status]
+            stats["nb_options_filtered_warnings"] = stats["nb_options"] - len(options)
+            stats["nb_options"] = len(options)
+        if not options:
+            return [], stats, mixture, future_data
+        # Sauter directement à la génération de stratégies
+        generator = OptionStrategyGeneratorV2(options)
+        if isinstance(scoring_weights, list):
+            weight_sets = scoring_weights
+        elif isinstance(scoring_weights, dict):
+            weight_sets = [scoring_weights]
+        else:
+            weight_sets = [{}]
+        best_strategies = generator.generate_top_strategies_multi(
+            filter=filter,
+            max_legs=max_legs,
+            top_n=top_n,
+            weight_sets=weight_sets,
+            leg_penalty=leg_penalty,
+        )
+        from math import comb
+        n_opts = len(options)
+        stats["nb_strategies_possibles"] = sum(comb(n_opts, k) * (2 ** k) for k in range(1, max_legs + 1))
+        stats["nb_strategies_classees"] = len(best_strategies.consensus_strategies)
+        clear_caches()
+        return best_strategies, stats, mixture, future_data
+
+    # Verifier le mode offline
+    offline = is_offline_mode()
 
     # Fetch options: Bloomberg ou Simulation selon OFFLINE_MODE
     if offline:
