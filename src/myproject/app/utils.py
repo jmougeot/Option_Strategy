@@ -2,16 +2,28 @@
 # FONCTIONS UTILITAIRES
 # ============================================================================
 
-from typing import Dict, List
+from typing import List, Optional
 from myproject.option.option_class import Option
+import streamlit as st 
 
+def collect_options_from_session() -> List[Option]:
+    """
+    Récupère toutes les options importées depuis la session.
+    Priorité: all_imported_options (complet) > extraction depuis les stratégies (partiel).
+    """
+    # 1. Source principale: toutes les options importées
+    all_opts: Optional[List[Option]] = st.session_state.get("all_imported_options")
+    if all_opts:
+        options = sorted(all_opts, key=lambda o: o.strike)
+        return options
+    else :
+        return []
 
-def prepare_options_data(options: List[Option]) -> Dict[str, List[Option]]:
-    """SÃ©pare les calls et puts."""
-    calls = [opt for opt in options if opt.option_type == "call"]
-    puts = [opt for opt in options if opt.option_type == "put"]
-
-    return {"calls": calls, "puts": puts}
+def split_calls_puts(options: List[Option]):
+    """Sépare les calls et puts."""
+    calls = [o for o in options if o.is_call()]
+    puts = [o for o in options if o.is_put()]
+    return calls, puts
 
 
 def format_currency(value: float) -> str:
@@ -22,12 +34,7 @@ def format_currency(value: float) -> str:
 
 
 def format_price(value: float, unit: str = "100ème") -> str:
-    """Formats a price value, converting to 64ths if needed.
-    
-    Args:
-        value: The price value (in decimal, e.g. 0.0625)
-        unit: "64ème" to display in 64ths, otherwise decimal
-    """
+    """Formats a price value, converting to 64ths if needed"""
     if value is None:
         return "-"
     if value == float("inf") or value == float("-inf"):

@@ -13,7 +13,6 @@ class ScenarioData:
     std_devs: List[float]  # std ou std_l si asymétrique
     std_devs_r: List[float]  # std_r si asymétrique, sinon égal à std_devs
     weights: List[float]
-    asymmetric: bool = False
 
 @dataclass
 class FutureData:

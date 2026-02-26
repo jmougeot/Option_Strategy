@@ -1,5 +1,5 @@
-﻿"""
-Module pour gÃ©rer les diffÃ©rents tabs de l'application Streamlit
+"""
+Module pour gérer les différents tabs de l'application Streamlit
 """
 
 import streamlit as st
@@ -34,7 +34,7 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
     winner = active_comparisons[0]
     expiry_str = format_expiration_date(winner.expiration_month, winner.expiration_year)
 
-    col1, col2, col3, col4 = st.columns([6, 4, 4, 4])
+    col1, col2, col3, col4 = st.columns([8, 3, 3, 3])
     with col1:
         st.metric(
             f"🥇 Best Strategy ({expiry_str})", 
@@ -43,16 +43,12 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
     with col2:
         st.metric("Max Profit", format_price(winner.max_profit, unit), "")
     with col3:
-        max_loss_str = (
-            format_price(winner.max_loss, unit)
-            if winner.max_loss != float("inf")
-            else "Unlimited"
-        )
-        st.metric("Max Loss", max_loss_str, "")
+        st.metric("Max Loss", 
+                    f"{winner.max_loss}")
     with col4:
         st.metric(
             "Expected gain at expiry",
-            f"{winner.average_pnl:.1f}% of max",
+            f"{winner.average_pnl:.1f} ",
         )
 
     st.markdown("---")

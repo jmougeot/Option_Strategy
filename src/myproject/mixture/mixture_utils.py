@@ -21,7 +21,7 @@ def create_mixture_from_scenarios(
     Supporte les gaussiennes symétriques et asymétriques.
 
     Args:
-        scenarios: ScenarioData avec centers, std_devs, std_devs_r, weights, asymmetric
+        scenarios: ScenarioData avec centers, std_devs, std_devs_r, weights
         price_min: Prix minimum de la grille
         price_max: Prix maximum de la grille
         num_points: Nombre de points dans la grille
@@ -34,31 +34,18 @@ def create_mixture_from_scenarios(
     std_devs = scenarios.std_devs
     std_devs_r = scenarios.std_devs_r
     proba = scenarios.weights
-    is_asymmetric = getattr(scenarios, 'asymmetric', False)
 
-    if is_asymmetric:
-        # Mode asymétrique: utiliser asymetric_gaussian
-        prices, mix = mixture(
-            price_min=price_min,
-            price_max=price_max,
-            num_points=num_points,
-            proba=proba,
-            mus=centers,
-            sigmas=std_devs,
-            f=asymetric_gaussian,
-            sigmas_r=std_devs_r,
-        )
-    else:
-        # Mode symétrique: utiliser gaussian standard
-        prices, mix = mixture(
-            price_min=price_min,
-            price_max=price_max,
-            num_points=num_points,
-            proba=proba,
-            mus=centers,
-            sigmas=std_devs,
-            f=gaussian,
-        )
+    prices, mix = mixture(
+        price_min=price_min,
+        price_max=price_max,
+        num_points=num_points,
+        proba=proba,
+        mus=centers,
+        sigmas=std_devs,
+        f=asymetric_gaussian,
+        sigmas_r=std_devs_r,
+    )
+
     average = float(np.average(prices, weights=mix))
     
     return prices, mix, average

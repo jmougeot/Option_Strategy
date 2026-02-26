@@ -98,7 +98,6 @@ def run():
         **Advantages:**
         - Models **multimodal** distributions (multiple possible peaks)
         - Naturally captures **fat tails**
-        - Allows **asymmetric** distributions
         
         **Visualization:** The P&L diagram shows the probability curve in the background.
         """)

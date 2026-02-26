@@ -5,13 +5,8 @@ from myproject.app.utils import strike_list
 from typing import Optional, List, Tuple
 
 
-# Mois Bloomberg disponibles
-MONTH_OPTIONS = ["H", "M", "U", "Z"]
-MONTH_NAMES = {"H": "March", "M": "June", "U": "September", "Z": "December"}
-
 # Type alias
 RollExpiry = Tuple[str, int]
-
 
 def parse_roll_input(roll_input: str) -> Optional[List[RollExpiry]]:
     """
@@ -143,8 +138,9 @@ def sidebar_params() -> UIParams:
         
         c1 , c2, c3= st.columns(3)
         with c1:
-            months_input = st.text_input(
+            months_input = st.selectbox(
                 "Expiration Month:",
+                options= ["F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"],
                 help="H=Mar, M=Jun, U=Sep, Z=Dec",
                 key="param_months"
             )

@@ -145,11 +145,10 @@ def create_payoff_diagram(
             x=prices_mixture,
             y=probabilities,
             mode="lines",
-            name="Distribution Gaussienne",
+            name="Gaussian Distribution",
             fill="tozeroy",
             line=dict(color="rgba(128, 128, 128, 0.8)", width=2, dash="dot"),
             fillcolor="rgba(128, 128, 128, 0.2)",
-            hovertemplate="Prix: $%{x:.2f}<br>ProbabilitÃ©: %{y:.4f}<extra></extra>",
             yaxis="y2",
         ),
         secondary_y=True,
@@ -176,7 +175,6 @@ def create_payoff_diagram(
             opacity=0.7,
         )
 
-    # RÃ©cupÃ©rer l'underlying depuis la premiÃ¨re stratÃ©gie si disponible
     underlying_label = ""
     if comparisons and len(comparisons) > 0:
         first_comp = comparisons[0]
@@ -188,7 +186,7 @@ def create_payoff_diagram(
     # Configuration du layout
     fig.update_layout(
         title=f"P&L Diagramm {underlying_label} with Gaussian Distribution",
-        xaxis_title="Prix du Sous-Jacent ($)",
+        xaxis_title="Underlying Price",
         yaxis_title="Profit",
         yaxis2_title="Density of Probabiliy",
         height=600,
@@ -202,17 +200,7 @@ def create_payoff_diagram(
             font=dict(size=9),
             itemwidth=30,
         ),
-        plot_bgcolor="rgba(0,0,0,0)",  # Fond transparent
-        paper_bgcolor="rgba(0,0,0,0)",  # Papier transparent
-        xaxis=dict(gridcolor="rgba(128,128,128,0.2)"),
-        yaxis=dict(
-            gridcolor="rgba(128,128,128,0.2)",
-            zeroline=True,
-            zerolinecolor="rgba(128,128,128,0.3)",
-        ),
-        yaxis2=dict(
-            gridcolor="rgba(128,128,128,0.2)", overlaying="y", side="right"
-        ),
+
     )
     st.plotly_chart(fig, width="stretch", key=key)
     return fig

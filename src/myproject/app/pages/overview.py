@@ -6,7 +6,7 @@ import streamlit as st
 import uuid
 from typing import Dict, List
 from streamlit_autorefresh import st_autorefresh
-from myproject.app.tabs import display_overview_tab
+from myproject.app.widget_tab import display_overview_tab
 from myproject.app.widget_payoff import create_payoff_diagram
 from myproject.async_processing import start_processing, check_processing_status, stop_processing
 from myproject.app.data_types import FilterData, FutureData

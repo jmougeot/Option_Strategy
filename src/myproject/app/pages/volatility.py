@@ -5,52 +5,9 @@ Affiche les IV des options importées, le slope Bachelier et les corrections war
 
 import streamlit as st
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from typing import List, Optional
-
 from myproject.option.option_class import Option
-from myproject.strategy.strategy_class import StrategyComparison
-
-
-# ============================================================================
-# HELPERS
-# ============================================================================
-
-def _collect_options_from_session() -> List[Option]:
-    """
-    Récupère toutes les options importées depuis la session.
-    Priorité: all_imported_options (complet) > extraction depuis les stratégies (partiel).
-    """
-    # 1. Source principale: toutes les options importées
-    all_opts: Optional[List[Option]] = st.session_state.get("all_imported_options")
-    if all_opts:
-        options = sorted(all_opts, key=lambda o: o.strike)
-        return options
-
-    # 2. Fallback: extraire depuis les stratégies (partiel)
-    comparisons: Optional[List[StrategyComparison]] = st.session_state.get("comparisons")
-    if not comparisons:
-        return []
-
-    seen = set()
-    options: List[Option] = []
-    for comp in comparisons:
-        for opt in comp.all_options:
-            key = (opt.strike, opt.option_type, opt.expiration_month, opt.expiration_year)
-            if key not in seen:
-                seen.add(key)
-                options.append(opt)
-
-    options.sort(key=lambda o: o.strike)
-    return options
-
-
-def _split_calls_puts(options: List[Option]):
-    """Sépare les calls et puts."""
-    calls = [o for o in options if o.is_call()]
-    puts = [o for o in options if o.is_put()]
-    return calls, puts
-
+from myproject.app.utils import split_calls_puts, collect_options_from_session
 
 # ============================================================================
 # GRAPHIQUES
@@ -144,7 +101,7 @@ def _options_table(options: List[Option]):
             "Delta":   round(o.delta, 4) if o.delta else 0.0,
             "Gamma":   round(o.gamma, 6) if o.gamma else 0.0,
             "Theta":   round(o.theta, 6) if o.theta else 0.0,
-            "Status":  "✅" if o.status else "⚠️ Corrigé",
+            "Status":  "Ok" if o.status else "⚠️ Corrigé",
         })
 
     df = pd.DataFrame(rows)
@@ -195,7 +152,7 @@ def run():
 
     st.header("Volatility Analysis")
 
-    options = _collect_options_from_session()
+    options = collect_options_from_session()
 
     if not options:
         st.info("Aucune donnée de volatilité disponible. Lancez une comparaison dans **Overview** d'abord.")
@@ -205,26 +162,7 @@ def run():
     future_data = st.session_state.get("future_data")
     underlying_price = future_data.underlying_price if future_data and future_data.underlying_price else None
 
-    calls, puts = _split_calls_puts(options)
-
-    # Stats rapides
-    n_warned = sum(1 for o in options if not o.status)
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Options totales", len(options))
-    with col2:
-        st.metric("Calls", len(calls))
-    with col3:
-        st.metric("Puts", len(puts))
-    with col4:
-        st.metric("Corrigées (warning)", n_warned)
-
-    # Sélecteur d'expiration si multiples
-    expiries = sorted(set(f"{o.expiration_month}{o.expiration_year}" for o in options))
-    if len(expiries) > 1:
-        selected_expiry = st.selectbox("Expiration", expiries, index=0)
-        options = [o for o in options if f"{o.expiration_month}{o.expiration_year}" == selected_expiry]
-        calls, puts = _split_calls_puts(options)
+    calls, puts = split_calls_puts(options)
 
     # Onglets
     tab_smile, tab_table = st.tabs(
