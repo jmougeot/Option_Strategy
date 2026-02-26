@@ -295,190 +295,137 @@ class OptionProcessor:
 def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float = 0.25, future_price: Optional[float] = None) -> None:
     """
     Calcule la volatilité Bachelier pour TOUTES les options.
+
+    Pipeline simplifié en 5 étapes sur une IV unique par strike :
+      1. Calcul IV individuelle (call + put)
+      2. Fusion call+put → iv_merged par strike (moyenne si cohérents, sinon le meilleur)
+      3. Suppression des strikes isolés
+      4. Calcul des slopes + extrapolation sur iv_merged
+      5. Application à chaque option + greeks
     """
     options.sort(key=lambda x: (x.strike, x.option_type))
 
-    F = future_price or FutureData.underlying_price
+    F = future_price
     if not F:
-        print("[_compute_bachelier_volatility] Pas de prix future disponible, abandon.")
         return
-    print(f"[_compute_bachelier_volatility] Appel avec F={F}, {len(options)} options")
-    for o in options:
-        if not o.status or o.premium <= 0:
-            sym = "C" if o.is_call() else "P"
-            print(f"  [DEBUG] {sym} K={o.strike} | premium={o.premium} | status={o.status} | IV_entree={o.implied_volatility:.4f}")
+
+    # ── 1. Calcul IV individuelle + construction de datas ───────────────────
     datas: List[Tuple[float, Option, Option]] = []
-
-    # ── Helpers ──────────────────────────────────────────────────────────────
-
-    def _calc_slope(iv_a: float, iv_b: float) -> Optional[float]:
-        """Retourne iv_a - iv_b si les deux IV sont valides, sinon None."""
-        return iv_a - iv_b if iv_a > 0 and iv_b > 0 else None
-
-    def _assign_slopes(call: Option, put: Option,
-                       left_c: Optional[float], right_c: Optional[float],
-                       left_p: Optional[float], right_p: Optional[float]) -> None:
-        """Assigne left/right slope avec fallback call↔put si l'un est None."""
-        call.left_slope  = left_c  if left_c  is not None else left_p
-        call.right_slope = right_c if right_c is not None else right_p
-        put.left_slope   = left_p  if left_p  is not None else left_c
-        put.right_slope  = right_p if right_p is not None else right_c
-    
-    IV_CALL_PUT_THRESHOLD = 0.30  # écart absolu max toléré entre IV call et IV put au même strike
-
-    def _detect_and_fix_bad_iv(datas_local: list, iv_c_local: list, iv_p_local: list) -> None:
-        """
-        Détecte les IVs aberrantes (mauvais prix Bloomberg) en combinant :
-          1. Écart call/put au même strike > seuil
-          2. Écart de chacun par rapport à la moyenne de ses voisins (même type)
-        L'option la plus éloignée de ses voisins est marquée status=False et son IV remise à 0,
-        afin que l'étape d'extrapolation la reconstruise proprement.
-        """
-        n_local = len(datas_local)
-
-        def neighbor_avg(iv_list: list, idx: int) -> Optional[float]:
-            neighbors = [iv_list[j] for j in (idx - 1, idx + 1) if 0 <= j < n_local and iv_list[j] > 0]
-            return sum(neighbors) / len(neighbors) if neighbors else None
-
-        def is_isolated(iv_list: list, idx: int) -> bool:
-            """True si aucun voisin valide ni à gauche ni à droite."""
-            left  = next((iv_list[j] for j in range(idx - 1, -1, -1)        if iv_list[j] > 0), None)
-            right = next((iv_list[j] for j in range(idx + 1, n_local)       if iv_list[j] > 0), None)
-            return left is None and right is None
-
-        # Passe 1 : supprimer les strikes isolés (aucun voisin valide des deux côtés)
-        for i, (_, call, put) in enumerate(datas_local):
-            if iv_c_local[i] > 0 and is_isolated(iv_c_local, i):
-                print(f"  [isolated] C K={call.strike}: aucun voisin valide → ignoré")
-                call.status = False
-                call.implied_volatility = 0.0
-                iv_c_local[i] = 0.0
-            if iv_p_local[i] > 0 and is_isolated(iv_p_local, i):
-                print(f"  [isolated] P K={put.strike}: aucun voisin valide → ignoré")
-                put.status = False
-                put.implied_volatility = 0.0
-                iv_p_local[i] = 0.0
-
-        # Passe 2 : détecter les IVs aberrantes (écart call/put + distance voisins)
-            iv_call = iv_c_local[i]
-            iv_put  = iv_p_local[i]
-
-            # Ne traiter que quand les deux IVs sont valides
-            if iv_call <= 0 or iv_put <= 0:
-                continue
-            if abs(iv_call - iv_put) <= IV_CALL_PUT_THRESHOLD:
-                continue
-
-            # Identifier laquelle est la plus incohérente avec ses voisins
-            avg_c = neighbor_avg(iv_c_local, i)
-            avg_p = neighbor_avg(iv_p_local, i)
-            err_c = abs(iv_call - avg_c) if avg_c is not None else 0.0
-            err_p = abs(iv_put  - avg_p) if avg_p is not None else 0.0
-
-            sym_c = "C" if call.is_call() else "P"
-            sym_p = "P" if put.is_call() is False else "C"
-
-            if err_c >= err_p:
-                print(f"  [bad IV] {sym_c} K={call.strike}: IV={iv_call:.4f} écart voisins={err_c:.4f} → ignoré")
-                call.status = False
-                call.implied_volatility = 0.0
-                iv_c_local[i] = 0.0
-            else:
-                print(f"  [bad IV] {sym_p} K={put.strike}: IV={iv_put:.4f} écart voisins={err_p:.4f} → ignoré")
-                put.status = False
-                put.implied_volatility = 0.0
-                iv_p_local[i] = 0.0
-        
-    # ── 1. Construction de datas + calcul IV de base ──────────────────────────
     for j in range(len(options) // 2):
-        opt1 = options[2 * j]       # call  (sort: "call" < "put")
-        opt2 = options[2 * j + 1]   # put
-        opt1.underlying_price = F
-        opt2.underlying_price = F
+        call = options[2 * j]       # "call" < "put" alphabétiquement → call en premier
+        put  = options[2 * j + 1]
+        call.underlying_price = F
+        put.underlying_price  = F
 
-        # Reset IV des options sans premium : l'IV Bloomberg est dans des unités
-        if not opt1.status or opt1.premium <= 0:
-            opt1.implied_volatility = 0.0
-        if not opt2.status or opt2.premium <= 0:
-            opt2.implied_volatility = 0.0
+        call.implied_volatility = (
+            bachelier_implied_vol(F, call.strike, call.premium, time_to_expiry, True)
+            if call.status and call.premium > 0 else 0.0
+        )
+        put.implied_volatility = (
+            bachelier_implied_vol(F, put.strike, put.premium, time_to_expiry, False)
+            if put.status and put.premium > 0 else 0.0
+        )
+        datas.append((call.strike, call, put))
 
-        if opt1.status and opt1.premium > 0:
-            opt1.implied_volatility = bachelier_implied_vol(F, opt1.strike, opt1.premium, time_to_expiry, opt1.is_call())
-        if opt2.status and opt2.premium > 0:
-            opt2.implied_volatility = bachelier_implied_vol(F, opt2.strike, opt2.premium, time_to_expiry, opt2.is_call())
-
-        datas.append((opt1.strike, opt1, opt2))
-
-    # ── 2. Détection des IVs aberrantes (avant calcul des slopes) ────────────────
     n = len(datas)
+    if n == 0:
+        return
+
+    # ── 2. Fusion call+put → iv_merged par strike ───────────────────────────
+    # Si les deux sont valides et cohérents  → moyenne
+    # Si l'un diverge trop vs ses voisins   → on garde l'autre
+    # Si un seul est disponible             → on garde celui-là
+    IV_DIVERGENCE_THRESHOLD = 0.30
+
+    def _neighbor_avg(iv_list: List[float], idx: int) -> Optional[float]:
+        neighbors = [iv_list[j] for j in (idx - 1, idx + 1) if 0 <= j < n and iv_list[j] > 0]
+        return sum(neighbors) / len(neighbors) if neighbors else None
+
     iv_c = [d[1].implied_volatility for d in datas]
     iv_p = [d[2].implied_volatility for d in datas]
+    iv_merged: List[float] = []
 
-    _detect_and_fix_bad_iv(datas, iv_c, iv_p)
+    for i, (_, call, put) in enumerate(datas):
+        ic, ip = iv_c[i], iv_p[i]
+        if ic > 0 and ip > 0:
+            if abs(ic - ip) <= IV_DIVERGENCE_THRESHOLD:
+                iv_merged.append((ic + ip) / 2.0)
+            else:
+                # Garder celui le plus cohérent avec ses voisins
+                err_c = abs(ic - _neighbor_avg(iv_c, i)) if _neighbor_avg(iv_c, i) is not None else float("inf")
+                err_p = abs(ip - _neighbor_avg(iv_p, i)) if _neighbor_avg(iv_p, i) is not None else float("inf")
+                if err_c <= err_p:
+                    put.status = False
+                    put.implied_volatility = 0.0
+                    iv_merged.append(ic)
+                    print(f"  [fusion] K={call.strike}: ecart C/P={abs(ic-ip):.4f} → put ecarte")
+                else:
+                    call.status = False
+                    call.implied_volatility = 0.0
+                    iv_merged.append(ip)
+                    print(f"  [fusion] K={call.strike}: ecart C/P={abs(ic-ip):.4f} → call ecarte")
+        elif ic > 0:
+            iv_merged.append(ic)
+        elif ip > 0:
+            iv_merged.append(ip)
+        else:
+            iv_merged.append(0.0)
 
-    # ── 3. Calcul des slopes sur IVs nettoyées ────────────────────────────────
-    for i, data in enumerate(datas):
-        call, put = data[1], data[2]
-        left_c  = 0.0 if i == 0     else _calc_slope(iv_c[i - 1], iv_c[i])
-        right_c = 0.0 if i == n - 1 else _calc_slope(iv_c[i], iv_c[i + 1])
-        left_p  = 0.0 if i == 0     else _calc_slope(iv_p[i - 1], iv_p[i])
-        right_p = 0.0 if i == n - 1 else _calc_slope(iv_p[i], iv_p[i + 1])
-        _assign_slopes(call, put, left_c, right_c, left_p, right_p)
+    # ── 3. Suppression des strikes isolés (aucun voisin valide) ─────────────
+    for i, (_, call, put) in enumerate(datas):
+        if iv_merged[i] > 0:
+            has_neighbor = any(iv_merged[j] > 0 for j in range(n) if j != i)
+            left  = any(iv_merged[j] > 0 for j in range(0, i))
+            right = any(iv_merged[j] > 0 for j in range(i + 1, n))
+            if not left and not right:
+                print(f"  [isolated] K={call.strike}: aucun voisin valide → ignore")
+                call.status = False
+                put.status  = False
+                call.implied_volatility = 0.0
+                put.implied_volatility  = 0.0
+                iv_merged[i] = 0.0
 
-    # ── 4. Propagation des slopes si encore None ─────────────────────────────
+    # ── 4. Slopes sur iv_merged + extrapolation ──────────────────────────────
+    def _slope(a: float, b: float) -> Optional[float]:
+        return a - b if a > 0 and b > 0 else None
+
+    sl: List[Optional[float]] = [0.0 if i == 0     else _slope(iv_merged[i - 1], iv_merged[i]) for i in range(n)]
+    sr: List[Optional[float]] = [0.0 if i == n - 1 else _slope(iv_merged[i], iv_merged[i + 1]) for i in range(n)]
+
+    # Propagation forward (left_slope manquant)
     for i in range(1, n):
-        call, put = datas[i][1], datas[i][2]
-        prev_call, prev_put = datas[i - 1][1], datas[i - 1][2]
-        if call.left_slope is None:
-            call.left_slope = prev_call.left_slope
-        if put.left_slope is None:
-            put.left_slope = prev_put.left_slope        
-
-    # Backward : right_slope hérite du strike supérieur
+        if sl[i] is None:
+            sl[i] = sl[i - 1]
+    # Propagation backward (right_slope manquant)
     for i in range(n - 2, -1, -1):
-        call, put = datas[i][1], datas[i][2]
-        next_call, next_put = datas[i + 1][1], datas[i + 1][2]
-        if call.right_slope is None:
-            call.right_slope = next_call.right_slope
-        if put.right_slope is None:
-            put.right_slope = next_put.right_slope
+        if sr[i] is None:
+            sr[i] = sr[i + 1]
 
-    # ── 5. Extrapolation des IV manquantes ──────────────────────────────────────
-    # Backward (droite→gauche) : strikes bas dont IV=0 → iv[i] = iv[i+1] + right_slope
+    # Extrapolation backward (strikes bas)
     for i in range(n - 2, -1, -1):
-        call, put = datas[i][1], datas[i][2]
-        next_call, next_put = datas[i + 1][1], datas[i + 1][2]
-        if call.implied_volatility <= 0 and next_call.implied_volatility > 0 and call.right_slope is not None:
-            call.implied_volatility = next_call.implied_volatility + call.right_slope
-        if put.implied_volatility <= 0 and next_put.implied_volatility > 0 and put.right_slope is not None:
-            put.implied_volatility = next_put.implied_volatility + put.right_slope
-
-    # Forward (gauche→droite) : strikes hauts dont IV=0 → iv[i] = iv[i-1] - left_slope
+        if iv_merged[i] <= 0 and iv_merged[i + 1] > 0 and sr[i] is not None:
+            iv_merged[i] = iv_merged[i + 1] + sr[i]
+    # Extrapolation forward (strikes hauts)
     for i in range(1, n):
-        call, put = datas[i][1], datas[i][2]
-        prev_call, prev_put = datas[i - 1][1], datas[i - 1][2]
-        if call.implied_volatility <= 0 and prev_call.implied_volatility > 0 and call.left_slope is not None:
-            call.implied_volatility = prev_call.implied_volatility - call.left_slope
-        if put.implied_volatility <= 0 and prev_put.implied_volatility > 0 and put.left_slope is not None:
-            put.implied_volatility = prev_put.implied_volatility - put.left_slope
+        if iv_merged[i] <= 0 and iv_merged[i - 1] > 0 and sl[i] is not None:
+            iv_merged[i] = iv_merged[i - 1] - sl[i]
 
-    # ── 6. Recalcul du premium pour les options extrapolées (premium=0, IV extrapolée) ──
-    for _, call, put in datas:
+    # ── 5. Application iv_merged + premium extrapolé + greeks ───────────────
+    for i, (_, call, put) in enumerate(datas):
+        iv = max(iv_merged[i], 0.0)
         for opt in (call, put):
-            if opt.premium <= 0 and opt.implied_volatility > 0:
-                opt.premium = bachelier_price(F, opt.strike, opt.implied_volatility, time_to_expiry, opt.is_call())
-                sym = "C" if opt.is_call() else "P"
-                print(f"  Corrige {sym} K={opt.strike}: IV={opt.implied_volatility:.4f}  Premium={opt.premium:.6f}")
-
-    # ── 7. Calcul du delta, gamma et theta à partir de la volatilité recalculée ───
-    for _, call, put in datas:
-        for opt in (call, put):
-            if opt.implied_volatility > 0:
-                opt.delta = bachelier_delta(F, opt.strike, opt.implied_volatility, time_to_expiry, opt.is_call())
-                opt.gamma = bachelier_gamma(F, opt.strike, opt.implied_volatility, time_to_expiry)
-                opt.theta = bachelier_theta(F, opt.strike, opt.implied_volatility, time_to_expiry)
-                sym = "C" if opt.is_call() else "P"
-                print(f"  Greeks {sym} K={opt.strike}: Delta={opt.delta:.4f}  Gamma={opt.gamma:.6f}  Theta={opt.theta:.6f}")
+            opt.left_slope  = sl[i]
+            opt.right_slope = sr[i]
+            if iv > 0:
+                was_missing = opt.implied_volatility <= 0
+                opt.implied_volatility = iv
+                if was_missing or opt.premium <= 0:
+                    opt.premium = bachelier_price(F, opt.strike, iv, time_to_expiry, opt.is_call())
+                    sym = "C" if opt.is_call() else "P"
+                    print(f"  Extrapole {sym} K={opt.strike}: IV={iv:.4f}  Premium={opt.premium:.6f}")
+                opt.delta = bachelier_delta(F, opt.strike, iv, time_to_expiry, opt.is_call())
+                opt.gamma = bachelier_gamma(F, opt.strike, iv, time_to_expiry)
+                opt.theta = bachelier_theta(F, opt.strike, iv, time_to_expiry)
 
 # ============================================================================
 # CALIBRATION SABR SUR LE SMILE BLOOMBERG

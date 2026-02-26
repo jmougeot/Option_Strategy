@@ -14,74 +14,153 @@ from myproject.app.utils import split_calls_puts, collect_options_from_session
 # ============================================================================
 
 def _plot_smile(calls: List[Option], puts: List[Option], underlying_price: Optional[float]):
-    """Smile de volatilité: IV vs Strike, séparé calls/puts, avec status warning."""
+    """
+    Smile de volatilité unifié : une seule courbe par strike.
+    - Si call ET put disponibles au même strike → moyenne des deux IV.
+    - Si un seul disponible → on garde cette IV.
+    - Les points corrigés (status=False) sont marqués d'un symbole différent.
+    - Les anomalies SABR (sabr_is_anomaly=True) sont surlignées en rouge.
+    """
+    from collections import defaultdict
+
+    # Index des calls et puts par strike
+    calls_by_strike: dict = {o.strike: o for o in calls if o.implied_volatility > 0}
+    puts_by_strike:  dict = {o.strike: o for o in puts  if o.implied_volatility > 0}
+
+    all_strikes = sorted(set(calls_by_strike) | set(puts_by_strike))
+    if not all_strikes:
+        st.info("Aucune volatilité implicite disponible.")
+        return
+
+    # Construire le smile fusionné
+    smile_x, smile_y = [], []
+    sabr_x, sabr_y, sabr_model_y, sabr_labels = [], [], [], []
+    warn_x, warn_y = [], []
+
+    for K in all_strikes:
+        c = calls_by_strike.get(K)
+        p = puts_by_strike.get(K)
+
+        ivs   = [o.implied_volatility for o in (c, p) if o is not None]
+        iv_avg = float(sum(ivs) / len(ivs))
+
+        # Point corrigé si au moins un des deux a status=False
+        is_corrected = any(not o.status for o in (c, p) if o is not None)
+
+        # Anomalie SABR : si l'un ou l'autre est flagué
+        is_anomaly = any(getattr(o, "sabr_is_anomaly", False) for o in (c, p) if o is not None)
+
+        if is_corrected:
+            warn_x.append(K)
+            warn_y.append(iv_avg)
+        elif is_anomaly:
+            sabr_x.append(K)
+            sabr_y.append(iv_avg)
+            # Récupérer la vol SABR modèle pour l'annotation
+            sabr_vol_model = next(
+                (getattr(o, "sabr_volatility", 0.0) for o in (c, p) if o is not None and getattr(o, "sabr_volatility", 0.0) > 0),
+                0.0,
+            )
+            res_bp = (iv_avg - sabr_vol_model) * 10_000
+            sabr_model_y.append(sabr_vol_model)
+            sabr_labels.append(f"K={K:.3f}<br>mkt={iv_avg*1e4:.1f}bp<br>SABR={sabr_vol_model*1e4:.1f}bp<br>Δ={res_bp:+.1f}bp")
+        else:
+            smile_x.append(K)
+            smile_y.append(iv_avg)
 
     fig = go.Figure()
 
-    # Calls bien cotés
-    good_calls = [o for o in calls if o.status and o.implied_volatility > 0]
-    warn_calls = [o for o in calls if not o.status and o.implied_volatility > 0]
+    # ── Smile normal ──────────────────────────────────────────────────────────
+    all_x = sorted(smile_x + warn_x + sabr_x)
+    all_y_dict = dict(zip(smile_x, smile_y))
+    all_y_dict.update(dict(zip(warn_x, warn_y)))
+    all_y_dict.update(dict(zip(sabr_x, sabr_y)))
+    line_y = [all_y_dict[k] for k in all_x]
 
-    # Puts bien cotés
-    good_puts = [o for o in puts if o.status and o.implied_volatility > 0]
-    warn_puts = [o for o in puts if not o.status and o.implied_volatility > 0]
+    fig.add_trace(go.Scatter(
+        x=all_x,
+        y=line_y,
+        mode="lines",
+        name="Smile",
+        line=dict(color="#2196F3", width=2),
+        showlegend=True,
+    ))
 
-    if good_calls:
+    if smile_x:
         fig.add_trace(go.Scatter(
-            x=[o.strike for o in good_calls],
-            y=[o.implied_volatility for o in good_calls],
-            mode="markers+lines",
-            name="Calls",
+            x=smile_x,
+            y=smile_y,
+            mode="markers",
+            name="IV marché",
             marker=dict(color="#2196F3", size=8, symbol="circle"),
-            line=dict(color="#2196F3", width=1, dash="dot"),
+            showlegend=True,
         ))
 
-    if warn_calls:
+    # ── Points corrigés (extrapolés) ─────────────────────────────────────────
+    if warn_x:
         fig.add_trace(go.Scatter(
-            x=[o.strike for o in warn_calls],
-            y=[o.implied_volatility for o in warn_calls],
+            x=warn_x,
+            y=warn_y,
             mode="markers",
-            name="Calls (corrigés)",
-            marker=dict(color="#2196F3", size=10, symbol="x", line=dict(width=2, color="#FF9800")),
+            name="Corrigé / extrapolé",
+            marker=dict(color="#FF9800", size=10, symbol="x", line=dict(width=2)),
+            showlegend=True,
         ))
 
-    if good_puts:
+    # ── Anomalies SABR ────────────────────────────────────────────────────────
+    if sabr_x:
         fig.add_trace(go.Scatter(
-            x=[o.strike for o in good_puts],
-            y=[o.implied_volatility for o in good_puts],
-            mode="markers+lines",
-            name="Puts",
-            marker=dict(color="#F44336", size=8, symbol="diamond"),
-            line=dict(color="#F44336", width=1, dash="dot"),
+            x=sabr_x,
+            y=sabr_y,
+            mode="markers+text",
+            name="Anomalie SABR",
+            marker=dict(color="#F44336", size=12, symbol="diamond",
+                        line=dict(color="white", width=1)),
+            text=[f"Δ={lbl.split('Δ=')[1].split('bp')[0]}bp" for lbl in sabr_labels],
+            textposition="top center",
+            textfont=dict(color="#F44336", size=9),
+            customdata=sabr_labels,
+            hovertemplate="%{customdata}<extra></extra>",
+            showlegend=True,
         ))
-
-    if warn_puts:
+        # Trait vertical reliant mkt au modèle SABR
+        for K, iv_mkt, iv_model in zip(sabr_x, sabr_y, sabr_model_y):
+            fig.add_trace(go.Scatter(
+                x=[K, K], y=[iv_mkt, iv_model],
+                mode="lines",
+                line=dict(color="#F44336", width=1, dash="dot"),
+                showlegend=False,
+                hoverinfo="skip",
+            ))
+        # Carré SABR modèle
         fig.add_trace(go.Scatter(
-            x=[o.strike for o in warn_puts],
-            y=[o.implied_volatility for o in warn_puts],
+            x=sabr_x,
+            y=sabr_model_y,
             mode="markers",
-            name="Puts (corrigés)",
-            marker=dict(color="#F44336", size=10, symbol="x", line=dict(width=2, color="#FF9800")),
+            name="SABR (modèle)",
+            marker=dict(color="#F44336", size=8, symbol="square-open",
+                        line=dict(color="#F44336", width=2)),
+            showlegend=True,
         ))
 
-    # Ligne verticale pour le prix du sous-jacent
+    # ── Forward ATM ───────────────────────────────────────────────────────────
     if underlying_price and underlying_price > 0:
         fig.add_vline(
             x=underlying_price, line_dash="dash", line_color="gray",
-            annotation_text=f"Forward {underlying_price:.2f}",
+            annotation_text=f"Forward {underlying_price:.3f}",
             annotation_position="top right",
         )
 
     fig.update_layout(
-        title="Volatility Smile — IV vs Strike",
+        title="Volatility Smile — IV vs Strike (smile unifié Call+Put)",
         xaxis_title="Strike",
-        yaxis_title="Implied Volatility (%)",
+        yaxis_title="Implied Volatility",
         template="plotly_dark",
         height=500,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def _options_table(options: List[Option]):
@@ -111,7 +190,7 @@ def _options_table(options: List[Option]):
     disabled_cols = [c for c in df.columns if c not in editable]
     edited = st.data_editor(
         df,
-        width="stretch",
+        use_container_width=True,
         hide_index=True,
         num_rows="fixed",
         disabled=disabled_cols,
@@ -178,7 +257,7 @@ def run():
         rerun_btn = st.button(
             "Rerun pipeline",
             type="primary",
-            width="stretch",
+            use_container_width=True,
         )
 
         if rerun_btn:
