@@ -371,19 +371,30 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         else:
             iv_merged.append(0.0)
 
-    # ── 3. Suppression des strikes isolés (aucun voisin valide) ─────────────
-    for i, (_, call, put) in enumerate(datas):
-        if iv_merged[i] > 0:
-            has_neighbor = any(iv_merged[j] > 0 for j in range(n) if j != i)
-            left  = any(iv_merged[j] > 0 for j in range(0, i))
-            right = any(iv_merged[j] > 0 for j in range(i + 1, n))
-            if not left and not right:
-                print(f"  [isolated] K={call.strike}: aucun voisin valide → ignore")
-                call.status = False
-                put.status  = False
-                call.implied_volatility = 0.0
-                put.implied_volatility  = 0.0
-                iv_merged[i] = 0.0
+    # ── 3. Suppression des clusters trop petits ──────────────────────────────
+    # On groupe les indices valides en clusters d'indices consécutifs.
+    # Tout cluster de taille < MIN_CLUSTER_SIZE est supprimé (1 isolé, paire isolée, etc.)
+    MIN_CLUSTER_SIZE = 3
+
+    valid_indices = [i for i in range(n) if iv_merged[i] > 0]
+    # Construire les clusters : indices consécutifs (pas de saut)
+    clusters: List[List[int]] = []
+    for idx in valid_indices:
+        if clusters and idx == clusters[-1][-1] + 1:
+            clusters[-1].append(idx)
+        else:
+            clusters.append([idx])
+
+    to_remove = {idx for cluster in clusters if len(cluster) < MIN_CLUSTER_SIZE for idx in cluster}
+
+    for i in to_remove:
+        _, call, put = datas[i]
+        print(f"  [isolated] K={call.strike}: cluster trop petit → ignore")
+        call.status = False
+        put.status  = False
+        call.implied_volatility = 0.0
+        put.implied_volatility  = 0.0
+        iv_merged[i] = 0.0
 
     # ── 4. Slopes sur iv_merged + extrapolation ──────────────────────────────
     def _slope(a: float, b: float) -> Optional[float]:
