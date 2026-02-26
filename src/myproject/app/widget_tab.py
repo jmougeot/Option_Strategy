@@ -97,12 +97,9 @@ def display_overview_tab(comparisons: List[StrategyComparison], roll_labels: Opt
 
     # Renumeroter les rangs si des lignes ont été supprimées
     if result_df is not None and len(result_df) < len(orig_df) and 'Rank' in result_df.columns:
-        # Mettre à jour la liste active en utilisant les indices conservés
         kept_positions = list(result_df.index)
         current_active = st.session_state[active_key]
-        st.session_state[active_key] = [
-            current_active[i] for i in kept_positions if i < len(current_active)
-        ]
+        st.session_state[active_key] = [current_active[i] for i in kept_positions if i < len(current_active)]
         result_df = result_df.reset_index(drop=True).copy()
         result_df['Rank'] = range(1, len(result_df) + 1)
         st.session_state[orig_key] = result_df

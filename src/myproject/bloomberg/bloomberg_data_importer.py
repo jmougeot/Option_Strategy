@@ -12,6 +12,7 @@ from myproject.bloomberg.ticker_builder import (build_option_ticker, build_optio
 from myproject.bloomberg.bloomber_to_opt import create_option_from_bloomberg
 from myproject.option.option_class import Option
 from myproject.option.bachelier import bachelier_implied_vol, bachelier_price, bachelier_delta, bachelier_gamma, bachelier_theta
+from myproject.option.sabr import SABRCalibration, sabr_vol as _sabr_vol
 from myproject.app.data_types import FutureData
 
 
@@ -480,6 +481,92 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
                 print(f"  Greeks {sym} K={opt.strike}: Delta={opt.delta:.4f}  Gamma={opt.gamma:.6f}  Theta={opt.theta:.6f}")
 
 # ============================================================================
+# CALIBRATION SABR SUR LE SMILE BLOOMBERG
+# ============================================================================
+
+def _compute_sabr_volatility(
+    options: List[Option],
+    time_to_expiry: float = 0.25,
+    future_price: Optional[float] = None,
+    anomaly_threshold: float = 2.5,
+) -> Optional[SABRCalibration]:
+    """
+    Calibre le modele SABR (beta=0, pure normal) sur le smile Bloomberg
+    et enrichit chaque Option avec :
+      - sabr_volatility  : vol SABR predite au strike
+      - sabr_residual    : IV_mkt - IV_SABR (en memes unites)
+      - sabr_z_score     : |residual| / RMSE de calibration
+      - sabr_is_anomaly  : True si le point est identifie comme aberrant
+
+    Parameters
+    ----------
+    options            : liste d'Options avec implied_volatility deja calcule
+    time_to_expiry     : temps a expiration en annees
+    future_price       : prix forward du sous-jacent
+    anomaly_threshold  : multiplicateur de RMSE pour flaguer une anomalie
+
+    Returns
+    -------
+    SABRCalibration calibree, ou None en cas d'echec
+    """
+    F = future_price
+    if not F:
+        print("[SABR] Pas de prix future disponible, calibration annulee.")
+        return None
+
+    # --- Grouper les IV valides par strike (moyenne call + put) ---
+    from collections import defaultdict
+    by_strike: dict = defaultdict(list)
+    for o in options:
+        if o.implied_volatility > 0 and o.strike > 0:
+            by_strike[round(o.strike, 6)].append(o.implied_volatility)
+
+    if len(by_strike) < 3:
+        print(f"[SABR] Pas assez de strikes valides ({len(by_strike)} < 3), calibration annulee.")
+        return None
+
+    strikes = np.array(sorted(by_strike.keys()))
+    sigmas  = np.array([float(np.mean(by_strike[K])) for K in strikes])
+
+    print(f"\n[SABR] Calibration sur {len(strikes)} strikes | F={F:.4f} | T={time_to_expiry:.4f}a")
+
+    try:
+        calib  = SABRCalibration(F=float(F), T=time_to_expiry, beta=0.0)
+        result = calib.fit(strikes, sigmas)
+        print(calib.summary())
+
+        # --- Identifier les strikes aberrants ---
+        anom_set = {a["strike"] for a in calib.anomalies(threshold=anomaly_threshold)}
+
+        # --- Enrichir chaque Option ---
+        for opt in options:
+            if opt.strike <= 0:
+                continue
+            opt.sabr_volatility = _sabr_vol(
+                float(F), opt.strike, time_to_expiry,
+                result.alpha, result.beta, result.rho, result.nu,
+            )
+            if opt.implied_volatility > 0:
+                opt.sabr_residual   = opt.implied_volatility - opt.sabr_volatility
+                opt.sabr_z_score    = (
+                    abs(opt.sabr_residual) / result.rmse if result.rmse > 0 else 0.0
+                )
+                opt.sabr_is_anomaly = round(opt.strike, 4) in anom_set
+            else:
+                opt.sabr_residual   = 0.0
+                opt.sabr_z_score    = 0.0
+                opt.sabr_is_anomaly = False
+
+        return calib
+
+    except Exception as e:
+        print(f"[SABR] Erreur de calibration : {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+# ============================================================================
 # FONCTION PRINCIPALE
 # ============================================================================
 
@@ -527,8 +614,9 @@ def import_options(
         
         # 3.5. Calculer la volatilité Bachelier pour TOUTES les options
         if options:
-            _compute_bachelier_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
-            for option in options:
+             _compute_sabr_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
+             _compute_bachelier_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
+             for option in options:
                 option._calcul_all_surface()
         
     except Exception as e:

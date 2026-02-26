@@ -57,6 +57,12 @@ class Option:
     right_slope : Optional[float]= 0.0
     historical_volatility: Optional[float] = None
 
+    # ============ SABR ============
+    sabr_volatility: float = 0.0        # Vol SABR predite au strike de cette option
+    sabr_residual: float = 0.0          # IV_mkt - IV_SABR (memes unites que implied_volatility)
+    sabr_z_score: float = 0.0           # |sabr_residual| / RMSE de calibration
+    sabr_is_anomaly: bool = False        # True si ce point est identifie comme aberrant
+
     # ============ LIQUIDITÉ ============
     open_interest: Optional[int] = None
     volume: Optional[int] = None
