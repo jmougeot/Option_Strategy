@@ -12,7 +12,6 @@ from myproject.share_result.generate_email import (open_outlook_with_email,)
 
 def _build_strategy_details(best, ref_price_str, underlying, price_step):
     """Build strategy result line, market data, risk and payoff commentary from a StrategyComparison."""
-    # Strategy result: e.g. "ERU6 97.62/97.87/98.18 Broken Call Fly vs 98.06 Put"
     strategy_result = f"{best.strategy_name}"
     
     # Market data: "Mkt is <premium>, <delta>d, ref <ref_price>"
@@ -129,7 +128,6 @@ def build_email_template_data(params, filter, scoring_weights) -> EmailTemplateD
             selection_criteria.append("HAS THE BEST OVERALL SCORE")
     
     # ─── Criteria section ───
-    # Build target description from scenarios in session state
     scenarios_list = st.session_state.get("scenarios", [])
     if scenarios_list:
         target_parts = []
@@ -181,58 +179,55 @@ def create_email_with_images(
     template_data: EmailTemplateData,
     mixture: tuple,
     comparisons: Optional[List] = None,
+    selected_comparisons: Optional[List] = None,
+    fields: Optional[dict] = None,
+    strat_data: Optional[List[dict]] = None,
+    params=None,
 ) -> bool:
     """
-    Create an Outlook email with embedded images.
-    Single pipeline for Outlook email.
-    
+    Create an Outlook email with one payoff image per selected strategy.
+
     Args:
-        template_data: EmailTemplateData with all parameters
-        comparisons: List of StrategyComparison (to generate images)
-        mixture: Tuple of mixture (for the diagram)
-    
+        template_data        : EmailTemplateData base
+        comparisons          : Full comparison list (legacy)
+        selected_comparisons : Strategies chosen on the Email page — one payoff PNG per entry
+        mixture              : Tuple (prices, probs, mean)
+        fields               : Dict of form values from the Email page
+        strat_data           : List of per-strategy dicts (line, commentary, stats …)
+        params               : UIParams
+
     Returns:
         True if email was opened successfully
     """
-    images = []
-    
-    # Generate images if we have the data
-    if comparisons:
+    from myproject.share_result.image_saver import save_payoff_single_strategy
+
+    # ── Generate one payoff PNG per selected strategy ────────────────────────
+    payoff_images: List[str] = []
+    strats_to_plot = selected_comparisons or comparisons or []
+    _future = st.session_state.get("future_data", None)
+    spot = _future.underlying_price if (_future and _future.underlying_price) else None
+
+    for i, comp in enumerate(strats_to_plot):
         try:
-            from myproject.share_result.image_saver import save_all_diagrams
-            print("[Email DEBUG] image_saver imported")
-            
-            saved_images = save_all_diagrams(comparisons, mixture)
-            print(f"[Email DEBUG] save_all_diagrams returns: {saved_images}")
-            
-            if saved_images.get('payoff'):
-                images.append(saved_images['payoff'])
-                print(f"[Email DEBUG] Payoff added: {saved_images['payoff']}")
-            
-            if saved_images.get('summary'):
-                images.append(saved_images['summary'])
-                print(f"[Email DEBUG] Summary added: {saved_images['summary']}")
-                
+            fname = f"payoff_strat_{i+1}_{comp.strategy_name[:20].replace(' ', '_')}.png"
+            path  = save_payoff_single_strategy(comp, mixture, fname, underlying_price=spot)
+            if path:
+                payoff_images.append(path)
+                print(f"[Email] Payoff {i+1} saved: {path}")
         except Exception as e:
-            print(f"[Email DEBUG] Error generating images: {e}")
-            import traceback
-            traceback.print_exc()
-    else:
-        print("[Email DEBUG] No comparisons provided - no images to generate")
-    
-    print(f"[Email DEBUG] Final images list: {images}")
-    
-    # Open Outlook with the template and images
+            print(f"[Email] Error saving payoff {i+1}: {e}")
+
+    # ── Open Outlook ─────────────────────────────────────────────────────────
     success = open_outlook_with_email(
         template_data=template_data,
-        images=images
+        payoff_images=payoff_images,
+        fields=fields,
+        strat_data=strat_data,
     )
-    
+
     if not success:
         print("[Email] Could not open Outlook.")
-        if images:
-            print("[Email] Generated images:")
-            for img in images:
-                print(f"   - {img}")
-    
+        for img in payoff_images:
+            print(f"   - {img}")
+
     return success

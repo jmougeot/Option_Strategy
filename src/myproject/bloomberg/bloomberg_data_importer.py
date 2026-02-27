@@ -431,27 +431,10 @@ def _compute_sabr_volatility(
     anomaly_threshold: float = 1.5,
 ) -> Optional[SABRCalibration]:
     """
-    Calibre le modele SABR (beta=0, pure normal) sur le smile Bloomberg
-    et enrichit chaque Option avec :
-      - sabr_volatility  : vol SABR predite au strike
-      - sabr_residual    : IV_mkt - IV_SABR (en memes unites)
-      - sabr_z_score     : |residual| / RMSE de calibration
-      - sabr_is_anomaly  : True si le point est identifie comme aberrant
-
-    Parameters
-    ----------
-    options            : liste d'Options avec implied_volatility deja calcule
-    time_to_expiry     : temps a expiration en annees
-    future_price       : prix forward du sous-jacent
-    anomaly_threshold  : multiplicateur de RMSE pour flaguer une anomalie
-
-    Returns
-    -------
-    SABRCalibration calibree, ou None en cas d'echec
+    Calibre le modele SABR 
     """
     F = future_price
     if not F:
-        print("[SABR] Pas de prix future disponible, calibration annulee.")
         return None
 
     # --- Grouper les IV valides par strike (moyenne call + put) ---
@@ -462,17 +445,14 @@ def _compute_sabr_volatility(
             by_strike[round(o.strike, 6)].append(o.implied_volatility)
 
     if len(by_strike) < 3:
-        print(f"[SABR] Pas assez de strikes valides ({len(by_strike)} < 3), calibration annulee.")
         return None
 
     strikes = np.array(sorted(by_strike.keys()))
     sigmas  = np.array([float(np.mean(by_strike[K])) for K in strikes])
 
-    print(f"\n[SABR] Calibration sur {len(strikes)} strikes | F={F:.4f} | T={time_to_expiry:.4f}a")
 
     try:
         # ── Boucle itérative : corriger une anomalie à la fois puis recalibrer ──
-        # sigmas_work est la copie de travail corrigée au fil des itérations
         sigmas_work     = sigmas.copy()
         corrected_set: dict[float, float] = {}   # strike → ancienne IV originale
         MAX_ITER = len(strikes)                  # ne può corriger plus de points qu'il n'y en a
@@ -494,12 +474,6 @@ def _compute_sabr_volatility(
             old_iv   = sigmas_work[idx]
             new_iv   = worst["sigma_model"]   # vol SABR du modèle courant
 
-            print(
-                f"[SABR] Iter {iteration+1} — correction K={K_bad:.4f}: "
-                f"{old_iv*1e4:.1f}bp → {new_iv*1e4:.1f}bp "
-                f"(Δ={worst['residual_bps']:+.1f}bp  z={worst['z_score']:.2f})"
-            )
-
             corrected_set[round(K_bad, 4)] = old_iv
             sigmas_work[idx] = new_iv
 
@@ -508,9 +482,6 @@ def _compute_sabr_volatility(
                 break
             calib  = SABRCalibration(F=float(F), T=time_to_expiry, beta=0.0)
             result = calib.fit(strikes, sigmas_work)
-
-        print(f"[SABR] Calibration finale ({len(corrected_set)} point(s) corrigé(s))")
-        print(calib.summary())
 
         # ── Enrichir chaque Option avec la calibration finale ────────────────
         for opt in options:
