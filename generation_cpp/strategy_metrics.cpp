@@ -203,14 +203,14 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
             if (premium_only_left) {
                 if (pnl < neg_abs_premium) return std::nullopt;
             } else {
-                if (pnl < -max_loss_left_param) return std::nullopt;
+                if (pnl < -(max_loss_left_param - total_premium)) return std::nullopt;
             }
         } else if (price > limit_right) {
             if (pnl < max_loss_right) max_loss_right = pnl;
             if (premium_only_right) {
                 if (pnl < neg_abs_premium) return std::nullopt;
             } else {
-                if (pnl < -max_loss_right_param) return std::nullopt;
+                if (pnl < -(max_loss_right_param - total_premium)) return std::nullopt;
             }
         } else {
             if (pnl < neg_abs_premium) return std::nullopt;
