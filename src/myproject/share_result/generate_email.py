@@ -13,82 +13,50 @@ from myproject.share_result.utils import (
 
 def generate_html_email_from_template(
     template_data: EmailTemplateData,
-    fields: Optional[dict] = None,
-    strat_data: Optional[List[dict]] = None,
 ) -> tuple:
     """
-    Generate subject and HTML body following the exact BGC trade-recommendation template.
-
+    Generate subject and HTML body for a professional email.
+    Matches the BGC rates derivatives template format.
+    
     Args:
-        template_data : EmailTemplateData with filter/scoring context
-        fields        : Dict of form values from the Email page (client_name, expiry_code, …)
-        strat_data    : List of per-strategy dicts built in run_email()
-
+        template_data: EmailTemplateData with all parameters
+    
     Returns:
         tuple: (subject, html_body)
     """
-    f = fields or {}
-    sd = strat_data or []
-
-    underlying      = f.get("expiry_code") or template_data.underlying or "Options"
-    client_name     = f.get("client_name",     "XXX")
-    target          = f.get("target",          "XXX")
-    target_date     = f.get("target_date",     "XXX")
-    und_price       = f.get("underlying_price","XXX")
-    uncert_l        = f.get("uncert_left",     "XXX")
-    uncert_r        = f.get("uncert_right",    "XXX")
-    tail_l          = f.get("tail_left",       "XXX")
-    tail_r          = f.get("tail_right",      "XXX")
-    limit_l         = f.get("limit_left",      "XXX")
-    limit_r         = f.get("limit_right",     "XXX")
-    open_risk       = f.get("open_risk",       "XXX")
-    max_legs        = f.get("max_legs",        str(template_data.max_legs))
-    price_min       = f.get("price_min",       "XXX")
-    price_max       = f.get("price_max",       "XXX")
-    price_step      = f.get("price_step",      "XXX")
-    min_short       = f.get("min_short",       "XXX")
-    delta_min       = f.get("delta_min",       "XXX")
-    delta_max       = f.get("delta_max",       "XXX")
-    signature       = f.get("signature",       "XXX")
-    screened        = f.get("nb_screened",  0)
-
-
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    subject  = f"[Options Strategy] {underlying} — Trade Recommendation ({date_str})"
-
-    # ── summary list (1 : BUY ...) ──────────────────────────────────────────────
-    summary_rows = ""
-    for s in sd:
-        summary_rows += f'<p style="margin:6px 0;">{s["idx"]} : {s["line"]}</p>\n'
-
-    # ── detail blocks ──────────────────────────────────────────────────────────
-    detail_blocks = ""
-    for s in sd:
-        i       = s["idx"] - 1      # 0-based index for CID
-        comment = s.get("commentary") or "XXXX"
-        prem    = s.get("premium",       0.0)
-        avg_pnl = s.get("avg_pnl",       0.0)
-        max_pft = s.get("max_profit",    0.0)
-        max_at  = s.get("max_profit_at", "XXX")
-        lvg     = s.get("leverage",      0.0)
-        be      = s.get("breakeven",     "XXX")
-
-        detail_blocks += f"""
-<p style="margin:12px 0; color: #991b1b;"><strong>{s['idx']} : {s['line']}</strong></p>
-
-<p style="margin:8px 0;">The model, and we, chose this strategy because {comment}</p>
-
-<p style="margin:14px 0 4px;"><strong>Statistics&nbsp;:</strong></p>
-<p style="margin:3px 0;">&bull;&nbsp;Leverage&nbsp;: {lvg:.2f} &mdash; pay {prem:.4f} to make {avg_pnl:.4f} net on average (using the gaussian model)</p>
-<p style="margin:3px 0;">&bull;&nbsp;Max Profit&nbsp;: {max_pft:.4f} (premium considered) at {max_at}</p>
-<p style="margin:3px 0;">&bull;&nbsp;Breakeven profit&nbsp;: from {be}</p>
-
-
-<p style="margin:12px 0;">See below the top strategies chose by the model (Strategy {s['idx']} Selected)&nbsp;:</p>
-
-<!-- PAYOFF_{i}_PLACEHOLDER -->
-"""
-
+    underlying = template_data.underlying or "Options"
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    subject = f"[Options Strategy] {underlying} - Recommended strategy ({date_str})"
+    
+    # Build selection criteria section (e.g. "ROLLS THE BEST" and "WITH THE HIGHEST LEVERAGE PnL")
+    criteria_items = template_data.selection_criteria or []
+    if len(criteria_items) == 1:
+        selection_html = f'<p style="font-weight:bold; color:#1a365d; text-transform:uppercase; margin:4px 0;">{criteria_items[0]}</p>'
+    elif len(criteria_items) >= 2:
+        parts = [f'<p style="font-weight:bold; color:#1a365d; text-transform:uppercase; margin:4px 0;">{criteria_items[0]}</p>']
+        for c in criteria_items[1:]:
+            parts.append(f'<p style="margin:2px 0;">and</p>')
+            parts.append(f'<p style="font-weight:bold; color:#1a365d; text-transform:uppercase; margin:4px 0;">{c}</p>')
+        selection_html = "\n".join(parts)
+    else:
+        selection_html = ""
+    
+    # Roll description
+    roll_html = ""
+    if template_data.roll_description:
+        roll_html = f'<p style="margin:8px 0;">{template_data.roll_description}</p>'
+    
+    # Leverage description
+    leverage_html = ""
+    if template_data.leverage_description:
+        connector = "<p style='margin:4px 0;font-weight:bold;'>AND</p>" if template_data.roll_description else ""
+        leverage_html = f'{connector}<p style="margin:8px 0;">{template_data.leverage_description}</p>'
+    
+    # Payoff commentary
+    payoff_comment_html = ""
+    if template_data.payoff_commentary:
+        payoff_comment_html = f'<p style="margin:12px 0; font-style:italic;">{template_data.payoff_commentary}</p>'
+    
     html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -97,63 +65,83 @@ body {{
     font-family: Aptos, Arial, Helvetica, sans-serif;
     font-size: 12pt;
     line-height: 1.5;
-    color: #222;
-    background-color: #ffffff;
-    max-width: 820px;
+    color: #333;
+    max-width: 800px;
     margin: 0;
-    padding: 20px;
+    padding: 15px;
+}}
+.intro {{
+    font-size: 12pt;
+    margin-bottom: 4px;
+}}
+.section-title {{
+    font-weight: bold;
+    color: #1a365d;
+    margin-top: 8px;
+    margin-bottom: 2px;
+    display: inline;
+}}
+.param-value {{
+    display: inline;
+    margin: 0;
+}}
+.criteria-block {{
+    margin-top: 15px;
+    padding: 10px 15px;
+    background-color: #f7fafc;
+    border-left: 3px solid #1a365d;
+}}
+.result-block {{
+    margin: 15px 0;
+}}
+.image-container {{
+    margin: 15px 0;
+    text-align: center;
+}}
+.image-container img {{
+    max-width: 700px;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }}
 </style>
 </head>
 <body>
 
-<p>Dear {client_name},</p>
+<p class="intro">Pls find below the strategy on {underlying} that</p>
 
-<p>&nbsp;</p>
+{selection_html}
 
-<p>As requested, here are the best trades in our opinion in <strong>{underlying}</strong></p>
+<div class="result-block">
+<p><strong>Result is</strong></p>
 
-<p>Helped by the option model we&#8217;re building (M2O, Macro to Options &#128521;)</p>
+<p><strong>{template_data.strategy_result}</strong></p>
+<p>{template_data.market_data}</p>
 
-<p>Trades on <strong>{underlying}</strong> to Target <strong>{target}</strong> by the end of <strong>{target_date}</strong></p>
+<p style="margin-top:8px;">{template_data.risk_description}</p>
 
-<p>&nbsp;</p>
+{roll_html}
+{leverage_html}
+</div>
 
-<p style="color:#991b1b;"><strong>Risk Criteria&nbsp;:</strong></p>
+{payoff_comment_html}
 
-<p>&bull;&nbsp;<strong>Underlying</strong> : {und_price}</p>
-<p>&bull;&nbsp;<strong>Target</strong> : {target} with {uncert_l}&nbsp;bp uncertainty on the left and {uncert_r}&nbsp;bp uncertainty on the right</p>
-<p>&bull;&nbsp;<strong>Tail Risk</strong> : {tail_l} tick loss on the downside / {tail_r} tick loss on the upside, starting from {limit_l} / {limit_r}</p>
-<p>&bull;&nbsp;<strong>Open Risk</strong> : 1x2 {open_risk}</p>
-<p>&bull;&nbsp;<strong>Maximum legs</strong> : {max_legs}</p>
-<p>&bull;&nbsp;<strong>Strikes Screened</strong> : Looking at all options between {price_min} and {price_max}. Every {price_step} ticks. Cannot short any option for less than {min_short} tick.</p>
-<p>&bull;&nbsp;<strong>Delta</strong> : From {delta_min} to {delta_max}</p>
-<p>&bull;&nbsp;<strong>Expiry</strong> : {underlying}</p>
-<p style="margin:3px 0;">&bull;&nbsp;Strategies Screened&nbsp;: {screened}</p>
+<!-- PAYOFF_DIAGRAM_PLACEHOLDER -->
 
-<p>&nbsp;</p>
+<!-- TOP10_SUMMARY_PLACEHOLDER -->
 
-<p style="color:#991b1b;"><strong>Best trades to fit this curve according to M2O are&nbsp;:</strong></p>
+<div class="criteria-block">
+<p style="font-weight:bold; color:#1a365d; margin-bottom:8px;">CRITERIA:</p>
 
-{summary_rows}
-
-<p>&nbsp;</p>
-
-<p><strong>DETAILS BELOW&nbsp;:</strong></p>
-
-{detail_blocks}
-
-<p>&nbsp;</p>
-
-<p>Happy to discuss&nbsp;!</p>
-
-<p>&nbsp;</p>
-
-<p>{signature}</p>
-
-<p>&nbsp;</p>
-
-<p>Best Regards,</p>
+<p><span class="section-title">FUTURE:</span> <span class="param-value">{underlying}</span></p>
+<p><span class="section-title">TARGET:</span> <span class="param-value">{template_data.target_description}</span></p>
+<p><span class="section-title">TAIL RISK:</span> <span class="param-value">{template_data.tail_risk_description}</span></p>
+<p><span class="section-title">MAX RISK:</span> <span class="param-value">{template_data.max_risk_description}</span></p>
+<p><span class="section-title">MAX LEGS:</span> <span class="param-value">{template_data.max_legs} legs ({template_data.max_legs} strikes)</span></p>
+<p><span class="section-title">STRIKES SCREENED:</span> <span class="param-value">{template_data.strikes_screened_description}</span></p>
+<p><span class="section-title">DELTA:</span> <span class="param-value">{template_data.delta_description}</span></p>
+<p><span class="section-title">PREMIUM SPENT MAX:</span> <span class="param-value">{template_data.premium_max_description}</span></p>
+</div>
 
 </body>
 </html>
@@ -164,99 +152,114 @@ body {{
 def open_outlook_with_email(
     template_data: EmailTemplateData,
     images: Optional[List[str]] = None,
-    payoff_images: Optional[List[str]] = None,
-    fields: Optional[dict] = None,
-    strat_data: Optional[List[dict]] = None,
     to: str = ""
 ) -> bool:
     """
     Open Outlook with a professional HTML email and embedded images.
-
+    Single pipeline for Outlook email.
+    
     Args:
         template_data: EmailTemplateData with all parameters
-        images: Legacy [payoff, summary] pair (used when payoff_images is None)
-        payoff_images: One PNG path per selected strategy (takes priority)
+        images: List of image paths [payoff_diagram, top10_summary]
         to: Recipient email (optional)
-
+    
     Returns:
         True if success, False otherwise
     """
     images = images or []
-    payoff_images = payoff_images or []
-
-    # payoff_images takes priority; fall back to legacy images list
-    all_payoff_paths: List[str] = payoff_images if payoff_images else images[:1]
-    summary_path: Optional[str] = None if payoff_images else (images[1] if len(images) > 1 else None)
-
+    
     print("\n" + "="*60)
     print("[Email DEBUG] open_outlook_with_email() called")
-    print(f"[Email DEBUG] Payoff images: {all_payoff_paths}")
-    print(f"[Email DEBUG] Summary image: {summary_path}")
+    print(f"[Email DEBUG] Number of images received: {len(images)}")
+    for i, img in enumerate(images):
+        print(f"[Email DEBUG]   Image {i}: {img}")
+        if img:
+            print(f"[Email DEBUG]   Exists: {os.path.exists(img)}")
+        else:
+            print(f"[Email DEBUG]   ⚠ Empty path!")
     print("="*60 + "\n")
-
+    
     if sys.platform != "win32":
         print("[Email] open_outlook_with_email is only available on Windows")
         return False
-
+    
     try:
         import pythoncom
         import win32com.client as win32
-
-        pythoncom.CoInitialize()
+        
+        # Initialize COM for this thread (required with Streamlit)
+        pythoncom.CoInitialize()        
         outlook = win32.Dispatch('Outlook.Application')
-        mail = outlook.CreateItem(0)
-
-        subject, html_content = generate_html_email_from_template(template_data, fields=fields, strat_data=strat_data)
-
+        mail = outlook.CreateItem(0)  # 0 = olMailItem
+        
+        # Generate email HTML
+        subject, html_content = generate_html_email_from_template(template_data)
+        
         if to:
             mail.To = to
         mail.Subject = subject
+        
+        # Filter valid images
+        valid_images = []
+        for img_path in images:
+            if img_path and os.path.exists(img_path):
+                abs_path = os.path.abspath(img_path)
+                valid_images.append(abs_path)
+                print(f"[Email DEBUG] Valid image: {abs_path}")
+            else:
+                print(f"[Email DEBUG] Invalid or missing image: {img_path}")
+                
+        # Replace placeholders with images
+        payoff_html = ""
+        summary_html = ""
+        
+        if len(valid_images) > 0:
+            payoff_html = '''
+<div class="image-container">
+<img src="cid:payoff_diagram" alt="Payoff Diagram">
+</div>
+'''
+        if len(valid_images) > 1:
+            summary_html = '''
+<div class="image-container">
+<img src="cid:top10_summary" alt="Top 10 Summary">
+</div>
+'''
 
-        # Validate paths
-        valid_payoffs = [
-            os.path.abspath(p) for p in all_payoff_paths
-            if p and os.path.exists(p)
-        ]
-        valid_summary = os.path.abspath(summary_path) \
-            if summary_path and os.path.exists(summary_path) else None
-
-        # Replace each per-strategy placeholder <!-- PAYOFF_i_PLACEHOLDER --> with its <img>
-        for i, _ in enumerate(valid_payoffs):
-            cid = f"payoff_{i}"
-            img_tag = f'<div style="margin:12px 0;"><img src="cid:{cid}" alt="Payoff Diagram {i+1}" width="1100" style="display:block;"></div>'
-            html_content = html_content.replace(f"<!-- PAYOFF_{i}_PLACEHOLDER -->", img_tag)
-
-        if valid_summary:
-            summary_html = '<div style="margin:12px 0;"><img src="cid:top10_summary" alt="Top 10 Summary" width="1100" style="display:block;"></div>'
-            html_content = html_content.replace("<!-- TOP10_SUMMARY_PLACEHOLDER -->", summary_html)
-
-        # HTMLBody MUST be set before adding inline CID attachments
-        mail.HTMLBody = html_content
-
+        # Insert images into HTML
+        html_content = html_content.replace("<!-- PAYOFF_DIAGRAM_PLACEHOLDER -->", payoff_html)
+        html_content = html_content.replace("<!-- TOP10_SUMMARY_PLACEHOLDER -->", summary_html)
+        
+        # Add images as attachments with CID BEFORE setting HTMLBody
+        # (Outlook COM requires attachments to exist before referencing them in HTML)
         PR_ATTACH_CONTENT_ID = "http://schemas.microsoft.com/mapi/proptag/0x3712001F"
-
-        # Attach each payoff image with its own CID
-        for i, img_path in enumerate(valid_payoffs):
-            cid = f"payoff_{i}"
+        PR_ATTACH_FLAGS = "http://schemas.microsoft.com/mapi/proptag/0x37140003"
+        
+        cid_names = ["payoff_diagram", "top10_summary"]
+        for i, img_path in enumerate(valid_images[:2]):
+            cid = cid_names[i] if i < len(cid_names) else f"image{i}"
             try:
-                att = mail.Attachments.Add(img_path)
-                att.PropertyAccessor.SetProperty(PR_ATTACH_CONTENT_ID, cid)
-                print(f"[Email DEBUG] Attached payoff {i}: {img_path} → cid:{cid}")
+                attachment = mail.Attachments.Add(img_path)
+                print(f"[Email DEBUG] Attachment added: {img_path}")
+                
+                attachment.PropertyAccessor.SetProperty(PR_ATTACH_CONTENT_ID, cid)
+                # Mark as inline attachment (hidden from attachment list)
+                attachment.PropertyAccessor.SetProperty(PR_ATTACH_FLAGS, 4)
+                print(f"[Email DEBUG] CID set: {cid}")
+                
             except Exception as att_err:
-                print(f"[Email DEBUG] Error attaching {img_path}: {att_err}")
-
-        if valid_summary:
-            try:
-                att = mail.Attachments.Add(valid_summary)
-                att.PropertyAccessor.SetProperty(PR_ATTACH_CONTENT_ID, "top10_summary")
-            except Exception as att_err:
-                print(f"[Email DEBUG] Error attaching summary: {att_err}")
-
+                print(f"[Email DEBUG] Error adding attachment: {att_err}")
+        
+        # Set HTMLBody AFTER adding attachments so CID references resolve
+        mail.HTMLBody = html_content
+        print("[Email DEBUG] HTMLBody set")
+        
         mail.Display(False)
-
+        
         pythoncom.CoUninitialize()
+        
         return True
-
+        
     except ImportError as ie:
         print(f"[Email] pywin32 module not installed: {ie}")
         print("[Email] Install with: pip install pywin32")
