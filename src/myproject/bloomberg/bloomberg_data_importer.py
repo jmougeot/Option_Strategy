@@ -509,10 +509,24 @@ def _compute_sabr_volatility(
                     abs(opt.sabr_residual) / result.rmse if result.rmse > 0 else 0.0
                 )
                 opt.sabr_is_anomaly = round(opt.strike, 4) in anom_set
+                # --- Correction du prix si anomalie ---
+                if opt.sabr_is_anomaly and opt.sabr_volatility > 0:
+                    print(
+                        f"[SABR] Correction K={opt.strike:.4f} {opt.option_type}: "
+                        f"IV {opt.implied_volatility*1e4:.1f}bp → {opt.sabr_volatility*1e4:.1f}bp "
+                        f"(Δ={opt.sabr_residual*1e4:+.1f}bp)"
+                    )
+                    opt.implied_volatility = opt.sabr_volatility
+                    opt.sabr_residual      = 0.0
+                    opt.sabr_corrected     = True
+                    opt.premium = bachelier_price(
+                        float(F), opt.strike, opt.sabr_volatility, time_to_expiry, opt.is_call()
+                    )
             else:
                 opt.sabr_residual   = 0.0
                 opt.sabr_z_score    = 0.0
                 opt.sabr_is_anomaly = False
+                opt.sabr_corrected  = False
 
         return calib
 

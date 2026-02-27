@@ -62,6 +62,7 @@ class Option:
     sabr_residual: float = 0.0          # IV_mkt - IV_SABR (memes unites que implied_volatility)
     sabr_z_score: float = 0.0           # |sabr_residual| / RMSE de calibration
     sabr_is_anomaly: bool = False        # True si ce point est identifie comme aberrant
+    sabr_corrected: bool = False         # True si implied_volatility + premium ont ete corriges par SABR
 
     # ============ LIQUIDITÉ ============
     open_interest: Optional[int] = None
