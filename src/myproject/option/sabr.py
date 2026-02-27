@@ -48,17 +48,8 @@ def sabr_lognormal_vol(
 ) -> float:
     """
     Volatilité lognormale (Black) selon Hagan et al. 2002, éq. (2.17b).
-
-    Paramètres
-    ----------
-    F, K : forward et strike
-    T    : temps à expiration (années)
-    alpha, beta, rho, nu : paramètres SABR
-
-    Retourne
-    --------
-    sigma_B (volatilité lognormale)
     """
+    # Garde fou
     if T <= 0:
         return alpha
     if K <= 0 or F <= 0:
@@ -66,8 +57,8 @@ def sabr_lognormal_vol(
 
     eps = 1e-7
 
+    # Approximation ATM 
     if abs(F - K) < eps:
-        # Cas ATM
         FK_beta = F ** (1.0 - beta)
         atm_correction = (
             (1 - beta) ** 2 / 24.0 * alpha ** 2 / FK_beta ** 2
@@ -76,6 +67,7 @@ def sabr_lognormal_vol(
         )
         return alpha / FK_beta * (1.0 + atm_correction * T)
 
+    # Terme de base pour la formule
     log_FK = np.log(F / K)
     FK_mid = np.sqrt(F * K)
     FK_beta = FK_mid ** (1.0 - beta)
@@ -108,19 +100,6 @@ def sabr_normal_vol(
 ) -> float:
     """
     Volatilité normale (Bachelier) selon SABR.
-
-    Pour beta = 0 (taux), utilise la formule exacte pure-normal.
-    Pour beta ≠ 0, utilise l'approximation Hagan du modèle mixte.
-
-    Paramètres
-    ----------
-    F, K : forward et strike
-    T    : temps à expiration (années)
-    alpha, beta, rho, nu : paramètres SABR
-
-    Retourne
-    --------
-    sigma_N (volatilité normale, en unités absolues comme Bachelier)
     """
     if T <= 0:
         return alpha
@@ -145,7 +124,6 @@ def sabr_normal_vol(
             return alpha * z_chi * (1.0 + atm_corr * T)
 
     # ── Cas général (beta ≠ 0) : conversion lognormal → normal ──────────────
-    # Relation : sigma_N ≈ sigma_B × (FK)^(beta/2) au premier ordre
     sigma_B = sabr_lognormal_vol(F, K, T, alpha, beta, rho, nu)
     FK_mid = np.sqrt(F * K)
     log2 = np.log(F / K) ** 2 if abs(F - K) > eps else 0.0
@@ -161,10 +139,6 @@ def sabr_vol(
 ) -> float:
     """
     Interface unifiée : renvoie la vol SABR lognormale ou normale.
-
-    Parameters
-    ----------
-    vol_type : "normal" (Bachelier, défaut) ou "lognormal" (Black)
     """
     if vol_type == "lognormal":
         return sabr_lognormal_vol(F, K, T, alpha, beta, rho, nu)
@@ -244,24 +218,6 @@ class SABRResult:
 class SABRCalibration:
     """
     Calibration SABR sur une surface de volatilités Bloomberg.
-
-    Le calibrateur optimise (alpha, rho, nu) pour un beta fixé.
-    Il utilise une double stratégie : algorithme évolutionnaire global
-    (differential_evolution) suivi d'un raffinement local (L-BFGS-B).
-
-    Parameters
-    ----------
-    F      : prix forward du sous-jacent au moment de la calibration
-    T      : temps à expiration en années
-    beta   : exposant CEV fixé (0.0 = pure normal pour taux, défaut)
-    vol_type : "normal" (Bachelier, défaut) ou "lognormal" (Black)
-
-    Exemple
-    -------
-    >>> calib = SABRCalibration(F=96.25, T=0.25, beta=0.0)
-    >>> result = calib.fit(strikes, implied_vols)
-    >>> anomalies = calib.anomalies(threshold=2.5)
-    >>> calib.plot()
     """
 
     def __init__(
@@ -281,24 +237,13 @@ class SABRCalibration:
 
     def fit(
         self,
-        strikes: Sequence[float],
-        sigmas_mkt: Sequence[float],
+        strikes: np.ndarray,
+        sigmas_mkt: np.ndarray,
         weights: Optional[Sequence[float]] = None,
         seed: int = 42,
     ) -> SABRResult:
         """
         Calibre les paramètres SABR (alpha, rho, nu) par moindres carrés pondérés.
-
-        Parameters
-        ----------
-        strikes   : liste des strikes (même unité que F, ex. 95.75, 96.00, …)
-        sigmas_mkt: volatilités normales implicites Bloomberg correspondantes
-        weights   : pondérations optionnelles (défaut = vega-weights proxy)
-        seed      : graine aléatoire pour differential_evolution
-
-        Returns
-        -------
-        SABRResult
         """
         strikes = np.asarray(strikes, dtype=float)
         sigmas_mkt = np.asarray(sigmas_mkt, dtype=float)
@@ -306,10 +251,7 @@ class SABRCalibration:
         # Filtrer les points valides
         valid = (sigmas_mkt > 0) & np.isfinite(sigmas_mkt) & np.isfinite(strikes)
         if valid.sum() < 3:
-            raise ValueError(
-                f"Pas assez de points valides pour calibrer SABR "
-                f"(besoin >= 3, obtenu {valid.sum()})"
-            )
+            raise ValueError(f"Pas assez de points valides pour calibrer SABR ")
         strikes = strikes[valid]
         sigmas_mkt = sigmas_mkt[valid]
 
@@ -329,9 +271,9 @@ class SABRCalibration:
 
         # ── 2. Optimisation globale (robustesse) ─────────────────────────
         bounds = [
-            (1e-6, sigma_atm * 5),   # alpha
-            (-0.99, 0.99),            # rho
-            (1e-4, 5.0),              # nu
+            (1e-6, sigma_atm * 5),   #
+            (-0.99, 0.99),            
+            (1e-4, 5.0),             
         ]
 
         result_de = differential_evolution(
@@ -394,14 +336,6 @@ class SABRCalibration:
     def predict(self, strikes: Sequence[float]) -> np.ndarray:
         """
         Retourne la surface SABR calibrée pour un vecteur de strikes.
-
-        Parameters
-        ----------
-        strikes : strikes cibles
-
-        Returns
-        -------
-        np.ndarray de volatilités
         """
         if self.result is None:
             raise RuntimeError("Calibrer d'abord avec .fit()")

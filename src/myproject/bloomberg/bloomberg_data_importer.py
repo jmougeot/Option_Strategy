@@ -295,13 +295,6 @@ class OptionProcessor:
 def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float = 0.25, future_price: Optional[float] = None) -> None:
     """
     Calcule la volatilité Bachelier pour TOUTES les options.
-
-    Pipeline simplifié en 5 étapes sur une IV unique par strike :
-      1. Calcul IV individuelle (call + put)
-      2. Fusion call+put → iv_merged par strike (moyenne si cohérents, sinon le meilleur)
-      3. Suppression des strikes isolés
-      4. Calcul des slopes + extrapolation sur iv_merged
-      5. Application à chaque option + greeks
     """
     options.sort(key=lambda x: (x.strike, x.option_type))
 
@@ -317,14 +310,12 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         call.underlying_price = F
         put.underlying_price  = F
 
-        call.implied_volatility = (
-            bachelier_implied_vol(F, call.strike, call.premium, time_to_expiry, True)
-            if call.status and call.premium > 0 else 0.0
-        )
-        put.implied_volatility = (
-            bachelier_implied_vol(F, put.strike, put.premium, time_to_expiry, False)
-            if put.status and put.premium > 0 else 0.0
-        )
+        call.implied_volatility = (bachelier_implied_vol(F, call.strike, call.premium, time_to_expiry, True)
+            if call.status and call.premium > 0 else 0.0)
+        
+        put.implied_volatility = (bachelier_implied_vol(F, put.strike, put.premium, time_to_expiry, False)
+            if put.status and put.premium > 0 else 0.0)
+        
         datas.append((call.strike, call, put))
 
     n = len(datas)
@@ -332,9 +323,6 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
         return
 
     # ── 2. Fusion call+put → iv_merged par strike ───────────────────────────
-    # Si les deux sont valides et cohérents  → moyenne
-    # Si l'un diverge trop vs ses voisins   → on garde l'autre
-    # Si un seul est disponible             → on garde celui-là
     IV_DIVERGENCE_THRESHOLD = 0.30
 
     def _neighbor_avg(iv_list: List[float], idx: int) -> Optional[float]:
@@ -358,12 +346,10 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
                     put.status = False
                     put.implied_volatility = 0.0
                     iv_merged.append(ic)
-                    print(f"  [fusion] K={call.strike}: ecart C/P={abs(ic-ip):.4f} → put ecarte")
                 else:
                     call.status = False
                     call.implied_volatility = 0.0
                     iv_merged.append(ip)
-                    print(f"  [fusion] K={call.strike}: ecart C/P={abs(ic-ip):.4f} → call ecarte")
         elif ic > 0:
             iv_merged.append(ic)
         elif ip > 0:
@@ -372,12 +358,9 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
             iv_merged.append(0.0)
 
     # ── 3. Suppression des clusters trop petits ──────────────────────────────
-    # On groupe les indices valides en clusters d'indices consécutifs.
-    # Tout cluster de taille < MIN_CLUSTER_SIZE est supprimé (1 isolé, paire isolée, etc.)
     MIN_CLUSTER_SIZE = 3
 
     valid_indices = [i for i in range(n) if iv_merged[i] > 0]
-    # Construire les clusters : indices consécutifs (pas de saut)
     clusters: List[List[int]] = []
     for idx in valid_indices:
         if clusters and idx == clusters[-1][-1] + 1:

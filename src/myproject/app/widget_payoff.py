@@ -149,19 +149,8 @@ def create_payoff_diagram(
             fill="tozeroy",
             line=dict(color="rgba(128, 128, 128, 0.8)", width=2, dash="dot"),
             fillcolor="rgba(128, 128, 128, 0.2)",
-            yaxis="y2",
         ),
         secondary_y=True,
-    )
-
-    # Ajouter ligne de moyenne
-    fig.add_vline(
-        x=mean_price,
-        line_dash="dash",
-        line_color="gray",
-        annotation_text=f"Î¼ = {mean_price:.2f}",
-        annotation_position="top right",
-        opacity=0.5,
     )
 
     # Ajouter ligne du prix actuel du sous-jacent
@@ -188,7 +177,6 @@ def create_payoff_diagram(
         title=f"P&L Diagramm {underlying_label} with Gaussian Distribution",
         xaxis_title="Underlying Price",
         yaxis_title="Profit",
-        yaxis2_title="Density of Probabiliy",
         height=600,
         hovermode="x unified",
         legend=dict(
