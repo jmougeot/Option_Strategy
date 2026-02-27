@@ -389,7 +389,6 @@ def _compute_bachelier_volatility(options: List[Option], time_to_expiry: float =
 
     for i in to_remove:
         _, call, put = datas[i]
-        print(f"  [isolated] K={call.strike}: cluster trop petit → ignore")
         call.status = False
         put.status  = False
         call.implied_volatility = 0.0
@@ -446,7 +445,7 @@ def _compute_sabr_volatility(
     options: List[Option],
     time_to_expiry: float = 0.25,
     future_price: Optional[float] = None,
-    anomaly_threshold: float = 2.5,
+    anomaly_threshold: float = 3.5,
 ) -> Optional[SABRCalibration]:
     """
     Calibre le modele SABR (beta=0, pure normal) sur le smile Bloomberg

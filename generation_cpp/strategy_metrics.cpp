@@ -1,6 +1,5 @@
 /**
  * Implémentation des calculs de métriques de stratégies
- * Optimisé pour la performance (SIMD-friendly, cache-friendly)
  */
 
 #include "strategy_metrics.hpp"
@@ -8,14 +7,9 @@
 #include <numeric>
 #include <cmath>
 #include <cstring>
-
-// Inclure les implémentations séparées (unity build)
 #include "strategy_filters.cpp"
 #include "strategy_calculs.cpp"
 #include "strategy_scoring.cpp"
-
-// Note: strategy_filters.cpp et strategy_calculs.cpp définissent leurs fonctions
-// dans le namespace strategy, donc pas besoin de rouvrir le namespace ici.
 
 namespace strategy {
 
@@ -70,8 +64,6 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
     }
     
     // ========== FILTRES (early exit) ==========
-    
-    // Filtre 1: Vente inutile (premium < min_premium_sell)
     if (!filter_useless_sell(options, signs, n_options, min_premium_sell)) {
         return std::nullopt;
     }
@@ -81,9 +73,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         return std::nullopt;
     }
     
-    // Filtre 4+4b: Put/Call open (fusionné en une seule passe)
-    // + Agrégation fusionnée (premium, delta, avg_pnl, roll, IV, counts)
-    // → une seule boucle pour tout
+    // Filtre 4: Put/Call open et autre fusionné
     double total_premium = static_cast<double>(n_options) * leg_penalty;
     double total_delta = 0.0;
     double total_gamma = 0.0;
@@ -136,10 +126,7 @@ std::optional<StrategyMetrics> StrategyCalculator::calculate(
         return std::nullopt;
     }
     
-    // ========== P&L total via raw pointers (zéro-copie) ==========
-    // Optimisation: première ligne = assignment direct (évite memset),
-    // lignes suivantes = accumulation. __restrict pour auto-vectorisation.
-    
+    // ========== P&L total via raw pointers (zéro-copie) =========
     {
         const double s0 = static_cast<double>(signs[0]);
         const double* __restrict row0 = pnl_rows[0];

@@ -415,22 +415,26 @@ class SABRCalibration:
 
     def anomalies(
         self,
-        threshold: float = 2.5,
-        min_error_bps: float = 1.0,
+        threshold: float = 3.5,
+        min_error_bps: float = 3.0,
+        min_relative: float = 0.05,
     ) -> List[Dict]:
         """
         Identifie les options dont la volatilité Bloomberg s'écarte
         anormalement de la surface SABR calibrée.
 
-        Critères de détection
-        ---------------------
+        Critères de détection (les TROIS conditions doivent être vérifiées)
+        -------------------------------------------------------------------
         Un point est signalé si :
-            |résidu_i| > threshold × RMSE   ET   |résidu_i| > min_error_bps / 10000
+            |résidu_i| > threshold × RMSE
+            ET  |résidu_i| > min_error_bps / 10000
+            ET  |résidu_i| / vol_mkt_i > min_relative
 
         Parameters
         ----------
-        threshold     : multiplicateur de RMSE (ex. 2.5 = 2.5× la RMSE globale)
+        threshold     : multiplicateur de RMSE (ex. 3.5 = 3.5× la RMSE globale)
         min_error_bps : erreur minimale absolue en bp pour éviter les faux positifs
+        min_relative  : écart relatif minimal par rapport à la vol marché (0.05 = 5 %)
 
         Returns
         -------
@@ -456,7 +460,10 @@ class SABRCalibration:
             r.strikes, r.sigmas_mkt, r.sigmas_model, r.residuals
         ):
             abs_res = abs(res)
-            if abs_res > anomaly_threshold and abs_res > min_error_abs:
+            relative_error = abs_res / s_mkt if s_mkt > 0 else 0.0
+            if (abs_res > anomaly_threshold
+                    and abs_res > min_error_abs
+                    and relative_error > min_relative):
                 z_score = abs_res / r.rmse if r.rmse > 0 else 0.0
                 # résidu > 0 : mkt > model → l'option est plus chère que le modèle
                 # en vol : vol_mkt > vol_model → vol élevée → option chère = potentiellement overpriced
@@ -523,7 +530,7 @@ class SABRCalibration:
         n_interp: int = 200,
         title: Optional[str] = None,
         ax=None,
-        anomaly_threshold: float = 2.5,
+        anomaly_threshold: float = 3.5,
         show: bool = True,
     ):
         """
@@ -713,7 +720,7 @@ def calibrate_from_options(
     F: Optional[float] = None,
     T: float = 0.25,
     beta: float = 0.0,
-    anomaly_threshold: float = 2.5,
+    anomaly_threshold: float = 3.5,
     plot: bool = True,
 ) -> Tuple["SABRCalibration", SABRResult, List[Dict]]:
     """
