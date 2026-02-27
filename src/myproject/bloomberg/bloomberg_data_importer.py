@@ -445,7 +445,7 @@ def _compute_sabr_volatility(
     options: List[Option],
     time_to_expiry: float = 0.25,
     future_price: Optional[float] = None,
-    anomaly_threshold: float = 3.5,
+    anomaly_threshold: float = 1.5,
 ) -> Optional[SABRCalibration]:
     """
     Calibre le modele SABR (beta=0, pure normal) sur le smile Bloomberg
