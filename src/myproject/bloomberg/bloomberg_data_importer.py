@@ -488,14 +488,48 @@ def _compute_sabr_volatility(
     print(f"\n[SABR] Calibration sur {len(strikes)} strikes | F={F:.4f} | T={time_to_expiry:.4f}a")
 
     try:
+        # ── Boucle itérative : corriger une anomalie à la fois puis recalibrer ──
+        # sigmas_work est la copie de travail corrigée au fil des itérations
+        sigmas_work     = sigmas.copy()
+        corrected_set: dict[float, float] = {}   # strike → ancienne IV originale
+        MAX_ITER = len(strikes)                  # ne può corriger plus de points qu'il n'y en a
+
         calib  = SABRCalibration(F=float(F), T=time_to_expiry, beta=0.0)
-        result = calib.fit(strikes, sigmas)
+        result = calib.fit(strikes, sigmas_work)
+
+        for iteration in range(MAX_ITER):
+            anoms = calib.anomalies(threshold=anomaly_threshold)
+            if not anoms:
+                break  # plus d'anomalie → on s'arrête
+
+            # Prendre uniquement le pire point (résidu absolu le plus grand)
+            worst = anoms[0]
+            K_bad = worst["strike"]
+
+            # Trouver l'index dans strikes
+            idx = np.argmin(np.abs(strikes - K_bad))
+            old_iv   = sigmas_work[idx]
+            new_iv   = worst["sigma_model"]   # vol SABR du modèle courant
+
+            print(
+                f"[SABR] Iter {iteration+1} — correction K={K_bad:.4f}: "
+                f"{old_iv*1e4:.1f}bp → {new_iv*1e4:.1f}bp "
+                f"(Δ={worst['residual_bps']:+.1f}bp  z={worst['z_score']:.2f})"
+            )
+
+            corrected_set[round(K_bad, 4)] = old_iv
+            sigmas_work[idx] = new_iv
+
+            # Recalibrer SABR sur les données corrigées (minimum 3 points)
+            if len(strikes) < 3:
+                break
+            calib  = SABRCalibration(F=float(F), T=time_to_expiry, beta=0.0)
+            result = calib.fit(strikes, sigmas_work)
+
+        print(f"[SABR] Calibration finale ({len(corrected_set)} point(s) corrigé(s))")
         print(calib.summary())
 
-        # --- Identifier les strikes aberrants ---
-        anom_set = {a["strike"] for a in calib.anomalies(threshold=anomaly_threshold)}
-
-        # --- Enrichir chaque Option ---
+        # ── Enrichir chaque Option avec la calibration finale ────────────────
         for opt in options:
             if opt.strike <= 0:
                 continue
@@ -504,23 +538,23 @@ def _compute_sabr_volatility(
                 result.alpha, result.beta, result.rho, result.nu,
             )
             if opt.implied_volatility > 0:
-                opt.sabr_residual   = opt.implied_volatility - opt.sabr_volatility
-                opt.sabr_z_score    = (
-                    abs(opt.sabr_residual) / result.rmse if result.rmse > 0 else 0.0
-                )
-                opt.sabr_is_anomaly = round(opt.strike, 4) in anom_set
-                # --- Correction du prix si anomalie ---
-                if opt.sabr_is_anomaly and opt.sabr_volatility > 0:
-                    print(
-                        f"[SABR] Correction K={opt.strike:.4f} {opt.option_type}: "
-                        f"IV {opt.implied_volatility*1e4:.1f}bp → {opt.sabr_volatility*1e4:.1f}bp "
-                        f"(Δ={opt.sabr_residual*1e4:+.1f}bp)"
-                    )
+                K_rounded = round(opt.strike, 4)
+                if K_rounded in corrected_set:
+                    # Ce strike a été corrigé : mettre à jour IV et premium
+                    opt.sabr_is_anomaly = True
+                    opt.sabr_corrected  = True
                     opt.implied_volatility = opt.sabr_volatility
                     opt.sabr_residual      = 0.0
-                    opt.sabr_corrected     = True
+                    opt.sabr_z_score       = 0.0
                     opt.premium = bachelier_price(
                         float(F), opt.strike, opt.sabr_volatility, time_to_expiry, opt.is_call()
+                    )
+                else:
+                    opt.sabr_is_anomaly = False
+                    opt.sabr_corrected  = False
+                    opt.sabr_residual   = opt.implied_volatility - opt.sabr_volatility
+                    opt.sabr_z_score    = (
+                        abs(opt.sabr_residual) / result.rmse if result.rmse > 0 else 0.0
                     )
             else:
                 opt.sabr_residual   = 0.0
