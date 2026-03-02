@@ -47,6 +47,7 @@ def process_bloomberg_to_strategies(
     brut_code: Optional[List[str]] = None,
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
     use_bachelier: bool = True,
+    use_sabr: bool = True,
     leg_penalty: float = 0.0,
     prefilled_options: Optional[List] = None,
 ) -> Tuple[Union[List[StrategyComparison], MultiRankingResult], Dict, Tuple[np.ndarray, np.ndarray, float], FutureData]:
@@ -124,6 +125,7 @@ def process_bloomberg_to_strategies(
             roll_expiries=roll_expiries,
             brut_code=brut_code,
             default_position="long",
+            use_sabr=use_sabr,
         )
 
     # Tracker du fetch

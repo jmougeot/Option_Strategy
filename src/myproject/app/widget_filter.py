@@ -31,6 +31,7 @@ def filter_params() -> FilterData:
     # Retrieve current values from session_state
     current_filter = st.session_state.filter
 
+    
     premium_only = st.checkbox(label="Risk Premium only", help= "Accept to loose only the strtegie's premium" )
     
     if premium_only:

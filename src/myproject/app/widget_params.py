@@ -73,12 +73,13 @@ class UIParams:
     roll_expiries: Optional[List[RollExpiry]] = None
     operation_penalisation : float = 0.0
     use_bachelier: bool = True
+    use_sabr: bool = True
 
 
 def sidebar_params() -> UIParams:
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1 :
-        brut_code_check =st.checkbox(
+        brut_code_check = st.checkbox(
             "Provide raw code",
             value=False,
             help="Provide full Bloomberg code",
@@ -90,6 +91,13 @@ def sidebar_params() -> UIParams:
             value=True,
             help="If unchecked, options with missing price data (warnings) are ignored instead of being priced via Bachelier.",
             key="use_bachelier_check"
+        )
+    with col3 :
+        use_sabr = st.checkbox(
+            "SABR calibration",
+            value=True,
+            help="Calibrate the SABR model on the Bloomberg smile to detect and correct anomalous volatilities.",
+            key="use_sabr_check"
         )
     
     underlying = "ER"
@@ -194,24 +202,16 @@ def sidebar_params() -> UIParams:
     
     roll_expiries: Optional[List[RollExpiry]] = None
 
-    # Roll uniquement en mode standard (pas brut_code)
-    if not brut_code_check:
-        custom_roll = st.checkbox(
-            "Custom roll",
-            value=False,
-            help="Check to specify roll expiries.",
-            key="param_custom_roll"
-        )
         
-        if custom_roll:
-            roll_input = st.text_input(
-                "Roll months",
-                value="Z5",
-                help="Format: M1Y1, M2Y2 (e.g. Z5 or H6, Z5)",
-                key="param_roll_input"
-            )
-            if roll_input:
-                roll_expiries = parse_roll_input(roll_input)
+    if "param_roll_input" not in st.session_state:
+        st.session_state["param_roll_input"] = ""
+    roll_input = st.text_input(
+        "Roll months",
+        help="Format: M1Y1, M2Y2 (e.g. Z5 or H6, Z5)",
+        key="param_roll_input"
+    )
+    if roll_input:
+        roll_expiries = parse_roll_input(roll_input)
 
     strikes = strike_list(price_min, price_max, price_step)
 
@@ -254,5 +254,6 @@ def sidebar_params() -> UIParams:
         brut_code=brut_code_result,
         roll_expiries=roll_expiries,
         use_bachelier=use_bachelier,
+        use_sabr=use_sabr,
         operation_penalisation=operation_penalisation,
     )

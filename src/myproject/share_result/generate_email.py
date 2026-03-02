@@ -188,12 +188,6 @@ def open_outlook_with_email(
     all_payoff_paths: List[str] = payoff_images if payoff_images else images[:1]
     summary_path: Optional[str] = None if payoff_images else (images[1] if len(images) > 1 else None)
 
-    print("\n" + "="*60)
-    print("[Email DEBUG] open_outlook_with_email() called")
-    print(f"[Email DEBUG] Payoff images: {all_payoff_paths}")
-    print(f"[Email DEBUG] Summary image: {summary_path}")
-    print("="*60 + "\n")
-
     if sys.platform != "win32":
         print("[Email] open_outlook_with_email is only available on Windows")
         return False
@@ -241,7 +235,6 @@ def open_outlook_with_email(
             try:
                 att = mail.Attachments.Add(img_path)
                 att.PropertyAccessor.SetProperty(PR_ATTACH_CONTENT_ID, cid)
-                print(f"[Email DEBUG] Attached payoff {i}: {img_path} → cid:{cid}")
             except Exception as att_err:
                 print(f"[Email DEBUG] Error attaching {img_path}: {att_err}")
 

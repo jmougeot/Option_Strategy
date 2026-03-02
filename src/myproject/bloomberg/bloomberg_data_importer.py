@@ -539,6 +539,7 @@ def import_options(
     brut_code: Optional[List[str]] = None,
     suffix: str = "Comdty",
     default_position: PositionType = "long",
+    use_sabr: bool = True,
 ) -> Tuple[List[Option], FutureData, List[str]]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne des objets Option.
@@ -574,7 +575,8 @@ def import_options(
         # 3.5. Calculer la volatilité Bachelier pour TOUTES les options
         if options:
              _compute_bachelier_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
-             _compute_sabr_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
+             if use_sabr:
+                 _compute_sabr_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
 
              for option in options:
                 option._calcul_all_surface()

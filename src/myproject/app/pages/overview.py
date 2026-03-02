@@ -225,6 +225,7 @@ def run():
             "filter": filter,
             "roll_expiries": params.roll_expiries,
             "use_bachelier": params.use_bachelier,
+            "use_sabr": params.use_sabr,
             "operation_penalisation": params.operation_penalisation,
         }
         st.session_state["_last_comparison_params"] = _params.copy()
