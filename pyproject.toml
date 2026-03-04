@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "option-strategy"            
 version = "0.1.0"
-description = "Option strategy Streamlit app"
+description = "Option strategy PyQt6 app"
 dependencies = []       
              
 [tool.setuptools.packages.find]

@@ -87,8 +87,8 @@ echo ""
 
 # Étape 5: Installer les dépendances
 echo "📥 Installation des dépendances..."
-echo "   • streamlit"
-echo "   • plotly"
+echo "   • PyQt6"
+   echo "   • plotly"
 echo "   • pandas"
 pip install -r requirements.txt --quiet
 echo "blpapiioiiii"
@@ -113,7 +113,8 @@ cat > run.sh << 'EOF'
 # Script de lancement rapide
 cd "$(dirname "$0")"
 source venv/bin/activate
-streamlit run src/app.py
+export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
+python -m myproject.app_qt
 EOF
 chmod +x run.sh
 echo "✅ Script run.sh créé"
@@ -128,7 +129,7 @@ echo "📋 Prochaines étapes:"
 echo ""
 echo "   Pour lancer l'application:"
 echo "   → Option 1: ./run.sh"
-echo "   → Option 2: source venv/bin/activate && streamlit run src/app.py"
+   echo "   → Option 2: source venv/bin/activate && python -m myproject.app_qt"
 echo ""
 echo "   L'application s'ouvrira automatiquement dans votre navigateur"
 echo "   URL: http://localhost:8501"

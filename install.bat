@@ -98,7 +98,7 @@ echo.
 
 REM Étape 5: Installer les dépendances
 echo Installation des dependances...
-echo   - streamlit
+echo   - PyQt6
 echo   - plotly
 echo   - pandas
 pip install -r requirements.txt --quiet
@@ -380,7 +380,7 @@ echo   Pour lancer l'application:
 echo   - Option 1: Double-cliquez sur run.bat
 echo   - Option 2: Dans PowerShell:
 echo       venv\Scripts\Activate.ps1
-echo       streamlit run src/app.py
+echo       python -m myproject.app_qt
 echo.
 echo   L'application s'ouvrira automatiquement dans votre navigateur
 echo   URL: http://localhost:8501
