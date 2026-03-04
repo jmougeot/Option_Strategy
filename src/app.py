@@ -21,10 +21,12 @@ def main() -> None:
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.path.join(real_plugins, "platforms")
 
     from PyQt6.QtWidgets import QApplication
+    from app.theme import apply as apply_theme
 
     app = QApplication(sys.argv)
     app.setApplicationName("M2O")
     app.setOrganizationName("BGC")
+    apply_theme(app)
 
     # Import after QApplication is created
     from app.main_window import MainWindow

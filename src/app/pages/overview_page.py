@@ -40,13 +40,19 @@ class _MetricLabel(QWidget):
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(4, 4, 4, 4)
-        self._title = QLabel(f"<small>{title}</small>")
+        lay.setContentsMargins(8, 6, 8, 6)
+        lay.setSpacing(2)
+        self._title = QLabel(title.upper())
+        self._title.setProperty("class", "metric-label")
         self._value = QLabel("—")
-        self._value.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self._value.setProperty("class", "metric")
         lay.addWidget(self._title)
         lay.addWidget(self._value)
-        self.setStyleSheet("border: 1px solid #ccc; border-radius: 4px;")
+        self.setStyleSheet(
+            "background-color: #1E2130;"
+            "border: 1px solid #2D3348;"
+            "border-radius: 6px;"
+        )
 
     def set_value(self, v: str) -> None:
         self._value.setText(v)
@@ -189,14 +195,19 @@ class OverviewPage(QWidget):
 
         # ── Action buttons ─────────────────────────────────────────────
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
         self._btn_run  = QPushButton("▶  Run Comparison")
-        self._btn_run.setStyleSheet("font-weight: bold;")
-        self._btn_stop = QPushButton("■  STOP")
+        self._btn_run.setProperty("accent", "true")
+        self._btn_run.setMinimumHeight(32)
+        self._btn_stop = QPushButton("■  Stop")
+        self._btn_stop.setProperty("danger", "true")
+        self._btn_stop.setMinimumHeight(32)
         self._btn_stop.setEnabled(False)
         self._btn_run.clicked.connect(self._on_run)
         self._btn_stop.clicked.connect(self._on_stop)
         btn_row.addWidget(self._btn_run)
         btn_row.addWidget(self._btn_stop)
+        btn_row.addStretch()
         root.addLayout(btn_row)
 
         # ── Status bar ─────────────────────────────────────────────────
