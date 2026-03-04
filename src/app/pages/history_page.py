@@ -18,10 +18,13 @@ from app.pages.history import (
     HistoryEntry, load_history_from_json, save_history_to_json,
 )
 from app.app_state import AppState
+from PyQt6.QtCore import pyqtSignal
 
 
 class HistoryPage(QWidget):
     """Display past searches and allow restoring parameters."""
+
+    restore_requested = pyqtSignal(object)  # emits HistoryEntry
 
     def __init__(self, state: AppState, parent=None):
         super().__init__(parent)
@@ -96,13 +99,10 @@ class HistoryPage(QWidget):
         if not entry:
             QMessageBox.information(self, "History", "Select a row first.")
             return
-        # The main window will read _pending_restore from state and apply sidebar values
-        self._state.search_history = self._entries
-        # Store the entry to restore in a temporary slot on state
-        self._state._pending_restore = entry  # type: ignore
+        self.restore_requested.emit(entry)
         QMessageBox.information(
             self, "History",
-            f"Parameters from '{entry.timestamp}' queued for restore.\n"
+            f"✅ Parameters from '{entry.timestamp}' restored in sidebar.\n"
             "Switch to Overview and press Run Comparison."
         )
 

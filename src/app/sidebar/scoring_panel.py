@@ -136,3 +136,58 @@ class ScoringPanel(QGroupBox):
             result = [_make_full_weights(RANKING_PRESETS["R1 — Leverage"])]
 
         return result
+
+    def load_from_weights(self, weights: list) -> None:
+        """
+        Restore preset checkboxes and/or custom rows from a saved weights list.
+        Each item is a full-weight dict {metric: float, ...}.
+        """
+        if not weights:
+            return
+
+        # Build set of full-expanded preset dicts for comparison
+        preset_full = {
+            name: _make_full_weights(w) for name, w in RANKING_PRESETS.items()
+        }
+
+        # Uncheck all presets first
+        for chk in self._preset_checks.values():
+            chk.blockSignals(True)
+            chk.setChecked(False)
+            chk.blockSignals(False)
+
+        # Remove existing custom rows
+        for wid in list(self._custom_rows.keys()):
+            row = self._custom_rows.pop(wid)
+            self._custom_layout.removeWidget(row)
+            row.deleteLater()
+
+        for w in weights:
+            # Normalise the incoming dict to all-keys
+            full = _make_full_weights({k: v for k, v in w.items() if v > 0})
+            # Try to match a preset
+            matched = False
+            for name, pf in preset_full.items():
+                if all(abs(full.get(k, 0) - pf.get(k, 0)) < 1e-6 for k in pf):
+                    chk = self._preset_checks.get(name)
+                    if chk:
+                        chk.blockSignals(True)
+                        chk.setChecked(True)
+                        chk.blockSignals(False)
+                    matched = True
+                    break
+            if not matched:
+                # Add as custom row
+                wid = str(__import__('uuid').uuid4())
+                idx = len(self._custom_rows) + 1
+                row = _CustomWeightRow(wid, idx)
+                row.deleted.connect(self._remove_custom)
+                row.changed.connect(self.changed.emit)
+                for key, spn in row._spins.items():
+                    spn.blockSignals(True)
+                    spn.setValue(int(round(w.get(key, 0.0) * 100)))
+                    spn.blockSignals(False)
+                self._custom_rows[wid] = row
+                self._custom_layout.addWidget(row)
+
+        self.changed.emit()

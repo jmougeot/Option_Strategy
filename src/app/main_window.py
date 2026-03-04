@@ -29,7 +29,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("M2O — Options Strategy")
-        self.resize(1400, 860)
+        self.resize(1440, 900)
+        self.setMinimumSize(1100, 700)
 
         # ── Central State ──────────────────────────────────────────────────
         self._state = AppState()
@@ -42,8 +43,8 @@ class MainWindow(QMainWindow):
 
         sidebar_contents = QWidget()
         sidebar_lay = QVBoxLayout(sidebar_contents)
-        sidebar_lay.setContentsMargins(4, 4, 4, 4)
-        sidebar_lay.setSpacing(8)
+        sidebar_lay.setContentsMargins(10, 10, 10, 10)
+        sidebar_lay.setSpacing(10)
         for w in (self._pnl_scenario, self._pnl_params, self._pnl_filter, self._pnl_scoring):
             sidebar_lay.addWidget(w)
         sidebar_lay.addStretch()
@@ -52,8 +53,9 @@ class MainWindow(QMainWindow):
         scroll.setWidget(sidebar_contents)
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setMinimumWidth(300)
-        scroll.setMaximumWidth(380)
+        scroll.setMinimumWidth(380)
+        scroll.setMaximumWidth(600)
+        scroll.setFrameShape(scroll.Shape.NoFrame)
 
         dock = QDockWidget("Parameters", self)
         dock.setWidget(scroll)
@@ -82,12 +84,19 @@ class MainWindow(QMainWindow):
         # Wire Overview result → refresh Volatility
         self._page_overview.result_available.connect(self._page_volatility.refresh)
 
+        # Wire History restore → populate sidebar + sync
+        self._page_history.restore_requested.connect(self._on_restore_from_history)
+
+        # Wire Overview result → refresh History table
+        self._page_overview.result_available.connect(self._page_history._load)
+
         tabs = QTabWidget()
-        tabs.addTab(self._page_overview,  "📊 Overview")
-        tabs.addTab(self._page_volatility, "📈 Volatility")
-        tabs.addTab(self._page_history,   "📜 History")
-        tabs.addTab(self._page_email,     "📧 Email")
-        tabs.addTab(self._page_help,      "📚 Help")
+        tabs.setDocumentMode(True)
+        tabs.addTab(self._page_overview,   "Overview")
+        tabs.addTab(self._page_volatility, "Volatility")
+        tabs.addTab(self._page_history,    "History")
+        tabs.addTab(self._page_email,      "Email")
+        tabs.addTab(self._page_help,       "Help")
         self.setCentralWidget(tabs)
 
     # ------------------------------------------------------------------ sync
@@ -114,3 +123,20 @@ class MainWindow(QMainWindow):
                 )
         except Exception:
             pass
+
+    def _on_restore_from_history(self, entry) -> None:
+        """Apply all fields of a HistoryEntry back into the sidebar."""
+        try:
+            if entry.params:
+                self._pnl_params.load_from_params_dict(entry.params)
+            if entry.scenarios:
+                self._pnl_scenario.load_from_list(entry.scenarios)
+            if entry.filter_data:
+                self._pnl_filter.load_from_dict(entry.filter_data)
+            if entry.scoring_weights:
+                weights = entry.scoring_weights
+                if isinstance(weights, list):
+                    self._pnl_scoring.load_from_weights(weights)
+            self._sync_state()
+        except Exception as e:
+            print(f"Restore from history error: {e}")

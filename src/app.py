@@ -13,10 +13,8 @@ import os
 
 
 def main() -> None:
-    # Qt imports MUST be inside main() — NOT at module level.
-    # multiprocessing.spawn re-imports app.py to bootstrap each subprocess;
-    # if PyQt6 is imported at module level it crashes with 0xC0000005.
     import PyQt6
+    
     real_plugins = os.path.join(os.path.dirname(PyQt6.__file__), "Qt6", "plugins")
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.path.join(real_plugins, "platforms")
 

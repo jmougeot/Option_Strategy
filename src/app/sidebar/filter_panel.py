@@ -178,3 +178,47 @@ class FilterPanel(QGroupBox):
             premium_only_right=po_right,
             premium_only_left=po_left,
         )
+
+    def load_from_dict(self, d: dict) -> None:
+        """Restore widget values from a saved filter dict."""
+        widgets = [
+            self._chk_premium_only, self._spn_loss_left, self._spn_loss_right,
+            self._spn_limit_left, self._spn_limit_right, self._chk_po_left, self._chk_po_right,
+            self._spn_max_prem, self._spn_min_short, self._spn_og, self._spn_od,
+            self._spn_delta_min, self._spn_delta_max, self._chk_filter_type,
+        ]
+        for w in widgets:
+            w.blockSignals(True)
+        try:
+            po = d.get("premium_only", False)
+            self._chk_premium_only.setChecked(po)
+            self._loss_widget.setVisible(not po)
+
+            if "max_loss_left" in d:
+                self._spn_loss_left.setValue(float(d["max_loss_left"]))
+            if "max_loss_right" in d:
+                self._spn_loss_right.setValue(float(d["max_loss_right"]))
+            if "limit_left" in d:
+                self._spn_limit_left.setValue(float(d["limit_left"]))
+            if "limit_right" in d:
+                self._spn_limit_right.setValue(float(d["limit_right"]))
+            if "premium_only_left" in d:
+                self._chk_po_left.setChecked(bool(d["premium_only_left"]))
+            if "premium_only_right" in d:
+                self._chk_po_right.setChecked(bool(d["premium_only_right"]))
+            if "max_premium" in d:
+                self._spn_max_prem.setValue(float(d["max_premium"]))
+            if "min_premium_sell" in d:
+                self._spn_min_short.setValue(float(d["min_premium_sell"]))
+            if "ouvert_gauche" in d:
+                self._spn_og.setValue(int(d["ouvert_gauche"]))
+            if "ouvert_droite" in d:
+                self._spn_od.setValue(int(d["ouvert_droite"]))
+            if "delta_min" in d:
+                self._spn_delta_min.setValue(float(d["delta_min"]))
+            if "delta_max" in d:
+                self._spn_delta_max.setValue(float(d["delta_max"]))
+        finally:
+            for w in widgets:
+                w.blockSignals(False)
+        self.changed.emit()

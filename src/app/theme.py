@@ -1,38 +1,38 @@
 """
-Modern dark theme for M2O — Options Strategy
-Palette: dark navy + accent bleu acier, typographie propre.
+Modern light theme for M2O — Options Strategy
+Palette: blanc / gris très clair + accent bleu acier sobre.
 """
 
 # ── Color tokens ───────────────────────────────────────────────────────────
-BG_APP        = "#0F1117"   # fond principal
-BG_SURFACE    = "#171923"   # surface (panels, dock)
-BG_RAISED     = "#1E2130"   # éléments surélevés (groupbox, cards)
-BG_INPUT      = "#252A3A"   # champs de saisie
-BG_HOVER      = "#2A3045"   # hover state
-BG_SELECTED   = "#2C3A5C"   # sélection
-BORDER        = "#2D3348"   # bordures générales
-BORDER_FOCUS  = "#4C7CF5"   # focus ring
+BG_APP        = "#F5F6FA"   # fond principal (gris très clair)
+BG_SURFACE    = "#FFFFFF"   # surface (panels, dock)
+BG_RAISED     = "#FFFFFF"   # éléments surélevés (groupbox, cards)
+BG_INPUT      = "#FFFFFF"   # champs de saisie
+BG_HOVER      = "#EEF1F8"   # hover state
+BG_SELECTED   = "#DDE6FB"   # sélection
+BORDER        = "#DDE0E8"   # bordures générales
+BORDER_FOCUS  = "#3D72F0"   # focus ring
 
-TEXT_PRIMARY   = "#E4E7F0"  # texte principal
-TEXT_SECONDARY = "#7A8099"  # texte secondaire / labels
-TEXT_DISABLED  = "#4A5060"  # texte désactivé
-TEXT_ACCENT    = "#6B9CF5"  # texte accentué (liens, titres section)
+TEXT_PRIMARY   = "#1A1D2E"  # texte principal
+TEXT_SECONDARY = "#6B7080"  # texte secondaire / labels
+TEXT_DISABLED  = "#B0B4C0"  # texte désactivé
+TEXT_ACCENT    = "#2A5BD7"  # texte accentué (liens, titres section)
 
-ACCENT        = "#4C7CF5"   # bouton primaire
-ACCENT_HOVER  = "#5B8AFF"
-ACCENT_PRESS  = "#3A6AE8"
-DANGER        = "#D95F5F"
-DANGER_HOVER  = "#E87070"
-SUCCESS       = "#3FB68B"
-WARNING       = "#D4A24C"
+ACCENT        = "#3D72F0"   # bouton primaire
+ACCENT_HOVER  = "#2A5BD7"
+ACCENT_PRESS  = "#1A4AC4"
+DANGER        = "#D94F4F"
+DANGER_HOVER  = "#C03030"
+SUCCESS       = "#2E9E72"
+WARNING       = "#C88A20"
 
-SCROLLBAR_BG   = "#171923"
-SCROLLBAR_THUMB = "#2D3348"
-SCROLLBAR_HOVER = "#3D4560"
+SCROLLBAR_BG   = "#F0F1F5"
+SCROLLBAR_THUMB = "#C8CBD8"
+SCROLLBAR_HOVER = "#A8ACBC"
 
-TAB_BAR_BG    = "#13161F"
-TAB_ACTIVE_BG = "#1E2130"
-TAB_INACTIVE  = "#171923"
+TAB_BAR_BG    = "#ECEEF5"
+TAB_ACTIVE_BG = "#FFFFFF"
+TAB_INACTIVE  = "#ECEEF5"
 
 RADIUS        = "6px"
 RADIUS_SM     = "4px"
@@ -96,7 +96,7 @@ QScrollBar:vertical {{
 QScrollBar::handle:vertical {{
     background: {SCROLLBAR_THUMB};
     border-radius: 3px;
-    min-height: 30px;
+    min-height: px;
 }}
 QScrollBar::handle:vertical:hover {{
     background: {SCROLLBAR_HOVER};
@@ -165,12 +165,12 @@ QTabBar {{
 QTabBar::tab {{
     background-color: {TAB_INACTIVE};
     color: {TEXT_SECONDARY};
-    padding: 8px 18px;
+    padding: 11px 20px;
     border: none;
     border-bottom: 2px solid transparent;
-    font-size: 12px;
+    font-size: 15px;
     font-weight: 500;
-    min-width: 80px;
+    min-width: 110px;
 }}
 QTabBar::tab:hover {{
     background-color: {BG_HOVER};

@@ -151,3 +151,25 @@ class ScenarioPanel(QGroupBox):
             std_devs_r=[s["std_r"] for s in data],
             weights=weights,
         )
+
+    def load_from_list(self, scenarios: list) -> None:
+        """
+        Restore rows from a list of dicts:
+        [{"center": ..., "std_l": ..., "std_r": ..., "weight": ...}, ...]
+        """
+        if not scenarios:
+            return
+        # Remove all existing rows
+        for sid in list(self._rows.keys()):
+            row = self._rows.pop(sid)
+            self._rows_layout.removeWidget(row)
+            row.deleteLater()
+        # Add one row per saved scenario — weight stored as normalized (0-1), display as 0-100
+        for s in scenarios:
+            self._add_scenario(
+                price=float(s.get("center", 98.0)),
+                std_l=float(s.get("std_l", 0.10)),
+                std_r=float(s.get("std_r", 0.10)),
+                weight=float(s.get("weight", 0.25) * 100),
+            )
+        self.changed.emit()

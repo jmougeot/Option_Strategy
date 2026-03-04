@@ -14,8 +14,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QPushButton,
     QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
-
-from app.data_types import FutureData
+from app.pages.history import add_to_history
 from app.utils import format_price
 from app.widget_comparison import create_comparison_table
 from app.widget_payoff import build_payoff_figure
@@ -49,8 +48,8 @@ class _MetricLabel(QWidget):
         lay.addWidget(self._title)
         lay.addWidget(self._value)
         self.setStyleSheet(
-            "background-color: #1E2130;"
-            "border: 1px solid #2D3348;"
+            "background-color: #FFFFFF;"
+            "border: 1px solid #DDE0E8;"
             "border-radius: 6px;"
         )
 
@@ -191,7 +190,8 @@ class OverviewPage(QWidget):
     # ------------------------------------------------------------------ build
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setSpacing(6)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(8)
 
         # ── Action buttons ─────────────────────────────────────────────
         btn_row = QHBoxLayout()
@@ -213,15 +213,27 @@ class OverviewPage(QWidget):
         # ── Status bar ─────────────────────────────────────────────────
         self._status = QLabel("")
         self._status.setWordWrap(True)
+        self._status.setProperty("class", "status")
+        self._status.setStyleSheet(
+            "color: #6B7080; font-size: 11px; padding: 2px 0;"
+        )
         root.addWidget(self._status)
 
         # ── Metrics row ────────────────────────────────────────────────
+        from PyQt6.QtWidgets import QFrame
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("color: #2D3348;")
+        root.addWidget(sep)
+
         mrow = QHBoxLayout()
+        mrow.setSpacing(8)
         self._m_price    = _MetricLabel("Underlying Price")
         self._m_date     = _MetricLabel("Last Tradeable Date")
         self._m_screened = _MetricLabel("Strategies Screened")
         for m in (self._m_price, self._m_date, self._m_screened):
             mrow.addWidget(m)
+        mrow.addStretch()
         root.addLayout(mrow)
 
         # ── Ranking tabs ───────────────────────────────────────────────
@@ -334,6 +346,53 @@ class OverviewPage(QWidget):
             tab = _RankingTab("Results", unit)
             tab.load(self._state.comparisons, mixture, price, roll_labels)
             self._tabs.addTab(tab, "Results")
+
+        # ── Save to history ────────────────────────────────────────────
+        try:
+            p = self._state.params
+            params_h = {
+                "underlying": p.underlying if p else "N/A",
+                "months": p.months if p else [],
+                "years": p.years if p else [],
+                "price_min": p.price_min if p else 0,
+                "price_max": p.price_max if p else 0,
+                "max_legs": p.max_legs if p else 0,
+            }
+            sc = self._state.scenarios
+            scenarios_list = [
+                {"center": c, "std_l": sl, "std_r": sr, "weight": w}
+                for c, sl, sr, w in zip(
+                    sc.centers, sc.std_devs, sc.std_devs_r, sc.weights
+                )
+            ] if sc else []
+            f = self._state.filter
+            filter_d = {
+                "max_loss_left": f.max_loss_left,
+                "max_loss_right": f.max_loss_right,
+                "max_premium": f.max_premium,
+                "min_premium_sell": f.min_premium_sell,
+                "ouvert_gauche": f.ouvert_gauche,
+                "ouvert_droite": f.ouvert_droite,
+                "delta_min": f.delta_min,
+                "delta_max": f.delta_max,
+                "limit_left": f.limit_left,
+                "limit_right": f.limit_right,
+                "premium_only": f.premium_only,
+                "premium_only_left": f.premium_only_left,
+                "premium_only_right": f.premium_only_right,
+            } if f else {}
+            self._state.search_history = add_to_history(
+                self._state.search_history,
+                params_h,
+                self._state.comparisons,
+                mixture,
+                future_data,
+                scenarios_list,
+                filter_d,
+                self._state.scoring_weights,
+            )
+        except Exception as _he:
+            print(f"History save error: {_he}")
 
         # Notify other pages (e.g. Volatility) that new results are available
         self.result_available.emit()

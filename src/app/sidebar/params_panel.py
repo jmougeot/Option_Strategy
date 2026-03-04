@@ -208,3 +208,43 @@ class ParamsPanel(QGroupBox):
             use_sabr=self._chk_sabr.isChecked(),
             operation_penalisation=self._spn_penalty.value(),
         )
+
+    def load_from_params_dict(self, params: dict) -> None:
+        """Restore widget values from a saved params dict (e.g. from history)."""
+        to_block = [
+            self._cmb_underlying, self._cmb_months, self._txt_years,
+            self._spn_price_min, self._spn_price_max, self._spn_price_step,
+            self._sld_legs, self._chk_bachelier, self._chk_sabr, self._spn_penalty,
+        ]
+        for w in to_block:
+            w.blockSignals(True)
+        try:
+            underlying = params.get("underlying", "ER")
+            idx = self._cmb_underlying.findText(underlying)
+            if idx >= 0:
+                self._cmb_underlying.setCurrentIndex(idx)
+
+            months = params.get("months", [])
+            if months:
+                idx_m = self._cmb_months.findText(months[0])
+                if idx_m >= 0:
+                    self._cmb_months.setCurrentIndex(idx_m)
+
+            years = params.get("years", [])
+            if years:
+                self._txt_years.setText(",".join(str(y) for y in years))
+
+            price_min = params.get("price_min")
+            price_max = params.get("price_max")
+            if price_min is not None:
+                self._spn_price_min.setValue(float(price_min))
+            if price_max is not None:
+                self._spn_price_max.setValue(float(price_max))
+
+            max_legs = params.get("max_legs")
+            if max_legs is not None:
+                self._sld_legs.setValue(int(max_legs))
+        finally:
+            for w in to_block:
+                w.blockSignals(False)
+        self.changed.emit()

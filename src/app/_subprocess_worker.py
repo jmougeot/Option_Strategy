@@ -7,7 +7,6 @@ initialise a display context inside a headless child process.
 """
 from __future__ import annotations
 
-import os
 import pickle
 import sys
 import tempfile

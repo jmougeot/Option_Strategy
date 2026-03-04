@@ -12,7 +12,6 @@ to avoid the 0xC0000005 crash caused by importing PyQt6 in a spawned process.
 
 from __future__ import annotations
 
-import sys
 import tempfile
 import traceback
 from multiprocessing import Process

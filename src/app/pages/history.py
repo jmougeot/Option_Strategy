@@ -12,7 +12,7 @@ import json
 import uuid
 
 # JSON file stored at project root
-HISTORY_FILE = Path(__file__).parent.parent.parent.parent.parent / "search_history.json"
+HISTORY_FILE = Path(__file__).parent.parent.parent.parent / "search_history.json"
 
 
 @dataclass

@@ -1,4 +1,4 @@
-from app.utils import format_currency, format_expiration_date, format_price
+from app.utils import format_price
 from strategy.strategy_class import StrategyComparison
 from typing import List, Optional
 import pandas as pd 
