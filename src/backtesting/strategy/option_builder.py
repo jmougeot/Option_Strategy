@@ -3,16 +3,6 @@ Option Builder for Backtesting
 ================================
 Construit des objets ``Option`` (cf. ``myproject.option.option_class``)
 à partir des données historiques récupérées via ``BDHFetcher``.
-
-Pour chaque date d'entrée, le builder :
-1. Récupère les prix calls / puts / sous-jacent depuis le BDH
-2. Retrouve la vol implicite Bachelier et les Greeks
-3. Injecte la mixture (densité implicite ou log-normale fallback)
-4. Calcule les surfaces de P&L (``_calcul_all_surface``)
-5. Calcule les prix intra-vie (``calculate_all_intra_life``)
-
-Les objets ``Option`` produits sont *directement compatibles* avec
-``OptionStrategyGeneratorV2`` et le scoring C++.
 """
 
 import sys
@@ -33,7 +23,8 @@ from src.backtesting.config import SFRConfig
 from src.backtesting.bloomberg.bdh_fetcher import BDHFetcher
 from src.backtesting.distrib_proba.implied_distribution import ImpliedDistribution
 
-from myproject.option.option_class import Option, bachelier_price
+from myproject.option.option_class import Option
+from myproject.option.bachelier import Bachelier
 
 
 # ============================================================================
@@ -71,7 +62,7 @@ def bachelier_implied_vol(
 
     try:
         def objective(sigma: float) -> float:
-            return bachelier_price(F, K, sigma, T, is_call) - market_price
+            return Bachelier(F, K, sigma, T, is_call).price() - market_price
 
         lo = objective(sigma_low)
         hi = objective(sigma_high)
@@ -247,13 +238,6 @@ class OptionBuilder:
             if opt is not None:
                 options.append(opt)
 
-        # Intra-life pour toutes les options
-        if options:
-            for opt in options:
-                opt.calculate_all_intra_life(
-                    all_options=options, time_to_expiry=T,
-                )
-
         return options
 
     def _create_option(
@@ -269,7 +253,6 @@ class OptionBuilder:
     ) -> Optional[Option]:
         """
         Crée un objet ``Option`` complet à partir du prix historique.
-
         Calcule la vol implicite Bachelier, les Greeks,
         et toute la surface de P&L sous la mixture.
         """
