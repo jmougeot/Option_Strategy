@@ -38,6 +38,16 @@ RADIUS        = "6px"
 RADIUS_SM     = "4px"
 RADIUS_LG     = "8px"
 
+# ── Alarm-page dot states ──────────────────────────────────────────────────
+DOT_IDLE      = "color: #aaa;      font-size: 18px;"   # off / not configured
+DOT_MISS      = "color: #cc3300;   font-size: 18px;"   # target not yet reached
+DOT_WARN      = "color: #ff9900;   font-size: 18px;"   # in warning delay
+DOT_HIT       = "color: #00cc00;   font-size: 18px;"   # confirmed alarm
+
+# ── Bloomberg status label ─────────────────────────────────────────────────
+BBG_OK        = "color: #007700; font-size: 12px;"
+BBG_ERR       = "color: #cc0000; font-size: 12px;"
+
 
 QSS = f"""
 /* ===== GLOBAL =========================================================== */
@@ -509,6 +519,15 @@ QMenu::separator {{
     height: 1px;
     background: {BORDER};
     margin: 4px 8px;
+}}
+
+/* ===== ALARM PAGE ======================================================= */
+QTableWidget#alarmTable {{
+    gridline-color: #dde;
+}}
+QPushButton#btnAlarmAdd {{
+    font-weight: bold;
+    padding: 5px 14px;
 }}
 """
 

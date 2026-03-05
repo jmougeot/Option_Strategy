@@ -33,6 +33,7 @@ from alarm.models.strategy import (
     TargetCondition, normalize_ticker,
 )
 from alarm.services.bloomberg_service import BloombergService
+from app import theme
 
 # ── column indices ────────────────────────────────────────────────────────────
 C_DOT    = 0
@@ -253,7 +254,7 @@ class AlarmPage(QWidget):
         top.addStretch()
 
         self._bbg_lbl = QLabel("Bloomberg: ⬤ déconnecté")
-        self._bbg_lbl.setStyleSheet("color: #cc0000; font-size: 12px;")
+        self._bbg_lbl.setStyleSheet(theme.BBG_ERR)
         top.addWidget(self._bbg_lbl)
 
         btn_save = QPushButton("Sauvegarder")
@@ -276,7 +277,7 @@ class AlarmPage(QWidget):
         self._table.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked
         )
-        self._table.setStyleSheet("QTableWidget { gridline-color: #dde; }")
+        self._table.setObjectName("alarmTable")
         self._table.cellChanged.connect(self._on_cell_changed)
         self._table.cellDoubleClicked.connect(self._on_cell_double_clicked)
 
@@ -312,7 +313,7 @@ class AlarmPage(QWidget):
         # Bottom bar ──────────────────────────────────────────────────────────
         bot = QHBoxLayout()
         btn_add = QPushButton("＋  Ajouter une stratégie")
-        btn_add.setStyleSheet("font-weight: bold; padding: 5px 14px;")
+        btn_add.setObjectName("btnAlarmAdd")
         btn_add.clicked.connect(lambda: self._add_strategy())
         bot.addWidget(btn_add)
         bot.addStretch()
@@ -382,7 +383,7 @@ class AlarmPage(QWidget):
         # ⬤ alarm dot ─────────────────────────────────────────────────────────
         dot = QLabel("⬤")
         dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        dot.setStyleSheet("color: #aaa; font-size: 18px;")
+        dot.setStyleSheet(theme.DOT_IDLE)
         dot.setToolTip("Alarme inactive")
         self._table.setCellWidget(r, C_DOT, dot)
 
@@ -597,11 +598,11 @@ class AlarmPage(QWidget):
     def _on_bbg_status(self, connected: bool, message: str) -> None:
         if connected:
             self._bbg_lbl.setText("Bloomberg: ⬤ connecté")
-            self._bbg_lbl.setStyleSheet("color: #007700; font-size: 12px;")
+            self._bbg_lbl.setStyleSheet(theme.BBG_OK)
             self._subscribe_all_tickers()
         else:
             self._bbg_lbl.setText("Bloomberg: ⬤ déconnecté")
-            self._bbg_lbl.setStyleSheet("color: #cc0000; font-size: 12px;")
+            self._bbg_lbl.setStyleSheet(theme.BBG_ERR)
 
     def _subscribe_all_tickers(self) -> None:
         """(Re)subscribe all tickers across every page."""
@@ -649,7 +650,7 @@ class AlarmPage(QWidget):
             return
 
         if s.status != StrategyStatus.EN_COURS:
-            dot.setStyleSheet("color: #aaa; font-size: 18px;")
+            dot.setStyleSheet(theme.DOT_IDLE)
             dot.setToolTip("Alarme désactivée")
             state.reset()
             return
@@ -657,14 +658,14 @@ class AlarmPage(QWidget):
         hit = s.is_target_reached()
 
         if hit is None:
-            dot.setStyleSheet("color: #aaa; font-size: 18px;")
+            dot.setStyleSheet(theme.DOT_IDLE)
             dot.setToolTip("Cible non définie")
             state.reset()
 
         elif not hit:
             state.reset()
             self._alert.on_target_left(s.id)
-            dot.setStyleSheet("color: #cc3300; font-size: 18px;")
+            dot.setStyleSheet(theme.DOT_MISS)
             price = s.calculate_strategy_price()
             if price is not None and s.target_price is not None:
                 dot.setToolTip(f"Distance cible : {s.target_price - price:+.4f}")
@@ -674,7 +675,7 @@ class AlarmPage(QWidget):
         else:
             if state.confirmed:
                 cond = "inf." if s.target_condition == TargetCondition.INFERIEUR else "sup."
-                dot.setStyleSheet("color: #00cc00; font-size: 18px;")
+                dot.setStyleSheet(theme.DOT_HIT)
                 dot.setToolTip(f"✅ ALARME — prix {cond} {s.target_price:.4f}")
             else:
                 if state.warning_start is None:
@@ -684,7 +685,7 @@ class AlarmPage(QWidget):
                     state.confirmed = True
                     self._fire_alarm(row, s)
                 else:
-                    dot.setStyleSheet("color: #ff9900; font-size: 18px;")
+                    dot.setStyleSheet(theme.DOT_WARN)
                     dot.setToolTip(f"⏳ Alerte dans {_WARN_DELAY - elapsed:.1f} s")
 
     def _fire_alarm(self, row: int, s: Strategy) -> None:
@@ -709,7 +710,7 @@ class AlarmPage(QWidget):
         dot: QLabel = self._table.cellWidget(row, C_DOT)
         if dot:
             cond = "inf." if s.target_condition == TargetCondition.INFERIEUR else "sup."
-            dot.setStyleSheet("color: #00cc00; font-size: 18px;")
+            dot.setStyleSheet(theme.DOT_HIT)
             dot.setToolTip(f"✅ ALARME — prix {cond} {s.target_price:.4f}")
 
     def _continue_alarm(self, strategy_id: str) -> None:
