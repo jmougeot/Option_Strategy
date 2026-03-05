@@ -51,15 +51,6 @@ class AlertHandler:
             if sys.platform == "win32":
                 winsound.Beep(1000, 200)
                 winsound.Beep(1500, 200)
-            elif sys.platform == "darwin":
-                import os
-                os.system("afplay /System/Library/Sounds/Glass.aiff")
-            else:
-                import os
-                os.system(
-                    "paplay /usr/share/sounds/freedesktop/stereo/complete.oga 2>/dev/null "
-                    "|| aplay /usr/share/sounds/alsa/Noise.wav 2>/dev/null"
-                )
         except Exception:
             pass
 

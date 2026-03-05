@@ -121,7 +121,11 @@ class _RankingTab(QWidget):
     def __init__(self, tab_label: str, unit: str = "100ème", parent=None):
         super().__init__(parent)
         self._unit = unit
+        self._tab_label = tab_label
         self._comparisons: List[Any] = []
+        self._mixture = None
+        self._underlying_price = None
+        self._locked_y: Optional[tuple] = None  # (ymin, ymax) once aligned
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(4, 4, 4, 4)
@@ -140,12 +144,14 @@ class _RankingTab(QWidget):
         self._strat_table = StrategyTableWidget()
         lay.addWidget(self._strat_table)
 
-        # Payoff chart
+        # Payoff chart (with title)
         self._chart = PlotlyChart(min_height=350)
         lay.addWidget(self._chart)
 
     def load(self, comparisons: List[Any], mixture, underlying_price, roll_labels=None) -> None:
         self._comparisons = comparisons
+        self._mixture = mixture
+        self._underlying_price = underlying_price
         if not comparisons:
             return
 
@@ -161,6 +167,7 @@ class _RankingTab(QWidget):
             lambda sel: self._update_chart(sel, mixture, underlying_price)
         )
 
+        self._chart.set_title(f"Payoff — {self._tab_label}")
         self._update_chart(comparisons[:5], mixture, underlying_price)
 
     def _update_chart(self, comparisons, mixture, underlying_price) -> None:
@@ -170,8 +177,19 @@ class _RankingTab(QWidget):
         try:
             fig = build_payoff_figure(comparisons, mixture, underlying_price)
             self._chart.set_figure(fig)
+            # Re-apply locked range so Y=0 stays aligned after row selection
+            if self._locked_y is not None:
+                self._chart.set_y_range(*self._locked_y)
         except Exception:
             self._chart.clear()
+
+    def get_y_range(self) -> Optional[tuple]:
+        """Return the (ymin, ymax) computed by the chart, or None."""
+        return getattr(self._chart, '_payoff_ymin', None), getattr(self._chart, '_payoff_ymax', None)
+
+    def apply_y_range(self, ymin: float, ymax: float) -> None:
+        self._locked_y = (ymin, ymax)
+        self._chart.set_y_range(ymin, ymax)
 
 
 class OverviewPage(QWidget):
@@ -299,7 +317,6 @@ class OverviewPage(QWidget):
             return
 
         # Update state
-        from strategy.multi_ranking import MultiRankingResult
         multi = best_strategies
         self._state.multi_ranking = multi
         self._state.comparisons = multi.all_strategies_flat()
@@ -320,7 +337,7 @@ class OverviewPage(QWidget):
         nb_opts = stats.get("nb_options", 0)
         nb_kept = stats.get("nb_strategies_classees", 0)
         self._status.setText(
-            f"✅ Done — {nb_opts} options, {_format_large(nb)} screened → {nb_kept} kept."
+            f"Done — {nb_opts} options, {_format_large(nb)} screened → {nb_kept} kept."
         )
 
         # Render tabs
@@ -332,19 +349,34 @@ class OverviewPage(QWidget):
         price = future_data.underlying_price if future_data else 0.0
 
         self._tabs.clear()
+        ranking_tabs: List[_RankingTab] = []
         if multi.is_multi:
             consensus_tab = _RankingTab("Consensus", unit)
             consensus_tab.load(self._state.comparisons, mixture, price, roll_labels)
             self._tabs.addTab(consensus_tab, "Meta Ranking")
+            ranking_tabs.append(consensus_tab)
         for i in range(multi.n_sets):
             label = multi.get_set_label(i)
             tab = _RankingTab(label, unit)
             tab.load(multi.per_set_strategies[i], mixture, price, roll_labels)
             self._tabs.addTab(tab, label)
+            ranking_tabs.append(tab)
         if multi.n_sets == 0:
             tab = _RankingTab("Results", unit)
             tab.load(self._state.comparisons, mixture, price, roll_labels)
             self._tabs.addTab(tab, "Results")
+            ranking_tabs.append(tab)
+
+        # Align Y=0 across all ranking tabs (common Y range)
+        global_ymin, global_ymax = 0.0, 0.0
+        for t in ranking_tabs:
+            ymin, ymax = t.get_y_range()
+            if ymin is not None and ymax is not None:
+                global_ymin = min(global_ymin, ymin)
+                global_ymax = max(global_ymax, ymax)
+        if global_ymin < global_ymax:
+            for t in ranking_tabs:
+                t.apply_y_range(global_ymin, global_ymax)
 
         # ── Save to history ────────────────────────────────────────────
         try:

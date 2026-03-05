@@ -7,7 +7,7 @@ from __future__ import annotations
 import numpy as np
 import pyqtgraph as pg
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 # ------------------------------------------------------------------
 # Global PyQtGraph config (light theme)
@@ -29,6 +29,14 @@ class PlotlyChart(QWidget):
             self.setMinimumHeight(min_height)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
+
+        self._title_lbl = QLabel("")
+        self._title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._title_lbl.setStyleSheet(
+            "font-size: 13px; font-weight: bold; color: #1A1D2E; padding: 4px 0;"
+        )
+        self._title_lbl.hide()
+        lay.addWidget(self._title_lbl)
 
         self._pw = pg.PlotWidget()
         self._pw.setBackground(_BG)
@@ -55,6 +63,13 @@ class PlotlyChart(QWidget):
         self._data_type: str = ""
 
     # ------------------------------------------------------------------ public
+    def set_title(self, text: str) -> None:
+        if text:
+            self._title_lbl.setText(text)
+            self._title_lbl.show()
+        else:
+            self._title_lbl.hide()
+
     def set_figure(self, data) -> None:
         if data is None:
             self.clear()
@@ -66,6 +81,12 @@ class PlotlyChart(QWidget):
             self._render_smile(data)
         else:
             self.clear()
+
+    def set_y_range(self, ymin: float, ymax: float) -> None:
+        """Lock the Y-axis to the given range (used to align 0 across tabs)."""
+        pi = self._pw.plotItem
+        if pi is not None:
+            pi.setYRange(ymin, ymax, padding=0)
 
     def clear(self) -> None:
         self._pw.clear()
@@ -93,6 +114,11 @@ class PlotlyChart(QWidget):
         self._data_type = "payoff"
         pi = self._pw.plotItem
         self._style_axes()
+
+        # Lock the chart — no pan, no zoom, no menu
+        self._pw.setMouseEnabled(x=False, y=False)
+        self._pw.setMenuEnabled(False)
+        pi.vb.setMouseEnabled(x=False, y=False)
 
         x = data["x"]
         legend = pi.addLegend(offset=(10, 10))
@@ -172,6 +198,16 @@ class PlotlyChart(QWidget):
 
         pi.setLabel("bottom", "Underlying Price", color=_AX)
         pi.setLabel("left", "P&L", color=_AX)
+
+        # Compute tight Y-range and auto-range X only
+        all_y = np.concatenate([l["y"] for l in data["pnl_lines"]])
+        ymin, ymax = float(all_y.min()), float(all_y.max())
+        margin = (ymax - ymin) * 0.10 or 0.01
+        self._payoff_ymin = ymin - margin
+        self._payoff_ymax = ymax + margin
+        pi.setYRange(self._payoff_ymin, self._payoff_ymax, padding=0)
+        pi.enableAutoRange(axis="x")
+        pi.enableAutoRange(axis="y", enable=False)
 
     # ------------------------------------------------------------------ smile
     def _render_smile(self, data: dict) -> None:

@@ -8,11 +8,8 @@ Supporte les modes synchrone et asynchrone.
 import blpapi
 from blpapi.session import Session
 from blpapi.sessionoptions import SessionOptions
-from blpapi.event import Event
-from blpapi.name import Name
-from blpapi.subscriptionlist import SubscriptionList
 from dataclasses import dataclass
-from typing import Optional, Callable
+from typing import Optional
 
 
 @dataclass

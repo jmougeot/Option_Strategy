@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QSlider, QSpinBox, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QLineEdit, QSlider, QVBoxLayout, QWidget,
 )
 from PyQt6.QtCore import Qt
 

@@ -4,7 +4,7 @@ Bloomberg Data Importer for Options Strategy App
 Importe les données d'options depuis Bloomberg et les convertit en objets Option.
 """
 
-from typing import Any, Dict, List, Literal, Optional, Tuple, cast
+from typing import Any, Dict, List, Literal, Optional, Tuple
 import numpy as np
 from option.option_class import Option
 from option.bachelier import Bachelier

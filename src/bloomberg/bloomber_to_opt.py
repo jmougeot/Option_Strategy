@@ -1,4 +1,4 @@
-from typing import Literal, Optional, cast, Tuple
+from typing import Literal, cast, Tuple
 
 from option.option_class import Option
 import numpy as np
