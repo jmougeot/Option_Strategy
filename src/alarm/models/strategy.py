@@ -8,28 +8,8 @@ from typing import Optional
 from datetime import datetime
 import math
 import uuid
-import re
 
-
-def normalize_ticker(ticker: str) -> str:
-    """
-    Normalise un ticker Bloomberg pour garantir la cohérence.
-    """
-    if not ticker:
-        return ""
-    
-    ticker = ticker.strip().upper()
-    
-    # Corriger les variantes de "COMDTY"
-    # Remplacer COMDITY, COMDTY, CMDTY, etc. par COMDTY
-    ticker = re.sub(r'\bCOMDITY\b', 'COMDTY', ticker, flags=re.IGNORECASE)
-    ticker = re.sub(r'\bCOMODITY\b', 'COMDTY', ticker, flags=re.IGNORECASE)
-    ticker = re.sub(r'\bCOMDTY\b', 'COMDTY', ticker, flags=re.IGNORECASE)
-    
-    # Normaliser les espaces multiples en un seul
-    ticker = re.sub(r'\s+', ' ', ticker)
-    
-    return ticker
+from bloomberg.config import normalize_ticker  # noqa: F401 – re-exported for backward compat
 
 
 class Position(Enum):

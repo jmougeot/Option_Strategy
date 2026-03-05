@@ -2,37 +2,13 @@
 Service Bloomberg pour la gestion des subscriptions en temps réel.
 Utilise les signaux Qt pour communiquer avec l'interface graphique.
 """
-import re
 import blpapi
 from PyQt6.QtCore import QObject, pyqtSignal as Signal, QThread, QMutex, QMutexLocker
 from typing import Optional
 
-
-DEFAULT_FIELDS = ["LAST_PRICE", "BID", "ASK", "DELTA", "GAMMA", "THETA", "IVOL_MID"]
-DEFAULT_SERVICE = "//blp/mktdata"
-
-
-def normalize_ticker_bloomberg(ticker: str) -> str:
-    """
-    Normalise un ticker pour Bloomberg.
-    - Majuscules
-    - Corrige les fautes de frappe courantes
-    - Supprime les espaces superflus
-    """
-    if not ticker:
-        return ""
-    
-    ticker = ticker.strip().upper()
-    
-    # Corriger les variantes de "COMDTY"
-    ticker = re.sub(r'\bCOMDITY\b', 'COMDTY', ticker, flags=re.IGNORECASE)
-    ticker = re.sub(r'\bCOMODITY\b', 'COMDTY', ticker, flags=re.IGNORECASE)
-    ticker = re.sub(r'\bCOMDTY\b', 'COMDTY', ticker, flags=re.IGNORECASE)
-    
-    # Normaliser les espaces multiples
-    ticker = re.sub(r'\s+', ' ', ticker)
-    
-    return ticker
+from bloomberg.config import (
+    BloombergConfig, MKTDATA_SERVICE, SUBSCRIPTION_FIELDS, normalize_ticker,
+)
 
 
 class BloombergEventHandler:
@@ -60,17 +36,16 @@ class BloombergWorker(QThread):
     
     _process_subscriptions = Signal()
     
-    def __init__(self, host: str = "localhost", port: int = 8194):
+    def __init__(self, cfg: BloombergConfig | None = None):
         super().__init__()
-        self.host = host
-        self.port = port
+        self._cfg = cfg or BloombergConfig()
         self.session: Optional['blpapi.Session'] = None # type: ignore
         self.subscriptions: dict[str, 'blpapi.CorrelationId'] = {} # type: ignore
         self.is_running = False
         self.mutex = QMutex()
         self._pending_subscriptions: list[str] = []
         self._pending_unsubscriptions: list[str] = []
-        
+
         # Connecter le signal interne
         self._process_subscriptions.connect(self._on_process_subscriptions_requested)
     
@@ -80,9 +55,9 @@ class BloombergWorker(QThread):
         try:
 
             session_options = blpapi.sessionoptions.SessionOptions()
-            session_options.setServerHost(self.host)
-            session_options.setServerPort(self.port)
-            session_options.setDefaultSubscriptionService(DEFAULT_SERVICE)
+            session_options.setServerHost(self._cfg.host)
+            session_options.setServerPort(self._cfg.port)
+            session_options.setDefaultSubscriptionService(MKTDATA_SERVICE)
 
             handler = BloombergEventHandler(self)
             self.session = blpapi.Session(session_options, handler) # type: ignore
@@ -91,8 +66,8 @@ class BloombergWorker(QThread):
                 self.connection_status.emit(False, "Impossible de démarrer la session Bloomberg")
                 return
             
-            if not self.session.openService(DEFAULT_SERVICE):  # type: ignore
-                self.connection_status.emit(False, f"Impossible d'ouvrir {DEFAULT_SERVICE}")
+            if not self.session.openService(MKTDATA_SERVICE):  # type: ignore
+                self.connection_status.emit(False, f"Impossible d'ouvrir {MKTDATA_SERVICE}")
                 return
             
             self.is_running = True
@@ -136,7 +111,7 @@ class BloombergWorker(QThread):
                 for ticker in self._pending_subscriptions:
                     corr_id = blpapi.CorrelationId(ticker)  # type: ignore
                     # Ajouter avec options pour recevoir les prix plus rapidement
-                    sub_list.add(ticker, DEFAULT_FIELDS, [], corr_id)
+                    sub_list.add(ticker, SUBSCRIPTION_FIELDS, [], corr_id)
                     self.subscriptions[ticker] = corr_id
                     print(f"[Bloomberg] Subscribing to: {ticker}")
                 
@@ -149,7 +124,7 @@ class BloombergWorker(QThread):
                 unsub_list = blpapi.SubscriptionList()  # type: ignore
                 for ticker in self._pending_unsubscriptions:
                     if ticker in self.subscriptions:
-                        unsub_list.add(ticker, DEFAULT_FIELDS, [], self.subscriptions[ticker])
+                        unsub_list.add(ticker, SUBSCRIPTION_FIELDS, [], self.subscriptions[ticker])
                         del self.subscriptions[ticker]
                 
                 self.session.unsubscribe(unsub_list)  # type: ignore
@@ -253,11 +228,10 @@ class BloombergService(QObject):
     subscription_failed = Signal(str, str)
     connection_status = Signal(bool, str)
     
-    def __init__(self, host: str = "localhost", port: int = 8194):
+    def __init__(self, cfg: BloombergConfig | None = None):
         super().__init__()
+        self._cfg = cfg or BloombergConfig()
         self.worker: Optional[BloombergWorker] = None
-        self.host = host
-        self.port = port
         self._active_subscriptions: set[str] = set()
     
     def start(self):
@@ -265,7 +239,7 @@ class BloombergService(QObject):
         if self.worker and self.worker.isRunning():
             return
         
-        self.worker = BloombergWorker(self.host, self.port)
+        self.worker = BloombergWorker(self._cfg)
         
         # Connecter les signaux
         self.worker.price_updated.connect(self._on_price_updated)
@@ -285,7 +259,7 @@ class BloombergService(QObject):
     
     def subscribe(self, ticker: str):
         """Subscribe à un ticker"""
-        ticker = normalize_ticker_bloomberg(ticker)
+        ticker = normalize_ticker(ticker)
         if not ticker or ticker in self._active_subscriptions:
             return
         
@@ -295,7 +269,7 @@ class BloombergService(QObject):
     
     def unsubscribe(self, ticker: str):
         """Unsubscribe d'un ticker"""
-        ticker = normalize_ticker_bloomberg(ticker)
+        ticker = normalize_ticker(ticker)
         if ticker not in self._active_subscriptions:
             return
         

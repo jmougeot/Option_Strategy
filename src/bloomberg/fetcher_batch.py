@@ -6,19 +6,10 @@ Récupère les données d'options depuis Bloomberg.
 
 import blpapi
 from typing import Any, List, Optional, Tuple
+
+from bloomberg.config import OPTION_FIELDS
 from bloomberg.connection import get_session, get_service
 from app.data_types import FutureData
-
-
-# Champs à récupérer (PX_LAST utilisé aussi pour le sous-jacent)
-OPTION_FIELDS = [
-    "PX_BID", "PX_ASK", "PX_MID", "PX_LAST",
-    "OPT_DELTA", "OPT_GAMMA", "OPT_VEGA", "OPT_THETA", "OPT_RHO",
-    "OPT_IMP_VOL", "IVOL_MID", "IVOL_BID", "IVOL_ASK",
-    "OPT_STRIKE_PX", "OPT_UNDL_PX", "OPT_PUT_CALL",
-    "VOLUME", "OPEN_INT",
-    "LAST_TRADEABLE_DT", "OPT_EXPIRE_DT",
-]
 
 
 def _safe_get_value(element, field: str) -> Any:
