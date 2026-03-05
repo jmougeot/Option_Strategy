@@ -6,11 +6,10 @@ using the share_result module for Outlook HTML + PDF generation.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, List, Literal, Optional
+from typing import Any, List
 
 from PyQt6.QtWidgets import (
-    QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
+    QFormLayout, QGroupBox, QHBoxLayout, QLabel,
     QLineEdit, QMessageBox, QPushButton, QScrollArea, QSpinBox,
     QTextEdit, QVBoxLayout, QWidget,
 )

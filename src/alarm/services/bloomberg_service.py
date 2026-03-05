@@ -8,7 +8,7 @@ from PyQt6.QtCore import QObject, pyqtSignal as Signal, QThread, QMutex, QMutexL
 from typing import Optional
 
 
-DEFAULT_FIELDS = ["LAST_PRICE", "BID", "ASK"]
+DEFAULT_FIELDS = ["LAST_PRICE", "BID", "ASK", "DELTA", "GAMMA", "THETA", "IVOL_MID"]
 DEFAULT_SERVICE = "//blp/mktdata"
 
 
@@ -53,11 +53,11 @@ class BloombergWorker(QThread):
     """Worker thread pour gérer la session Bloomberg"""
     
     price_updated = Signal(str, float, float, float)  # ticker, last, bid, ask
+    greeks_updated = Signal(str, float, float, float, float)  # ticker, delta, gamma, theta, ivol_mid
     subscription_started = Signal(str)  # ticker
     subscription_failed = Signal(str, str)  # ticker, error
     connection_status = Signal(bool, str)  # connected, message
     
-    # Signal interne pour déclencher le traitement des subscriptions
     _process_subscriptions = Signal()
     
     def __init__(self, host: str = "localhost", port: int = 8194):
@@ -78,30 +78,24 @@ class BloombergWorker(QThread):
         """Boucle principale du thread Bloomberg"""
         
         try:
-            print("[Bloomberg] Configuration de la session...")
-            # Configuration de la session
-            session_options = blpapi.SessionOptions() # type: ignore
+
+            session_options = blpapi.sessionoptions.SessionOptions()
             session_options.setServerHost(self.host)
             session_options.setServerPort(self.port)
             session_options.setDefaultSubscriptionService(DEFAULT_SERVICE)
-            
-            # Créer la session avec un event handler
-            print("[Bloomberg] Création de la session...")
+
             handler = BloombergEventHandler(self)
             self.session = blpapi.Session(session_options, handler) # type: ignore
             
-            print("[Bloomberg] Démarrage de la session...")
             if not self.session.start(): # type: ignore
                 self.connection_status.emit(False, "Impossible de démarrer la session Bloomberg")
                 return
             
-            print("[Bloomberg] Ouverture du service...")
             if not self.session.openService(DEFAULT_SERVICE):  # type: ignore
                 self.connection_status.emit(False, f"Impossible d'ouvrir {DEFAULT_SERVICE}")
                 return
             
             self.is_running = True
-            print("[Bloomberg] Connecté!")
             self.connection_status.emit(True, "Connecté à Bloomberg")
             
             # Traiter les subscriptions initiales
@@ -198,13 +192,25 @@ class BloombergWorker(QThread):
                         bid if bid is not None else -1.0,
                         ask if ask is not None else -1.0
                     )
+
+                # Greeks (disponibles pour les options Bloomberg)
+                import math
+                try:
+                    delta_v = msg.getElementAsFloat("DELTA")    if msg.hasElement("DELTA")    else math.nan
+                    gamma_v = msg.getElementAsFloat("GAMMA")    if msg.hasElement("GAMMA")    else math.nan
+                    theta_v = msg.getElementAsFloat("THETA")    if msg.hasElement("THETA")    else math.nan
+                    ivol_v  = msg.getElementAsFloat("IVOL_MID") if msg.hasElement("IVOL_MID") else math.nan
+                    if not all(math.isnan(v) for v in (delta_v, gamma_v, theta_v, ivol_v)):
+                        self.greeks_updated.emit(ticker, delta_v, gamma_v, theta_v, ivol_v)
+                except Exception:
+                    pass
         
-        elif event.eventType() == blpapi.Event.SUBSCRIPTION_STATUS:  # type: ignore
+        elif event.eventType() == blpapi.event.Event.SUBSCRIPTION_STATUS: 
             for msg in event:
                 ticker = msg.correlationId().value()
-                if msg.messageType() == blpapi.Names.SUBSCRIPTION_STARTED:  # type: ignore
+                if msg.messageType() == blpapi.names.Names.SUBSCRIPTION_STARTED:  
                     self.subscription_started.emit(ticker)
-                elif msg.messageType() == blpapi.Names.SUBSCRIPTION_FAILURE:  # type: ignore
+                elif msg.messageType() == blpapi.names.Names.SUBSCRIPTION_FAILURE:  
                     self.subscription_failed.emit(ticker, str(msg))
     
     def subscribe(self, ticker: str):
@@ -242,6 +248,7 @@ class BloombergService(QObject):
     
     # Signaux
     price_updated = Signal(str, float, float, float)  # ticker, last, bid, ask
+    greeks_updated = Signal(str, float, float, float, float)  # ticker, delta, gamma, theta, ivol_mid
     subscription_started = Signal(str)
     subscription_failed = Signal(str, str)
     connection_status = Signal(bool, str)
@@ -262,6 +269,7 @@ class BloombergService(QObject):
         
         # Connecter les signaux
         self.worker.price_updated.connect(self._on_price_updated)
+        self.worker.greeks_updated.connect(self._on_greeks_updated)
         self.worker.subscription_started.connect(self._on_subscription_started)
         self.worker.subscription_failed.connect(self._on_subscription_failed)
         self.worker.connection_status.connect(self._on_connection_status)
@@ -308,7 +316,11 @@ class BloombergService(QObject):
     def _on_price_updated(self, ticker: str, last: float, bid: float, ask: float):
         """Relaye le signal de mise à jour de prix"""
         self.price_updated.emit(ticker, last, bid, ask)
-    
+
+    def _on_greeks_updated(self, ticker: str, delta: float, gamma: float, theta: float, ivol: float):
+        """Relaye le signal de mise à jour des greeks"""
+        self.greeks_updated.emit(ticker, delta, gamma, theta, ivol)
+
     def _on_subscription_started(self, ticker: str):
         """Relaye le signal de subscription réussie"""
         self.subscription_started.emit(ticker)

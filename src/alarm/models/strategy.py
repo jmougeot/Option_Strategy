@@ -6,6 +6,7 @@ from enum import Enum
 from http import client
 from typing import Optional
 from datetime import datetime
+import math
 import uuid
 import re
 
@@ -64,7 +65,13 @@ class OptionLeg:
     ask: Optional[float] = None
     mid: Optional[float] = None
     last_update: Optional[datetime] = None
-    
+
+    # Greeks temps réel depuis Bloomberg
+    delta: Optional[float] = None
+    gamma: Optional[float] = None
+    theta: Optional[float] = None
+    implied_vol: Optional[float] = None
+
     def update_price(self, last_price: float, bid: float, ask: float):
         """Met à jour les prix de l'option. Ignore les valeurs négatives (pas de donnée)."""
         if last_price is not None and last_price >= 0:
@@ -76,7 +83,18 @@ class OptionLeg:
         if self.bid is not None and self.ask is not None:
             self.mid = (self.bid + self.ask) / 2
         self.last_update = datetime.now()
-    
+
+    def update_greeks(self, delta: float, gamma: float, theta: float, ivol: float) -> None:
+        """Met à jour les greeks depuis Bloomberg. Ignore les valeurs NaN."""
+        if not math.isnan(delta):
+            self.delta = delta
+        if not math.isnan(gamma):
+            self.gamma = gamma
+        if not math.isnan(theta):
+            self.theta = theta
+        if not math.isnan(ivol):
+            self.implied_vol = ivol
+
     def get_price_contribution(self) -> Optional[float]:
         """
         Retourne la contribution au prix de la stratégie.
@@ -130,7 +148,10 @@ class Strategy:
     # Timestamps
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
-    
+
+    # Prix du future sous-jacent (mis à jour via Bloomberg)
+    future_price: Optional[float] = None
+
     def add_leg(self, ticker: str = "", position: Position = Position.LONG, quantity: int = 1) -> OptionLeg:
         """Ajoute une jambe à la stratégie"""
         leg = OptionLeg(ticker=ticker, position=position, quantity=quantity)
@@ -170,7 +191,39 @@ class Strategy:
             total += contribution
         
         return total
-    
+
+    def get_total_delta(self) -> Optional[float]:
+        """Delta agrégé de la stratégie (signé par position)."""
+        vals = []
+        for leg in self.legs:
+            if leg.delta is not None:
+                sign = 1 if leg.position == Position.LONG else -1
+                vals.append(leg.delta * leg.quantity * sign)
+        return sum(vals) if vals else None
+
+    def get_total_gamma(self) -> Optional[float]:
+        """Gamma agrégé de la stratégie (signé par position)."""
+        vals = []
+        for leg in self.legs:
+            if leg.gamma is not None:
+                sign = 1 if leg.position == Position.LONG else -1
+                vals.append(leg.gamma * leg.quantity * sign)
+        return sum(vals) if vals else None
+
+    def get_total_theta(self) -> Optional[float]:
+        """Theta agrégé de la stratégie (signé par position)."""
+        vals = []
+        for leg in self.legs:
+            if leg.theta is not None:
+                sign = 1 if leg.position == Position.LONG else -1
+                vals.append(leg.theta * leg.quantity * sign)
+        return sum(vals) if vals else None
+
+    def get_average_ivol(self) -> Optional[float]:
+        """Volatilité implicite moyenne des legs."""
+        ivols = [leg.implied_vol for leg in self.legs if leg.implied_vol is not None]
+        return sum(ivols) / len(ivols) if ivols else None
+
     def is_target_reached(self) -> Optional[bool]:
         """
         Vérifie si le prix a atteint la cible selon la condition.
