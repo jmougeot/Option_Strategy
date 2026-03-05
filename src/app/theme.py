@@ -45,7 +45,7 @@ QWidget {{
     background-color: {BG_APP};
     color: {TEXT_PRIMARY};
     font-family: "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
-    font-size: 12px;
+    font-size: 14px;
     border: none;
     outline: none;
 }}
@@ -66,7 +66,7 @@ QDockWidget::title {{
     color: {TEXT_SECONDARY};
     text-align: left;
     padding: 6px 10px;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -137,7 +137,7 @@ QGroupBox {{
     border-radius: {RADIUS};
     margin-top: 18px;
     padding: 8px 6px 6px 6px;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
     color: {TEXT_ACCENT};
     letter-spacing: 0.06em;
@@ -168,7 +168,7 @@ QTabBar::tab {{
     padding: 11px 20px;
     border: none;
     border-bottom: 2px solid transparent;
-    font-size: 15px;
+    font-size: 17px;
     font-weight: 500;
     min-width: 110px;
 }}
@@ -273,10 +273,10 @@ QPushButton {{
     color: {TEXT_PRIMARY};
     border: 1px solid {BORDER};
     border-radius: {RADIUS_SM};
-    padding: 5px 14px;
-    font-size: 12px;
+    padding: 7px 18px;
+    font-size: 14px;
     font-weight: 500;
-    min-height: 26px;
+    min-height: 32px;
 }}
 QPushButton:hover {{
     background-color: {BG_HOVER};
@@ -326,8 +326,8 @@ QCheckBox {{
     spacing: 6px;
 }}
 QCheckBox::indicator {{
-    width: 14px;
-    height: 14px;
+    width: 18px;
+    height: 18px;
     border: 1px solid {BORDER};
     border-radius: 3px;
     background-color: {BG_INPUT};
@@ -377,23 +377,23 @@ QLabel {{
 }}
 QLabel[class="section-title"] {{
     color: {TEXT_ACCENT};
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
 }}
 QLabel[class="metric"] {{
     color: {TEXT_PRIMARY};
-    font-size: 18px;
+    font-size: 22px;
     font-weight: 600;
 }}
 QLabel[class="metric-label"] {{
     color: {TEXT_SECONDARY};
-    font-size: 11px;
+    font-size: 13px;
 }}
 QLabel[class="status"] {{
     color: {TEXT_SECONDARY};
-    font-size: 11px;
+    font-size: 13px;
     padding: 4px 0;
 }}
 
@@ -422,8 +422,8 @@ QHeaderView::section {{
     border: none;
     border-bottom: 1px solid {BORDER};
     border-right: 1px solid {BORDER};
-    padding: 5px 8px;
-    font-size: 11px;
+    padding: 6px 10px;
+    font-size: 13px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -436,7 +436,7 @@ QHeaderView::section:hover {{
 /* ===== FORM LAYOUT ====================================================== */
 QFormLayout > QLabel {{
     color: {TEXT_SECONDARY};
-    font-size: 11px;
+    font-size: 13px;
 }}
 
 /* ===== TOOLTIP ========================================================== */
@@ -445,8 +445,8 @@ QToolTip {{
     color: {TEXT_PRIMARY};
     border: 1px solid {BORDER};
     border-radius: {RADIUS_SM};
-    padding: 4px 8px;
-    font-size: 11px;
+    padding: 5px 10px;
+    font-size: 13px;
 }}
 
 /* ===== STATUS BAR ======================================================= */

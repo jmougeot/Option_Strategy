@@ -1,10 +1,5 @@
 # Dépendances Python pour le projet Options Strategy Analyzer
 # =============================================================
-# NOTE: Utiliser Python 3.11 (recommandé pour blpapi)
-# Pour installer blpapi:
-#   pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi
-
-# Interface utilisateur web
 
 # Visualisations graphiques
 plotly>=5.17.0
@@ -31,3 +26,7 @@ kaleido >=1.2.0
 pybind11>=2.11.0
 
 scipy>=1.17.0
+
+PyQt6
+
+pyqtgraph

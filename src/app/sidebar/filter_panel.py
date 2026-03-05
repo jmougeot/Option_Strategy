@@ -27,7 +27,7 @@ class FilterPanel(QGroupBox):
     # ------------------------------------------------------------------ build
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setSpacing(4)
+        root.setSpacing(6)
 
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)

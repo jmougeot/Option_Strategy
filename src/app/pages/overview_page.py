@@ -8,9 +8,10 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, List, Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QHBoxLayout, QHeaderView, QLabel,
+    QAbstractItemView, QApplication, QHBoxLayout, QHeaderView, QLabel,
     QMessageBox, QPushButton,
     QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
@@ -78,13 +79,43 @@ class StrategyTableWidget(QWidget):
         lay.addLayout(top)
 
         self._table = QTableWidget()
-        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.verticalHeader().setVisible(False)
+        self._table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.setAlternatingRowColors(True)
-        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self._table.itemSelectionChanged.connect(self._on_selection)
         self._table.setMinimumHeight(220)
+        self._table.itemSelectionChanged.connect(self._on_selection)
+
+        # Ctrl+C to copy selected cells
+        sc = QShortcut(QKeySequence.StandardKey.Copy, self._table)
+        sc.activated.connect(self._copy_selection)
+
         lay.addWidget(self._table)
+
+    def _apply_column_sizing(self) -> None:
+        """Resize columns to content then distribute remaining space."""
+        header = self._table.horizontalHeader()
+        n = self._table.columnCount()
+        if n == 0:
+            return
+        # First pass: size to content
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        # Force layout so widths are computed
+        self._table.horizontalHeader().setStretchLastSection(False)
+        self._table.resizeColumnsToContents()
+        # Read content-based widths
+        widths = [self._table.columnWidth(c) for c in range(n)]
+        # Switch to fixed so we can set widths manually
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        total_content = sum(widths)
+        available = self._table.viewport().width()
+        if total_content <= 0:
+            return
+        # Scale all columns proportionally to fill the full width
+        scale = max(available / total_content, 1.0)
+        for c in range(n):
+            self._table.setColumnWidth(c, int(widths[c] * scale))
 
     def load(self, comparisons: List[Any], roll_labels=None, unit: str = "100ème") -> None:
         self._comparisons = comparisons
@@ -101,9 +132,27 @@ class StrategyTableWidget(QWidget):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._table.setItem(r, c, item)  # type: ignore
 
+        # Delay column sizing so the viewport has its final width
+        QTimer.singleShot(0, self._apply_column_sizing)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self._table.columnCount() > 0:
+            QTimer.singleShot(0, self._apply_column_sizing)
+
     def _reset(self) -> None:
-        # Re-select all rows
         self._table.clearSelection()
+
+    def _copy_selection(self) -> None:
+        indexes = sorted(self._table.selectedIndexes(), key=lambda i: (i.row(), i.column()))
+        if not indexes:
+            return
+        rows: dict[int, list[str]] = {}
+        for idx in indexes:
+            item = self._table.item(idx.row(), idx.column())
+            rows.setdefault(idx.row(), []).append(item.text() if item else "")
+        text = "\n".join("\t".join(cells) for cells in rows.values())
+        QApplication.clipboard().setText(text)
 
     def _on_selection(self) -> None:
         rows = sorted({idx.row() for idx in self._table.selectedIndexes()})

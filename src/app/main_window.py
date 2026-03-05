@@ -109,9 +109,9 @@ class MainWindow(QMainWindow):
         toolbar.setMovable(False)
         toolbar.setFloatable(False)
         toolbar.setStyleSheet("""
-            QToolBar { spacing: 6px; padding: 4px 8px; }
+            QToolBar { spacing: 8px; padding: 6px 10px; }
             QToolButton {
-                font-size: 13px; padding: 4px 16px;
+                font-size: 15px; padding: 6px 20px;
                 border: 1px solid transparent; border-radius: 4px;
             }
             QToolButton:checked {
