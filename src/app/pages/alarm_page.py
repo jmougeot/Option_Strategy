@@ -256,11 +256,11 @@ class AlarmPage(QWidget):
         self._bbg_lbl.setStyleSheet("color: #cc0000; font-size: 12px;")
         top.addWidget(self._bbg_lbl)
 
-        btn_save = QPushButton("💾  Sauvegarder")
+        btn_save = QPushButton("Sauvegarder")
         btn_save.clicked.connect(self._save)
         top.addWidget(btn_save)
 
-        btn_load = QPushButton("📂  Ouvrir")
+        btn_load = QPushButton("Ouvrir")
         btn_load.clicked.connect(self._load)
         top.addWidget(btn_load)
 

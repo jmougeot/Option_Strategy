@@ -7,7 +7,7 @@ using the share_result module for Outlook HTML + PDF generation.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from PyQt6.QtWidgets import (
     QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
@@ -57,11 +57,9 @@ class _StrategyBlock(QGroupBox):
         form = QFormLayout(self)
 
         prem = abs(comp.premium or 0.0)
-        sign = "BUY" if (comp.premium or 0) >= 0 else "SELL"
         delta = getattr(comp, "total_delta", 0.0)
-
         self._summary = QLineEdit(
-            f"{sign} {comp.strategy_name}, mkt={prem:.4f}, ref={ref}, Δ={delta:+.3f}"
+            f"{comp.strategy_name}, mkt={prem:.4f}, ref={ref}, Δ={delta:+.3f}"
         )
         self._comment = QTextEdit()
         self._comment.setFixedHeight(60)

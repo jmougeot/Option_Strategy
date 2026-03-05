@@ -205,7 +205,9 @@ class Bachelier:
         future_price: Optional[float] = None,
     ) -> None:
         """
-        Calcule la volatilité Bachelier (+ grecques + extrapolation) pour toutes les options.
+        Calcule la volatilité Bachelier (+ grecques) via calibration SABR.
+        Poids de calibration basés sur le spread bid-ask (plus le spread est
+        grand, plus le poids est faible ; pas de prix → poids 0).
         """
         if not future_price:
             return
@@ -240,7 +242,7 @@ class Bachelier:
         if n == 0:
             return
 
-        # ── 2. Fusion call+put → iv_merged par strike ───────────────────────
+        # ── 2. Fusion call+put → iv_merged + poids bid-ask ────────────────
         IV_DIVERGENCE_THRESHOLD = 0.30
 
         def _neighbor_avg(iv_list: List[float], idx: int) -> Optional[float]:
@@ -250,6 +252,7 @@ class Bachelier:
         iv_c = [d[1].implied_volatility for d in datas]
         iv_p = [d[2].implied_volatility for d in datas]
         iv_merged: List[float] = []
+        ba_weights: List[float] = []
 
         for i, (_, call, put) in enumerate(datas):
             ic, ip = iv_c[i], iv_p[i]
@@ -274,65 +277,71 @@ class Bachelier:
             else:
                 iv_merged.append(0.0)
 
-        # ── 3. Suppression des clusters trop petits ──────────────────────────
-        MIN_CLUSTER_SIZE = 3
-
-        valid_indices = [i for i in range(n) if iv_merged[i] > 0]
-        clusters: List[List[int]] = []
-        for idx in valid_indices:
-            if clusters and idx == clusters[-1][-1] + 1:
-                clusters[-1].append(idx)
+            # Poids basé sur le spread bid-ask : grand spread → faible poids
+            if iv_merged[-1] <= 0:
+                ba_weights.append(0.0)
             else:
-                clusters.append([idx])
+                spreads = []
+                for opt in (call, put):
+                    if (opt.bid is not None and opt.ask is not None
+                            and opt.ask >= opt.bid >= 0):
+                        spreads.append(opt.ask - opt.bid)
+                if spreads:
+                    avg_spread = sum(spreads) / len(spreads)
+                    ba_weights.append(1.0 / (1.0 + avg_spread))
+                else:
+                    ba_weights.append(1.0)  # prix dispo mais pas de bid/ask
 
-        to_remove = {idx for cluster in clusters if len(cluster) < MIN_CLUSTER_SIZE for idx in cluster}
+        # ── 3. Calibration SABR avec poids bid-ask ───────────────────────────
+        from option.sabr import SABRCalibration
 
-        for i in to_remove:
-            _, call, put = datas[i]
-            call.status = False
-            put.status  = False
-            call.implied_volatility = 0.0
-            put.implied_volatility  = 0.0
-            iv_merged[i] = 0.0
+        strikes_arr = np.array([d[0] for d in datas])
+        iv_arr = np.array(iv_merged)
+        w_arr = np.array(ba_weights)
 
-        # ── 4. Slopes sur iv_merged + extrapolation ──────────────────────────
-        def _slope(a: float, b: float) -> Optional[float]:
-            return a - b if a > 0 and b > 0 else None
+        sabr = SABRCalibration(F=F, T=T, beta=0.0, vol_type="normal")
+        sabr_ok = False
 
-        sl: List[Optional[float]] = [
-            0.0 if i == 0 else _slope(iv_merged[i - 1], iv_merged[i]) for i in range(n)
-        ]
-        sr: List[Optional[float]] = [
-            0.0 if i == n - 1 else _slope(iv_merged[i], iv_merged[i + 1]) for i in range(n)
-        ]
+        if (iv_arr > 0).sum() >= 3:
+            try:
+                sabr.fit(strikes=strikes_arr, sigmas_mkt=iv_arr, weights=w_arr)
+                sabr_ok = True
+                print(f"  SABR calibré : {sabr.result}")
+            except Exception as exc:
+                print(f"  SABR calibration échouée : {exc}")
 
-        for i in range(1, n):
-            if sl[i] is None:
-                sl[i] = sl[i - 1]
-        for i in range(n - 2, -1, -1):
-            if sr[i] is None:
-                sr[i] = sr[i + 1]
-
-        for i in range(n - 2, -1, -1):
-            if iv_merged[i] <= 0 and iv_merged[i + 1] > 0 and sr[i] is not None:
-                iv_merged[i] = iv_merged[i + 1] + sr[i]
-        for i in range(1, n):
-            if iv_merged[i] <= 0 and iv_merged[i - 1] > 0 and sl[i] is not None:
-                iv_merged[i] = iv_merged[i - 1] - sl[i]
-
-        # ── 5. Application iv_merged + premium extrapolé + grecques ─────────
-        for i, (_, call, put) in enumerate(datas):
-            iv = max(iv_merged[i], 0.0)
-            for opt in (call, put):
-                opt.left_slope  = sl[i]
-                opt.right_slope = sr[i]
-                if iv > 0:
-                    was_missing = opt.implied_volatility <= 0
-                    opt.implied_volatility = iv
-                    if was_missing or opt.premium <= 0:
-                        opt.premium = Bachelier(F, opt.strike, iv, T, opt.is_call()).price()
-                        sym = "C" if opt.is_call() else "P"
-                        print(f"  Extrapole {sym} K={opt.strike}: IV={iv:.4f}  Premium={opt.premium:.6f}")
-                    opt.delta = Bachelier(F, opt.strike, iv, T, opt.is_call()).delta()
-                    opt.gamma = Bachelier(F, opt.strike, iv, T, opt.is_call()).gamma()
-                    opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()
+        # ── 4. Application SABR → IV, premium, grecques ──────────────────────
+        if sabr_ok:
+            all_sabr_vols = sabr.predict(strikes_arr)
+            for i, (_, call, put) in enumerate(datas):
+                iv = max(float(all_sabr_vols[i]), 0.0)
+                mkt_iv = iv_merged[i]
+                for opt in (call, put):
+                    opt.sabr_volatility = iv
+                    opt.sabr_residual = (mkt_iv - iv) if mkt_iv > 0 else 0.0
+                    opt.sabr_z_score = (
+                        abs(opt.sabr_residual) / max(sabr.result.rmse, 1e-10)
+                        if mkt_iv > 0 else 0.0
+                    )
+                    if iv > 0:
+                        opt.implied_volatility = iv
+                        opt.sabr_corrected = True
+                        if not (opt.status and opt.premium > 0):
+                            opt.premium = Bachelier(F, opt.strike, iv, T, opt.is_call()).price()
+                            sym = "C" if opt.is_call() else "P"
+                            print(f"  SABR → {sym} K={opt.strike}: IV={iv:.4f}  Premium={opt.premium:.6f}")
+                        opt.delta = Bachelier(F, opt.strike, iv, T, opt.is_call()).delta()
+                        opt.gamma = Bachelier(F, opt.strike, iv, T, opt.is_call()).gamma()
+                        opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()
+        else:
+            # Fallback : pas assez de points pour SABR, on garde les IV individuelles
+            for i, (_, call, put) in enumerate(datas):
+                iv = max(iv_merged[i], 0.0)
+                for opt in (call, put):
+                    if iv > 0:
+                        opt.implied_volatility = iv
+                        if not (opt.status and opt.premium > 0):
+                            opt.premium = Bachelier(F, opt.strike, iv, T, opt.is_call()).price()
+                        opt.delta = Bachelier(F, opt.strike, iv, T, opt.is_call()).delta()
+                        opt.gamma = Bachelier(F, opt.strike, iv, T, opt.is_call()).gamma()
+                        opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()

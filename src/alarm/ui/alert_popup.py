@@ -3,7 +3,7 @@ Popup d'alerte pour les stratégies
 """
 import os
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QApplication, QGraphicsDropShadowEffect
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QColor, QPixmap
 
 
@@ -11,7 +11,7 @@ class AlertPopup(QWidget):
     """Popup d'alerte animé quand une cible est atteinte"""
     
     def __init__(self, strategy_name: str, current_price: float, target_price: float, is_inferior: bool, 
-                 strategy_id: str = None, continue_callback=None, parent=None):
+                 strategy_id: str, continue_callback=None, parent=None):
         super().__init__(parent, Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool) # type: ignore
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground) # type: ignore
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose) # type: ignore

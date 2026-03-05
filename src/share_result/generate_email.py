@@ -18,14 +18,6 @@ def generate_html_email_from_template(
 ) -> tuple:
     """
     Generate subject and HTML body following the exact BGC trade-recommendation template.
-
-    Args:
-        template_data : EmailTemplateData with filter/scoring context
-        fields        : Dict of form values from the Email page (client_name, expiry_code, …)
-        strat_data    : List of per-strategy dicts built in run_email()
-
-    Returns:
-        tuple: (subject, html_body)
     """
     f = fields or {}
     sd = strat_data or []
@@ -56,7 +48,6 @@ def generate_html_email_from_template(
     date_str = datetime.now().strftime("%Y-%m-%d")
     subject  = f"[Options Strategy] {underlying} — Trade Recommendation ({date_str})"
 
-    # ── summary list (1 : BUY ...) ──────────────────────────────────────────────
     summary_rows = ""
     for s in sd:
         summary_rows += f'<p style="margin:6px 0;">{s["idx"]} : {s["line"]}</p>\n'
@@ -187,10 +178,6 @@ def open_outlook_with_email(
     # payoff_images takes priority; fall back to legacy images list
     all_payoff_paths: List[str] = payoff_images if payoff_images else images[:1]
     summary_path: Optional[str] = None if payoff_images else (images[1] if len(images) > 1 else None)
-
-    if sys.platform != "win32":
-        print("[Email] open_outlook_with_email is only available on Windows")
-        return False
 
     try:
         import pythoncom

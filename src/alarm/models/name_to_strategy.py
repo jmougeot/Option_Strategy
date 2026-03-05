@@ -45,10 +45,6 @@ STRATEGY_POSITIONS = {
 def separate_parts(info_strategy: str) -> Tuple[str, str, str]:
     """
     Sépare une ligne comme 'Avi  SFRF6 96.50/96.625/96.75 Call Fly  buy to open' en 3 parties
-    basé sur les tabs ou grands espaces (2+ espaces consécutifs)
-    - partie 1: 'Avi'
-    - partie 2: 'SFRF6 96.50/96.625/96.75 Call Fly'
-    - partie 3: 'buy to open'
     """
     # Split sur les tabs ou espaces multiples (2 ou plus)
     parts = re.split(r'\t+|\s{2,}', info_strategy.strip())
@@ -83,9 +79,6 @@ def convert_strike_decimal(strike_str: str) -> float:
 def detect_vs(strategy_str: str) -> Tuple[str, Optional[str]]:
     """
     Détecte si la stratégie contient 'vs' et split en deux parties
-    Ex: 'SFRF6 96.50/96.75 Call Fly vs SFRF6 97.00 Call'
-    Returns: ('SFRF6 96.50/96.75 Call Fly', 'SFRF6 97.00 Call')
-    Ou: ('SFRF6 96.50/96.75 Call Fly', None) si pas de vs
     """
     # Pattern pour détecter "vs" entouré d'espaces
     vs_pattern = r'\s+vs\s+|\s+VS\s+'
