@@ -374,6 +374,8 @@ class OverviewPage(QWidget):
         self._state.stats = stats
         if "all_options" in stats:
             self._state.all_imported_options = stats["all_options"]
+        if "sabr_calibration" in stats:
+            self._state.sabr_calibration = stats["sabr_calibration"]
 
         # Metrics
         if future_data and future_data.underlying_price is not None:

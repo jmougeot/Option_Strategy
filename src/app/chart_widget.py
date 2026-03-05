@@ -222,11 +222,17 @@ class PlotlyChart(QWidget):
 
         self._hover_series = []
 
+        # Collect all Y values to compute a tight, centred range
+        all_x: list = []
+        all_y: list = []
+
         # SABR smooth curve
         sc_data = data.get("sabr_curve")
         if sc_data and sc_data["x"]:
             pi.plot(sc_data["x"], sc_data["y"],
                     pen=pg.mkPen("#F44336", width=2), name="SABR")
+            all_x.extend(sc_data["x"])
+            all_y.extend(sc_data["y"])
 
         # Market IV scatter
         nm = data.get("market")
@@ -235,11 +241,13 @@ class PlotlyChart(QWidget):
                 nm["x"], nm["y"], symbol="o", size=9,
                 pen=pg.mkPen("#2196F3", width=1),
                 brush=pg.mkBrush("#2196F3"),
-                name="IV marche",
+                name="IV marché",
             )
             pi.addItem(sc)
             lbs = nm["labels"]
             self._hover_series.append((nm["x"], nm["y"], lambda i, lb=lbs: lb[i]))
+            all_x.extend(nm["x"])
+            all_y.extend(nm["y"])
 
         # Corrected / status=False
         cr = data.get("corrected")
@@ -248,25 +256,50 @@ class PlotlyChart(QWidget):
                 cr["x"], cr["y"], symbol="x", size=11,
                 pen=pg.mkPen("#FF9800", width=2),
                 brush=pg.mkBrush(None),
-                name="Corrige",
+                name="Corrigé",
             )
             pi.addItem(sc2)
             lbs = cr["labels"]
             self._hover_series.append((cr["x"], cr["y"], lambda i, lb=lbs: lb[i]))
+            all_x.extend(cr["x"])
+            all_y.extend(cr["y"])
 
-        # Spot / forward
+        # Compute tight X / Y ranges with padding
+        if all_x and all_y:
+            x_arr = np.asarray(all_x, dtype=float)
+            y_arr = np.asarray(all_y, dtype=float)
+            y_arr = y_arr[np.isfinite(y_arr) & (y_arr > 0)]
+
+            x_min, x_max = float(x_arr.min()), float(x_arr.max())
+            x_pad = max((x_max - x_min) * 0.05, 0.001)
+
+            if len(y_arr):
+                y_min, y_max = float(y_arr.min()), float(y_arr.max())
+                y_pad = max((y_max - y_min) * 0.15, 1e-5)
+                pi.setXRange(x_min - x_pad, x_max + x_pad, padding=0)
+                pi.setYRange(y_min - y_pad, y_max + y_pad, padding=0)
+            else:
+                pi.setXRange(x_min - x_pad, x_max + x_pad, padding=0)
+                pi.enableAutoRange(axis="y")
+        else:
+            pi.enableAutoRange()
+
+        # Spot / forward — pin label just above the bottom of the visible range
         spot = data.get("spot")
         if spot:
             pi.addItem(pg.InfiniteLine(
                 pos=spot, angle=90,
                 pen=pg.mkPen("#888888", width=1, style=Qt.PenStyle.DashLine),
             ))
-            lbl_item = pg.TextItem(f"Fwd {spot:.3f}", color="#888888", anchor=(0, 0))
-            lbl_item.setPos(spot, 0)
+            y_bot = pi.vb.viewRange()[1][0]
+            lbl_item = pg.TextItem(f"Fwd {spot:.3f}", color="#888888", anchor=(0.5, 1))
+            lbl_item.setPos(spot, y_bot)
             pi.addItem(lbl_item)
 
         pi.setLabel("bottom", "Strike", color=_AX)
         pi.setLabel("left", "Implied Volatility", color=_AX)
+        # Disable mouse pan/zoom so the carefully-set ranges stay put
+        self._pw.setMouseEnabled(x=True, y=False)
 
     # ------------------------------------------------------------------ hover
     def _on_mouse(self, evt) -> None:

@@ -10,13 +10,13 @@ BG_RAISED     = "#FFFFFF"   # éléments surélevés (groupbox, cards)
 BG_INPUT      = "#FFFFFF"   # champs de saisie
 BG_HOVER      = "#EEF1F8"   # hover state
 BG_SELECTED   = "#DDE6FB"   # sélection
-BORDER        = "#DDE0E8"   # bordures générales
+BORDER        = "#C5C9D6"   # bordures générales
 BORDER_FOCUS  = "#3D72F0"   # focus ring
 
-TEXT_PRIMARY   = "#1A1D2E"  # texte principal
-TEXT_SECONDARY = "#6B7080"  # texte secondaire / labels
-TEXT_DISABLED  = "#B0B4C0"  # texte désactivé
-TEXT_ACCENT    = "#2A5BD7"  # texte accentué (liens, titres section)
+TEXT_PRIMARY   = "#0F1120"  # texte principal
+TEXT_SECONDARY = "#3D4255"  # texte secondaire / labels
+TEXT_DISABLED  = "#8A8FA0"  # texte désactivé
+TEXT_ACCENT    = "#1A4ABD"  # texte accentué (liens, titres section)
 
 ACCENT        = "#3D72F0"   # bouton primaire
 ACCENT_HOVER  = "#2A5BD7"
@@ -45,7 +45,7 @@ QWidget {{
     background-color: {BG_APP};
     color: {TEXT_PRIMARY};
     font-family: "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
-    font-size: 14px;
+    font-size: 15px;
     border: none;
     outline: none;
 }}
@@ -66,7 +66,7 @@ QDockWidget::title {{
     color: {TEXT_SECONDARY};
     text-align: left;
     padding: 6px 10px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -137,7 +137,7 @@ QGroupBox {{
     border-radius: {RADIUS};
     margin-top: 18px;
     padding: 8px 6px 6px 6px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     color: {TEXT_ACCENT};
     letter-spacing: 0.06em;
@@ -192,7 +192,7 @@ QLineEdit, QTextEdit, QPlainTextEdit {{
     border: 1px solid {BORDER};
     border-radius: {RADIUS_SM};
     color: {TEXT_PRIMARY};
-    padding: 4px 8px;
+    padding: 6px 9px;
     selection-background-color: {BG_SELECTED};
     selection-color: {TEXT_PRIMARY};
 }}
@@ -209,7 +209,7 @@ QSpinBox, QDoubleSpinBox {{
     border: 1px solid {BORDER};
     border-radius: {RADIUS_SM};
     color: {TEXT_PRIMARY};
-    padding: 3px 4px;
+    padding: 5px 6px;
 }}
 QSpinBox:focus, QDoubleSpinBox:focus {{
     border-color: {BORDER_FOCUS};
@@ -230,7 +230,7 @@ QComboBox {{
     border: 1px solid {BORDER};
     border-radius: {RADIUS_SM};
     color: {TEXT_PRIMARY};
-    padding: 4px 8px;
+    padding: 6px 9px;
     min-width: 60px;
 }}
 QComboBox:focus {{
@@ -273,10 +273,10 @@ QPushButton {{
     color: {TEXT_PRIMARY};
     border: 1px solid {BORDER};
     border-radius: {RADIUS_SM};
-    padding: 7px 18px;
-    font-size: 14px;
-    font-weight: 500;
-    min-height: 32px;
+    padding: 8px 20px;
+    font-size: 15px;
+    font-weight: 600;
+    min-height: 36px;
 }}
 QPushButton:hover {{
     background-color: {BG_HOVER};
@@ -422,8 +422,8 @@ QHeaderView::section {{
     border: none;
     border-bottom: 1px solid {BORDER};
     border-right: 1px solid {BORDER};
-    padding: 6px 10px;
-    font-size: 13px;
+    padding: 7px 12px;
+    font-size: 15px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -436,7 +436,7 @@ QHeaderView::section:hover {{
 /* ===== FORM LAYOUT ====================================================== */
 QFormLayout > QLabel {{
     color: {TEXT_SECONDARY};
-    font-size: 13px;
+    font-size: 15px;
 }}
 
 /* ===== TOOLTIP ========================================================== */
@@ -445,8 +445,8 @@ QToolTip {{
     color: {TEXT_PRIMARY};
     border: 1px solid {BORDER};
     border-radius: {RADIUS_SM};
-    padding: 5px 10px;
-    font-size: 13px;
+    padding: 6px 12px;
+    font-size: 15px;
 }}
 
 /* ===== STATUS BAR ======================================================= */

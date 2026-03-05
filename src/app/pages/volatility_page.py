@@ -25,8 +25,8 @@ from option.option_class import Option
 # Smile figure builder  (ex pages/volatility.py)
 # ============================================================================
 
-def build_smile_figure(calls, puts, underlying_price):
-    """Build smile data with market IV points + SABR curve."""
+def build_smile_figure(calls, puts, underlying_price, sabr_calibration=None):
+    """Build smile data with market IV points + SABR smooth curve."""
     # Gather all options by strike
     calls_by_strike = {o.strike: o for o in calls}
     puts_by_strike  = {o.strike: o for o in puts}
@@ -73,11 +73,34 @@ def build_smile_figure(calls, puts, underlying_price):
                 mkt_x.append(K); mkt_y.append(mkt_iv)
                 mkt_labels.append(lbl)
 
+    # Build smooth SABR curve on a dense grid
+    if sabr_calibration is not None and len(all_strikes) >= 2:
+        K_min = min(all_strikes) * 0.98
+        K_max = max(all_strikes) * 1.02
+        k_dense = np.linspace(K_min, K_max, 200)
+        try:
+            sabr_dense = np.maximum(sabr_calibration.predict(k_dense), 0.0)
+            sabr_curve_x: list = k_dense.tolist()
+            sabr_curve_y: list = sabr_dense.tolist()
+        except Exception:
+            sabr_curve_x = sabr_x
+            sabr_curve_y = sabr_y
+    elif len(sabr_x) >= 4:
+        # Fallback: cubic spline through calibrated points
+        from scipy.interpolate import CubicSpline
+        k_dense = np.linspace(sabr_x[0], sabr_x[-1], 200)
+        cs = CubicSpline(sabr_x, sabr_y)
+        sabr_curve_x = k_dense.tolist()
+        sabr_curve_y = np.maximum(cs(k_dense), 0.0).tolist()
+    else:
+        sabr_curve_x = sabr_x
+        sabr_curve_y = sabr_y
+
     return {
         "type": "smile",
         "market":    {"x": mkt_x,  "y": mkt_y,  "labels": mkt_labels}  if mkt_x  else None,
         "corrected": {"x": warn_x, "y": warn_y, "labels": warn_labels} if warn_x else None,
-        "sabr_curve": {"x": sabr_x, "y": sabr_y} if sabr_x else None,
+        "sabr_curve": {"x": sabr_curve_x, "y": sabr_curve_y} if sabr_curve_x else None,
         "spot": float(underlying_price) if underlying_price else None,
     }
 
@@ -115,7 +138,7 @@ class VolatilityPage(QWidget):
         smile_lay.setContentsMargins(0, 0, 0, 0)
         self._smile_chart = PlotlyChart(min_height=450)
         smile_lay.addWidget(self._smile_chart)
-        self._tabs.addTab(self._smile_tab, "📈 Smile")
+        self._tabs.addTab(self._smile_tab, "Smile")
 
         # Table tab
         self._table_tab = QWidget()
@@ -123,7 +146,7 @@ class VolatilityPage(QWidget):
         table_lay.setContentsMargins(4, 4, 4, 4)
         self._opt_table = QTableWidget()
         self._opt_table.setAlternatingRowColors(True)
-        self._opt_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._opt_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) #type: ignore 
         self._opt_table.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked |
             QAbstractItemView.EditTrigger.AnyKeyPressed
@@ -134,7 +157,7 @@ class VolatilityPage(QWidget):
         self._btn_rerun.setStyleSheet("font-weight: bold; padding: 6px;")
         self._btn_rerun.clicked.connect(self._on_rerun)
         table_lay.addWidget(self._btn_rerun)
-        self._tabs.addTab(self._table_tab, "📋 Table")
+        self._tabs.addTab(self._table_tab, "Table")
 
     # ------------------------------------------------------------------ public
     def refresh(self) -> None:
@@ -156,7 +179,8 @@ class VolatilityPage(QWidget):
         calls, puts = split_calls_puts(self._options)
 
         # Smile chart
-        fig = build_smile_figure(calls, puts, underlying_price)
+        sabr_calibration = getattr(self._state, "sabr_calibration", None)
+        fig = build_smile_figure(calls, puts, underlying_price, sabr_calibration=sabr_calibration)
         if fig is not None:
             self._smile_chart.set_figure(fig)
         else:
@@ -184,7 +208,7 @@ class VolatilityPage(QWidget):
                 f"{o.premium:.6f}" if o.premium else "0",
                 f"{o.bid:.6f}" if o.bid else "0",
                 f"{o.ask:.6f}" if o.ask else "0",
-                f"{o.implied_volatility:.4f}" if o.implied_volatility else "0",
+                f"{o.implied_volatility * 100:.4f}" if o.implied_volatility else "0",
                 f"{o.delta:.4f}" if o.delta else "0",
                 f"{o.gamma:.6f}" if o.gamma else "0",
                 f"{o.theta:.6f}" if o.theta else "0",

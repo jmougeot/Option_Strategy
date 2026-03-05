@@ -3,19 +3,9 @@ Service Bloomberg pour la gestion des subscriptions en temps réel.
 Utilise les signaux Qt pour communiquer avec l'interface graphique.
 """
 import re
-
+import blpapi
 from PyQt6.QtCore import QObject, pyqtSignal as Signal, QThread, QMutex, QMutexLocker
 from typing import Optional
-
-
-# Import blpapi avec gestion d'erreur
-try:
-    from bloomberg.blpapi_import_helper import blpapi  # type: ignore
-    BLPAPI_AVAILABLE = True
-except ImportError:
-    BLPAPI_AVAILABLE = False
-    blpapi = None
-    print("[WARNING] blpapi non disponible - Connexion Bloomberg impossible")
 
 
 DEFAULT_FIELDS = ["LAST_PRICE", "BID", "ASK"]
@@ -86,13 +76,6 @@ class BloombergWorker(QThread):
     
     def run(self):
         """Boucle principale du thread Bloomberg"""
-        print("[Bloomberg] Démarrage du worker...")
-        
-        # Vérifier que blpapi est disponible
-        if not BLPAPI_AVAILABLE:
-            print("[Bloomberg] blpapi non disponible")
-            self.connection_status.emit(False, "blpapi non installé - Installez le SDK Bloomberg")
-            return
         
         try:
             print("[Bloomberg] Configuration de la session...")

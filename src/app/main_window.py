@@ -58,15 +58,15 @@ class MainWindow(QMainWindow):
         scroll.setWidget(sidebar_contents)
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setMinimumWidth(380)
-        scroll.setMaximumWidth(600)
+        scroll.setMinimumWidth(300)
         scroll.setFrameShape(scroll.Shape.NoFrame)
 
         dock = QDockWidget("Parameters", self)
         dock.setWidget(scroll)
         dock.setFeatures(
             QDockWidget.DockWidgetFeature.DockWidgetMovable |
-            QDockWidget.DockWidgetFeature.DockWidgetFloatable
+            QDockWidget.DockWidgetFeature.DockWidgetFloatable |
+            QDockWidget.DockWidgetFeature.DockWidgetClosable
         )
         dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
@@ -109,16 +109,16 @@ class MainWindow(QMainWindow):
         toolbar.setMovable(False)
         toolbar.setFloatable(False)
         toolbar.setStyleSheet("""
-            QToolBar { spacing: 8px; padding: 6px 10px; }
+            QToolBar { spacing: 10px; padding: 8px 12px; }
             QToolButton {
-                font-size: 15px; padding: 6px 20px;
+                font-size: 17px; padding: 8px 24px;
                 border: 1px solid transparent; border-radius: 4px;
             }
             QToolButton:checked {
-                background: #4A5173; color: white;
-                border-color: #4A5173;
+                background: #2D3348; color: white;
+                border-color: #2D3348;
             }
-            QToolButton:!checked { color: #4A5173; }
+            QToolButton:!checked { color: #2D3348; }
             QToolButton:hover:!checked { background: #e8e9ef; }
         """)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)

@@ -7,7 +7,7 @@ import numpy as np
 from scipy.stats import norm
 from scipy.optimize import brentq
 from scipy.interpolate import CubicSpline as CS
-from typing import Optional, List, Tuple
+from typing import Any, Optional, List, Tuple
 from option.option_class import Option
 
 
@@ -203,14 +203,15 @@ class Bachelier:
         options: List[Option],
         time_to_expiry: float = 0.25,
         future_price: Optional[float] = None,
-    ) -> None:
+    ) -> Optional[Any]:
         """
         Calcule la volatilité Bachelier (+ grecques) via calibration SABR.
         Poids de calibration basés sur le spread bid-ask (plus le spread est
         grand, plus le poids est faible ; pas de prix → poids 0).
+        Returns the fitted SABRCalibration object, or None if calibration failed.
         """
         if not future_price:
-            return
+            return None
 
         F = future_price
         T = time_to_expiry
@@ -319,6 +320,7 @@ class Bachelier:
                 for opt in (call, put):
                     opt.market_implied_volatility = mkt_iv
                     opt.sabr_volatility = iv
+                    opt.sabr_is_anomaly = abs(mkt_iv - iv) > sabr.result.rmse * 1.5 if mkt_iv > 0 else False
                     opt.sabr_residual = (mkt_iv - iv) if mkt_iv > 0 else 0.0
                     opt.sabr_z_score = (
                         abs(opt.sabr_residual) / max(sabr.result.rmse, 1e-10)
@@ -334,6 +336,7 @@ class Bachelier:
                         opt.delta = Bachelier(F, opt.strike, iv, T, opt.is_call()).delta()
                         opt.gamma = Bachelier(F, opt.strike, iv, T, opt.is_call()).gamma()
                         opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()
+            return sabr
         else:
             # Fallback : pas assez de points pour SABR, on garde les IV individuelles
             for i, (_, call, put) in enumerate(datas):
@@ -347,3 +350,4 @@ class Bachelier:
                         opt.delta = Bachelier(F, opt.strike, iv, T, opt.is_call()).delta()
                         opt.gamma = Bachelier(F, opt.strike, iv, T, opt.is_call()).gamma()
                         opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()
+            return None

@@ -110,17 +110,16 @@ class ParamsPanel(QGroupBox):
 
         root.addLayout(price_form)
 
-        # ── Max legs slider ───────────────────────────────────────────
-        legs_row = QHBoxLayout()
-        self._lbl_legs = QLabel("Max legs: 4")
-        self._sld_legs = QSlider(Qt.Orientation.Horizontal)
-        self._sld_legs.setRange(1, 9)
-        self._sld_legs.setValue(4)
-        legs_row.addWidget(self._lbl_legs)
-        legs_row.addWidget(self._sld_legs)
-        root.addLayout(legs_row)
+        legs_form = QFormLayout()
+        legs_form.setContentsMargins(0, 0, 0, 0)
+        self._lbl_legs = QDoubleSpinBox()
+        self._lbl_legs.setDecimals(0)
+        self._lbl_legs.setSingleStep(1)
+        self._lbl_legs.setRange(1, 10)
+        self._lbl_legs.setValue(4)
+        legs_form.addRow("Max legs:", self._lbl_legs)
+        root.addLayout(legs_form)
 
-        # ── Leg penalty ───────────────────────────────────────────────
         pen_form = QFormLayout()
         pen_form.setContentsMargins(0, 0, 0, 0)
         self._spn_penalty = QDoubleSpinBox()
@@ -135,9 +134,7 @@ class ParamsPanel(QGroupBox):
     def _connect_signals(self) -> None:
         self._chk_brut.toggled.connect(self._on_brut_toggle)
         self._cmb_underlying.currentTextChanged.connect(self._on_underlying_change)
-        self._sld_legs.valueChanged.connect(
-            lambda v: (self._lbl_legs.setText(f"Max legs: {v}"), self.changed.emit())
-        )
+        self._lbl_legs.valueChanged.connect(lambda _: self.changed.emit())
         for w in (
             self._chk_bachelier, self._chk_sabr,
             self._cmb_months, self._cmb_unit,
@@ -199,7 +196,7 @@ class ParamsPanel(QGroupBox):
             price_min=price_min,
             price_max=price_max,
             price_step=price_step,
-            max_legs=self._sld_legs.value(),
+            max_legs=int(self._lbl_legs.value()),
             strikes=strikes,
             unit=self._cmb_unit.currentText(),
             brut_code=brut_code,
@@ -214,7 +211,7 @@ class ParamsPanel(QGroupBox):
         to_block = [
             self._cmb_underlying, self._cmb_months, self._txt_years,
             self._spn_price_min, self._spn_price_max, self._spn_price_step,
-            self._sld_legs, self._chk_bachelier, self._chk_sabr, self._spn_penalty,
+            self._lbl_legs, self._chk_bachelier, self._chk_sabr, self._spn_penalty,
         ]
         for w in to_block:
             w.blockSignals(True)
@@ -243,7 +240,7 @@ class ParamsPanel(QGroupBox):
 
             max_legs = params.get("max_legs")
             if max_legs is not None:
-                self._sld_legs.setValue(int(max_legs))
+                self._lbl_legs.setValue(int(max_legs))
         finally:
             for w in to_block:
                 w.blockSignals(False)

@@ -30,6 +30,7 @@ class AppState:
     future_data: Optional[FutureData] = None
     stats: Dict[str, Any] = field(default_factory=dict)
     all_imported_options: List[Any] = field(default_factory=list)  # List[Option]
+    sabr_calibration: Optional[Any] = None  # SABRCalibration from last pipeline run
 
     # ── History (persisted to JSON) ────────────────────────────────────────
     search_history: List[Any] = field(default_factory=list)

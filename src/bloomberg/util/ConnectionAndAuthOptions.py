@@ -1,4 +1,4 @@
-from bloomberg.blpapi_import_helper import blpapi
+import blpapi
 from argparse import Action
 from collections import namedtuple
 

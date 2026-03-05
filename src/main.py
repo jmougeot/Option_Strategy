@@ -103,7 +103,7 @@ def process_bloomberg_to_strategies(
         default_expiry_date = (datetime.now() + relativedelta(months=5)).strftime("%Y-%m-%d")
         future_data = FutureData(underlying_price, default_expiry_date)
     else:
-        options, future_data, fetch_warnings = import_options(
+        options, future_data, fetch_warnings, sabr_calibration = import_options(
             mixture=mixture,
             underlying=underlying,
             months=months,
@@ -117,7 +117,9 @@ def process_bloomberg_to_strategies(
 
     # Tracker du fetch
     stats["future_data"] = future_data
-    stats["all_options"] = options  # Toutes les options import�es (pour page Volatility)
+    stats["all_options"] = options  # Toutes les options importées (pour page Volatility)
+    if not offline:
+        stats["sabr_calibration"] = sabr_calibration  # type: ignore[possibly-undefined]
 
     if not offline and fetch_warnings: #type: ignore
         stats["fetch_warnings"] = fetch_warnings

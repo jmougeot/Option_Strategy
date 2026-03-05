@@ -1,4 +1,4 @@
-from bloomberg.blpapi_import_helper import blpapi
+import blpapi
 
 DEFAULT_SERVICE = "//blp/mktdata"
 DEFAULT_TOPIC_PREFIX = "/ticker/"
@@ -100,7 +100,7 @@ def createSubscriptionList(options):
     if options.interval:
         options.options.append(f"interval={options.interval}")
 
-    subscriptions = blpapi.SubscriptionList()
+    subscriptions = blpapi.subscriptionlist.SubscriptionList()
     for topic in options.topics:
         subscriptions.add(
             topic, options.fields, options.options, blpapi.CorrelationId(topic)

@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 import numpy as np
 from option.option_class import Option
 from option.bachelier import Bachelier
-from option.sabr import compute_sabr_volatility
 from app.data_types import FutureData
 from bloomberg.OptionProcessor import OptionProcessor
 from bloomberg.TickerBuilder import TickerBuilder
@@ -62,11 +61,11 @@ def import_options(
     suffix: str = "Comdty",
     default_position: PositionType = "long",
     use_sabr: bool = True,
-) -> Tuple[List[Option], FutureData, List[str]]:
+) -> Tuple[List[Option], FutureData, List[str], Any]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne des objets Option.
     Returns:
-        Tuple (liste d'objets Option, FutureData avec prix et date, warnings)
+        Tuple (liste d'objets Option, FutureData, warnings, SABRCalibration or None)
     """    
     # 1. Construction des tickers
     builder = TickerBuilder(suffix, roll_expiries)
@@ -83,6 +82,7 @@ def import_options(
     future_data = FutureData(None, None)
     options: List[Option] = []
     fetch_warnings: List[str] = []
+    sabr_calibration: Any = None
     
     try:
         fetcher = PremiumFetcher(builder)
@@ -96,7 +96,7 @@ def import_options(
         
         # 3.5. Calculer la volatilité Bachelier + SABR pour TOUTES les options
         if options:
-             Bachelier.compute_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
+             sabr_calibration = Bachelier.compute_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
 
              for option in options:
                 option._calcul_all_surface()
@@ -107,4 +107,4 @@ def import_options(
         traceback.print_exc()
 
 
-    return options, future_data, fetch_warnings
+    return options, future_data, fetch_warnings, sabr_calibration
