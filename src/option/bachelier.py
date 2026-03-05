@@ -317,6 +317,7 @@ class Bachelier:
                 iv = max(float(all_sabr_vols[i]), 0.0)
                 mkt_iv = iv_merged[i]
                 for opt in (call, put):
+                    opt.market_implied_volatility = mkt_iv
                     opt.sabr_volatility = iv
                     opt.sabr_residual = (mkt_iv - iv) if mkt_iv > 0 else 0.0
                     opt.sabr_z_score = (
@@ -338,6 +339,7 @@ class Bachelier:
             for i, (_, call, put) in enumerate(datas):
                 iv = max(iv_merged[i], 0.0)
                 for opt in (call, put):
+                    opt.market_implied_volatility = iv
                     if iv > 0:
                         opt.implied_volatility = iv
                         if not (opt.status and opt.premium > 0):

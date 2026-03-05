@@ -27,13 +27,6 @@ _METRIC_LABELS: Dict[str, str] = {
 class MultiRankingResult:
     """
     Résultat d'un scoring multi-poids.
-
-    Attributes:
-        per_set_strategies: Liste de listes — un classement par jeu de poids.
-        consensus_strategies: Classement consensus (moyenne des rangs).
-        weight_sets: Les jeux de poids utilisés.
-        weight_set_names: Labels optionnels (ex: "R1 — Leverage").
-        n_candidates: Nombre total de combinaisons évaluées.
     """
     per_set_strategies: List[List[StrategyComparison]] = field(default_factory=list)
     consensus_strategies: List[StrategyComparison] = field(default_factory=list)

@@ -176,11 +176,11 @@ def batch_to_strategies(
     prices = options[0].prices
     
     for indices, signs, metrics in results:
-        # R�cup�rer les options correspondantes
+        # Récuperer les options correspondantes
         opts = [options[i] for i in indices]
         signs_arr = np.array([float(s) for s in signs], dtype=np.float64)
         
-        # G�n�rer le nom et l'expiration
+        # Generer le nom et l'expiration
         strategy_name = generate_strategy_name(opts, signs_arr)
         exp_info = get_expiration_info(opts)
         
@@ -193,7 +193,7 @@ def batch_to_strategies(
                         total_rolls_detail[label] = 0.0
                     total_rolls_detail[label] += float(signs_arr[i]) * value
         
-        # Cr�er la StrategyComparison
+        # Creer la StrategyComparison
         strat = StrategyComparison(
             strategy_name=strategy_name,
             premium=metrics['total_premium'],

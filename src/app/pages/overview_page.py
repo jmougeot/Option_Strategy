@@ -437,10 +437,29 @@ class OverviewPage(QWidget):
 
     # ------------------------------------------------------------------ public: called from Volatility rerun
     def rerun_with_prefilled(self, options: list) -> None:
-        if not self._state.params:
+        params = self._state.params
+        scenarios = self._state.scenarios
+        filter_ = self._state.filter
+        if params is None or scenarios is None or filter_ is None:
             return
-        params_dict: Dict[str, Any] = self._state.stats.get("_last_params", {}).copy()
-        params_dict["prefilled_options"] = options
+        params_dict: Dict[str, Any] = {
+            "brut_code": params.brut_code,
+            "underlying": params.underlying,
+            "months": params.months,
+            "years": params.years,
+            "strikes": params.strikes,
+            "price_min": params.price_min,
+            "price_max": params.price_max,
+            "max_legs": params.max_legs,
+            "scoring_weights": self._state.scoring_weights,
+            "scenarios": scenarios,
+            "filter": filter_,
+            "roll_expiries": params.roll_expiries,
+            "use_bachelier": params.use_bachelier,
+            "use_sabr": params.use_sabr,
+            "operation_penalisation": params.operation_penalisation,
+            "prefilled_options": options,
+        }
 
         self._state.is_processing = True
         self._btn_run.setEnabled(False)

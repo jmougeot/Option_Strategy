@@ -26,7 +26,6 @@ class OptionStrategyGeneratorV2:
     Genere toutes les strtagies à partir d'une liste d'options 
     """
 
-
     def __init__(self, options: List[Option]):
         """
         Initilisation du generateur 

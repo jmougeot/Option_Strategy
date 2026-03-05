@@ -94,11 +94,9 @@ def import_options(
         options = processor.process_all()
         future_data = fetcher.future_data
         
-        # 3.5. Calculer la volatilité Bachelier pour TOUTES les options
+        # 3.5. Calculer la volatilité Bachelier + SABR pour TOUTES les options
         if options:
              Bachelier.compute_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
-             if use_sabr:
-                 compute_sabr_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
 
              for option in options:
                 option._calcul_all_surface()

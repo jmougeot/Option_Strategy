@@ -45,20 +45,26 @@ def process_bloomberg_to_strategies(
         scenarios, price_min, price_max, num_points
     )
 
-    # -- Shortcut: options pr�-charg�es (rerun depuis page Volatility) --
+    # -- Shortcut: options pré-chargées (rerun depuis page Volatility) --
     if prefilled_options is not None:
         options = prefilled_options
         stats["future_data"] = future_data
         stats["all_options"] = options
         stats["nb_options"] = len(options)
-        # Filtrer les options sans statut si Bachelier d�sactiv�
+        # Filtrer les options sans statut si Bachelier désactivé
         if not use_bachelier:
             options = [opt for opt in options if opt.status]
             stats["nb_options_filtered_warnings"] = stats["nb_options"] - len(options)
             stats["nb_options"] = len(options)
         if not options:
             return [], stats, mixture, future_data
-        # Sauter directement � la g�n�ration de strat�gies
+        # Recalculer pnl_array / average_pnl / sigma_pnl avec les premium/IV édités
+        prices_grid, mixture_probs, _ = mixture
+        for opt in options:
+            opt.prices = prices_grid
+            opt.mixture = mixture_probs
+            opt._calcul_all_surface()
+        # Générer les stratégies
         generator = OptionStrategyGeneratorV2(options)
         if isinstance(scoring_weights, list):
             weight_sets = scoring_weights

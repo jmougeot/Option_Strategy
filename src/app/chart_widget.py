@@ -222,14 +222,14 @@ class PlotlyChart(QWidget):
 
         self._hover_series = []
 
-        # Smile connecting line
-        sl = data["smile_line"]
-        if sl["x"]:
-            pi.plot(sl["x"], sl["y"],
-                    pen=pg.mkPen("#2196F3", width=2), name="Smile")
+        # SABR smooth curve
+        sc_data = data.get("sabr_curve")
+        if sc_data and sc_data["x"]:
+            pi.plot(sc_data["x"], sc_data["y"],
+                    pen=pg.mkPen("#F44336", width=2), name="SABR")
 
-        # Normal IV scatter
-        nm = data.get("normal")
+        # Market IV scatter
+        nm = data.get("market")
         if nm and nm["x"]:
             sc = pg.ScatterPlotItem(
                 nm["x"], nm["y"], symbol="o", size=9,
@@ -241,7 +241,7 @@ class PlotlyChart(QWidget):
             lbs = nm["labels"]
             self._hover_series.append((nm["x"], nm["y"], lambda i, lb=lbs: lb[i]))
 
-        # Corrected / extrapolated
+        # Corrected / status=False
         cr = data.get("corrected")
         if cr and cr["x"]:
             sc2 = pg.ScatterPlotItem(
@@ -253,29 +253,6 @@ class PlotlyChart(QWidget):
             pi.addItem(sc2)
             lbs = cr["labels"]
             self._hover_series.append((cr["x"], cr["y"], lambda i, lb=lbs: lb[i]))
-
-        # SABR anomalies
-        sb = data.get("sabr")
-        if sb and sb["x"]:
-            for K, ymkt, ymod in zip(sb["x"], sb["y_mkt"], sb["y_mod"]):
-                pi.plot([K, K], [ymkt, ymod],
-                        pen=pg.mkPen("#F44336", width=1, style=Qt.PenStyle.DotLine))
-            sc3 = pg.ScatterPlotItem(
-                sb["x"], sb["y_mkt"], symbol="d", size=12,
-                pen=pg.mkPen("#F44336", width=1),
-                brush=pg.mkBrush("#F44336"),
-                name="Anomalie SABR",
-            )
-            pi.addItem(sc3)
-            sc4 = pg.ScatterPlotItem(
-                sb["x"], sb["y_mod"], symbol="s", size=8,
-                pen=pg.mkPen("#F44336", width=1.5),
-                brush=pg.mkBrush(None),
-                name="SABR (modele)",
-            )
-            pi.addItem(sc4)
-            lbs = sb["labels"]
-            self._hover_series.append((sb["x"], sb["y_mkt"], lambda i, lb=lbs: lb[i]))
 
         # Spot / forward
         spot = data.get("spot")

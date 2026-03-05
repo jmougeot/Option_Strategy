@@ -53,6 +53,7 @@ class Option:
 
     # ============ VOLATILITÉ ============
     implied_volatility: float = 0.0
+    market_implied_volatility: float = 0.0   # IV brute issue du prix marché (avant SABR)
     left_slope : Optional[float]= 0.0
     right_slope : Optional[float]= 0.0
     historical_volatility: Optional[float] = None
