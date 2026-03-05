@@ -15,8 +15,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 from app.pages.history import add_to_history
-from app.utils import format_price
-from app.widget_comparison import create_comparison_table
+from app.utils import format_price, create_comparison_table
 from app.widget_payoff import build_payoff_figure
 from app.app_state import AppState
 from app.chart_widget import PlotlyChart

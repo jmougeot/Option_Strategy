@@ -1,15 +1,19 @@
 """
 MainWindow — QMainWindow with:
   • Left QDockWidget: Scenario + Params + Filter + Scoring panels (scrollable)
-  • Central QTabWidget: Overview, Volatility, History, Email, Help
+  • Central QStackedWidget:
+      Page 0 — QTabWidget: Overview, Volatility, History, Email, Help
+      Page 1 — AlarmPage (full Strategy Price Monitor)
+  • Top toolbar to switch between the two pages
 """
 
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QDockWidget, QMainWindow, QScrollArea, QSizePolicy,
-    QTabWidget, QVBoxLayout, QWidget,
+    QStackedWidget, QTabWidget, QToolBar, QVBoxLayout, QWidget,
 )
 
 from app.app_state import AppState
@@ -22,6 +26,7 @@ from app.pages.volatility_page import VolatilityPage
 from app.pages.history_page import HistoryPage
 from app.pages.email_page import EmailPage
 from app.pages.help_page import HelpPage
+from app.pages.alarm_page import AlarmPage
 
 
 class MainWindow(QMainWindow):
@@ -77,6 +82,7 @@ class MainWindow(QMainWindow):
         self._page_history   = HistoryPage(self._state)
         self._page_email     = EmailPage(self._state)
         self._page_help      = HelpPage()
+        self._page_alarm     = AlarmPage()
 
         # Wire Volatility "Rerun pipeline" → Overview
         self._page_volatility.rerun_requested.connect(self._page_overview.rerun_with_prefilled)
@@ -97,7 +103,57 @@ class MainWindow(QMainWindow):
         tabs.addTab(self._page_history,    "History")
         tabs.addTab(self._page_email,      "Email")
         tabs.addTab(self._page_help,       "Help")
-        self.setCentralWidget(tabs)
+
+        # ── Top navigation toolbar ─────────────────────────────────────────
+        toolbar = QToolBar("Navigation", self)
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        toolbar.setStyleSheet("""
+            QToolBar { spacing: 6px; padding: 4px 8px; }
+            QToolButton {
+                font-size: 13px; padding: 4px 16px;
+                border: 1px solid transparent; border-radius: 4px;
+            }
+            QToolButton:checked {
+                background: #4A5173; color: white;
+                border-color: #4A5173;
+            }
+            QToolButton:!checked { color: #4A5173; }
+            QToolButton:hover:!checked { background: #e8e9ef; }
+        """)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
+
+        act_strategy = QAction("📊  Stratégies", self)
+        act_alarm    = QAction("🔔  Alarmes",    self)
+        for a in (act_strategy, act_alarm):
+            a.setCheckable(True)
+        act_strategy.setChecked(True)
+        toolbar.addAction(act_strategy)
+        toolbar.addAction(act_alarm)
+
+        # ── Central stacked widget ─────────────────────────────────────────
+        self._stack = QStackedWidget()
+        self._stack.addWidget(tabs)               # page 0 — options strategy
+        self._stack.addWidget(self._page_alarm)   # page 1 — alarm monitor
+        self.setCentralWidget(self._stack)
+
+        # keep a reference to the dock so we can hide/show it
+        self._dock = dock
+
+        def _go_strategy():
+            act_strategy.setChecked(True)
+            act_alarm.setChecked(False)
+            self._stack.setCurrentIndex(0)
+            self._dock.show()
+
+        def _go_alarm():
+            act_alarm.setChecked(True)
+            act_strategy.setChecked(False)
+            self._stack.setCurrentIndex(1)
+            self._dock.hide()
+
+        act_strategy.triggered.connect(lambda: _go_strategy())
+        act_alarm.triggered.connect(lambda: _go_alarm())
 
     # ------------------------------------------------------------------ sync
     def _sync_state(self) -> None:

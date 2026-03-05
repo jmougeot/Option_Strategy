@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
+import numpy as np
 import pandas as pd
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -14,10 +15,69 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
-from app.pages.volatility import build_smile_figure
 from app.utils import split_calls_puts
 from app.app_state import AppState
 from app.chart_widget import PlotlyChart
+from option.option_class import Option
+
+
+# ============================================================================
+# Smile figure builder  (ex pages/volatility.py)
+# ============================================================================
+
+def build_smile_figure(calls, puts, underlying_price):
+    calls_by_strike = {o.strike: o for o in calls if o.implied_volatility > 0}
+    puts_by_strike  = {o.strike: o for o in puts  if o.implied_volatility > 0}
+    all_strikes = sorted(set(calls_by_strike) | set(puts_by_strike))
+    if not all_strikes:
+        return None
+
+    smile_x, smile_y, smile_labels = [], [], []
+    warn_x,  warn_y,  warn_labels  = [], [], []
+    sabr_x,  sabr_y_mkt, sabr_y_mod, sabr_labels = [], [], [], []
+
+    for K in all_strikes:
+        c = calls_by_strike.get(K)
+        p = puts_by_strike.get(K)
+        ivs = [o.implied_volatility for o in (c, p) if o is not None]
+        iv_avg = float(sum(ivs) / len(ivs))
+        is_corrected = any(not o.status for o in (c, p) if o is not None)
+        is_anomaly   = any(getattr(o, "sabr_is_anomaly", False) for o in (c, p) if o is not None)
+
+        if is_corrected:
+            warn_x.append(K); warn_y.append(iv_avg)
+            warn_labels.append(f"K={K:.3f}\nIV={iv_avg*1e4:.1f}bp\n! Corrige")
+        elif is_anomaly:
+            sabr_vol_model = next(
+                (getattr(o, "sabr_volatility", 0.0) for o in (c, p)
+                 if o is not None and getattr(o, "sabr_volatility", 0.0) > 0), 0.0)
+            res_bp = (iv_avg - sabr_vol_model) * 10_000
+            sabr_x.append(K); sabr_y_mkt.append(iv_avg); sabr_y_mod.append(sabr_vol_model)
+            sabr_labels.append(
+                f"K={K:.3f}\nmkt={iv_avg*1e4:.1f}bp\nSABR={sabr_vol_model*1e4:.1f}bp\nD={res_bp:+.1f}bp"
+            )
+        else:
+            smile_x.append(K); smile_y.append(iv_avg)
+            smile_labels.append(f"K={K:.3f}\nIV={iv_avg*1e4:.1f}bp")
+
+    all_y_dict = {}
+    all_y_dict.update(zip(smile_x, smile_y))
+    all_y_dict.update(zip(warn_x, warn_y))
+    all_y_dict.update(zip(sabr_x, sabr_y_mkt))
+    line_x = sorted(all_y_dict.keys())
+    line_y = [all_y_dict[k] for k in line_x]
+
+    return {
+        "type": "smile",
+        "normal":    {"x": smile_x, "y": smile_y, "labels": smile_labels} if smile_x else None,
+        "corrected": {"x": warn_x,  "y": warn_y,  "labels": warn_labels}  if warn_x  else None,
+        "sabr": {
+            "x": sabr_x, "y_mkt": sabr_y_mkt,
+            "y_mod": sabr_y_mod, "labels": sabr_labels,
+        } if sabr_x else None,
+        "smile_line": {"x": line_x, "y": line_y},
+        "spot": float(underlying_price) if underlying_price else None,
+    }
 
 
 class VolatilityPage(QWidget):

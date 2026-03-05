@@ -45,14 +45,13 @@ def init_cpp_cache(options: List[Option]) -> bool:
     # Stocker les options dans le cache global pour batch_to_strategies
     _options_cache = options
         
-    # V�rifier que les don�es sont valides
     if options[0].pnl_array is None or options[0].prices is None:
         return False
     
     n = len(options)
     pnl_length = len(options[0].pnl_array)
     
-    # Extraction des donn�es des options
+    # Extraction des donnees des options
     premiums = np.array([opt.premium for opt in options], dtype=np.float64)
     deltas = np.array([opt.delta for opt in options], dtype=np.float64)
     gammas = np.array([opt.gamma for opt in options], dtype=np.float64)
@@ -63,7 +62,7 @@ def init_cpp_cache(options: List[Option]) -> bool:
     strikes = np.array([opt.strike for opt in options], dtype=np.float64)
     is_calls = np.array([opt.option_type.lower() == 'call' for opt in options], dtype=np.bool_)
     
-    # Donn�es de rolls
+    # Donnees de rolls
     rolls = np.array([opt.roll[0] if opt.roll else 0.0 for opt in options], dtype=np.float64)
 
     # Matrice P&L
@@ -72,7 +71,7 @@ def init_cpp_cache(options: List[Option]) -> bool:
         if opt.pnl_array is not None:
             pnl_matrix[i] = opt.pnl_array
     
-    # Donn�es communes
+    # Donnees communes
     prices = np.array(options[0].prices, dtype=np.float64)
     mixture = np.asarray(options[0].mixture, dtype=np.float64)
     average_mix = float(options[0].average_mix) if options[0].average_mix else 0.0
@@ -98,7 +97,7 @@ def init_cpp_cache(options: List[Option]) -> bool:
     return True
 
 # =============================================================================
-# TRAITEMENT C++ � MULTI-SCORING (N jeux de poids simultan�s)
+# TRAITEMENT C++  MULTI-SCORING (N jeux de poids simultanes)
 # =============================================================================
 
 def process_batch_cpp_with_multi_scoring(

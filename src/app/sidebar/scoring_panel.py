@@ -14,9 +14,7 @@ from PyQt6.QtWidgets import (
     QSpinBox, QVBoxLayout, QWidget,
 )
 
-from app.widget_scoring import (
-    ALL_FIELDS, RANKING_PRESETS, SCORING_FIELDS, _make_full_weights, _preset_summary,
-)
+from app.data_types import (ALL_FIELDS, RANKING_PRESETS, SCORING_FIELDS, _make_full_weights, _preset_summary,)
 
 
 class _CustomWeightRow(QWidget):

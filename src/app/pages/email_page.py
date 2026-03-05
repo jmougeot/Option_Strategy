@@ -174,7 +174,7 @@ class EmailPage(QWidget):
 
         # Payoff chart
         if mixture is not None and comparisons:
-            from app.widget_payoff import build_payoff_figure
+            from app.widget_payoff import build_payoff_figure  # noqa: lazy import
             price = future_data.underlying_price if future_data else 0.0
             try:
                 fig = build_payoff_figure(comparisons[:nb], mixture, price)

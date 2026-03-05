@@ -10,8 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from app.data_types import FilterData, FutureData, ScenarioData
-from app.widget_params import UIParams
+from app.data_types import FilterData, FutureData, ScenarioData, UIParams
 
 
 @dataclass

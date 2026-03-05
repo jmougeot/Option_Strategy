@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from app.widget_params import UIParams, UNDERLYING_PARAMS, parse_roll_input
+from app.data_types import UIParams, UNDERLYING_PARAMS, parse_roll_input
 from app.utils import strike_list
 
 
