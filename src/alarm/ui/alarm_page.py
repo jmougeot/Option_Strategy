@@ -32,7 +32,7 @@ from alarm.handlers.file_handler import FileHandler
 from alarm.models.strategy import (
     Position, Strategy, StrategyStatus, TargetCondition, normalize_ticker,
 )
-from alarm.services.bloomberg_service import BloombergService
+from bloomberg.realtime import BloombergService
 from alarm.ui.alarm_state import RowState
 from alarm.ui.columns import (
     C_ACTION, C_CLIENT, C_COND, C_DELTA, C_DOT,
