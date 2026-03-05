@@ -79,7 +79,7 @@ class StrategyTableWidget(QWidget):
         lay.addLayout(top)
 
         self._table = QTableWidget()
-        self._table.verticalHeader().setVisible(False)
+        self._table.verticalHeader().setVisible(False) #type: ignore
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -100,18 +100,20 @@ class StrategyTableWidget(QWidget):
         if n == 0:
             return
         # First pass: size to content
-        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents) #type: ignore
         # Force layout so widths are computed
-        self._table.horizontalHeader().setStretchLastSection(False)
+        self._table.horizontalHeader().setStretchLastSection(False) #type: ignore 
         self._table.resizeColumnsToContents()
         # Read content-based widths
         widths = [self._table.columnWidth(c) for c in range(n)]
         # Switch to fixed so we can set widths manually
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive) #type: ignore
         total_content = sum(widths)
-        available = self._table.viewport().width()
+        available = self._table.viewport().width() #type: ignore
         if total_content <= 0:
             return
+        
         # Scale all columns proportionally to fill the full width
         scale = max(available / total_content, 1.0)
         for c in range(n):
@@ -131,12 +133,10 @@ class StrategyTableWidget(QWidget):
                 item = QTableWidgetItem(str(val))
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._table.setItem(r, c, item)  # type: ignore
-
-        # Delay column sizing so the viewport has its final width
         QTimer.singleShot(0, self._apply_column_sizing)
 
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
+    def resizeEvent(self, a0) -> None:
+        super().resizeEvent(a0)
         if self._table.columnCount() > 0:
             QTimer.singleShot(0, self._apply_column_sizing)
 

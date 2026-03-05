@@ -1,18 +1,13 @@
 """
 Options Monitor - Surveillance en temps réel de plusieurs options (Calls/Puts)
-Permet de suivre les prix de plusieurs strikes simultanément.
-
-Exemple d'utilisation:
-    python OptionsMonitor.py --underlying "SPY US" --expiry "12/20/25" --strikes 580 585 590 595 600 --types C P
-    python OptionsMonitor.py --underlying "AAPL US" --expiry "01/17/25" --strikes 170 175 180 --types C
-    python OptionsMonitor.py --tickers "SPY US 12/20/25 C590 Equity" "SPY US 12/20/25 P590 Equity"
+Permet de suivre les prix de plusieurs strikes simultanément
 """
 
 import time
 from argparse import ArgumentParser, RawTextHelpFormatter
 from datetime import datetime
 
-from bloomberg.blpapi_import_helper import blpapi
+import blpapi
 
 from bloomberg.util.ConnectionAndAuthOptions import (
     addConnectionAndAuthOptions,

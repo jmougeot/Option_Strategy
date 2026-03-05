@@ -14,12 +14,6 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict
 
-# ── resolve src/myproject so "from main import ..." works in the subprocess ──
-_HERE = Path(__file__).resolve().parent          # app/
-_MYPROJECT = _HERE.parent                        # myproject/
-if str(_MYPROJECT) not in sys.path:
-    sys.path.insert(0, str(_MYPROJECT))
-
 TEMP_DIR = Path(tempfile.gettempdir()) / "option_strategy_results"
 TEMP_DIR.mkdir(exist_ok=True)
 
@@ -35,7 +29,7 @@ def _error_path(session_id: str) -> Path:
 def run(session_id: str, params: Dict[str, Any]) -> None:
     """Called by multiprocessing.Process — no Qt imports anywhere in this file."""
     try:
-        from main import process_bloomberg_to_strategies  # type: ignore
+        from main import process_bloomberg_to_strategies 
 
         result = process_bloomberg_to_strategies(
             brut_code=params.get("brut_code"),
