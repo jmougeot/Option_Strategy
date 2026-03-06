@@ -138,8 +138,10 @@ class SmileDialog(QDialog):
 
     # ── fetch ─────────────────────────────────────────────────────────────
     def _on_fetch(self) -> None:
-        from bloomberg.connection import is_connected
-        if not is_connected():
+        from bloomberg.connection import get_session
+        try:
+            get_session()
+        except ConnectionError:
             self._lbl_status.setText("Bloomberg non connecté — fetch ignoré")
             self._lbl_status.setStyleSheet(f"color: {theme.WARNING}; font-size: 12px;")
             return
