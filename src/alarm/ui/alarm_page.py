@@ -43,6 +43,8 @@ from app import theme
 class AlarmPage(QWidget):
     """Table-based strategy price monitor page."""
 
+    _GHOST_ROWS = 50  # empty rows at the bottom (Excel-like)
+
     # ── class-level cycle tables ──────────────────────────────────────────────
     _COND_CYCLE = [
         (TargetCondition.INFERIEUR, "Inférieur à"),
@@ -147,12 +149,16 @@ class AlarmPage(QWidget):
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
-        self._table.setStyleSheet("QTableWidget { font-size: 11px; }")
+        self._table.setStyleSheet("""
+            QTableWidget { font-size: 12px; }
+            QTableWidget QLineEdit { font-size: 12px; }
+            QTableWidget QAbstractItemView { font-size: 12px; }
+        """)
 
         vh = self._table.verticalHeader()
         if vh:
             vh.setVisible(False)
-            vh.setDefaultSectionSize(28)
+            vh.setDefaultSectionSize(34)
 
         self._table.cellChanged.connect(self._on_cell_changed)
         self._table.cellDoubleClicked.connect(self._on_cell_double_clicked)
@@ -197,14 +203,6 @@ class AlarmPage(QWidget):
 
         root.addWidget(self._table)
 
-        # Bottom bar ──────────────────────────────────────────────────────────
-        bot = QHBoxLayout()
-        btn_add = QPushButton("＋  Ajouter une stratégie")
-        btn_add.setObjectName("btnAlarmAdd")
-        btn_add.clicked.connect(lambda: self._add_strategy())
-        bot.addWidget(btn_add)
-        bot.addStretch()
-        root.addLayout(bot)
 
         self._refresh_page_combo()
         self._reload_table()
@@ -260,12 +258,35 @@ class AlarmPage(QWidget):
             if s.id not in self._states:
                 self._states[s.id] = RowState(s)
             self._append_row(s)
+        self._fill_ghost_rows()
+        self._table.blockSignals(False)
+
+    def _fill_ghost_rows(self) -> None:
+        """Ensure there are always _GHOST_ROWS empty rows at the bottom."""
+        n_strat = len(self._pages[self._cur]["strategies"])
+        current_total = self._table.rowCount()
+        n_ghosts = current_total - n_strat
+        need = self._GHOST_ROWS - n_ghosts
+        if need <= 0:
+            return
+        self._table.blockSignals(True)
+        for _ in range(need):
+            r = self._table.rowCount()
+            self._table.insertRow(r)
+            self._table.setRowHeight(r, 34)
+            for col in range(self._table.columnCount()):
+                editable = col in (C_CLIENT, C_NAME, C_ACTION, C_TARGET)
+                it = QTableWidgetItem("")
+                it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if not editable:
+                    it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self._table.setItem(r, col, it)
         self._table.blockSignals(False)
 
     def _append_row(self, strategy: Strategy) -> None:
         r = self._table.rowCount()
         self._table.insertRow(r)
-        self._table.setRowHeight(r, 28)
+        self._table.setRowHeight(r, 34)
 
         # ⬤ alarm dot
         dot = QLabel("⬤")
@@ -386,8 +407,16 @@ class AlarmPage(QWidget):
     # ── cell change ───────────────────────────────────────────────────────────
     def _on_cell_changed(self, row: int, col: int) -> None:
         s = self._strategy_at_row(row)
+
+        # Ghost row → promote to real strategy on first edit
         if s is None:
-            return
+            item = self._table.item(row, col)
+            if item is None or not item.text().strip():
+                return
+            s = self._promote_ghost_row(row)
+            if s is None:
+                return
+
         item = self._table.item(row, col)
         if item is None:
             return
@@ -468,6 +497,40 @@ class AlarmPage(QWidget):
                 legs_item.setText(self._legs_summary(strategy))
 
     # ── add / remove ──────────────────────────────────────────────────────────
+    def _promote_ghost_row(self, row: int) -> Optional[Strategy]:
+        """Turn a ghost row into a real strategy and refill ghosts."""
+        strategies = self._pages[self._cur]["strategies"]
+        if row < len(strategies):
+            return None  # not a ghost row
+        strategy = Strategy(id=str(uuid.uuid4()), name="")
+        strategies.append(strategy)
+        self._states[strategy.id] = RowState(strategy)
+
+        # Upgrade the ghost row: add dot widget + make cells functional
+        dot = QLabel("⬤")
+        dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dot.setStyleSheet(theme.DOT_IDLE)
+        dot.setToolTip("Alarme inactive")
+        self._table.setCellWidget(row, C_DOT, dot)
+
+        # Make non-editable cells functional
+        for col in (C_LEGS, C_PRICE, C_COND, C_STATUS, C_DELTA, C_GAMMA, C_THETA, C_IV, C_FUT):
+            item = self._table.item(row, col)
+            if item:
+                if col == C_LEGS:
+                    item.setText("—")
+                elif col == C_PRICE:
+                    item.setText("--")
+                elif col == C_COND:
+                    item.setText("Inférieur à")
+                elif col == C_STATUS:
+                    item.setText("En cours")
+                elif col in (C_DELTA, C_GAMMA, C_THETA, C_IV, C_FUT):
+                    item.setText("--")
+
+        self._fill_ghost_rows()
+        return strategy
+
     def _add_strategy(self, strategy: Strategy | None = None) -> None:
         if strategy is None:
             strategy = Strategy(id=str(uuid.uuid4()), name="")
@@ -487,6 +550,7 @@ class AlarmPage(QWidget):
         if row >= 0:
             strategies.pop(row)
             self._table.removeRow(row)
+            self._fill_ghost_rows()
 
     # ── Bloomberg status ──────────────────────────────────────────────────────
     def _on_bbg_status(self, connected: bool, message: str) -> None:
