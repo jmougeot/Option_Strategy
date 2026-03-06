@@ -41,6 +41,7 @@ from alarm.ui.columns import (
     HEADERS, WARN_DELAY,
 )
 from alarm.ui.block_dialog import BlockDialog
+from alarm.ui.smile_dialog import SmileDialog
 from alarm.ui.legs_dialog import LegsDialog
 from app import theme
 
@@ -731,7 +732,8 @@ class AlarmPage(QWidget):
         pass  # TODO
     
     def _show_smile(self, strategy: Strategy) -> None:
-        pass  # TODO
+        dlg = SmileDialog(strategy,parent = self)
+        dlg.exec()
 
     def _show_block(self, strategy: Strategy) -> None:
         dlg = BlockDialog(strategy, parent=self)

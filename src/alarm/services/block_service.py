@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List, Optional
-
 from alarm.models.strategy import OptionLeg, Position, Strategy
 
 
@@ -115,4 +114,3 @@ def adjust_prices(
 
     return results
 
-    return results

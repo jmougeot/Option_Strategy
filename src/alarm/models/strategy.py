@@ -38,7 +38,7 @@ class OptionLeg:
     ticker: str = ""  # ex: "SFRH6C 98.00 Comdty"
     position: Position = Position.LONG
     quantity: int = 1
-    
+    underlying: str = ""
     # Prix temps réel depuis Bloomberg
     last_price: Optional[float] = None
     bid: Optional[float] = None
@@ -117,18 +117,15 @@ class Strategy:
     legs: list[OptionLeg] = field(default_factory=list)
     client : Optional[str] = None
     action : Optional[str] = None
-    
-    # Prix cible et condition
+    underlying : Optional[str] = None
+    expiration : Optional[str] = None
     target_price: Optional[float] = None
     target_condition: TargetCondition = TargetCondition.INFERIEUR  # Alarme si prix < ou > cible
-    
     # Status
     status: StrategyStatus = StrategyStatus.EN_COURS
-    
     # Timestamps
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
-
     # Prix du future sous-jacent (mis à jour via Bloomberg)
     future_price: Optional[float] = None
 
