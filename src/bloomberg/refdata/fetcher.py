@@ -1,9 +1,9 @@
 """
 Bloomberg Batch Fetcher
 ========================
-Récupère les données d'options via HistoricalDataRequest.
-Utilise un lookback de quelques jours pour avoir un fallback
-si le dernier point n'est pas disponible.
+Récupère les données d'options via ReferenceDataRequest (BDP) pour les prix
+et les Greeks. Si un ticker n'a pas de prix, on utilise HistoricalDataRequest
+(BDH) avec un lookback de quelques jours en fallback.
 """
 from __future__ import annotations
 
@@ -16,8 +16,10 @@ from bloomberg.config import OPTION_FIELDS
 from bloomberg.connection import get_session, get_service
 from app.data_types import FutureData
 
-# Champs prix utilisés pour vérifier qu'une ligne historique est valide
-_PRICE_FIELDS = {"PX_BID", "PX_ASK", "PX_MID", "PX_LAST"}
+# Champs prix utilisés pour le BDH fallback
+_BDH_FIELDS = ["PX_BID", "PX_ASK", "PX_MID", "PX_LAST"]
+# Set pour vérifier rapidement si un ticker a des prix
+_PRICE_FIELD_SET = set(_BDH_FIELDS)
 
 
 def _safe_get_value(element, field: str) -> Any:
@@ -55,9 +57,138 @@ def _pick_last_valid_row(field_data, fields: list[str]) -> dict[str, Any]:
     for i in range(field_data.numValues()):
         row = field_data.getValueAsElement(i)
         row_data = {f: _safe_get_value(row, f) for f in fields}
-        if any(row_data.get(pf) is not None for pf in _PRICE_FIELDS):
+        if any(row_data.get(pf) is not None for pf in _PRICE_FIELD_SET):
             best = row_data
     return best
+
+
+def _has_prices(data: dict[str, Any]) -> bool:
+    """Vérifie qu'un ticker a au moins un prix bid ou ask."""
+    return bool(data.get("PX_BID") or data.get("PX_ASK") or data.get("PX_MID"))
+
+
+def _bdp_fetch(
+    session, service,
+    all_securities: list[str],
+    use_overrides: bool,
+) -> dict[str, dict[str, Any]]:
+    """ReferenceDataRequest (BDP) — tous les champs y compris Greeks."""
+    raw: dict[str, dict[str, Any]] = {}
+
+    request = service.createRequest("ReferenceDataRequest")
+    securities = Name("securities")
+    fields = Name("fields")
+    overrides = Name("overrides")
+    fieldId = Name("fieldId")
+    value = Name("value")
+
+    for sec in all_securities:
+        request.append(securities, sec)
+    for field in OPTION_FIELDS:
+        request.append(fields, field)
+
+    if use_overrides:
+        ov = request.getElement(overrides)
+        ov1 = ov.appendElement()
+        ov1.setElement(fieldId, "PRICING_SOURCE")
+        ov1.setElement(value, "BGNE")
+
+    session.sendRequest(request)
+
+    while True:
+        event = session.nextEvent(5000)
+        if event.eventType() in (blpapi.event.Event.RESPONSE,
+                                 blpapi.event.Event.PARTIAL_RESPONSE):
+            for msg in event:
+                if not msg.hasElement("securityData"):
+                    continue
+                sec_data = msg.getElement("securityData")
+                for i in range(sec_data.numValues()):
+                    sec = sec_data.getValueAsElement(i)
+                    ticker = sec.getElementAsString("security")
+
+                    if sec.hasElement("securityError"):
+                        err = sec.getElement("securityError")
+                        err_msg = err.getElementAsString("message") if err.hasElement("message") else "Unknown"
+                        print(f"⚠️ Erreur BDP pour {ticker}: {err_msg}")
+                        continue
+
+                    if not sec.hasElement("fieldData"):
+                        continue
+                    fd = sec.getElement("fieldData")
+                    raw[ticker] = {f: _safe_get_value(fd, f) for f in OPTION_FIELDS}
+
+        if event.eventType() == blpapi.event.Event.RESPONSE:
+            break
+
+    return raw
+
+
+def _bdh_fallback(
+    session, service,
+    missing_tickers: list[str],
+    lookback_days: int,
+    use_overrides: bool,
+) -> dict[str, dict[str, Any]]:
+    """HistoricalDataRequest (BDH) fallback — uniquement les prix."""
+    raw: dict[str, dict[str, Any]] = {}
+    if not missing_tickers:
+        return raw
+
+    print(f"  ↻ BDH fallback pour {len(missing_tickers)} tickers sans prix...")
+
+    request = service.createRequest("HistoricalDataRequest")
+    securities = Name("securities")
+    fields = Name("fields")
+    startDate = Name("startDate")
+    endDate = Name("endDate")
+    periodicitySelection = Name("periodicitySelection")
+    overrides = Name("overrides")
+    fieldId = Name("fieldId")
+    value = Name("value")
+
+    for sec in missing_tickers:
+        request.append(securities, sec)
+    for field in _BDH_FIELDS:
+        request.append(fields, field)
+
+    end_dt = date.today()
+    start_dt = end_dt - timedelta(days=lookback_days)
+    request.set(startDate, start_dt.strftime("%Y%m%d"))
+    request.set(endDate, end_dt.strftime("%Y%m%d"))
+    request.set(periodicitySelection, "DAILY")
+
+    if use_overrides:
+        ov = request.getElement(overrides)
+        ov1 = ov.appendElement()
+        ov1.setElement(fieldId, "PRICING_SOURCE")
+        ov1.setElement(value, "BGNE")
+
+    session.sendRequest(request)
+
+    while True:
+        event = session.nextEvent(10_000)
+        if event.eventType() in (blpapi.event.Event.RESPONSE,
+                                 blpapi.event.Event.PARTIAL_RESPONSE):
+            for msg in event:
+                if not msg.hasElement("securityData"):
+                    continue
+                sec_data = msg.getElement("securityData")
+                ticker = sec_data.getElementAsString("security")
+
+                if sec_data.hasElement("securityError"):
+                    continue
+                if not sec_data.hasElement("fieldData"):
+                    continue
+                fd = sec_data.getElement("fieldData")
+                best = _pick_last_valid_row(fd, _BDH_FIELDS)
+                if best:
+                    raw[ticker] = best
+
+        if event.eventType() == blpapi.event.Event.RESPONSE:
+            break
+
+    return raw
 
 
 def fetch_options_batch(
@@ -68,9 +199,9 @@ def fetch_options_batch(
 ) -> Tuple[dict[str, dict[str, Any]], FutureData, List[str]]:
     """Récupère les données pour une liste de tickers Bloomberg.
 
-    Utilise HistoricalDataRequest avec un lookback de *lookback_days* jours
-    calendaires. Pour chaque ticker, le dernier point disponible est retenu :
-    si le jour le plus récent n'a pas de données, on prend le jour d'avant.
+    1) ReferenceDataRequest (BDP) pour tous les champs (prix + Greeks).
+    2) Pour les tickers sans prix, fallback HistoricalDataRequest (BDH)
+       sur les *lookback_days* derniers jours calendaires.
 
     Returns:
         (résultats par ticker, FutureData, liste de warnings)
@@ -81,84 +212,50 @@ def fetch_options_batch(
         session = get_session()
         service = get_service()
 
-        # création de la requête
-        request = service.createRequest("HistoricalDataRequest")
-
-        # Name permet de facilter la comparaison cela devient du O(1) car :
-        # request.append(securities, ticker) est equivalent à request["securities"].append(ticker)
-        securities = Name("securities")
-        fields = Name("fields")
-        startDate = Name("startDate")
-        endDate = Name("endDate")
-        periodicitySelection = Name("periodicitySelection")
-        overrides = Name("overrides")
-        fieldId= Name("fieldId")
-        value = Name("value")
-
-
+        # Liste complète des securities pour le BDP
+        all_securities = list(tickers)
         if underlyings is not None:
-            request.append(securities, underlyings)
-        for ticker in tickers:
-            request.append(securities, ticker)
-        for field in OPTION_FIELDS:
-            request.append(fields, field)
+            all_securities = [underlyings] + all_securities
 
-        # Plage de dates
-        end_dt = date.today()
-        start_dt = end_dt - timedelta(days=lookback_days)
-        request.set(startDate, start_dt.strftime("%Y%m%d"))
-        request.set(endDate, end_dt.strftime("%Y%m%d"))
-        request.set(periodicitySelection, "DAILY")
-
-        # Permet d'avoir des meilleurs prix depuis bloomberd car la source BGNE est meileur 
-        if use_overrides:
-            ov = request.getElement(overrides)
-            ov1 = ov.appendElement()
-            ov1.setElement(fieldId, "PRICING_SOURCE")
-            ov1.setElement(value, "BGNE")
-
-        session.sendRequest(request)
+        # ── Étape 1 : BDP (prix + Greeks) ──────────────────────────────
+        bdp_raw = _bdp_fetch(session, service, all_securities, use_overrides)
 
         underlying_price: Optional[float] = None
         last_tradable_date: Optional[str] = None
 
-        while True:
-            event = session.nextEvent(10_000)
-            if event.eventType() in (blpapi.event.Event.RESPONSE,
-                                     blpapi.event.Event.PARTIAL_RESPONSE):
-                for msg in event:
-                    if not msg.hasElement("securityData"):
-                        continue
-                    # HistoricalDataRequest : un seul security par message
-                    sec_data = msg.getElement("securityData")
-                    ticker = sec_data.getElementAsString("security")
+        # Extraire le sous-jacent
+        if underlyings is not None and underlyings in bdp_raw:
+            price = _extract_underlying_price(bdp_raw[underlyings])
+            if price is not None:
+                underlying_price = price
 
-                    if sec_data.hasElement("securityError"):
-                        err = sec_data.getElement("securityError")
-                        err_msg = err.getElementAsString("message") if err.hasElement("message") else "Unknown"
-                        print(f"⚠️ Erreur pour {ticker}: {err_msg}")
-                        continue
+        # Remplir les résultats depuis BDP
+        for t in tickers:
+            data = bdp_raw.get(t, {})
+            if data:
+                results[t] = data
+                if last_tradable_date is None:
+                    dt = data.get("LAST_TRADEABLE_DT")
+                    last_tradable_date = str(dt) if dt is not None else None
 
-                    if not sec_data.hasElement("fieldData"):
-                        continue
-                    fd = sec_data.getElement("fieldData")
+        # ── Étape 2 : BDH fallback pour tickers sans prix ─────────────
+        missing = [t for t in tickers if not _has_prices(results.get(t, {}))]
+        if missing:
+            bdh_raw = _bdh_fallback(session, service, missing, lookback_days, use_overrides)
+            # Aussi le sous-jacent si pas de prix
+            if underlyings is not None and underlying_price is None:
+                undl_bdh = _bdh_fallback(session, service, [underlyings], lookback_days, use_overrides)
+                if underlyings in undl_bdh:
+                    price = _extract_underlying_price(undl_bdh[underlyings])
+                    if price is not None:
+                        underlying_price = price
 
-                    # Prendre la dernière ligne qui a des données de prix
-                    best = _pick_last_valid_row(fd, OPTION_FIELDS)
-
-                    if underlyings is not None and ticker == underlyings:
-                        price = _extract_underlying_price(best)
-                        if price is not None:
-                            underlying_price = price
-                    else:
-                        if best:
-                            results[ticker] = best
-                        if last_tradable_date is None and best:
-                            dt = best.get("LAST_TRADEABLE_DT")
-                            last_tradable_date = str(dt) if dt is not None else None
-
-            if event.eventType() == blpapi.event.Event.RESPONSE:
-                break
+            for t in missing:
+                if t in bdh_raw:
+                    # Merger : on conserve les Greeks du BDP, on remplace les prix
+                    merged = dict(results.get(t, {}))
+                    merged.update(bdh_raw[t])
+                    results[t] = merged
 
         # Quality warnings
         missing_both: List[str] = []

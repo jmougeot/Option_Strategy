@@ -225,9 +225,9 @@ class Bachelier:
         # ── 2. Fusion call+put → iv_merged + poids bid-ask ────────────────
         IV_DIVERGENCE_THRESHOLD = 0.30
 
-        def _neighbor_avg(iv_list: List[float], idx: int) -> float:
+        def _neighbor_avg(iv_list: List[float], idx: int) -> Optional[float]:
             neighbors = [iv_list[j] for j in (idx - 1, idx + 1) if 0 <= j < n and iv_list[j] > 0]
-            return sum(neighbors) / len(neighbors)
+            return sum(neighbors) / len(neighbors) if neighbors else None
 
         iv_c = [d[1].implied_volatility for d in datas]
         iv_p = [d[2].implied_volatility for d in datas]
