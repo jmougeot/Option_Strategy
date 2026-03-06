@@ -40,6 +40,14 @@ class PlotlyChart(QWidget):
 
         self._pw = pg.PlotWidget()
         self._pw.setBackground(_BG)
+        # Disable pan (drag), keep scroll-wheel zoom only, no right-click menu
+        self._pw.setMouseEnabled(x=False, y=False)
+        self._pw.setMenuEnabled(False)
+        pi = self._pw.plotItem
+        if pi and pi.vb:
+            pi.vb.setMouseEnabled(x=False, y=False)
+            pi.vb.setMenuEnabled(False)
+            pi.vb.wheelEvent = lambda ev, axis=None: ev.ignore()  # type: ignore[assignment]
         lay.addWidget(self._pw)
 
         # Hover helpers
@@ -115,10 +123,7 @@ class PlotlyChart(QWidget):
         pi = self._pw.plotItem
         self._style_axes()
 
-        # Lock the chart — no pan, no zoom, no menu
-        self._pw.setMouseEnabled(x=False, y=False)
-        self._pw.setMenuEnabled(False)
-        pi.vb.setMouseEnabled(x=False, y=False)
+        # Zoom already restricted globally in __init__
 
         x = data["x"]
         legend = pi.addLegend(offset=(10, 10))
@@ -298,8 +303,6 @@ class PlotlyChart(QWidget):
 
         pi.setLabel("bottom", "Strike", color=_AX)
         pi.setLabel("left", "Implied Volatility", color=_AX)
-        # Disable mouse pan/zoom so the carefully-set ranges stay put
-        self._pw.setMouseEnabled(x=True, y=False)
 
     # ------------------------------------------------------------------ hover
     def _on_mouse(self, evt) -> None:
