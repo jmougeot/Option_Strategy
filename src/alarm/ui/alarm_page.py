@@ -40,6 +40,7 @@ from alarm.ui.columns import (
     C_PRICE, C_STATUS, C_TARGET, C_THETA,
     HEADERS, WARN_DELAY,
 )
+from alarm.ui.block_dialog import BlockDialog
 from alarm.ui.legs_dialog import LegsDialog
 from app import theme
 
@@ -708,12 +709,18 @@ class AlarmPage(QWidget):
         menu = QMenu(self)
         act_plot   = menu.addAction("Plot Backtest")
         act_payoff = menu.addAction("Show Payoff")
+        act_block = menu.addAction("Show Block")
+        act_smile = menu.addAction("Show Smile")
         vp = self._table.viewport()
         action = menu.exec(vp.mapToGlobal(pos) if vp else pos)
         if action == act_plot:
             self._plot_backtest(s)
         elif action == act_payoff:
             self._show_payoff(s)
+        elif action == act_block:
+            self._show_block(s)
+        elif action == act_smile:
+            self._show_smile(s)
 
     def _plot_backtest(self, strategy: Strategy) -> None:
         """À implémenter — affiche le backtest de la stratégie."""
@@ -725,6 +732,10 @@ class AlarmPage(QWidget):
     
     def _show_smile(self, strategy: Strategy) -> None:
         pass  # TODO
+
+    def _show_block(self, strategy: Strategy) -> None:
+        dlg = BlockDialog(strategy, parent=self)
+        dlg.exec()
 
 
     # ── static helpers ────────────────────────────────────────────────────────
