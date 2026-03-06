@@ -1,8 +1,11 @@
+"""
+Récupère et extrait les prix depuis bloomberg
+"""
 
 from typing import Dict, Any, List, Tuple
-from bloomberg.fetcher_batch import fetch_options_batch, extract_best_values
+from bloomberg.refdata.fetcher import fetch_options_batch, extract_best_values
 from app.data_types import FutureData
-from bloomberg.TickerBuilder import TickerBuilder, TickerMeta
+from bloomberg.ticker_builder import TickerBuilder, TickerMeta
 
 PremiumKey = Tuple[float, str, str, int]
 

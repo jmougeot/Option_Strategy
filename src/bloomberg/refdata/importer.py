@@ -1,6 +1,5 @@
 """
 Bloomberg Data Importer for Options Strategy App
-=================================================
 Importe les données d'options depuis Bloomberg et les convertit en objets Option.
 """
 
@@ -9,9 +8,9 @@ import numpy as np
 from option.option_class import Option
 from option.bachelier import Bachelier
 from app.data_types import FutureData
-from bloomberg.OptionProcessor import OptionProcessor
-from bloomberg.TickerBuilder import TickerBuilder
-from bloomberg.PremiumFetcher import PremiumFetcher
+from bloomberg.refdata.processor import OptionProcessor
+from bloomberg.ticker_builder import TickerBuilder
+from bloomberg.refdata.premium import PremiumFetcher
 
 
 # ============================================================================
@@ -42,9 +41,6 @@ MID_CURVE = {
     "R":"ER",
     "N":"SFI",
     "Q":"SFR"}
-
-
-
 
 # ============================================================================
 # FONCTION PRINCIPALE

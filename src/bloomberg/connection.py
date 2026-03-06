@@ -8,19 +8,9 @@ Supporte les modes synchrone et asynchrone.
 import blpapi
 from blpapi.session import Session
 from blpapi.sessionoptions import SessionOptions
-from dataclasses import dataclass
 from typing import Optional
 
-
-@dataclass
-class BloombergConfig:
-    """Configuration de connexion Bloomberg."""
-    host: str = "localhost"
-    port: int = 8194
-
-
-# Configuration globale
-config = BloombergConfig()
+from bloomberg.config import BloombergConfig, REFDATA_SERVICE, config  # noqa: F401
 
 # Session et service globaux (mode synchrone)
 _session: Optional[Session] = None
@@ -55,7 +45,7 @@ def get_session() -> Session:
     return _session
 
 
-def get_service(service_name: str = "//blp/refdata") -> blpapi.service.Service:
+def get_service(service_name: str = REFDATA_SERVICE) -> blpapi.service.Service:
     """
     Retourne le service Bloomberg (l'ouvre si nécessaire).
     """

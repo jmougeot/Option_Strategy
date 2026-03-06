@@ -1,13 +1,10 @@
 """
 Bloomberg Data Importer OFFLINE (Mode Simulation)
-==================================================
 
 Simule les donnees Bloomberg pour tester l'application sans connexion.
 Genere des options avec des donnees realistes basees sur Black-Scholes.
 
-Activation: 
-    - Variable d'environnement OFFLINE_MODE=true
-    - Ou modifier le fichier .env a la racine du projet
+Activation: modifier le fichier .env a la racine du projet
 """
 
 import os

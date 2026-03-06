@@ -1,3 +1,5 @@
+from blpapi.auth import AuthUser, AuthOptions
+from blpapi.session import Session
 import blpapi
 from argparse import Action
 from collections import namedtuple
@@ -16,8 +18,8 @@ class AuthOptionsAction(Action):
 
         auth_type = vals[0]
         if auth_type == "user":
-            authUser = blpapi.AuthUser.createWithLogonName()
-            authOptions = blpapi.AuthOptions.createWithUser(authUser)
+            authUser = AuthUser.createWithLogonName()
+            authOptions = AuthOptions.createWithUser(authUser)
         elif auth_type == "none":
             authOptions = None
         else:
@@ -26,27 +28,27 @@ class AuthOptionsAction(Action):
 
             if auth_type == "app":
                 appName = vals[1]
-                authOptions = blpapi.AuthOptions.createWithApp(appName)
+                authOptions = AuthOptions.createWithApp(appName)
             elif auth_type == "userapp":
                 appName = vals[1]
-                authUser = blpapi.AuthUser.createWithLogonName()
-                authOptions = blpapi.AuthOptions.createWithUserAndApp(
+                authUser = AuthUser.createWithLogonName()
+                authOptions = AuthOptions.createWithUserAndApp(
                     authUser, appName
                 )
             elif auth_type == "dir":
                 dirProperty = vals[1]
-                authUser = blpapi.AuthUser.createWithActiveDirectoryProperty(
+                authUser = AuthUser.createWithActiveDirectoryProperty(
                     dirProperty
                 )
-                authOptions = blpapi.AuthOptions.createWithUser(authUser)
+                authOptions = AuthOptions.createWithUser(authUser)
             elif auth_type == "manual":
                 parts = vals[1].split(",")
                 if len(parts) != 3:
                     parser.error(f"Invalid auth option '{values}'")
 
                 appName, ip, userId = parts
-                authUser = blpapi.AuthUser.createWithManualOptions(userId, ip)
-                authOptions = blpapi.AuthOptions.createWithUserAndApp(
+                authUser = AuthUser.createWithManualOptions(userId, ip)
+                authOptions = AuthOptions.createWithUserAndApp(
                     authUser, appName
                 )
             else:
@@ -68,7 +70,7 @@ class AppAuthAction(Action):
             parser.error(f"Invalid auth option '{values}'")
 
         setattr(args, self.dest, appName)
-        authOptions = blpapi.AuthOptions.createWithApp(appName)
+        authOptions = AuthOptions.createWithApp(appName)
         setattr(args, _SESSION_IDENTITY_AUTH_OPTIONS, authOptions)
 
 
@@ -265,13 +267,13 @@ def _getTlsOptions(options):
             credential_blob = credentialfile.read()
         with open(options.tls_trust_material, "rb") as trustfile:
             trust_blob = trustfile.read()
-        return blpapi.TlsOptions.createFromBlobs(
+        return blpapi.sessionoptions.TlsOptions.createFromBlobs(
             credential_blob,
             options.tls_client_credentials_password,
             trust_blob,
         )
 
-    return blpapi.TlsOptions.createFromFiles(
+    return blpapi.sessionoptions.TlsOptions.createFromFiles(
         options.tls_client_credentials,
         options.tls_client_credentials_password,
         options.tls_trust_material,
@@ -285,14 +287,14 @@ def createClientServerSetupAuthOptions(options):
     """
     authOptionsByIdentifier = {}
     for userId, ip in options.userIdAndIps:
-        authUser = blpapi.AuthUser.createWithManualOptions(userId, ip)
-        authOptions = blpapi.AuthOptions.createWithUserAndApp(
+        authUser = AuthUser.createWithManualOptions(userId, ip)
+        authOptions = AuthOptions.createWithUserAndApp(
             authUser, options.authAppName
         )
         authOptionsByIdentifier[f"{userId}:{ip}"] = authOptions
 
     for i, token in enumerate(options.tokens):
-        authOptions = blpapi.AuthOptions.createWithToken(token)
+        authOptions = AuthOptions.createWithToken(token)
         authOptionsByIdentifier[f"token #{i + 1}"] = authOptions
 
     return authOptionsByIdentifier
@@ -316,10 +318,10 @@ def createSessionOptions(options):
             options.remote, tlsOptions
         )
     else:
-        sessionOptions = blpapi.SessionOptions()
+        sessionOptions = blpapi.sessionoptions.SessionOptions()
         for idx, serverAddress in enumerate(options.hosts):
             socks5Config = (
-                blpapi.Socks5Config(
+                blpapi.sessionoptions.Socks5Config(
                     serverAddress.socks5.host, int(serverAddress.socks5.port)
                 )
                 if serverAddress.socks5

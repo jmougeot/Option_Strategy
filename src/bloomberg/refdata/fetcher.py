@@ -12,6 +12,7 @@ from blpapi.name import Name
 from datetime import date, timedelta
 from typing import Any, List, Optional, Tuple
 
+<<<<<<< HEAD
 from bloomberg.connection import get_session, get_service
 from app.data_types import FutureData
 
@@ -24,6 +25,12 @@ OPTION_FIELDS = [
     "LAST_TRADEABLE_DT", "OPT_EXPIRE_DT",
 ]
 
+=======
+from bloomberg.config import OPTION_FIELDS
+from bloomberg.connection import get_session, get_service
+from app.data_types import FutureData
+
+>>>>>>> V5.1.0
 # Champs prix utilisés pour le BDH fallback
 _BDH_FIELDS = ["PX_BID", "PX_ASK", "PX_MID", "PX_LAST"]
 # Set pour vérifier rapidement si un ticker a des prix
