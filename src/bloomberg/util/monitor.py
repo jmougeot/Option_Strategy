@@ -3,9 +3,10 @@ Options Monitor - Surveillance en temps réel de plusieurs options (Calls/Puts)
 Permet de suivre les prix de plusieurs strikes simultanément
 """
 
-import time
 from argparse import ArgumentParser, RawTextHelpFormatter
 from datetime import datetime
+from blpapi.names import Names
+from blpapi.session import Session
 
 import blpapi
 
@@ -101,12 +102,12 @@ class OptionsMonitorHandler:
         """Traite les événements de statut de subscription"""
         for msg in event:
             topic = msg.correlationId().value()
-            if msg.messageType() == blpapi.Names.SUBSCRIPTION_FAILURE:
+            if msg.messageType() == Names.SUBSCRIPTION_FAILURE:
                 print(f"[ERREUR] Subscription échouée pour: {topic}")
                 print(f"         {msg}")
-            elif msg.messageType() == blpapi.Names.SUBSCRIPTION_TERMINATED:
+            elif msg.messageType() == Names.SUBSCRIPTION_TERMINATED:
                 print(f"[INFO] Subscription terminée pour: {topic}")
-            elif msg.messageType() == blpapi.Names.SUBSCRIPTION_STARTED:
+            elif msg.messageType() == Names.SUBSCRIPTION_STARTED:
                 print(f"[OK] Subscription démarrée pour: {topic}")
 
     def processSubscriptionDataEvent(self, event):
@@ -122,10 +123,10 @@ class OptionsMonitorHandler:
     def processMiscEvents(self, event):
         """Traite les autres événements"""
         for msg in event:
-            if msg.messageType() == blpapi.Names.SESSION_TERMINATED:
+            if msg.messageType() == Names.SESSION_TERMINATED:
                 print("[INFO] Session terminée")
                 self.is_running = False
-            elif msg.messageType() == blpapi.Names.SLOW_CONSUMER_WARNING:
+            elif msg.messageType() == Names.SLOW_CONSUMER_WARNING:
                 print("[WARNING] Slow consumer - données potentiellement perdues")
 
     def processEvent(self, event, _session) -> None:
@@ -280,7 +281,7 @@ def main():
         handler.register_option(ticker)
     
     # Créer la session
-    session = blpapi.Session(sessionOptions, handler.processEvent)
+    session = Session(sessionOptions, handler.processEvent)
 
     try:
         if not session.start():
@@ -292,7 +293,7 @@ def main():
             return
 
         # Créer les subscriptions
-        subscriptions = blpapi.SubscriptionList()
+        subscriptions = blpapi.subscriptionlist.SubscriptionList()
         sub_options = []
         
         if options.interval:
@@ -303,13 +304,12 @@ def main():
                 ticker,
                 fields,
                 sub_options,
-                blpapi.CorrelationId(ticker)
+                blpapi.correlationid.CorrelationId(ticker)
             )
 
         # Démarrer les subscriptions
         session.subscribe(subscriptions)
         
-        print("\nSurveillance active. Appuyez sur ENTER pour quitter...\n")
         input()
 
     except KeyboardInterrupt:

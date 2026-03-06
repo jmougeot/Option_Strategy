@@ -1,3 +1,6 @@
+"""
+Récupère et extrait les prix depuis bloomberg
+"""
 
 from typing import Dict, Any, List, Tuple
 from bloomberg.refdata.fetcher import fetch_options_batch, extract_best_values

@@ -1,5 +1,8 @@
-from typing import Literal, cast, Tuple
+"""
+Module principale qui transforme les donées traitées de blommberg en class Option
+"""
 
+from typing import Literal, cast, Tuple
 from option.option_class import Option
 import numpy as np
 

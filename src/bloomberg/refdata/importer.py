@@ -1,6 +1,5 @@
 """
 Bloomberg Data Importer for Options Strategy App
-=================================================
 Importe les données d'options depuis Bloomberg et les convertit en objets Option.
 """
 

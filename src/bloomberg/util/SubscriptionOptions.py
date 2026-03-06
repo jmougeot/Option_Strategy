@@ -103,7 +103,7 @@ def createSubscriptionList(options):
     subscriptions = blpapi.subscriptionlist.SubscriptionList()
     for topic in options.topics:
         subscriptions.add(
-            topic, options.fields, options.options, blpapi.CorrelationId(topic)
+            topic, options.fields, options.options, blpapi.correlationid.CorrelationId(topic)
         )
     return subscriptions
 
@@ -119,7 +119,7 @@ def createSubscriptionStrings(options):
     subscriptionStrings = {}
 
     # Use SubscriptionList to help construct the subscription string
-    subscriptionList = blpapi.SubscriptionList()
+    subscriptionList = blpapi.subscriptionlist.SubscriptionList()
     for i, userTopic in enumerate(options.topics):
         subscriptionList.add(userTopic, options.fields, options.options)
         subscriptionStrings[userTopic] = subscriptionList.topicStringAt(i)

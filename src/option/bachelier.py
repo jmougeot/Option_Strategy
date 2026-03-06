@@ -9,7 +9,7 @@ from scipy.optimize import brentq
 from scipy.interpolate import CubicSpline as CS
 from typing import Any, Optional, List, Tuple
 from option.option_class import Option
-
+from option.sabr import SABRCalibration
 
 class Bachelier:
     """
@@ -120,27 +120,6 @@ class Bachelier:
         days_to_expiry = self.T * 365.0
         return float(theta_annual / days_to_expiry)
 
-    # ------------------------------------------------------------------
-    # Prix vectorisé
-    # ------------------------------------------------------------------
-
-    def price_vec(self, F_vec: np.ndarray) -> np.ndarray:
-        """
-        Version vectorisée : calcule les prix pour un array de prix forward F_vec,
-        en conservant K, sigma, T et is_call de l'instance.
-        """
-        if self.T <= 0 or self.sigma <= 0:
-            return np.maximum(F_vec - self.K, 0.0) if self.is_call else np.maximum(self.K - F_vec, 0.0)
-
-        sigma_sqrt_T = self.sigma * np.sqrt(self.T)
-        d = (F_vec - self.K) / sigma_sqrt_T
-
-        if self.is_call:
-            prices = (F_vec - self.K) * norm.cdf(d) + sigma_sqrt_T * norm.pdf(d)
-        else:
-            prices = (self.K - F_vec) * norm.cdf(-d) + sigma_sqrt_T * norm.pdf(d)
-
-        return np.maximum(prices, 0.0)
 
     # ------------------------------------------------------------------
     # Densité risque-neutre (Breeden-Litzenberger)
@@ -246,9 +225,9 @@ class Bachelier:
         # ── 2. Fusion call+put → iv_merged + poids bid-ask ────────────────
         IV_DIVERGENCE_THRESHOLD = 0.30
 
-        def _neighbor_avg(iv_list: List[float], idx: int) -> Optional[float]:
+        def _neighbor_avg(iv_list: List[float], idx: int) -> float:
             neighbors = [iv_list[j] for j in (idx - 1, idx + 1) if 0 <= j < n and iv_list[j] > 0]
-            return sum(neighbors) / len(neighbors) if neighbors else None
+            return sum(neighbors) / len(neighbors)
 
         iv_c = [d[1].implied_volatility for d in datas]
         iv_p = [d[2].implied_volatility for d in datas]
@@ -294,7 +273,6 @@ class Bachelier:
                     ba_weights.append(1.0)  # prix dispo mais pas de bid/ask
 
         # ── 3. Calibration SABR avec poids bid-ask ───────────────────────────
-        from option.sabr import SABRCalibration
 
         strikes_arr = np.array([d[0] for d in datas])
         iv_arr = np.array(iv_merged)
