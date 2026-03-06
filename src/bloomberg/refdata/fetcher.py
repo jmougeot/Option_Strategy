@@ -96,7 +96,8 @@ def fetch_options_batch(
         value = Name("value")
 
 
-        request.append(securities, underlyings)
+        if underlyings is not None:
+            request.append(securities, underlyings)
         for ticker in tickers:
             request.append(securities, ticker)
         for field in OPTION_FIELDS:
