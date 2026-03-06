@@ -82,7 +82,7 @@ def fetch_options_batch(
         service = get_service()
 
         # création de la requête
-        request = service.createRequest("ReferenceDataRequest")
+        request = service.createRequest("HistoricalDataRequest")
 
         # Name permet de facilter la comparaison cela devient du O(1) car :
         # request.append(securities, ticker) est equivalent à request["securities"].append(ticker)
@@ -90,7 +90,7 @@ def fetch_options_batch(
         fields = Name("fields")
         startDate = Name("startDate")
         endDate = Name("endDate")
-        eriodicitySelection = Name("eriodicitySelection")
+        periodicitySelection = Name("periodicitySelection")
         overrides = Name("overrides")
         fieldId= Name("fieldId")
         value = Name("value")
@@ -107,9 +107,9 @@ def fetch_options_batch(
         start_dt = end_dt - timedelta(days=lookback_days)
         request.set(startDate, start_dt.strftime("%Y%m%d"))
         request.set(endDate, end_dt.strftime("%Y%m%d"))
-        request.set(eriodicitySelection, "DAILY")
+        request.set(periodicitySelection, "DAILY")
 
-        # Permet d'avoir des meilleurs prix depuis bloomberd car la source BGNE est meileur apparement
+        # Permet d'avoir des meilleurs prix depuis bloomberd car la source BGNE est meileur 
         if use_overrides:
             ov = request.getElement(overrides)
             ov1 = ov.appendElement()
