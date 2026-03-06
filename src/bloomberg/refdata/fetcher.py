@@ -134,8 +134,6 @@ def _bdh_fallback(
     if not missing_tickers:
         return raw
 
-    print(f"  ↻ BDH fallback pour {len(missing_tickers)} tickers sans prix...")
-
     request = service.createRequest("HistoricalDataRequest")
     securities = Name("securities")
     fields = Name("fields")
@@ -194,13 +192,9 @@ def fetch_options_batch(
     tickers: list[str],
     use_overrides: bool = True,
     underlyings: str = "SFR",
-    lookback_days: int = 10,
+    lookback_days: int = 3,
 ) -> Tuple[dict[str, dict[str, Any]], FutureData, List[str]]:
     """Récupère les données pour une liste de tickers Bloomberg.
-
-    1) ReferenceDataRequest (BDP) pour tous les champs (prix + Greeks).
-    2) Pour les tickers sans prix, fallback HistoricalDataRequest (BDH)
-       sur les *lookback_days* derniers jours calendaires.
 
     Returns:
         (résultats par ticker, FutureData, liste de warnings)
@@ -269,10 +263,10 @@ def fetch_options_batch(
             if bid is None and ask is None:
                 missing_both.append(t)
                 results[t]["_warning"] = True
-            if ask and bid is None and ask > 0.08:
+            if ask and bid is None and ask > 0.03:
                 wide_spread.append(t)
                 results[t]["_warning"] = True
-            if ask and bid and (ask - bid) > 0.08:
+            if ask and bid and (ask - bid) > 0.03:
                 wide_spread.append(f"{t} (spread={ask - bid:.4f})")
                 results[t]["_warning"] = True
 

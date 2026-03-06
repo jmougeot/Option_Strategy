@@ -1,5 +1,4 @@
 from blpapi.auth import AuthUser, AuthOptions
-from blpapi.session import Session
 import blpapi
 from argparse import Action
 from collections import namedtuple
