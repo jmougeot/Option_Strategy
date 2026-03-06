@@ -42,7 +42,7 @@ class SmileDialog(QDialog):
         self._underlying, self._expiry = self._extract_info(strategy)
 
         self.setWindowTitle(f"Smile — {self._underlying}{self._expiry}")
-        self.setMinimumSize(1000, 600)
+        self.setMinimumSize(2000, 1500)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
 
         self._build()
@@ -202,19 +202,70 @@ class SmileDialog(QDialog):
 
         points = self._result.points
         forward = self._result.forward_price
+        n = len(points)
 
-        # Collecter les IV marché (moyenne call/put si les deux existent)
+        # ── 1. Fusion call/put IV (même logique que Bachelier.compute_volatility) ──
+        IV_DIVERGENCE_THRESHOLD = 0.30
+
+        iv_c = [sp.call_iv if sp.call_iv and sp.call_iv > 0 else 0.0 for sp in points]
+        iv_p = [sp.put_iv if sp.put_iv and sp.put_iv > 0 else 0.0 for sp in points]
+
+        def _neighbor_avg(iv_list: list, idx: int):
+            neighbors = [iv_list[j] for j in (idx - 1, idx + 1)
+                         if 0 <= j < n and iv_list[j] > 0]
+            return sum(neighbors) / len(neighbors) if neighbors else None
+
+        iv_merged: list[float] = []
+        ba_weights: list[float] = []
+
+        for i, sp in enumerate(points):
+            ic, ip = iv_c[i], iv_p[i]
+            if ic > 0 and ip > 0:
+                if abs(ic - ip) <= IV_DIVERGENCE_THRESHOLD:
+                    iv_merged.append((ic + ip) / 2.0)
+                else:
+                    avg_c = _neighbor_avg(iv_c, i)
+                    avg_p = _neighbor_avg(iv_p, i)
+                    err_c = abs(ic - avg_c) if avg_c is not None else float("inf")
+                    err_p = abs(ip - avg_p) if avg_p is not None else float("inf")
+                    iv_merged.append(ic if err_c <= err_p else ip)
+            elif ic > 0:
+                iv_merged.append(ic)
+            elif ip > 0:
+                iv_merged.append(ip)
+            else:
+                iv_merged.append(0.0)
+
+            # Poids bid-ask : grand spread → faible poids
+            if iv_merged[-1] <= 0:
+                ba_weights.append(0.0)
+            else:
+                spreads: list[float] = []
+                if (sp.call_bid is not None and sp.call_ask is not None
+                        and sp.call_ask >= sp.call_bid >= 0):
+                    spreads.append(sp.call_ask - sp.call_bid)
+                if (sp.put_bid is not None and sp.put_ask is not None
+                        and sp.put_ask >= sp.put_bid >= 0):
+                    spreads.append(sp.put_ask - sp.put_bid)
+                if spreads:
+                    ba_weights.append(1.0 / (1.0 + sum(spreads) / len(spreads)))
+                else:
+                    ba_weights.append(1.0)
+
+        # ── 2. Données marché pour le chart ──────────────────────────────────
         mkt_x, mkt_y, mkt_labels = [], [], []
-        for sp in points:
-            ivs = [v for v in [sp.call_iv, sp.put_iv] if v is not None and v > 0]
-            if not ivs:
+        valid_indices: list[int] = []
+
+        for i, sp in enumerate(points):
+            iv = iv_merged[i]
+            if iv <= 0:
                 continue
-            iv = sum(ivs) / len(ivs)
             mkt_x.append(sp.strike)
             mkt_y.append(iv)
+            valid_indices.append(i)
             lbl = f"K={sp.strike:g}\nIV={iv * 10000:.1f}bp"
-            if sp.call_iv and sp.put_iv:
-                lbl += f"\nC={sp.call_iv * 10000:.1f} / P={sp.put_iv * 10000:.1f}"
+            if iv_c[i] > 0 and iv_p[i] > 0:
+                lbl += f"\nC={iv_c[i] * 10000:.1f} / P={iv_p[i] * 10000:.1f}"
             mkt_labels.append(lbl)
 
         if not mkt_x:
@@ -222,7 +273,7 @@ class SmileDialog(QDialog):
             self._lbl_sabr.setText("")
             return
 
-        # Calibrer SABR
+        # ── 3. Calibration SABR avec poids bid-ask ──────────────────────────
         sabr_curve_x, sabr_curve_y = [], []
         warn_x, warn_y, warn_labels = [], [], []
 
@@ -230,10 +281,11 @@ class SmileDialog(QDialog):
             from option.sabr import SABRCalibration
             strikes_arr = np.array(mkt_x)
             ivs_arr = np.array(mkt_y)
+            w_arr = [ba_weights[i] for i in valid_indices]
             F = forward if forward else float(np.median(strikes_arr))
 
             sabr = SABRCalibration(F=F, T=0.25, beta=0.0, vol_type="normal")
-            res = sabr.fit(strikes_arr, ivs_arr)
+            sabr.fit(strikes_arr, ivs_arr, weights=w_arr)
 
             # Courbe lissée
             K_min, K_max = strikes_arr.min(), strikes_arr.max()
@@ -247,7 +299,6 @@ class SmileDialog(QDialog):
             anomalies = sabr.anomalies(threshold=2.0, min_error_bps=1.0)
             anomaly_strikes = {a["strike"] for a in anomalies}
 
-            # Séparer points normaux vs corrigés
             new_mkt_x, new_mkt_y, new_mkt_labels = [], [], []
             for x, y, lbl in zip(mkt_x, mkt_y, mkt_labels):
                 if round(x, 4) in anomaly_strikes:
@@ -264,7 +315,7 @@ class SmileDialog(QDialog):
         except Exception as e:
             self._lbl_sabr.setText(f"SABR non calibré : {e}")
 
-        # Construire le dict au format attendu par PlotlyChart._render_smile
+        # ── 4. Envoi au chart ────────────────────────────────────────────────
         smile_data = {
             "type": "smile",
             "market": {"x": mkt_x, "y": mkt_y, "labels": mkt_labels} if mkt_x else None,

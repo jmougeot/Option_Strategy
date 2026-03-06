@@ -27,6 +27,10 @@ class SmilePoint:
     put_iv: Optional[float] = None
     call_mid: Optional[float] = None
     put_mid: Optional[float] = None
+    call_bid: Optional[float] = None
+    call_ask: Optional[float] = None
+    put_bid: Optional[float] = None
+    put_ask: Optional[float] = None
     underlying_price: Optional[float] = None
     warning: bool = False
 
@@ -164,20 +168,26 @@ def fetch_smile(underlying: str, expiry: str) -> SmileResult:
             data.update(bdh_raw[ticker])
             warning = True
 
-        iv = _extract_iv(data)
         mid = _extract_mid(data)
         undl = data.get("OPT_UNDL_PX")
+
+        bid_raw = data.get("PX_BID")
+        ask_raw = data.get("PX_ASK")
+        bid = float(bid_raw) if bid_raw is not None and float(bid_raw) >= 0 else None
+        ask = float(ask_raw) if ask_raw is not None and float(ask_raw) > 0 else None
 
         sp = data_by_strike[K]
         if warning:
             sp.warning = True
 
         if opt_type == "C":
-            sp.call_iv = iv
             sp.call_mid = mid
+            sp.call_bid = bid
+            sp.call_ask = ask
         else:
-            sp.put_iv = iv
             sp.put_mid = mid
+            sp.put_bid = bid
+            sp.put_ask = ask
 
         if undl is not None and float(undl) > 0:
             sp.underlying_price = float(undl)
@@ -188,5 +198,24 @@ def fetch_smile(underlying: str, expiry: str) -> SmileResult:
     undl_prices = [p.underlying_price for p in result.points if p.underlying_price]
     if undl_prices:
         result.forward_price = undl_prices[len(undl_prices) // 2]
+
+    # ── Calcul IV Bachelier depuis les prix mid ──────────────────────────
+    from option.bachelier import Bachelier
+
+    F = result.forward_price
+    T = 0.25
+
+    if F and F > 0:
+        for sp in result.points:
+            if sp.call_mid and sp.call_mid > 0:
+                iv = Bachelier(F, sp.strike, 0.0, T, True, sp.call_mid).implied_vol()
+                sp.call_iv = iv if iv > 0 else None
+            else:
+                sp.call_iv = None
+            if sp.put_mid and sp.put_mid > 0:
+                iv = Bachelier(F, sp.strike, 0.0, T, False, sp.put_mid).implied_vol()
+                sp.put_iv = iv if iv > 0 else None
+            else:
+                sp.put_iv = None
 
     return result
