@@ -53,10 +53,8 @@ def build_smile_figure(calls, puts, underlying_price, sabr_calibration=None):
             sabr_x.append(K)
             sabr_y.append(sv)
 
-        # Market IV (original from price) — fallback to implied_volatility
+        # Market IV (original from price) — only genuine market data
         mkt_ivs = [o.market_implied_volatility for o in opts if o.market_implied_volatility > 0]
-        if not mkt_ivs:
-            mkt_ivs = [o.implied_volatility for o in opts if o.implied_volatility > 0]
         is_corrected = any(not o.status for o in opts)
 
         if mkt_ivs:
@@ -230,7 +228,7 @@ class VolatilityPage(QWidget):
             prem_item = self._opt_table.item(r, prem_col)
             if iv_item is not None:
                 try:
-                    o.implied_volatility = float(iv_item.text())
+                    o.implied_volatility = float(iv_item.text()) / 100.0
                 except ValueError:
                     pass
             if prem_item is not None:

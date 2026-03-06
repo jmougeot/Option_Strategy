@@ -1,11 +1,5 @@
 """
 AlarmPage — Table-based strategy price monitor.
-
-Each ROW  = one strategy.
-Each COLUMN = one attribute:
-  ⬤ | Client | Stratégie | Action | Legs | Prix | Alarme si | Cible | Statut
-  | Δ Delta | Γ Gamma | Θ Theta | IV% | Fut.
-
 Live prices come from BloombergService (silent no-op if blpapi unavailable).
 Pages are selected with a combo-box at the top.
 Save / Load uses a simple JSON file.
@@ -153,11 +147,12 @@ class AlarmPage(QWidget):
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
+        self._table.setStyleSheet("QTableWidget { font-size: 11px; }")
 
         vh = self._table.verticalHeader()
         if vh:
             vh.setVisible(False)
-            vh.setDefaultSectionSize(34)
+            vh.setDefaultSectionSize(28)
 
         self._table.cellChanged.connect(self._on_cell_changed)
         self._table.cellDoubleClicked.connect(self._on_cell_double_clicked)
@@ -270,7 +265,7 @@ class AlarmPage(QWidget):
     def _append_row(self, strategy: Strategy) -> None:
         r = self._table.rowCount()
         self._table.insertRow(r)
-        self._table.setRowHeight(r, 34)
+        self._table.setRowHeight(r, 28)
 
         # ⬤ alarm dot
         dot = QLabel("⬤")
@@ -321,13 +316,14 @@ class AlarmPage(QWidget):
     # ── helpers ───────────────────────────────────────────────────────────────
     def _legs_summary(self, strategy: Strategy) -> str:
         if not strategy.legs:
-            return "— aucun leg —"
+            return "—"
         parts = []
         for leg in strategy.legs:
             tick = (leg.ticker or "?").replace(" COMDTY", "")
-            pos  = "L" if leg.position == Position.LONG else "S"
-            parts.append(f"{tick} {pos}×{leg.quantity}")
-        return "  |  ".join(parts)
+            sign = "+" if leg.position == Position.LONG else "−"
+            qty = leg.quantity
+            parts.append(f"{sign}{qty} {tick}")
+        return " / ".join(parts)
 
     def _row_by_sid(self, sid: str) -> int:
         for i, s in enumerate(self._pages[self._cur]["strategies"]):
@@ -738,6 +734,7 @@ class AlarmPage(QWidget):
     def _show_block(self, strategy: Strategy) -> None:
         dlg = BlockDialog(strategy, parent=self)
         dlg.exec()
+
 
 
     # ── static helpers ────────────────────────────────────────────────────────

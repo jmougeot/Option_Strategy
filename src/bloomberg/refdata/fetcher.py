@@ -263,10 +263,10 @@ def fetch_options_batch(
             if bid is None and ask is None:
                 missing_both.append(t)
                 results[t]["_warning"] = True
-            if ask and bid is None and ask > 0.03:
+            if ask and bid is None and ask > 0.05:
                 wide_spread.append(t)
                 results[t]["_warning"] = True
-            if ask and bid and (ask - bid) > 0.03:
+            if ask and bid and (ask - bid) > 0.08:
                 wide_spread.append(f"{t} (spread={ask - bid:.4f})")
                 results[t]["_warning"] = True
 

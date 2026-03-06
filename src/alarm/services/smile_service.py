@@ -13,7 +13,19 @@ from typing import Dict, List, Optional, Tuple
 
 # ── Configuration par underlying ──────────────────────────────────────────────
 DATA_UNDERLYING: Dict[str, Dict] = {
-    "SFR": {"atm": 98, "step": 0.0125, "research_zone": 1.5},
+    # Short-term rate futures (prix ~96-99, tick 1/8 bp = 0.0125)
+    "SFR": {"atm": 97,    "step": 0.0125, "research_zone": 1.5},   # SOFR 3M
+    "SFI": {"atm": 96.5,  "step": 0.0125, "research_zone": 1.5},   # SOFR 1M
+    "ER":  {"atm": 97.5,  "step": 0.0125, "research_zone": 1.5},   # Euribor 3M
+    # Mid-curves (même tick que STIR)
+    "0R":  {"atm": 97.5,  "step": 0.0125, "research_zone": 1.5},   # Euribor mid-curve
+    "0Q":  {"atm": 96.5,  "step": 0.0125, "research_zone": 1.5},   # SOFR mid-curve
+    "0N":  {"atm": 97,    "step": 0.0125, "research_zone": 1.5},   # SONIA mid-curve
+    # Euro govies (prix en points)
+    "RX":  {"atm": 129,   "step": 0.50,   "research_zone": 4.0},   # Euro-Bund 10Y
+    "OE":  {"atm": 117,   "step": 0.25,   "research_zone": 3.0},   # Euro-Bobl 5Y
+    "DU":  {"atm": 107,   "step": 0.10,   "research_zone": 1.5},   # Euro-Schatz 2Y
+    "UB":  {"atm": 110,   "step": 1.00,   "research_zone": 8.0},   # Ultra Bond
 }
 
 
