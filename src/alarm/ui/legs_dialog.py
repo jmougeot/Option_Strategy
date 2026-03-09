@@ -13,7 +13,8 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
-from alarm.models.strategy import OptionLeg, Position, Strategy, parse_leg_ticker
+from alarm.models.leg_ticker import parse_leg_ticker
+from alarm.models.strategy import OptionLeg, Position, Strategy
 from app import theme
 
 # Column indices — plain text items only, no widgets
@@ -197,8 +198,8 @@ class LegsDialog(QDialog):
             if leg is None:
                 continue
 
-            raw = (self._table.item(r, _C_TICKER).text().strip().upper()
-                   if self._table.item(r, _C_TICKER) else "")
+            ticker_item = self._table.item(r, _C_TICKER)
+            raw = ticker_item.text().strip().upper() if ticker_item is not None else ""
             if raw and "COMDTY" not in raw:
                 raw += " COMDTY"
             ticker, underlying, strike = parse_leg_ticker(raw)
@@ -206,12 +207,12 @@ class LegsDialog(QDialog):
             leg.underlying = underlying
             leg.strike = strike
 
-            pos_text = (self._table.item(r, _C_POS).text()
-                        if self._table.item(r, _C_POS) else "Long")
+            pos_item = self._table.item(r, _C_POS)
+            pos_text = pos_item.text() if pos_item is not None else "Long"
             leg.position = Position.SHORT if pos_text == "Short" else Position.LONG
 
-            qty_text = (self._table.item(r, _C_QTY).text()
-                        if self._table.item(r, _C_QTY) else "1")
+            qty_item = self._table.item(r, _C_QTY)
+            qty_text = qty_item.text() if qty_item is not None else "1"
             try:
                 leg.quantity = max(1, int(qty_text))
             except ValueError:
