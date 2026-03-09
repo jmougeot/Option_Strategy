@@ -39,6 +39,7 @@ class OptionLeg:
     position: Position = Position.LONG
     quantity: int = 1
     underlying: str = ""
+    strike: float = 0.0
     # Prix temps réel depuis Bloomberg
     last_price: Optional[float] = None
     bid: Optional[float] = None

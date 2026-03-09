@@ -3,9 +3,9 @@ Block Dialog — Popup affichant les legs avec prix Bloomberg ajustés.
 """
 from __future__ import annotations
 
-from typing import List, Optional, Dict
+from typing import List, Optional
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QDialog, QDoubleSpinBox, QHBoxLayout, QHeaderView,
@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 
 from alarm.models.strategy import Position, Strategy
-from alarm.services.block_service import LegResult, adjust_prices, fetch_legs_prices
+from alarm.services.block_service import LegResult, adjust_prices
 from app import theme
 
 _COLOR_MISSING = QColor("#FFEAEA")   # fond rose pâle pour prix manquant
@@ -34,12 +34,9 @@ DATA_UNDERLYING = {
 }
 
 
-def _tick_for(ticker: str) -> float:
-    """Retourne la taille du tick pour un ticker (recherche du préfixe le plus long)."""
-    for key in sorted(DATA_UNDERLYING, key=len, reverse=True):
-        if ticker.upper().startswith(key.upper()):
-            return DATA_UNDERLYING[key]
-    return 0.0025  # fallback
+def _tick_for(underlying: str) -> float:
+    """Retourne la taille du tick pour un underlying (ex: 'SFR', 'ER', 'RX')."""
+    return DATA_UNDERLYING.get(underlying.upper(), 0.0025)
 
 
 def _snap_to_quarter_tick(price: float, tick: float) -> float:
@@ -63,9 +60,7 @@ class BlockDialog(QDialog):
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
 
         self._build()
-
-        # Auto-fetch dès l'ouverture (après que l'event loop a démarré)
-        QTimer.singleShot(50, self._on_fetch)
+        self._on_fetch()
 
     # ── construction ───────────────────────────────────────────────────────
     def _build(self) -> None:
@@ -115,7 +110,7 @@ class BlockDialog(QDialog):
 
         # Boutons
         btn_row = QHBoxLayout()
-        self._btn_fetch = QPushButton("↻ Refresh Bloomberg")
+        self._btn_fetch = QPushButton("↻ Refresh")
         self._btn_fetch.setStyleSheet(
             f"background: {theme.ACCENT}; color: white; padding: 6px 16px;"
             f" border-radius: {theme.RADIUS_SM};"
@@ -216,43 +211,21 @@ class BlockDialog(QDialog):
         # Snap chaque prix ajusté au quart de tick de l'instrument
         for lr in self._results:
             if lr.adjusted_mid is not None:
-                tick = _tick_for(lr.leg.ticker or "")
+                tick = _tick_for(lr.leg.underlying or "")
                 lr.adjusted_mid = _snap_to_quarter_tick(lr.adjusted_mid, tick)
 
         self._populate_results()
 
     # ── actions ────────────────────────────────────────────────────────────
     def _on_fetch(self) -> None:
-        """Fetch les prix Bloomberg pour chaque leg, puis ajuste."""
-        from bloomberg.connection import get_session
-        try:
-            get_session()
-        except ConnectionError:
-            self._lbl_status.setText("Bloomberg non connecté — fetch ignoré")
-            self._lbl_status.setStyleSheet(f"color: {theme.WARNING}; font-size: 12px;")
-            return
-        self._btn_fetch.setEnabled(False)
-        self._btn_fetch.setText("Fetching…")
-        self._lbl_status.setText("Connexion à Bloomberg…")
-        # Force le repaint pour que le texte s'affiche avant le blocage
-        from PyQt6.QtWidgets import QApplication
-        QApplication.processEvents()
-        try:
-            self._results = fetch_legs_prices(self._strategy)
-
-            bbg_price = self._compute_bbg_strategy_price()
-            if bbg_price is not None:
-                self._lbl_bbg_price.setText(f"{bbg_price:.4f}")
-            else:
-                self._lbl_bbg_price.setText("—")
-
-            self._run_adjust()
-        except Exception as e:
-            self._lbl_status.setText(f"✗ Erreur Bloomberg : {e}")
-            self._lbl_status.setStyleSheet(f"color: {theme.DANGER}; font-size: 12px;")
-        finally:
-            self._btn_fetch.setEnabled(True)
-            self._btn_fetch.setText("↻ Refresh Bloomberg")
+        """Construit les LegResult depuis les prix déjà disponibles dans les legs, puis ajuste."""
+        self._results = [
+            LegResult(leg=leg, bbg_mid=leg.mid)
+            for leg in self._strategy.legs
+        ]
+        bbg_price = self._compute_bbg_strategy_price()
+        self._lbl_bbg_price.setText(f"{bbg_price:.4f}" if bbg_price is not None else "—")
+        self._run_adjust()
 
     def _on_price_changed(self) -> None:
         """Appelé quand le prix cible change — re-ajuste automatiquement."""

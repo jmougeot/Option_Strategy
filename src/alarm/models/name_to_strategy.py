@@ -310,7 +310,8 @@ def str_to_leg(match, opt_type, strategy_type, strikes) :
         position = Position.LONG if signs[i][0] == "long" else Position.SHORT
         quantity = signs[i][1]
         
-        Leg_i = OptionLeg(ticker=ticker, position=position, quantity=quantity)
+        Leg_i = OptionLeg(ticker=ticker, position=position, quantity=quantity,
+                          underlying=underlying, strike=strike)
         Legs.append(Leg_i)
     return Legs
 
@@ -342,7 +343,7 @@ def str_to_strat(info_strategy : str) -> Optional[Strategy]:
     if not match1:
         return None
     
-    Legs = str_to_leg(match1, opt_type1, strategy_type1, strikes1)
+    Legs: List[OptionLeg] = str_to_leg(match1, opt_type1, strategy_type1, strikes1)
 
     # Traiter la deuxième partie si elle existe
     if part2 is not None : 
