@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
-from alarm.models.strategy import OptionLeg, Position, Strategy
+from alarm.models.strategy import OptionLeg, Position, Strategy, parse_leg_ticker
 from app import theme
 
 # Column indices — plain text items only, no widgets
@@ -201,7 +201,10 @@ class LegsDialog(QDialog):
                    if self._table.item(r, _C_TICKER) else "")
             if raw and "COMDTY" not in raw:
                 raw += " COMDTY"
-            leg.ticker = raw
+            ticker, underlying, strike = parse_leg_ticker(raw)
+            leg.ticker = ticker
+            leg.underlying = underlying
+            leg.strike = strike
 
             pos_text = (self._table.item(r, _C_POS).text()
                         if self._table.item(r, _C_POS) else "Long")

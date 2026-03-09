@@ -3,13 +3,33 @@ Modèles de données pour les stratégies d'options
 """
 from dataclasses import dataclass, field
 from enum import Enum
-from http import client
 from typing import Optional
 from datetime import datetime
 import math
+import re
 import uuid
 
-from bloomberg.config import normalize_ticker  # noqa: F401 – re-exported for backward compat
+from bloomberg.config import normalize_ticker 
+
+
+_OPTION_TICKER_RE = re.compile(
+    r"^([A-Z0-9]{2,4})[FGHJKMNQUVXZ]\d[CP]\s+(\d+(?:\.\d+)?)\s+COMDTY$",
+    re.IGNORECASE,
+)
+
+
+def parse_leg_ticker(ticker: str) -> tuple[str, str, float]:
+    """Normalise un ticker et en extrait underlying/strike si le format est reconnu."""
+    normalized = normalize_ticker(ticker)
+    match = _OPTION_TICKER_RE.match(normalized)
+    if not match:
+        return normalized, "", 0.0
+
+    try:
+        strike = float(match.group(2))
+    except ValueError:
+        strike = 0.0
+    return normalized, match.group(1).upper(), strike
 
 
 class Position(Enum):
@@ -94,19 +114,28 @@ class OptionLeg:
             "id": self.id,
             "ticker": self.ticker,
             "position": self.position.value,
-            "quantity": self.quantity
+            "quantity": self.quantity,
+            "underlying": self.underlying,
+            "strike": self.strike,
         }
     
     @classmethod
     def from_dict(cls, data: dict) -> "OptionLeg":
         """Crée depuis un dictionnaire"""
-        # Normaliser le ticker pour cohérence avec Bloomberg
-        ticker = normalize_ticker(data.get("ticker", ""))
+        ticker, inferred_underlying, inferred_strike = parse_leg_ticker(data.get("ticker", ""))
+        strike_raw = data.get("strike", 0.0)
+        try:
+            strike = float(strike_raw) if strike_raw not in (None, "") else inferred_strike
+        except (TypeError, ValueError):
+            strike = inferred_strike
+
         return cls(
             id=data.get("id", str(uuid.uuid4())),
             ticker=ticker,
             position=Position(data.get("position", "long")),
-            quantity=data.get("quantity", 1)
+            quantity=data.get("quantity", 1),
+            underlying=data.get("underlying", "") or inferred_underlying,
+            strike=strike,
         )
 
 
@@ -132,7 +161,14 @@ class Strategy:
 
     def add_leg(self, ticker: str = "", position: Position = Position.LONG, quantity: int = 1) -> OptionLeg:
         """Ajoute une jambe à la stratégie"""
-        leg = OptionLeg(ticker=ticker, position=position, quantity=quantity)
+        normalized_ticker, underlying, strike = parse_leg_ticker(ticker)
+        leg = OptionLeg(
+            ticker=normalized_ticker,
+            position=position,
+            quantity=quantity,
+            underlying=underlying,
+            strike=strike,
+        )
         self.legs.append(leg)
         self.updated_at = datetime.now()
         return leg
