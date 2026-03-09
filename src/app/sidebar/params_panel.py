@@ -37,11 +37,9 @@ class ParamsPanel(QGroupBox):
         # ── Options row ────────────────────────────────────────────────
         opts_layout = QHBoxLayout()
         self._chk_brut = QCheckBox("Raw code")
-        self._chk_bachelier = QCheckBox("Bachelier")
-        self._chk_bachelier.setChecked(True)
         self._chk_sabr = QCheckBox("SABR")
         self._chk_sabr.setChecked(True)
-        for w in (self._chk_brut, self._chk_bachelier, self._chk_sabr):
+        for w in (self._chk_brut, self._chk_sabr):
             opts_layout.addWidget(w)
         root.addLayout(opts_layout)
 
@@ -136,7 +134,7 @@ class ParamsPanel(QGroupBox):
         self._cmb_underlying.currentTextChanged.connect(self._on_underlying_change)
         self._lbl_legs.valueChanged.connect(lambda _: self.changed.emit())
         for w in (
-            self._chk_bachelier, self._chk_sabr,
+            self._chk_sabr,
             self._cmb_months, self._cmb_unit,
             self._spn_price_min, self._spn_price_max, self._spn_price_step,
             self._spn_penalty,
@@ -201,7 +199,7 @@ class ParamsPanel(QGroupBox):
             unit=self._cmb_unit.currentText(),
             brut_code=brut_code,
             roll_expiries=roll_expiries,
-            use_bachelier=self._chk_bachelier.isChecked(),
+            use_bachelier=True,
             use_sabr=self._chk_sabr.isChecked(),
             operation_penalisation=self._spn_penalty.value(),
         )
@@ -211,7 +209,7 @@ class ParamsPanel(QGroupBox):
         to_block = [
             self._cmb_underlying, self._cmb_months, self._txt_years,
             self._spn_price_min, self._spn_price_max, self._spn_price_step,
-            self._lbl_legs, self._chk_bachelier, self._chk_sabr, self._spn_penalty,
+            self._lbl_legs, self._chk_sabr, self._spn_penalty,
         ]
         for w in to_block:
             w.blockSignals(True)

@@ -92,6 +92,9 @@ class AlarmPage(
         self._bbg.unsubscribe_all()
         self._states.clear()
         self._pages = pages if pages else [{"name": "Page 1", "strategies": []}]
+        for page in self._pages:
+            for strategy in page["strategies"]:
+                self._states[strategy.id] = RowState(strategy)
         self._cur = 0
         self._refresh_page_combo()
         self._reload_table()

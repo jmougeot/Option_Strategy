@@ -1,12 +1,11 @@
-"""
-Payoff diagram builder — returns a data dict consumed by PlotlyChart (PyQtGraph).
-"""
+"""Payoff diagram builder for the shared chart widget."""
 from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
 import numpy as np
 
+from app.chart_types import PayoffFigureSpec
 from strategy.strategy_class import StrategyComparison
 
 COLORS = [
@@ -19,10 +18,9 @@ def create_payoff_diagram(
     comparisons: List[StrategyComparison],
     mixture: Tuple[np.ndarray, np.ndarray, float],
     underlying_price: Optional[float] = None,
-) -> Optional[dict]:
+) -> Optional[PayoffFigureSpec]:
     """
-    Build and return a data dict for the payoff diagram.
-    Consumed by PlotlyChart.set_figure() which renders via PyQtGraph.
+    Build the figure description consumed by ChartWidget.set_figure().
     """
     if not comparisons:
         return None

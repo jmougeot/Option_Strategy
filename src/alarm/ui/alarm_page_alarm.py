@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from PyQt6.QtWidgets import QTableWidget
 
@@ -28,16 +28,19 @@ class AlarmMixin:
         def _paint_row(self, row: int, s: Strategy) -> None: ...
 
     def _tick(self) -> None:
-        for row, s in enumerate(self._pages[self._cur]["strategies"]):
-            self._update_dot(row, s)
+        for page_index, page in enumerate(self._pages):
+            for row, s in enumerate(page["strategies"]):
+                visible_row = row if page_index == self._cur else None
+                self._update_dot(visible_row, s)
 
-    def _update_dot(self, row: int, s: Strategy) -> None:
+    def _update_dot(self, row: Optional[int], s: Strategy) -> None:
         state = self._states.get(s.id)
         if state is None:
             return
 
-        status_item = self._table.item(row, C_STATUS)
-        self._paint_row(row, s)
+        status_item = self._table.item(row, C_STATUS) if row is not None else None
+        if row is not None:
+            self._paint_row(row, s)
 
         if s.status != StrategyStatus.EN_COURS:
             if status_item:
@@ -76,14 +79,15 @@ class AlarmMixin:
                     if status_item:
                         status_item.setToolTip(f"Alerte dans {WARN_DELAY - elapsed:.1f} s")
 
-    def _fire_alarm(self, row: int, s: Strategy) -> None:
+    def _fire_alarm(self, row: Optional[int], s: Strategy) -> None:
         s.status = StrategyStatus.FAIT
-        self._table.blockSignals(True)
-        status_item = self._table.item(row, C_STATUS)
-        if status_item:
-            status_item.setText("Fait")
-        self._table.blockSignals(False)
-        self._paint_row(row, s)
+        if row is not None:
+            self._table.blockSignals(True)
+            status_item = self._table.item(row, C_STATUS)
+            if status_item:
+                status_item.setText("Fait")
+            self._table.blockSignals(False)
+            self._paint_row(row, s)
 
         self._alert.fire(
             strategy_id=s.id,
@@ -93,24 +97,27 @@ class AlarmMixin:
             is_inferior=s.target_condition == TargetCondition.INFERIEUR,
         )
 
-        status_item = self._table.item(row, C_STATUS)
+        status_item = self._table.item(row, C_STATUS) if row is not None else None
         if status_item:
             cond = "inf." if s.target_condition == TargetCondition.INFERIEUR else "sup."
             status_item.setToolTip(f"ALARME — prix {cond} {s.target_price:.4f}")
 
     def _continue_alarm(self, strategy_id: str) -> None:
         """Callback from the popup 'Continuer l'alarme' — resets to En cours."""
-        for row, s in enumerate(self._pages[self._cur]["strategies"]):
-            if s.id == strategy_id:
+        for page_index, page in enumerate(self._pages):
+            for row, s in enumerate(page["strategies"]):
+                if s.id != strategy_id:
+                    continue
                 s.status = StrategyStatus.EN_COURS
                 state = self._states.get(s.id)
                 if state:
                     state.reset()
-                self._table.blockSignals(True)
-                status_item = self._table.item(row, C_STATUS)
-                if status_item:
-                    status_item.setText("En cours")
-                self._table.blockSignals(False)
-                self._paint_row(row, s)
-                self._update_dot(row, s)
-                break
+                if page_index == self._cur:
+                    self._table.blockSignals(True)
+                    status_item = self._table.item(row, C_STATUS)
+                    if status_item:
+                        status_item.setText("En cours")
+                    self._table.blockSignals(False)
+                    self._paint_row(row, s)
+                    self._update_dot(row, s)
+                return

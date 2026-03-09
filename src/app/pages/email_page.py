@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 
 from app.app_state import AppState
-from app.chart_widget import PlotlyChart
+from app.chart_widget import ChartWidget
 
 MONTH_NAMES = {
     "F": "January", "G": "February", "H": "March", "K": "April",
@@ -160,7 +160,7 @@ class EmailPage(QWidget):
         root.addWidget(self._scroll, stretch=1)
 
         # ── Payoff chart preview ───────────────────────────────────────
-        self._chart = PlotlyChart(min_height=280)
+        self._chart = ChartWidget(min_height=280)
         root.addWidget(self._chart)
 
         # ── Action buttons ─────────────────────────────────────────────

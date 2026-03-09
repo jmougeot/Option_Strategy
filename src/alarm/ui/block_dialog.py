@@ -3,7 +3,7 @@ Block Dialog — Popup affichant les legs avec prix Bloomberg ajustés.
 """
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
@@ -20,6 +20,32 @@ from app import theme
 
 _COLOR_MISSING = QColor("#FFEAEA")   # fond rose pâle pour prix manquant
 _COLOR_OK      = QColor("#EAFFF0")   # fond vert pâle pour ajusté OK
+
+DATA_UNDERLYING = {
+    "SFR": 0.0025,   # SOFR 3M
+    "SFI": 0.0025,   # SONIA 1M
+    "ER": 0.0025,   # Euribor 3M
+    "0R": 0.0025,   # Euribor mid-curve
+    "0Q": 0.005,   # SOFR mid-curve
+    "0N": 0.0025,   # SONIA mid-curve
+    "RX": 0.01,   # Euro-Bund 10Y
+    "OE": 0.005,   # Euro-Bobl 5Y
+    "DU": 0.005,   # Euro-Schatz 2Y
+}
+
+
+def _tick_for(ticker: str) -> float:
+    """Retourne la taille du tick pour un ticker (recherche du préfixe le plus long)."""
+    for key in sorted(DATA_UNDERLYING, key=len, reverse=True):
+        if ticker.upper().startswith(key.upper()):
+            return DATA_UNDERLYING[key]
+    return 0.0025  # fallback
+
+
+def _snap_to_quarter_tick(price: float, tick: float) -> float:
+    """Arrondit un prix au quart de tick le plus proche."""
+    step = tick / 4
+    return round(price / step) * step
 
 
 class BlockDialog(QDialog):
@@ -186,6 +212,13 @@ class BlockDialog(QDialog):
         else:
             for lr in self._results:
                 lr.adjusted_mid = lr.bbg_mid
+
+        # Snap chaque prix ajusté au quart de tick de l'instrument
+        for lr in self._results:
+            if lr.adjusted_mid is not None:
+                tick = _tick_for(lr.leg.ticker or "")
+                lr.adjusted_mid = _snap_to_quarter_tick(lr.adjusted_mid, tick)
+
         self._populate_results()
 
     # ── actions ────────────────────────────────────────────────────────────

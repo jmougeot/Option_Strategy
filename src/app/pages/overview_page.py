@@ -19,7 +19,7 @@ from app.pages.history_page import add_to_history
 from app.utils import format_price, create_comparison_table
 from app.widget_payoff import build_payoff_figure
 from app.app_state import AppState
-from app.chart_widget import PlotlyChart
+from app.chart_widget import ChartWidget
 from app.worker import ProcessingWorker
 
 
@@ -194,7 +194,7 @@ class _RankingTab(QWidget):
         lay.addWidget(self._strat_table)
 
         # Payoff chart (with title)
-        self._chart = PlotlyChart(min_height=350)
+        self._chart = ChartWidget(min_height=350)
         lay.addWidget(self._chart)
 
     def load(self, comparisons: List[Any], mixture, underlying_price, roll_labels=None) -> None:

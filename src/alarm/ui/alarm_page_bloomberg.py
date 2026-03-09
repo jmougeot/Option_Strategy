@@ -29,7 +29,7 @@ class BloombergMixin:
 
     if TYPE_CHECKING:
         # Stubs for methods provided by other mixins
-        def _update_dot(self, row: int, s: Strategy) -> None: ...
+        def _update_dot(self, row: Optional[int], s: Strategy) -> None: ...
 
     # ── Bloomberg status ──────────────────────────────────────────────────────
     def _on_bbg_status(self, connected: bool, message: str) -> None:
@@ -51,26 +51,30 @@ class BloombergMixin:
     # ── Bloomberg price updates ───────────────────────────────────────────────
     def _on_price_updated(self, ticker: str, last: float, bid: float, ask: float) -> None:
         ticker_n = normalize_ticker(ticker)
-        for row, s in enumerate(self._pages[self._cur]["strategies"]):
-            option_tickers = {normalize_ticker(t) for t in s.get_all_tickers()}
-            if ticker_n in option_tickers:
-                for leg in s.legs:
-                    if normalize_ticker(leg.ticker or "") == ticker_n:
-                        leg.update_price(last, bid, ask)
-                self._refresh_price_cell(row, s.calculate_strategy_price())
-                self._update_dot(row, s)
-            else:
-                # Check if this is the underlying future for this strategy
-                for opt_t in s.get_all_tickers():
-                    fut = self._future_ticker_from_option(normalize_ticker(opt_t))
-                    if fut and normalize_ticker(fut) == ticker_n:
-                        price = last if last >= 0 else (
-                            (bid + ask) / 2 if bid >= 0 and ask >= 0 else None
-                        )
-                        if price is not None:
-                            s.future_price = price
-                            self._refresh_greeks_cells(row, s)
-                        break
+        for page_index, page in enumerate(self._pages):
+            for row, s in enumerate(page["strategies"]):
+                visible_row = row if page_index == self._cur else None
+                option_tickers = {normalize_ticker(t) for t in s.get_all_tickers()}
+                if ticker_n in option_tickers:
+                    for leg in s.legs:
+                        if normalize_ticker(leg.ticker or "") == ticker_n:
+                            leg.update_price(last, bid, ask)
+                    if visible_row is not None:
+                        self._refresh_price_cell(visible_row, s.calculate_strategy_price())
+                    self._update_dot(visible_row, s)
+                else:
+                    # Check if this is the underlying future for this strategy
+                    for opt_t in s.get_all_tickers():
+                        fut = self._future_ticker_from_option(normalize_ticker(opt_t))
+                        if fut and normalize_ticker(fut) == ticker_n:
+                            price = last if last >= 0 else (
+                                (bid + ask) / 2 if bid >= 0 and ask >= 0 else None
+                            )
+                            if price is not None:
+                                s.future_price = price
+                                if visible_row is not None:
+                                    self._refresh_greeks_cells(visible_row, s)
+                            break
 
     def _refresh_price_cell(self, row: int, price: Optional[float]) -> None:
         item = self._table.item(row, C_PRICE)

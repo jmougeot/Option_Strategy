@@ -92,9 +92,22 @@ def import_options(
         
         # 3.5. Calculer la volatilité Bachelier + SABR pour TOUTES les options
         if options:
-             sabr_calibration = Bachelier.compute_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
+            if use_sabr:
+                sabr_calibration = Bachelier.compute_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
+            else:
+                # Bachelier IV sans calibration SABR
+                F = future_data.underlying_price
+                T = 0.25
+                if F:
+                    for opt in options:
+                        opt.underlying_price = F
+                        if opt.status and opt.premium > 0:
+                            opt.implied_volatility = Bachelier(F, opt.strike, 0.0, T, opt.is_call(), opt.premium).implied_vol()
+                        opt.delta = Bachelier(F, opt.strike, opt.implied_volatility or 0.0, T, opt.is_call()).delta()
+                        opt.gamma = Bachelier(F, opt.strike, opt.implied_volatility or 0.0, T, opt.is_call()).gamma()
+                        opt.theta = Bachelier(F, opt.strike, opt.implied_volatility or 0.0, T, opt.is_call()).theta()
 
-             for option in options:
+            for option in options:
                 option._calcul_all_surface()
         
     except Exception as e:

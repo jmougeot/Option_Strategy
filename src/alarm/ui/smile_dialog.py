@@ -7,7 +7,7 @@ calibre SABR, et affiche le graphique + la table des données.
 from __future__ import annotations
 
 import re
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer
@@ -21,11 +21,11 @@ from PyQt6.QtWidgets import (
 
 from alarm.models.strategy import Strategy
 from alarm.services.smile_service import SmilePoint, SmileResult, fetch_smile, parse_option_ticker
-from app.chart_widget import PlotlyChart
+from app.chart_types import SmileFigureSpec
+from app.chart_widget import ChartWidget
 from app import theme
 
 _COLOR_WARN = QColor("#FFEAEA")
-_COLOR_OK   = QColor("#EAFFF0")
 
 
 class SmileDialog(QDialog):
@@ -86,7 +86,7 @@ class SmileDialog(QDialog):
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Chart
-        self._chart = PlotlyChart(min_height=350)
+        self._chart = ChartWidget(min_height=350)
         splitter.addWidget(self._chart)
 
         # Table
@@ -316,12 +316,12 @@ class SmileDialog(QDialog):
             self._lbl_sabr.setText(f"SABR non calibré : {e}")
 
         # ── 4. Envoi au chart ────────────────────────────────────────────────
-        smile_data = {
+        smile_data: SmileFigureSpec = {
             "type": "smile",
             "market": {"x": mkt_x, "y": mkt_y, "labels": mkt_labels} if mkt_x else None,
             "corrected": {"x": warn_x, "y": warn_y, "labels": warn_labels} if warn_x else None,
             "sabr_curve": {"x": sabr_curve_x, "y": sabr_curve_y} if sabr_curve_x else None,
-            "spot": float(forward) if forward else None,
+            "spot": float(forward) if forward is not None else None,
         }
 
         self._chart.set_title(f"Smile {self._underlying} {self._expiry}")

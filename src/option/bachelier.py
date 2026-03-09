@@ -122,58 +122,6 @@ class Bachelier:
 
 
     # ------------------------------------------------------------------
-    # Densité risque-neutre (Breeden-Litzenberger)
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def breeden_litzenberger_density(
-        strikes: np.ndarray,
-        call_prices: np.ndarray,
-        price_grid: np.ndarray,
-        risk_free_rate: float = 0.0,
-        time_to_expiry: float = 1.0,
-    ) -> Optional[np.ndarray]:
-        """
-        Extrait la densité risque-neutre q_T(K) via la formule de Breeden-Litzenberger.
-
-        q_T(K) = e^{rT} * d²C/dK²
-        """
-        if len(strikes) < 4:
-            return None
-
-        sort_idx = np.argsort(strikes)
-        K = strikes[sort_idx]
-        C = call_prices[sort_idx]
-
-        valid_mask = C > 0
-        if np.sum(valid_mask) < 4:
-            return None
-
-        K = K[valid_mask]
-        C = C[valid_mask]
-
-        try:
-            cs = CS(K, C)
-            d2C_dK2 = cs(price_grid, 2)
-
-            discount_factor = np.exp(risk_free_rate * time_to_expiry)
-            q_T = discount_factor * d2C_dK2
-            q_T = np.maximum(q_T, 0.0)
-
-            dx = float(np.mean(np.diff(price_grid))) if len(price_grid) > 1 else 1.0
-            total_mass = np.sum(q_T) * dx
-            if total_mass > 1e-10:
-                q_T = q_T / total_mass
-            else:
-                return None
-
-            return q_T
-
-        except Exception as e:
-            print(f"Erreur Breeden-Litzenberger: {e}")
-            return None
-
-    # ------------------------------------------------------------------
     # Calcul des volatilités pour une liste d'options
     # ------------------------------------------------------------------
 
@@ -223,12 +171,6 @@ class Bachelier:
             return
 
         # ── 2. Fusion call+put → iv_merged + poids bid-ask ────────────────
-        IV_DIVERGENCE_THRESHOLD = 0.30
-
-        def _neighbor_avg(iv_list: List[float], idx: int) -> Optional[float]:
-            neighbors = [iv_list[j] for j in (idx - 1, idx + 1) if 0 <= j < n and iv_list[j] > 0]
-            return sum(neighbors) / len(neighbors) if neighbors else None
-
         iv_c = [d[1].implied_volatility for d in datas]
         iv_p = [d[2].implied_volatility for d in datas]
         iv_merged: List[float] = []
@@ -237,19 +179,7 @@ class Bachelier:
         for i, (_, call, put) in enumerate(datas):
             ic, ip = iv_c[i], iv_p[i]
             if ic > 0 and ip > 0:
-                if abs(ic - ip) <= IV_DIVERGENCE_THRESHOLD:
-                    iv_merged.append((ic + ip) / 2.0)
-                else:
-                    err_c = abs(ic - _neighbor_avg(iv_c, i)) if _neighbor_avg(iv_c, i) is not None else float("inf")
-                    err_p = abs(ip - _neighbor_avg(iv_p, i)) if _neighbor_avg(iv_p, i) is not None else float("inf")
-                    if err_c <= err_p:
-                        put.status = False
-                        put.implied_volatility = 0.0
-                        iv_merged.append(ic)
-                    else:
-                        call.status = False
-                        call.implied_volatility = 0.0
-                        iv_merged.append(ip)
+                iv_merged.append((ic + ip) / 2.0)
             elif ic > 0:
                 iv_merged.append(ic)
             elif ip > 0:

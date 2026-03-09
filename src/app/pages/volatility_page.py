@@ -17,7 +17,8 @@ from PyQt6.QtWidgets import (
 
 from app.utils import split_calls_puts
 from app.app_state import AppState
-from app.chart_widget import PlotlyChart
+from app.chart_types import SmileFigureSpec
+from app.chart_widget import ChartWidget
 from option.option_class import Option
 
 
@@ -25,7 +26,7 @@ from option.option_class import Option
 # Smile figure builder  (ex pages/volatility.py)
 # ============================================================================
 
-def build_smile_figure(calls, puts, underlying_price, sabr_calibration=None):
+def build_smile_figure(calls, puts, underlying_price, sabr_calibration=None) -> Optional[SmileFigureSpec]:
     """Build smile data with market IV points + SABR smooth curve."""
     # Gather all options by strike
     calls_by_strike = {o.strike: o for o in calls}
@@ -99,7 +100,7 @@ def build_smile_figure(calls, puts, underlying_price, sabr_calibration=None):
         "market":    {"x": mkt_x,  "y": mkt_y,  "labels": mkt_labels}  if mkt_x  else None,
         "corrected": {"x": warn_x, "y": warn_y, "labels": warn_labels} if warn_x else None,
         "sabr_curve": {"x": sabr_curve_x, "y": sabr_curve_y} if sabr_curve_x else None,
-        "spot": float(underlying_price) if underlying_price else None,
+        "spot": float(underlying_price) if underlying_price is not None else None,
     }
 
 
@@ -134,7 +135,7 @@ class VolatilityPage(QWidget):
         self._smile_tab = QWidget()
         smile_lay = QVBoxLayout(self._smile_tab)
         smile_lay.setContentsMargins(0, 0, 0, 0)
-        self._smile_chart = PlotlyChart(min_height=450)
+        self._smile_chart = ChartWidget(min_height=450)
         smile_lay.addWidget(self._smile_chart)
         self._tabs.addTab(self._smile_tab, "Smile")
 
