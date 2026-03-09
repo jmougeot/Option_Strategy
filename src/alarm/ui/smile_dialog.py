@@ -284,7 +284,7 @@ class SmileDialog(QDialog):
             w_arr = [ba_weights[i] for i in valid_indices]
             F = forward if forward else float(np.median(strikes_arr))
 
-            sabr = SABRCalibration(F=F, T=0.25, beta=0.0, vol_type="normal")
+            sabr = SABRCalibration(F=F, T=0.25, beta=0.5, vol_type="normal")
             sabr.fit(strikes_arr, ivs_arr, weights=w_arr)
 
             # Courbe lissée

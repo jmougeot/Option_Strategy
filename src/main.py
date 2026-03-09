@@ -27,8 +27,7 @@ def process_bloomberg_to_strategies(
     num_points: int = 200,
     brut_code: Optional[List[str]] = None,
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
-    use_bachelier: bool = True,
-    use_sabr: bool = True,
+    recalibrate: bool = True,
     leg_penalty: float = 0.0,
     prefilled_options: Optional[List] = None,
 ) -> Tuple[Union[List[StrategyComparison], MultiRankingResult], Dict, Tuple[np.ndarray, np.ndarray, float], FutureData]:
@@ -51,11 +50,6 @@ def process_bloomberg_to_strategies(
         stats["future_data"] = future_data
         stats["all_options"] = options
         stats["nb_options"] = len(options)
-        # Filtrer les options sans statut si Bachelier désactivé
-        if not use_bachelier:
-            options = [opt for opt in options if opt.status]
-            stats["nb_options_filtered_warnings"] = stats["nb_options"] - len(options)
-            stats["nb_options"] = len(options)
         if not options:
             return [], stats, mixture, future_data
         # Recalculer pnl_array / average_pnl / sigma_pnl avec les premium/IV édités
@@ -112,7 +106,7 @@ def process_bloomberg_to_strategies(
             roll_expiries=roll_expiries,
             brut_code=brut_code,
             default_position="long",
-            use_sabr=use_sabr,
+            recalibrate=recalibrate,
         )
 
     # Tracker du fetch
@@ -124,11 +118,6 @@ def process_bloomberg_to_strategies(
     if not offline and fetch_warnings: #type: ignore
         stats["fetch_warnings"] = fetch_warnings
 
-    # Filtrer les options avec warning si Bachelier n'est pas utilis�
-    if not use_bachelier:
-        before = len(options)
-        options = [opt for opt in options if opt.status]
-        stats["nb_options_filtered_warnings"] = before - len(options)
 
     stats["nb_options"] = len(options)
 

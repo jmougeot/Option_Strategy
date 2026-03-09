@@ -417,7 +417,7 @@ class SABRCalibration:
             sigmas_work = sigmas.copy()
             corrected_set: dict[float, float] = {}
 
-            calib  = cls(F=float(F), T=time_to_expiry, beta=0.0)
+            calib  = cls(F=float(F), T=time_to_expiry, beta=0.5)
             result = calib.fit(strikes, sigmas_work)
 
             for _ in range(len(strikes)):
@@ -434,7 +434,7 @@ class SABRCalibration:
 
                 if len(strikes) < 3:
                     break
-                calib  = cls(F=float(F), T=time_to_expiry, beta=0.0)
+                calib  = cls(F=float(F), T=time_to_expiry, beta=0.5)
                 result = calib.fit(strikes, sigmas_work)
 
             for opt in options:

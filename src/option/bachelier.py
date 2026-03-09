@@ -208,7 +208,7 @@ class Bachelier:
         iv_arr = np.array(iv_merged)
         w_arr = np.array(ba_weights)
 
-        sabr = SABRCalibration(F=F, T=T, beta=0.0, vol_type="normal")
+        sabr = SABRCalibration(F=F, T=T, beta=0.5, vol_type="normal")
         sabr_ok = False
 
         if (iv_arr > 0).sum() >= 3:
@@ -219,43 +219,27 @@ class Bachelier:
             except Exception as exc:
                 print(f"  SABR calibration échouée : {exc}")
 
-        # ── 4. Application SABR → IV, premium, grecques ──────────────────────
+        # ── 4. Appliquer les IV (SABR si calibré, sinon marché) ─────────────
         if sabr_ok:
             all_sabr_vols = sabr.predict(strikes_arr)
-            for i, (_, call, put) in enumerate(datas):
-                iv = max(float(all_sabr_vols[i]), 0.0)
-                mkt_iv = iv_merged[i]
-                for opt in (call, put):
-                    opt.market_implied_volatility = mkt_iv
-                    opt.sabr_volatility = iv
-                    opt.sabr_is_anomaly = abs(mkt_iv - iv) > sabr.result.rmse * 1.5 if mkt_iv > 0 else False
-                    opt.sabr_residual = (mkt_iv - iv) if mkt_iv > 0 else 0.0
-                    opt.sabr_z_score = (
-                        abs(opt.sabr_residual) / max(sabr.result.rmse, 1e-10)
-                        if mkt_iv > 0 else 0.0
-                    )
-                    if iv > 0:
-                        opt.implied_volatility = iv
-                        opt.sabr_corrected = True
-                        if not (opt.status and opt.premium > 0):
-                            opt.premium = Bachelier(F, opt.strike, iv, T, opt.is_call()).price()
-                            sym = "C" if opt.is_call() else "P"
-                            print(f"  SABR → {sym} K={opt.strike}: IV={iv:.4f}  Premium={opt.premium:.6f}")
-                        opt.delta = Bachelier(F, opt.strike, iv, T, opt.is_call()).delta()
-                        opt.gamma = Bachelier(F, opt.strike, iv, T, opt.is_call()).gamma()
-                        opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()
-            return sabr
+            final_ivs = [max(float(v), 0.0) for v in all_sabr_vols]
         else:
-            # Fallback : pas assez de points pour SABR, on garde les IV individuelles
-            for i, (_, call, put) in enumerate(datas):
-                iv = max(iv_merged[i], 0.0)
-                for opt in (call, put):
-                    opt.market_implied_volatility = iv
-                    if iv > 0:
-                        opt.implied_volatility = iv
-                        if not (opt.status and opt.premium > 0):
-                            opt.premium = Bachelier(F, opt.strike, iv, T, opt.is_call()).price()
-                        opt.delta = Bachelier(F, opt.strike, iv, T, opt.is_call()).delta()
-                        opt.gamma = Bachelier(F, opt.strike, iv, T, opt.is_call()).gamma()
-                        opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()
-            return None
+            final_ivs = iv_merged
+
+        for i, (_, call, put) in enumerate(datas):
+            iv = final_ivs[i]
+            mkt_iv = iv_merged[i]
+            for opt in (call, put):
+                opt.market_implied_volatility = mkt_iv
+                opt.sabr_volatility = iv if sabr_ok else 0.0
+                if iv > 0:
+                    opt.implied_volatility = iv
+                    # Reconstruire le premium seulement s'il manque
+                    if not (opt.status and opt.premium > 0):
+                        opt.sabr_corrected = True
+                        opt.premium = Bachelier(F, opt.strike, iv, T, opt.is_call()).price()
+                    opt.delta = Bachelier(F, opt.strike, iv, T, opt.is_call()).delta()
+                    opt.gamma = Bachelier(F, opt.strike, iv, T, opt.is_call()).gamma()
+                    opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()
+
+        return sabr if sabr_ok else None

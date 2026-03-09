@@ -3,6 +3,7 @@ Bloomberg Data Importer for Options Strategy App
 Importe les données d'options depuis Bloomberg et les convertit en objets Option.
 """
 
+from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, Tuple
 import numpy as np
 from option.option_class import Option
@@ -42,6 +43,40 @@ MID_CURVE = {
     "N":"SFI",
     "Q":"SFR"}
 
+
+def _parse_expiry_date(value: Optional[str]) -> Optional[date]:
+    if not value:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    if "T" in text:
+        text = text.split("T", 1)[0]
+    if " " in text:
+        text = text.split(" ", 1)[0]
+
+    for fmt in ("%Y-%m-%d", "%m/%d/%y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+
+    try:
+        return datetime.fromisoformat(text).date()
+    except ValueError:
+        return None
+
+
+def _time_to_expiry_from_future_data(future_data: FutureData, default: float = 0.25) -> float:
+    expiry_date = _parse_expiry_date(future_data.last_tradable_date)
+    if expiry_date is None:
+        return default
+
+    days_to_expiry = (expiry_date - date.today()).days
+    return max(days_to_expiry, 1) / 365.0
+
 # ============================================================================
 # FONCTION PRINCIPALE
 # ============================================================================
@@ -56,7 +91,7 @@ def import_options(
     brut_code: Optional[List[str]] = None,
     suffix: str = "Comdty",
     default_position: PositionType = "long",
-    use_sabr: bool = True,
+    recalibrate: bool = True,
 ) -> Tuple[List[Option], FutureData, List[str], Any]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne des objets Option.
@@ -89,24 +124,17 @@ def import_options(
         processor = OptionProcessor(builder, fetcher, mixture, default_position)
         options = processor.process_all()
         future_data = fetcher.future_data
+        time_to_expiry = _time_to_expiry_from_future_data(future_data)
         
-        # 3.5. Calculer la volatilité Bachelier + SABR pour TOUTES les options
+        # 3.5. Calculer la volatilité Bachelier + SABR (si demandé)
+        if options and recalibrate:
+            sabr_calibration = Bachelier.compute_volatility(
+                options,
+                time_to_expiry=time_to_expiry,
+                future_price=future_data.underlying_price,
+            )
+        
         if options:
-            if use_sabr:
-                sabr_calibration = Bachelier.compute_volatility(options, time_to_expiry=0.25, future_price=future_data.underlying_price)
-            else:
-                # Bachelier IV sans calibration SABR
-                F = future_data.underlying_price
-                T = 0.25
-                if F:
-                    for opt in options:
-                        opt.underlying_price = F
-                        if opt.status and opt.premium > 0:
-                            opt.implied_volatility = Bachelier(F, opt.strike, 0.0, T, opt.is_call(), opt.premium).implied_vol()
-                        opt.delta = Bachelier(F, opt.strike, opt.implied_volatility or 0.0, T, opt.is_call()).delta()
-                        opt.gamma = Bachelier(F, opt.strike, opt.implied_volatility or 0.0, T, opt.is_call()).gamma()
-                        opt.theta = Bachelier(F, opt.strike, opt.implied_volatility or 0.0, T, opt.is_call()).theta()
-
             for option in options:
                 option._calcul_all_surface()
         

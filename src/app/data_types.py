@@ -121,9 +121,8 @@ class UIParams:
     unit: str
     brut_code: Optional[List[str]] = None
     roll_expiries: Optional[List[RollExpiry]] = None
+    recalibrate: bool = True
     operation_penalisation: float = 0.0
-    use_bachelier: bool = True
-    use_sabr: bool = True
 
 
 # ============================================================================

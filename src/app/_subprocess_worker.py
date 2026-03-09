@@ -44,8 +44,7 @@ def run(session_id: str, params: Dict[str, Any]) -> None:
             scenarios=params["scenarios"],
             filter=params["filter"],
             roll_expiries=params.get("roll_expiries"),
-            use_bachelier=params.get("use_bachelier", True),
-            use_sabr=params.get("use_sabr", True),
+            recalibrate=params.get("recalibrate", True),
             leg_penalty=params.get("operation_penalisation", 0.0),
             prefilled_options=params.get("prefilled_options"),
         )

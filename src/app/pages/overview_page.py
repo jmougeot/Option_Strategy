@@ -330,8 +330,7 @@ class OverviewPage(QWidget):
             "scenarios": scenarios,
             "filter": filter_,
             "roll_expiries": params.roll_expiries,
-            "use_bachelier": params.use_bachelier,
-            "use_sabr": params.use_sabr,
+            "recalibrate": params.recalibrate,
             "operation_penalisation": params.operation_penalisation,
         }
 
@@ -506,8 +505,7 @@ class OverviewPage(QWidget):
             "scenarios": scenarios,
             "filter": filter_,
             "roll_expiries": params.roll_expiries,
-            "use_bachelier": params.use_bachelier,
-            "use_sabr": params.use_sabr,
+            "recalibrate": params.recalibrate,
             "operation_penalisation": params.operation_penalisation,
             "prefilled_options": options,
         }
