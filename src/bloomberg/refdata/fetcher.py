@@ -232,23 +232,23 @@ def fetch_options_batch(
                     last_tradable_date = str(dt) if dt is not None else None
 
         # ── Étape 2 : BDH fallback pour tickers sans prix ─────────────
-        missing = [t for t in tickers if not _has_prices(results.get(t, {}))]
-        if missing:
-            bdh_raw = _bdh_fallback(session, service, missing, lookback_days, use_overrides)
-            # Aussi le sous-jacent si pas de prix
-            if underlyings is not None and underlying_price is None:
-                undl_bdh = _bdh_fallback(session, service, [underlyings], lookback_days, use_overrides)
-                if underlyings in undl_bdh:
-                    price = _extract_underlying_price(undl_bdh[underlyings])
-                    if price is not None:
-                        underlying_price = price
+        # missing = [t for t in tickers if not _has_prices(results.get(t, {}))]
+        # if missing:
+        #     bdh_raw = _bdh_fallback(session, service, missing, lookback_days, use_overrides)
+        #     # Aussi le sous-jacent si pas de prix
+        #     if underlyings is not None and underlying_price is None:
+        #         undl_bdh = _bdh_fallback(session, service, [underlyings], lookback_days, use_overrides)
+        #         if underlyings in undl_bdh:
+        #             price = _extract_underlying_price(undl_bdh[underlyings])
+        #             if price is not None:
+        #                 underlying_price = price
 
-            for t in missing:
-                if t in bdh_raw:
-                    # Merger : on conserve les Greeks du BDP, on remplace les prix
-                    merged = dict(results.get(t, {}))
-                    merged.update(bdh_raw[t])
-                    results[t] = merged
+        #     for t in missing:
+        #         if t in bdh_raw:
+        #             # Merger : on conserve les Greeks du BDP, on remplace les prix
+        #             merged = dict(results.get(t, {}))
+        #             merged.update(bdh_raw[t])
+        #             results[t] = merged
 
         # Quality warnings
         missing_both: List[str] = []
@@ -263,10 +263,10 @@ def fetch_options_batch(
             if bid is None and ask is None:
                 missing_both.append(t)
                 results[t]["_warning"] = True
-            if ask and bid is None and ask > 0.05:
+            if ask and bid is None and ask > 0.005:
                 wide_spread.append(t)
                 results[t]["_warning"] = True
-            if ask and bid and (ask - bid) > 0.08:
+            if ask and bid and (ask - bid) > 0.008:
                 wide_spread.append(f"{t} (spread={ask - bid:.4f})")
                 results[t]["_warning"] = True
 
