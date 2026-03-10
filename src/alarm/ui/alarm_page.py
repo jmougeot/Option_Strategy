@@ -57,7 +57,6 @@ class AlarmPage(
         # Bloomberg
         self._bbg = BloombergService()
         self._bbg.price_updated.connect(self._on_price_updated)
-        self._bbg.greeks_updated.connect(self._on_greeks_updated)
         self._bbg.connection_status.connect(self._on_bbg_status)
 
         # Handlers

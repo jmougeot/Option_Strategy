@@ -12,7 +12,6 @@ Usage:
     bbg.start()
     bbg.subscribe("SFRH6 COMDTY")
 """
-import math
 
 import blpapi
 from PyQt6.QtCore import QMutex, QMutexLocker, QObject, QThread
@@ -41,7 +40,6 @@ class BloombergWorker(QThread):
     """Worker thread qui gère la session Bloomberg et émet les mises à jour."""
 
     price_updated      = Signal(str, float, float, float)         # ticker, last, bid, ask
-    greeks_updated     = Signal(str, float, float, float, float)  # ticker, delta, gamma, theta, ivol
     subscription_started = Signal(str)                            # ticker
     subscription_failed  = Signal(str, str)                       # ticker, error
     connection_status    = Signal(bool, str)                      # connected, message
@@ -132,7 +130,6 @@ class BloombergWorker(QThread):
             for msg in event:
                 ticker = msg.correlationId().value()
                 self._handle_price(msg, ticker)
-                self._handle_greeks(msg, ticker)
 
         elif event.eventType() == blpapi.event.Event.SUBSCRIPTION_STATUS:
             for msg in event:
@@ -168,17 +165,6 @@ class BloombergWorker(QThread):
                 ask  if ask  is not None else -1.0,
             )
 
-    def _handle_greeks(self, msg, ticker: str) -> None:
-        try:
-            d = msg.getElementAsFloat("DELTA")    if msg.hasElement("DELTA")    else math.nan
-            g = msg.getElementAsFloat("GAMMA")    if msg.hasElement("GAMMA")    else math.nan
-            t = msg.getElementAsFloat("THETA")    if msg.hasElement("THETA")    else math.nan
-            v = msg.getElementAsFloat("IVOL_MID") if msg.hasElement("IVOL_MID") else math.nan
-            if not all(math.isnan(x) for x in (d, g, t, v)):
-                self.greeks_updated.emit(ticker, d, g, t, v)
-        except Exception:
-            pass
-
     # ── public API ────────────────────────────────────────────────────────────
     def subscribe(self, ticker: str) -> None:
         with QMutexLocker(self.mutex):
@@ -205,7 +191,6 @@ class BloombergService(QObject):
     """Service principal Bloomberg — gère les subscriptions et relaye les signaux Qt."""
 
     price_updated        = Signal(str, float, float, float)
-    greeks_updated       = Signal(str, float, float, float, float)
     subscription_started = Signal(str)
     subscription_failed  = Signal(str, str)
     connection_status    = Signal(bool, str)
@@ -222,7 +207,6 @@ class BloombergService(QObject):
             return
         self.worker = BloombergWorker(self._cfg)
         self.worker.price_updated.connect(self.price_updated)
-        self.worker.greeks_updated.connect(self.greeks_updated)
         self.worker.subscription_started.connect(self._on_subscription_started)
         self.worker.subscription_failed.connect(self._on_subscription_failed)
         self.worker.connection_status.connect(self.connection_status)

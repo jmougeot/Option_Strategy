@@ -6,7 +6,6 @@ from __future__ import annotations
 from typing import List, Optional
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QApplication, QDialog, QDoubleSpinBox, QHBoxLayout, QHeaderView,
     QLabel, QPushButton,
@@ -26,12 +25,20 @@ from app import theme
 class BlockDialog(QDialog):
     """Popup qui affiche les legs, fetch Bloomberg, et ajuste les prix."""
 
-    _COLS = ["Ticker", "Pos", "Qty", "Mid BBG", "Mid Ajusté"]
+    C_TICKER = 0
+    C_POS = 1
+    C_QTY = 2
+    C_TOTAL = 3
+    C_BBG = 4
+    C_ADJUSTED = 5
+
+    _COLS = ["Ticker", "Pos", "Qty", "Total", "Mid BBG", "Mid Ajusté"]
 
     def __init__(self, strategy: Strategy, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._strategy = strategy
         self._results: List[OptionLeg] = list(strategy.legs)
+        self._base_total: Optional[int] = None
 
         self.setWindowTitle(f"Block {strategy.name or ''}")
         self.setMinimumSize(800, 400)
@@ -52,8 +59,10 @@ class BlockDialog(QDialog):
         # Table des legs
         self._table = QTableWidget(0, len(self._COLS))
         self._table.setHorizontalHeaderLabels(self._COLS)
-        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self._table.setAlternatingRowColors(True)
+        self._table.setEditTriggers(
+            QTableWidget.EditTrigger.DoubleClicked | QTableWidget.EditTrigger.EditKeyPressed
+        )
+        self._table.itemChanged.connect(self._on_item_changed)
         hh = self._table.horizontalHeader()
         if hh:
             hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -63,13 +72,13 @@ class BlockDialog(QDialog):
 
         # Ligne prix stratégie
         price_row = QHBoxLayout()
-        price_row.addWidget(QLabel("Prix stratégie Bloomberg :"))
+        price_row.addWidget(QLabel("Bloomberg Price:"))
         self._lbl_bbg_price = QLabel("—")
         self._lbl_bbg_price.setStyleSheet("font-weight: bold;")
         price_row.addWidget(self._lbl_bbg_price)
         price_row.addStretch()
 
-        price_row.addWidget(QLabel("Prix cible :"))
+        price_row.addWidget(QLabel("Target Price :"))
         self._spin_price = QDoubleSpinBox()
         self._spin_price.setRange(-999.0, 999.0)
         self._spin_price.setDecimals(4)
@@ -104,32 +113,25 @@ class BlockDialog(QDialog):
         self._run_adjust()
 
     # ── helpers table ──────────────────────────────────────────────────────
-    def _populate_legs_only(self) -> None:
-        """Remplit la table avec les legs sans données de prix."""
-        self._table.setRowCount(0)
-        for leg in self._strategy.legs:
-            r = self._table.rowCount()
-            self._table.insertRow(r)
-            self._set_cell(r, 0, leg.ticker or "—")
-            self._set_cell(r, 1, "L" if leg.position == Position.LONG else "S")
-            self._set_cell(r, 2, str(leg.quantity))
-            for c in range(3, len(self._COLS)):
-                self._set_cell(r, c, "…")
-    
-    
-
     def _populate_results(self) -> None:
         """Remplit la table avec les résultats fetch + ajustement."""
+        self._table.blockSignals(True)
         self._table.setRowCount(0)
         missing_count = 0
-        for lr in self._results:
+        for row, leg in enumerate(self._results):
             r = self._table.rowCount()
             self._table.insertRow(r)
-            self._set_cell(r, 0, lr.ticker or "—")
-            self._set_cell(r, 1, "L" if lr.position == Position.LONG else "S")
-            self._set_cell(r, 2, str(lr.quantity))
-            self._set_cell(r, 3, self._fmt(lr.mid))
-            self._set_cell(r, 4, self._fmt(lr.adjusted_mid))
+            self._set_cell(r, self.C_TICKER, leg.ticker or "—")
+            self._set_cell(r, self.C_POS, "L" if leg.position == Position.LONG else "S")
+            self._set_cell(r, self.C_QTY, str(leg.quantity))
+            self._set_cell(r, self.C_TOTAL, self._fmt_total(self._row_total(row, leg)), editable=row == 0)
+            self._set_cell(r, self.C_BBG, self._fmt(leg.mid))
+            self._set_cell(r, self.C_ADJUSTED, self._fmt(leg.adjusted_mid))
+
+            if leg.mid is None:
+                missing_count += 1
+
+        self._table.blockSignals(False)
 
         # Mise à jour du status
         n = len(self._results)
@@ -142,14 +144,58 @@ class BlockDialog(QDialog):
             )
             self._lbl_status.setStyleSheet(f"color: {theme.WARNING}; font-size: 12px;")
 
-    def _set_cell(self, row: int, col: int, text: str) -> None:
+    def _set_cell(self, row: int, col: int, text: str, editable: bool = False) -> None:
         item = QTableWidgetItem(text)
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        if not editable:
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         self._table.setItem(row, col, item)
+
+    @staticmethod
+    def _signed_quantity(leg: OptionLeg) -> int:
+        return leg.quantity if leg.position == Position.LONG else -leg.quantity
+
+    def _row_total(self, row: int, leg: OptionLeg) -> Optional[int]:
+        if self._base_total is None or not self._results:
+            return None
+
+        if row == 0:
+            return self._base_total
+
+        base_signed_qty = self._signed_quantity(self._results[0])
+        if base_signed_qty == 0:
+            return None
+
+        ratio = self._signed_quantity(leg) / base_signed_qty
+        return int(round(self._base_total * ratio))
 
     @staticmethod
     def _fmt(val: Optional[float]) -> str:
         return f"{val:.4f}" if val is not None else "—"
+
+    @staticmethod
+    def _fmt_total(val: Optional[int]) -> str:
+        return str(val) if val is not None else "—"
+
+    def _on_item_changed(self, item: QTableWidgetItem) -> None:
+        if item.row() != 0 or item.column() != self.C_TOTAL:
+            return
+
+        text = item.text().strip().replace(",", ".")
+        if not text or text == "—":
+            self._base_total = None
+            self._populate_results()
+            return
+
+        try:
+            self._base_total = int(round(float(text)))
+        except ValueError:
+            self._lbl_status.setText("✗ Total invalide")
+            self._lbl_status.setStyleSheet(f"color: {theme.WARNING}; font-size: 12px;")
+            self._populate_results()
+            return
+
+        self._populate_results()
 
     def _copy_message(self) -> None:
         clipboard = QApplication.clipboard()

@@ -16,7 +16,7 @@ from alarm.ui.columns import (
     C_ACTION, C_CLIENT, C_COND, C_DELTA,
     C_FUT, C_GAMMA, C_IV, C_LEGS, C_NAME,
     C_PRICE, C_STATUS, C_TARGET, C_THETA,
-    HEADERS,
+    HEADERS, C_EXPIRY
 )
 from app import theme
 
@@ -83,21 +83,20 @@ class UIBuildMixin(_WidgetBase):
         # Top bar ─────────────────────────────────────────────────────────────
         top = QHBoxLayout()
         top.setSpacing(8)
-        top.addWidget(QLabel("<b>Page :</b>"))
 
         self._page_combo = QComboBox()
-        self._page_combo.setMinimumWidth(160)
+        self._page_combo.setMinimumWidth(250)
         self._page_combo.currentIndexChanged.connect(self._switch_page)
         top.addWidget(self._page_combo)
 
-        btn_add_page = QPushButton("+")
-        btn_add_page.setFixedWidth(30)
+        btn_add_page = QPushButton("Nouvelle page")
+        btn_add_page.setMinimumWidth(160)
         btn_add_page.setToolTip("Nouvelle page")
         btn_add_page.clicked.connect(self._new_page)
         top.addWidget(btn_add_page)
 
-        btn_del_page = QPushButton("−")
-        btn_del_page.setFixedWidth(30)
+        btn_del_page = QPushButton("Supprimer la page")
+        btn_del_page.setMinimumWidth(160)
         btn_del_page.setToolTip("Supprimer la page")
         btn_del_page.clicked.connect(self._delete_page)
         top.addWidget(btn_del_page)
@@ -128,7 +127,8 @@ class UIBuildMixin(_WidgetBase):
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
         self._table.setStyleSheet("""
             QTableWidget { font-size: 12px; }
-            QTableWidget::item:alternate { background-color: #E8F0FE; }
+            QTableWidget::item:alternate { background-color: #F7FAFF; }
+            QTableWidget::item:selected { background-color: #B3D4FC; color: #000000; }
             QTableWidget QLineEdit { font-size: 12px; }
             QTableWidget QAbstractItemView { font-size: 12px; }
         """)
@@ -151,7 +151,7 @@ class UIBuildMixin(_WidgetBase):
         hh = self._table.horizontalHeader()
         if hh:
             hh.setSectionResizeMode(C_CLIENT, QHeaderView.ResizeMode.Interactive)
-            hh.setSectionResizeMode(C_NAME,   QHeaderView.ResizeMode.Stretch)
+            hh.setSectionResizeMode(C_NAME,   QHeaderView.ResizeMode.Interactive)
             hh.setSectionResizeMode(C_ACTION, QHeaderView.ResizeMode.Interactive)
             hh.setSectionResizeMode(C_LEGS,   QHeaderView.ResizeMode.Interactive)
             hh.setSectionResizeMode(C_PRICE,  QHeaderView.ResizeMode.Fixed)
@@ -163,19 +163,22 @@ class UIBuildMixin(_WidgetBase):
             hh.setSectionResizeMode(C_THETA,  QHeaderView.ResizeMode.Fixed)
             hh.setSectionResizeMode(C_IV,     QHeaderView.ResizeMode.Fixed)
             hh.setSectionResizeMode(C_FUT,    QHeaderView.ResizeMode.Fixed)
+            hh.setSectionResizeMode(C_EXPIRY,   QHeaderView.ResizeMode.Fixed)
 
-        self._table.setColumnWidth(C_CLIENT, 90)
-        self._table.setColumnWidth(C_ACTION, 120)
+        self._table.setColumnWidth(C_CLIENT, 200)
+        self._table.setColumnWidth(C_NAME,   400)
+        self._table.setColumnWidth(C_ACTION, 200)
         self._table.setColumnWidth(C_LEGS,   200)
         self._table.setColumnWidth(C_PRICE,  110)
         self._table.setColumnWidth(C_COND,   130)
         self._table.setColumnWidth(C_TARGET, 100)
-        self._table.setColumnWidth(C_STATUS, 110)
+        self._table.setColumnWidth(C_STATUS, 100)
         self._table.setColumnWidth(C_DELTA,   80)
         self._table.setColumnWidth(C_GAMMA,   80)
         self._table.setColumnWidth(C_THETA,   80)
-        self._table.setColumnWidth(C_IV,      70)
-        self._table.setColumnWidth(C_FUT,     90)
+        self._table.setColumnWidth(C_IV,      80)
+        self._table.setColumnWidth(C_FUT,     80)
+        self._table.setColumnWidth(C_EXPIRY,  80)
 
         root.addWidget(self._table)
 

@@ -1,21 +1,43 @@
 """
 Modèles de données pour les stratégies d'options
 """
+import calendar
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
-from datetime import datetime
+from datetime import date, datetime
 import math
 import re
 import uuid
 
-from bloomberg.config import normalize_ticker 
+from bloomberg.config import normalize_ticker
+from option.bachelier import Bachelier
 
 
 _OPTION_TICKER_RE = re.compile(
     r"^([A-Z0-9]{2,4})[FGHJKMNQUVXZ]\d[CP]\s+(\d+(?:\.\d+)?)\s+COMDTY$",
     re.IGNORECASE,
 )
+
+_OPTION_TICKER_DETAILS_RE = re.compile(
+    r"^([A-Z0-9]{2,4})([FGHJKMNQUVXZ])(\d{1,2})([CP])\s+(\d+(?:\.\d+)?)\s+COMDTY$",
+    re.IGNORECASE,
+)
+
+_MONTH_TO_NUMBER = {
+    "F": 1,
+    "G": 2,
+    "H": 3,
+    "J": 4,
+    "K": 5,
+    "M": 6,
+    "N": 7,
+    "Q": 8,
+    "U": 9,
+    "V": 10,
+    "X": 11,
+    "Z": 12,
+}
 
 
 def parse_leg_ticker(ticker: str) -> tuple[str, str, float]:
@@ -30,6 +52,53 @@ def parse_leg_ticker(ticker: str) -> tuple[str, str, float]:
     except ValueError:
         strike = 0.0
     return normalized, match.group(1).upper(), strike
+
+
+def _third_wednesday(year: int, month: int) -> date:
+    weeks = calendar.monthcalendar(year, month)
+    wednesdays = [week[calendar.WEDNESDAY] for week in weeks if week[calendar.WEDNESDAY] != 0]
+    return date(year, month, wednesdays[2])
+
+
+def _resolve_expiry_year(year_code: str) -> int:
+    raw_year = int(year_code)
+    today = date.today()
+
+    if len(year_code) == 1:
+        base_year = (today.year // 10) * 10
+        resolved = base_year + raw_year
+        if resolved < today.year - 1:
+            resolved += 10
+        return resolved
+
+    base_year = (today.year // 100) * 100
+    resolved = base_year + raw_year
+    if resolved < today.year - 20:
+        resolved += 100
+    return resolved
+
+
+def _parse_option_ticker_details(ticker: str) -> Optional[tuple[bool, float, float]]:
+    normalized = normalize_ticker(ticker)
+    match = _OPTION_TICKER_DETAILS_RE.match(normalized)
+    if not match:
+        return None
+
+    month_code = match.group(2).upper()
+    month_number = _MONTH_TO_NUMBER.get(month_code)
+    if month_number is None:
+        return None
+
+    try:
+        expiry_year = _resolve_expiry_year(match.group(3))
+        strike = float(match.group(5))
+    except ValueError:
+        return None
+
+    expiry_date = _third_wednesday(expiry_year, month_number)
+    time_to_expiry = max((expiry_date - date.today()).days, 1) / 365.0
+    is_call = match.group(4).upper() == "C"
+    return is_call, strike, time_to_expiry
 
 
 class Position(Enum):
@@ -88,16 +157,48 @@ class OptionLeg:
             self.mid = (self.bid + self.ask) / 2
         self.last_update = datetime.now()
 
-    def update_greeks(self, delta: float, gamma: float, theta: float, ivol: float) -> None:
-        """Met à jour les greeks depuis Bloomberg. Ignore les valeurs NaN."""
-        if not math.isnan(delta):
-            self.delta = delta
-        if not math.isnan(gamma):
-            self.gamma = gamma
-        if not math.isnan(theta):
-            self.theta = theta
-        if not math.isnan(ivol):
-            self.implied_vol = ivol
+    def _clear_market_analytics(self) -> None:
+        self.delta = None
+        self.gamma = None
+        self.theta = None
+        self.implied_vol = None
+
+    def recalculate_market_analytics(self, forward_price: Optional[float]) -> None:
+        """Recalcule IV, delta, gamma et theta via Bachelier à partir du prix marché."""
+        market_price = self.mid if self.mid is not None and self.mid > 0 else self.last_price
+        if forward_price is None or forward_price <= 0 or market_price is None or market_price <= 0:
+            self._clear_market_analytics()
+            return
+
+        details = _parse_option_ticker_details(self.ticker or "")
+        if details is None:
+            self._clear_market_analytics()
+            return
+
+        is_call, ticker_strike, time_to_expiry = details
+        strike = self.strike if self.strike > 0 else ticker_strike
+        if strike <= 0 or time_to_expiry <= 0:
+            self._clear_market_analytics()
+            return
+
+        implied_vol = Bachelier(
+            forward_price,
+            strike,
+            0.0,
+            time_to_expiry,
+            is_call,
+            market_price,
+        ).implied_vol()
+
+        if implied_vol <= 0 or not math.isfinite(implied_vol):
+            self._clear_market_analytics()
+            return
+
+        model = Bachelier(forward_price, strike, implied_vol, time_to_expiry, is_call)
+        self.delta = model.delta()
+        self.gamma = model.gamma()
+        self.theta = model.theta()
+        self.implied_vol = implied_vol
 
     def get_price_contribution(self) -> Optional[float]:
         """
@@ -208,6 +309,11 @@ class Strategy:
             total += contribution
         
         return total
+
+    def recalculate_market_analytics(self) -> None:
+        """Recalcule les grecques temps réel et l'IV de chaque leg via Bachelier."""
+        for leg in self.legs:
+            leg.recalculate_market_analytics(self.future_price)
 
     def get_total_delta(self) -> Optional[float]:
         """Delta agrégé de la stratégie (signé par position)."""

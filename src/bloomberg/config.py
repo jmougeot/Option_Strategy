@@ -44,7 +44,6 @@ config = BloombergConfig()
 # Champs pour les subscriptions temps réel (//blp/mktdata)
 SUBSCRIPTION_FIELDS: list[str] = [
     "LAST_PRICE", "BID", "ASK",
-    "DELTA", "GAMMA", "THETA", "IVOL_MID",
 ]
 
 # Champs pour les requêtes de données de référence options (//blp/refdata)

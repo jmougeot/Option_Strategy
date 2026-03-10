@@ -162,9 +162,8 @@ def _generate_simulated_option(
     # Temps jusqu'à expiration en années
     T = days_to_expiry / 365
     
-    # Volatilité implicite avec smile (plus élevée loin de la monnaie)
-    moneyness = strike / underlying_price
-    iv_smile = base_iv * (1 + 0.1 * abs(moneyness - 1))
+    # Volatilité implicite BS (plate, juste pour pricer)
+    iv_smile = base_iv
     
     # Calcul du prix Black-Scholes
     premium = _black_scholes_price(
@@ -190,13 +189,18 @@ def _generate_simulated_option(
     opt_char = "C" if option_type == "call" else "P"
     ticker = f"{underlying}{month}{year} {opt_char}{strike}"
 
-    # Volatilité normale Bachelier (même unité que le mode online)
+    # Volatilité normale Bachelier de base
     is_call = option_type == "call"
     if premium > 0 and T > 0:
         from option.bachelier import Bachelier as _Bach
-        bach_iv = _Bach(underlying_price, strike, 0.0, T, is_call, premium).implied_vol()
+        bach_iv_base = _Bach(underlying_price, strike, 0.0, T, is_call, premium).implied_vol()
     else:
-        bach_iv = 0.0
+        bach_iv_base = 0.0
+
+    # Smile appliqué directement sur la vol Bachelier :
+    #   skew négatif (puts OTM plus chers) + convexité (ailes remontées)
+    x = (strike - underlying_price) / underlying_price  # distance relative au forward
+    bach_iv = bach_iv_base * (1 - 0.08 * x + 0.6 * x * x)
     
     # Créer l'option
     option = Option(

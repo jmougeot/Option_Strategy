@@ -3,6 +3,9 @@ Column indices and headers for the AlarmPage table.
 """
 
 # ── column indices ────────────────────────────────────────────────────────────
+from bloomberg.util import expiry
+
+
 C_CLIENT = 0
 C_NAME   = 1
 C_ACTION = 2
@@ -16,10 +19,12 @@ C_GAMMA  = 9
 C_THETA  = 10
 C_IV     = 11
 C_FUT    = 12
+C_EXPIRY= 13
+
 
 HEADERS = ["Client", "Stratégie", "Action", "Legs",
-           "Prix", "Alarme si", "Cible", "Statut",
-           "Δ Delta", "Γ Gamma", "Θ Theta", "IV%", "Fut."]
+           "Prix", "Alarm if", "Cible", "Statut",
+           "Δ", "Γ", "Θ ", "IV%", "Fut.", "expiry"]
 
 # How long a price must stay in the alarm zone before the alert fires (seconds)
 WARN_DELAY: float = 5.0

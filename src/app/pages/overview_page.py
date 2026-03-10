@@ -70,12 +70,8 @@ class StrategyTableWidget(QWidget):
 
         top = QHBoxLayout()
         self._lbl_title = QLabel("<b>Top Strategies</b>")
-        btn_reset = QPushButton("↺ Reset")
-        btn_reset.setFixedWidth(70)
-        btn_reset.clicked.connect(self._reset)
         top.addWidget(self._lbl_title)
         top.addStretch()
-        top.addWidget(btn_reset)
         lay.addLayout(top)
 
         self._table = QTableWidget()

@@ -1,4 +1,4 @@
-"""Mixin — Bloomberg price/greeks updates and subscription management."""
+"""Mixin — Bloomberg price updates and local analytics refresh."""
 from __future__ import annotations
 
 import math
@@ -59,11 +59,16 @@ class BloombergMixin:
                 visible_row = row if page_index == self._cur else None
                 option_tickers = {normalize_ticker(t) for t in s.get_all_tickers()}
                 if ticker_n in option_tickers:
+                    strategy_changed = False
                     for leg in s.legs:
                         if normalize_ticker(leg.ticker or "") == ticker_n:
                             leg.update_price(last, bid, ask)
+                            strategy_changed = True
+                    if strategy_changed:
+                        s.recalculate_market_analytics()
                     if visible_row is not None:
                         self._refresh_price_cell(visible_row, s.calculate_strategy_price())
+                        self._refresh_greeks_cells(visible_row, s)
                     self._update_dot(visible_row, s)
                 else:
                     # Check if this is the underlying future for this strategy
@@ -75,6 +80,7 @@ class BloombergMixin:
                             )
                             if price is not None:
                                 s.future_price = price
+                                s.recalculate_market_analytics()
                                 if visible_row is not None:
                                     self._refresh_greeks_cells(visible_row, s)
                             break
@@ -92,18 +98,6 @@ class BloombergMixin:
         else:
             item.setText(f"{price:.4f}")
             item.setForeground(QColor("#cc2200"))
-
-    # ── Bloomberg greeks updates ──────────────────────────────────────────────
-    def _on_greeks_updated(self, ticker: str, delta: float, gamma: float,
-                           theta: float, ivol: float) -> None:
-        ticker_n = normalize_ticker(ticker)
-        for row, s in enumerate(self._pages[self._cur]["strategies"]):
-            if ticker_n not in {normalize_ticker(t) for t in s.get_all_tickers()}:
-                continue
-            for leg in s.legs:
-                if normalize_ticker(leg.ticker or "") == ticker_n:
-                    leg.update_greeks(delta, gamma, theta, ivol)
-            self._refresh_greeks_cells(row, s)
 
     def _refresh_greeks_cells(self, row: int, s: Strategy) -> None:
         """Update the 5 analytic cells for the given row."""

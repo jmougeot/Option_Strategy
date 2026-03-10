@@ -172,14 +172,17 @@ class AlertPopup(QWidget):
         
     def _position_popup(self):
         """Positionne le popup au centre de l'écran"""
-        screen = QApplication.primaryScreen().geometry()
-        x = (screen.width() - self.width()) // 2
-        y = (screen.height() - self.height()) // 2
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            return
+        geometry = screen.geometry()
+        x = (geometry.width() - self.width()) // 2
+        y = (geometry.height() - self.height()) // 2
         self.move(x, y)
     
-    def showEvent(self, event):
-        """Appelé quand le popup est affiché"""
-        super().showEvent(event)
+    def showEvent(self, a0):  # type: ignore[override]
+        """Appelé quand le popup est affiché."""
+        super().showEvent(a0)
         self.fade_in.start()
     
     def _close_with_animation(self):
