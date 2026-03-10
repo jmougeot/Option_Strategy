@@ -89,7 +89,7 @@ def is_possible(target: float,
         return
 
 
-def adjust_prices(results: List[LegResult], step: float, target_price: float) -> List["LegResult"]:
+def adjust_prices(results: List[LegResult], step: float, target_price: float) -> List[LegResult]:
     tol = 1e-9
     result_copy = results.copy()
 
@@ -97,7 +97,7 @@ def adjust_prices(results: List[LegResult], step: float, target_price: float) ->
     scaled_target = target_price / step
     T = round(scaled_target)
     if abs(scaled_target - T) > tol:
-        return []
+        return result_copy
 
     # quantités actives
     qs = [abs(l.leg.quantity) for l in results if l.leg.quantity != 0]
