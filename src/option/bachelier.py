@@ -4,10 +4,11 @@
 
 
 import numpy as np
+from collections import defaultdict
 from scipy.stats import norm
 from scipy.optimize import brentq
 from scipy.interpolate import CubicSpline as CS
-from typing import Any, Optional, List, Tuple
+from typing import Any, Dict, Optional, List, Tuple
 from option.option_class import Option
 from option.sabr import SABRCalibration
 
@@ -143,41 +144,45 @@ class Bachelier:
         F = future_price
         T = time_to_expiry
 
-        options.sort(key=lambda x: (x.strike, x.option_type))
-
         # ── 1. Calcul IV individuelle ────────────────────────────────────────
-        datas: List[Tuple[float, Option, Option]] = []
-        for j in range(len(options) // 2):
-            call = options[2 * j]
-            put  = options[2 * j + 1]
-            call.underlying_price = F
-            put.underlying_price  = F
-
-            call.implied_volatility = (
-                Bachelier(F, call.strike, 0.0, T, True, call.premium).implied_vol()
-                if call.status and call.premium > 0
-                else 0.0
-            )
-            put.implied_volatility = (
-                Bachelier(F, put.strike, 0.0, T, False, put.premium).implied_vol()
-                if put.status and put.premium > 0
+        grouped_by_strike: Dict[float, Dict[str, List[Option]]] = defaultdict(
+            lambda: {"call": [], "put": []}
+        )
+        for opt in options:
+            opt.underlying_price = F
+            opt.implied_volatility = (
+                Bachelier(F, opt.strike, 0.0, T, opt.is_call(), opt.premium).implied_vol()
+                if opt.status and opt.premium > 0
                 else 0.0
             )
 
-            datas.append((call.strike, call, put))
+            strike_key = round(opt.strike, 6)
+            grouped_by_strike[strike_key]["call" if opt.is_call() else "put"].append(opt)
+
+        datas: List[Tuple[float, List[Option], List[Option]]] = []
+        for strike_key in sorted(grouped_by_strike):
+            strike_group = grouped_by_strike[strike_key]
+            calls = strike_group["call"]
+            puts = strike_group["put"]
+            if not calls and not puts:
+                continue
+
+            strike = calls[0].strike if calls else puts[0].strike
+            datas.append((strike, calls, puts))
 
         n = len(datas)
         if n == 0:
             return
 
         # ── 2. Fusion call+put → iv_merged + poids bid-ask ────────────────
-        iv_c = [d[1].implied_volatility for d in datas]
-        iv_p = [d[2].implied_volatility for d in datas]
         iv_merged: List[float] = []
         ba_weights: List[float] = []
 
-        for i, (_, call, put) in enumerate(datas):
-            ic, ip = iv_c[i], iv_p[i]
+        for _, calls, puts in datas:
+            call_ivs = [opt.implied_volatility for opt in calls if opt.implied_volatility > 0]
+            put_ivs = [opt.implied_volatility for opt in puts if opt.implied_volatility > 0]
+            ic = float(sum(call_ivs) / len(call_ivs)) if call_ivs else 0.0
+            ip = float(sum(put_ivs) / len(put_ivs)) if put_ivs else 0.0
             if ic > 0 and ip > 0:
                 iv_merged.append((ic + ip) / 2.0)
             elif ic > 0:
@@ -192,7 +197,7 @@ class Bachelier:
                 ba_weights.append(0.0)
             else:
                 spreads = []
-                for opt in (call, put):
+                for opt in calls + puts:
                     if (opt.bid is not None and opt.ask is not None
                             and opt.ask >= opt.bid >= 0):
                         spreads.append(opt.ask - opt.bid)
@@ -208,7 +213,7 @@ class Bachelier:
         iv_arr = np.array(iv_merged)
         w_arr = np.array(ba_weights)
 
-        sabr = SABRCalibration(F=F, T=T, beta=0.5, vol_type="normal")
+        sabr = SABRCalibration(F=F, T=T, beta=0.0, vol_type="normal")
         sabr_ok = False
 
         if (iv_arr > 0).sum() >= 3:
@@ -226,10 +231,10 @@ class Bachelier:
         else:
             final_ivs = iv_merged
 
-        for i, (_, call, put) in enumerate(datas):
+        for i, (_, calls, puts) in enumerate(datas):
             iv = final_ivs[i]
             mkt_iv = iv_merged[i]
-            for opt in (call, put):
+            for opt in calls + puts:
                 opt.market_implied_volatility = mkt_iv
                 opt.sabr_volatility = iv if sabr_ok else 0.0
                 if iv > 0:
