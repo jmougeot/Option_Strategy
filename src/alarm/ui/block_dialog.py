@@ -158,11 +158,7 @@ class BlockDialog(QDialog):
             self._lbl_status.setStyleSheet(f"color: {theme.WARNING}; font-size: 12px;")
             return
 
-        clipboard.setText(
-            build_confirmation_message(
-                self._results,
-            )
-        )
+        clipboard.setText(build_confirmation_message(self._results, self._spin_price.value()))
         self._lbl_status.setText("✓ Message copié dans le presse-papiers")
         self._lbl_status.setStyleSheet(f"color: {theme.SUCCESS}; font-size: 12px;")
 

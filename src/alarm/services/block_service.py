@@ -55,7 +55,7 @@ def _fmt_price(val: float) -> str:
     return "0" if text in {"", "-0"} else text
 
 
-def build_confirmation_message(results: List[OptionLeg]) -> str:
+def build_confirmation_message(results: List[OptionLeg], target_price) -> str:
     """Construit le message de confirmation bloc à partir des résultats courants."""
     lines = ["To confirm, Aurel BGC does the following trades:"]
     overall = 0.0
@@ -63,11 +63,10 @@ def build_confirmation_message(results: List[OptionLeg]) -> str:
     for r in results:
         signed_qty = _signed_quantity(r)
         price = (r.adjusted_mid or 0.0)
-        overall += signed_qty * price * r.quantity
         ticker_text = _format_leg_ticker(r.ticker or "")
         lines.append(f"{signed_qty:+d} {ticker_text} @ {_fmt_price(price)}")
 
-    lines.append(f"Overall Price {_fmt_price(overall)}")
+    lines.append(f"Overall Price {_fmt_price(target_price)}")
     lines.append("(Leg prices are indicative)")
     lines.append("** Please check details and confirm **")
     return "\n".join(lines)
