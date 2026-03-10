@@ -331,17 +331,9 @@ class ChartWidget(QWidget):
         self._style_axes()
         self._add_legend()
 
-        all_x: list = []
-        all_y: list = []
         pi = self._plot_item()
 
-        sc_data = data.get("sabr_curve")
-        if sc_data and sc_data["x"]:
-            pi.plot(sc_data["x"], sc_data["y"],
-                    pen=pg.mkPen("#F44336", width=2), name="SABR")
-            all_x.extend(list(sc_data["x"]))
-            all_y.extend(list(sc_data["y"]))
-
+        # Plot market data first to collect the "reference" ranges
         market_x, market_y = self._plot_scatter_series(
             data.get("market"),
             name="IV marché",
@@ -358,12 +350,28 @@ class ChartWidget(QWidget):
             pen=pg.mkPen("#FF9800", width=2),
             brush=pg.mkBrush(None),
         )
-        all_x.extend(market_x)
-        all_x.extend(corrected_x)
-        all_y.extend(market_y)
-        all_y.extend(corrected_y)
 
-        self._apply_smile_ranges(all_x, all_y)
+        # Ranges based on market points only (not SABR extrapolation)
+        ref_x: list = list(market_x) + list(corrected_x)
+        ref_y: list = list(market_y) + list(corrected_y)
+
+        # Plot SABR curve, clipped to market strike range for range calc
+        sc_data = data.get("sabr_curve")
+        if sc_data and sc_data["x"]:
+            pi.plot(sc_data["x"], sc_data["y"],
+                    pen=pg.mkPen("#F44336", width=2), name="SABR")
+            # Only include SABR Y-values within the market strike range for
+            # axis scaling — prevents extreme wing values from crushing the view
+            if ref_x:
+                x_lo, x_hi = min(ref_x), max(ref_x)
+                for sx, sy in zip(sc_data["x"], sc_data["y"]):
+                    if x_lo <= sx <= x_hi:
+                        ref_y.append(sy)
+            if not ref_x:
+                ref_x.extend(list(sc_data["x"]))
+                ref_y.extend(list(sc_data["y"]))
+
+        self._apply_smile_ranges(ref_x, ref_y)
 
         spot = data.get("spot")
         if spot is not None:

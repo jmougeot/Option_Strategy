@@ -124,7 +124,7 @@ class SABRCalibration:
         F: float, K: float, T: float,
         alpha: float, beta: float, rho: float, nu: float,
     ) -> float:
-        """Volatilité normale (Bachelier) selon SABR."""
+        """Volatilité normale (Bachelier) — Hagan et al. 2002, éq. B.67a."""
         if T <= 0:
             return alpha
         if alpha <= 0:
@@ -132,6 +132,7 @@ class SABRCalibration:
 
         eps = 1e-7
 
+        # ── β ≈ 0 : formule directe normal SABR ──
         if abs(beta) < eps:
             diff = F - K
             if abs(diff) < eps:
@@ -145,11 +146,46 @@ class SABRCalibration:
                 atm_corr = (2.0 - 3.0 * rho ** 2) / 24.0 * nu ** 2
                 return alpha * z_chi * (1.0 + atm_corr * T)
 
-        sigma_B = SABRCalibration.lognormal_vol(F, K, T, alpha, beta, rho, nu)
-        FK_mid = np.sqrt(F * K)
-        log2 = np.log(F / K) ** 2 if abs(F - K) > eps else 0.0
-        A_exp = 1.0 + (1.0 - beta) ** 2 / 24.0 * log2
-        sigma_N = sigma_B * FK_mid ** beta * A_exp
+        # ── β > 0 : formule Hagan (A.69b) pour la vol normale ──
+        if K <= 0 or F <= 0:
+            return 1e-8
+
+        one_m_beta = 1.0 - beta
+
+        if abs(F - K) < eps:
+            # ATM : σ_N = α·F^β·[1 + C_N·T]
+            F1b = F ** one_m_beta
+            time_corr = (
+                -beta * (2.0 - beta) / 24.0 * alpha ** 2 / (F1b * F1b)
+                + rho * beta * nu * alpha / (4.0 * F1b)
+                + (2.0 - 3.0 * rho ** 2) / 24.0 * nu ** 2
+            )
+            return alpha * F ** beta * (1.0 + time_corr * T)
+
+        # Non-ATM
+        F1b = F ** one_m_beta
+        K1b = K ** one_m_beta
+
+        # Préfacteur : α·(1-β)·(F - K) / (F^{1-β} - K^{1-β})
+        prefactor = alpha * one_m_beta * (F - K) / (F1b - K1b)
+
+        # ζ = (ν/α)·(F^{1-β} - K^{1-β}) / (1-β)
+        zeta = nu / alpha * (F1b - K1b) / one_m_beta
+
+        sqrt_disc = np.sqrt(1.0 - 2.0 * rho * zeta + zeta ** 2)
+        chi = np.log((sqrt_disc + zeta - rho) / (1.0 - rho))
+        zeta_chi = zeta / chi if abs(chi) > eps else 1.0
+
+        # Correction temporelle C_N
+        FK_1b = (F * K) ** one_m_beta              # (FK)^{1-β}
+        FK_half_1b = (F * K) ** (one_m_beta / 2.0)  # (FK)^{(1-β)/2}
+        time_corr = (
+            -beta * (2.0 - beta) / 24.0 * alpha ** 2 / FK_1b
+            + rho * beta * nu * alpha / (4.0 * FK_half_1b)
+            + (2.0 - 3.0 * rho ** 2) / 24.0 * nu ** 2
+        )
+
+        sigma_N = prefactor * zeta_chi * (1.0 + time_corr * T)
         return max(sigma_N, 1e-8)
 
     @staticmethod

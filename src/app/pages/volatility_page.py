@@ -54,8 +54,14 @@ def build_smile_figure(calls, puts, underlying_price, sabr_calibration=None) -> 
             sabr_x.append(K)
             sabr_y.append(sv)
 
-        # Market IV (original from price) — only genuine market data
-        mkt_ivs = [o.market_implied_volatility for o in opts if o.market_implied_volatility > 0]
+        # Market IV (original from price) — prefer market_implied_volatility,
+        # fall back to implied_volatility when SABR wasn't run
+        mkt_ivs = [
+            o.market_implied_volatility if o.market_implied_volatility > 0
+            else o.implied_volatility
+            for o in opts
+        ]
+        mkt_ivs = [iv for iv in mkt_ivs if iv > 0]
         is_corrected = any(not o.status for o in opts)
 
         if mkt_ivs:

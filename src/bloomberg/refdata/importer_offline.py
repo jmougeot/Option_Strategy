@@ -10,7 +10,7 @@ Activation: modifier le fichier .env a la racine du projet
 import os
 from pathlib import Path
 import numpy as np
-from typing import List, Literal, Optional, Tuple
+from typing import Any, List, Literal, Optional, Tuple
 import math
 
 from option.option_class import Option
@@ -189,6 +189,14 @@ def _generate_simulated_option(
     # Créer le ticker
     opt_char = "C" if option_type == "call" else "P"
     ticker = f"{underlying}{month}{year} {opt_char}{strike}"
+
+    # Volatilité normale Bachelier (même unité que le mode online)
+    is_call = option_type == "call"
+    if premium > 0 and T > 0:
+        from option.bachelier import Bachelier as _Bach
+        bach_iv = _Bach(underlying_price, strike, 0.0, T, is_call, premium).implied_vol()
+    else:
+        bach_iv = 0.0
     
     # Créer l'option
     option = Option(
@@ -208,7 +216,7 @@ def _generate_simulated_option(
         vega=greeks["vega"],
         theta=greeks["theta"],
         rho=greeks["rho"],
-        implied_volatility=round(iv_smile * 100, 2),  # En pourcentage
+        implied_volatility=bach_iv,
         underlying_price=underlying_price,
     )
     
@@ -232,7 +240,8 @@ def import_options_offline(
     years: List[int],
     strikes: List[float],
     default_position: Literal["long", "short"] = "long",
-) -> Tuple[List[Option], float]:
+    recalibrate: bool = True,
+) -> Tuple[List[Option], float, Any]:
 
     print("\n🔧 MODE OFFLINE - Simulation des données Bloomberg")
     
@@ -249,9 +258,12 @@ def import_options_offline(
         "V": 270, "X": 300, "Z": 330
     }
     
+    days_used = None
     for year in years:
         for month in months:
             days = month_to_days.get(month, 30)
+            if days_used is None:
+                days_used = days
             
             for strike in strikes:
                 for opt_type in ["call", "put"]:
@@ -274,4 +286,15 @@ def import_options_offline(
                         print(f"  ✓ {sym} {strike}: Premium={option.premium:.4f}, "
                               f"Delta={option.delta:.4f}, IV={option.implied_volatility:.1f}%")
     
-    return options, underlying_price
+    # ── Calibration SABR (même pipeline que le mode online) ──
+    sabr_calibration: Any = None
+    if options and recalibrate:
+        from option.bachelier import Bachelier
+        time_to_expiry = (days_used or 30) / 365.0
+        sabr_calibration = Bachelier.compute_volatility(
+            options,
+            time_to_expiry=time_to_expiry,
+            future_price=underlying_price,
+        )
+
+    return options, underlying_price, sabr_calibration

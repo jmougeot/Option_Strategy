@@ -85,15 +85,16 @@ def process_bloomberg_to_strategies(
 
     # Fetch options: Bloomberg ou Simulation selon OFFLINE_MODE
     if offline:
-        options, underlying_price = import_options_offline(
+        options, underlying_price, sabr_calibration = import_options_offline(
             mixture=mixture,
             underlying=underlying,
             months=months,
             years=years,
             strikes=strikes,
             default_position="long",
+            recalibrate=recalibrate,
         )
-        # En mode offline, d�finir une date par d�faut de 5 mois dans le futur
+        # En mode offline, définir une date par défaut de 5 mois dans le futur
         default_expiry_date = (datetime.now() + relativedelta(months=5)).strftime("%Y-%m-%d")
         future_data = FutureData(underlying_price, default_expiry_date)
     else:
@@ -112,8 +113,7 @@ def process_bloomberg_to_strategies(
     # Tracker du fetch
     stats["future_data"] = future_data
     stats["all_options"] = options  # Toutes les options importées (pour page Volatility)
-    if not offline:
-        stats["sabr_calibration"] = sabr_calibration  # type: ignore[possibly-undefined]
+    stats["sabr_calibration"] = sabr_calibration
 
     if not offline and fetch_warnings: #type: ignore
         stats["fetch_warnings"] = fetch_warnings
