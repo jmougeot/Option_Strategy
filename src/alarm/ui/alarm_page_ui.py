@@ -122,12 +122,13 @@ class UIBuildMixin(_WidgetBase):
         self._table = QTableWidget(0, len(HEADERS))
         self._table.setHorizontalHeaderLabels(HEADERS)
         self._table.setObjectName("alarmTable")
-        self._table.setAlternatingRowColors(False)
+        self._table.setAlternatingRowColors(True)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
         self._table.setStyleSheet("""
             QTableWidget { font-size: 12px; }
+            QTableWidget::item:alternate { background-color: #E8F0FE; }
             QTableWidget QLineEdit { font-size: 12px; }
             QTableWidget QAbstractItemView { font-size: 12px; }
         """)

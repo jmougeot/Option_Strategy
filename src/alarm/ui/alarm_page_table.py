@@ -23,9 +23,6 @@ if TYPE_CHECKING:
     from bloomberg.realtime import BloombergService
 
 
-_COL_EVEN_TINT = QColor("#E8F0FE")   # bleu clair pour colonnes paires
-
-
 class TableMixin:
     """Table population, row lookup helpers, add / remove strategies."""
 
@@ -72,8 +69,6 @@ class TableMixin:
                 it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 if not editable:
                     it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                if col % 2 == 0:
-                    it.setBackground(_COL_EVEN_TINT)
                 self._table.setItem(r, col, it)
         self._table.blockSignals(False)
 
@@ -220,4 +215,4 @@ class TableMixin:
             if item is None:
                 item = QTableWidgetItem()
                 self._table.setItem(row, col, item)
-            item.setBackground(_COL_EVEN_TINT if col % 2 == 0 else colour)
+            item.setBackground(colour)
