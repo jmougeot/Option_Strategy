@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 )
 
 from alarm.models.strategy import Strategy
-from alarm.services.smile_service import SmilePoint, SmileResult, fetch_smile, parse_option_ticker
+from alarm.services.smile_service import SmileResult, fetch_smile, parse_option_ticker
 from app.chart_types import SmileFigureSpec
 from app.chart_widget import ChartWidget
 from app import theme

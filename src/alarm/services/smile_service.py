@@ -96,17 +96,6 @@ def build_tickers(underlying: str, expiry: str, strike: float) -> Tuple[str, str
     )
 
 
-def _extract_iv(data: Dict, field_prio: Optional[List[str]] = None) -> Optional[float]:
-    """Extrait l'IV depuis un dict Bloomberg, en essayant plusieurs champs."""
-    if field_prio is None:
-        field_prio = ["IVOL_MID", "OPT_IMP_VOL", "IVOL_BID", "IVOL_ASK"]
-    for f in field_prio:
-        v = data.get(f)
-        if v is not None and float(v) > 0:
-            return float(v)
-    return None
-
-
 def _extract_mid(data: Dict) -> Optional[float]:
     """Calcule le mid depuis un dict Bloomberg."""
     mid = data.get("PX_MID")

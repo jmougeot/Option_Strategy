@@ -21,15 +21,13 @@ class PremiumFetcher:
     
     def fetch_all(self):
         """Fetch toutes les données en batch."""
-        self.main_data, self.future_data, warnings = fetch_options_batch(
+        self.main_data, self.future_data = fetch_options_batch(
             self.builder.main_tickers, 
             underlyings=self.builder.underlying_ticker
         )
-        self.warnings.extend(warnings)
         
         if self.builder.roll_tickers:
-            roll_data, _, roll_warnings = fetch_options_batch(self.builder.roll_tickers, use_overrides=True)
-            self.warnings.extend(roll_warnings)
+            roll_data, _ = fetch_options_batch(self.builder.roll_tickers, use_overrides=True)
             self._extract_premiums(roll_data, self.builder.roll_metadata)
     
     def _extract_premiums(self, batch_data: Dict, metadata: Dict[str, TickerMeta]):

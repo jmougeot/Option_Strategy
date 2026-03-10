@@ -193,7 +193,7 @@ def fetch_options_batch(
     use_overrides: bool = True,
     underlyings: str = "SFR",
     lookback_days: int = 3,
-) -> Tuple[dict[str, dict[str, Any]], FutureData, List[str]]:
+) -> Tuple[dict[str, dict[str, Any]], FutureData]:
     """Récupère les données pour une liste de tickers Bloomberg.
 
     Returns:
@@ -270,19 +270,15 @@ def fetch_options_batch(
                 wide_spread.append(f"{t} (spread={ask - bid:.4f})")
                 results[t]["_warning"] = True
 
-        warnings: List[str] = []
-        if missing_both:
-            warnings.append(f"Sans Bid ni Ask ({len(missing_both)}): " + ", ".join(missing_both))
-        if wide_spread:
-            warnings.append(f"Spread > 8 ticks ({len(wide_spread)}): " + ", ".join(wide_spread))
 
-        return results, FutureData(underlying_price, last_tradable_date), warnings
+
+        return results, FutureData(underlying_price, last_tradable_date)
 
     except Exception as e:
         import traceback
         print(f"✗ Erreur fetch: {e}")
         traceback.print_exc()
-        return results, FutureData(None, None), []
+        return results, FutureData(None, None)
 
 
 def extract_best_values(data: dict[str, Any]) -> dict[str, Any]:
