@@ -28,7 +28,6 @@ class BloombergMixin:
     _bbg: BloombergService
 
     if TYPE_CHECKING:
-        # Stubs for methods provided by other mixins
         def _update_dot(self, row: Optional[int], s: Strategy) -> None: ...
 
     # ── Bloomberg status ──────────────────────────────────────────────────────
@@ -37,6 +36,7 @@ class BloombergMixin:
             self._bbg_lbl.setText("Bloomberg: ⬤ connecté")
             self._bbg_lbl.setStyleSheet(theme.BBG_OK)
             self._subscribe_all_tickers()
+            self._bbg.resubscribe_all()
         else:
             self._bbg_lbl.setText("Bloomberg: ⬤ déconnecté")
             self._bbg_lbl.setStyleSheet(theme.BBG_ERR)
@@ -47,6 +47,9 @@ class BloombergMixin:
             for s in page["strategies"]:
                 for t in s.get_all_tickers():
                     self._bbg.subscribe(t)
+                    fut = self._future_ticker_from_option(normalize_ticker(t))
+                    if fut:
+                        self._bbg.subscribe(fut)
 
     # ── Bloomberg price updates ───────────────────────────────────────────────
     def _on_price_updated(self, ticker: str, last: float, bid: float, ask: float) -> None:

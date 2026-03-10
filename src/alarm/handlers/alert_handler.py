@@ -13,6 +13,7 @@ if sys.platform == "win32":
 
 if TYPE_CHECKING:
     from PyQt6.QtWidgets import QWidget
+    from alarm.ui.alert_popup import AlertPopup
 
 
 class AlertHandler:
@@ -22,6 +23,7 @@ class AlertHandler:
         self._parent = parent
         self._continue_callback = continue_callback
         self._alerted: set[str] = set()
+        self._popup: Optional["AlertPopup"] = None
 
     # ── public API ────────────────────────────────────────────────────────────
     def fire(
@@ -65,7 +67,7 @@ class AlertHandler:
     ) -> None:
         from alarm.ui.alert_popup import AlertPopup
 
-        popup = AlertPopup(
+        self._popup = AlertPopup(
             strategy_name,
             current_price if current_price is not None else 0.0,
             target_price,
@@ -74,7 +76,7 @@ class AlertHandler:
             continue_callback=self._on_continue,
             parent=self._parent,
         )
-        popup.show()
+        self._popup.show()
 
     def _on_continue(self, strategy_id: str) -> None:
         """Callback du popup « Continuer l'alarme »."""

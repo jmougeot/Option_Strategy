@@ -259,6 +259,13 @@ class BloombergService(QObject):
         for t in list(self._active_subscriptions):
             self.unsubscribe(t)
 
+    def resubscribe_all(self) -> None:
+        """Force re-subscription of all active tickers to the worker."""
+        if not self.worker:
+            return
+        for t in self._active_subscriptions:
+            self.worker.subscribe(t)
+
     # ── private callbacks ─────────────────────────────────────────────────────
     def _on_subscription_started(self, ticker: str) -> None:
         self.subscription_started.emit(ticker)
