@@ -8,35 +8,20 @@ from typing import List, Optional
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QDialog, QDoubleSpinBox, QHBoxLayout, QHeaderView,
+    QApplication, QDialog, QDoubleSpinBox, QHBoxLayout, QHeaderView,
     QLabel, QPushButton,
     QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget,
 )
 
-from alarm.models.strategy import Position, Strategy
-from alarm.services.block_service import LegResult, adjust_prices
+from alarm.models.strategy import OptionLeg, Position, Strategy
+from alarm.services.block_service import (
+    adjust_prices,
+    build_confirmation_message,
+    tick_for_underlying,
+)
 from app import theme
 
-_COLOR_MISSING = QColor("#FFEAEA")   # fond rose pâle pour prix manquant
-_COLOR_OK      = QColor("#EAFFF0")   # fond vert pâle pour ajusté OK
-
-DATA_UNDERLYING = {
-    "SFR": 0.0025,   # SOFR 3M
-    "SFI": 0.0025,   # SONIA 1M
-    "ER": 0.0025,   # Euribor 3M
-    "0R": 0.0025,   # Euribor mid-curve
-    "0Q": 0.005,   # SOFR mid-curve
-    "0N": 0.0025,   # SONIA mid-curve
-    "RX": 0.01,   # Euro-Bund 10Y
-    "OE": 0.005,   # Euro-Bobl 5Y
-    "DU": 0.005,   # Euro-Schatz 2Y
-}
-
-
-def _tick_for(underlying: str) -> float:
-    """Retourne la taille du tick pour un underlying (ex: 'SFR', 'ER', 'RX')."""
-    return DATA_UNDERLYING.get(underlying.upper(), 0.0025)
 
 class BlockDialog(QDialog):
     """Popup qui affiche les legs, fetch Bloomberg, et ajuste les prix."""
@@ -46,15 +31,7 @@ class BlockDialog(QDialog):
     def __init__(self, strategy: Strategy, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._strategy = strategy
-        self._results: List[LegResult] = [
-            LegResult(
-                leg=leg,
-                bbg_bid=leg.bid,
-                bbg_ask=leg.ask,
-                bbg_mid=leg.mid,
-            )
-            for leg in strategy.legs
-        ]
+        self._results: List[OptionLeg] = list(strategy.legs)
 
         self.setWindowTitle(f"Block {strategy.name or ''}")
         self.setMinimumSize(800, 400)
@@ -107,11 +84,23 @@ class BlockDialog(QDialog):
         self._lbl_status.setStyleSheet(f"color: {theme.TEXT_SECONDARY}; font-size: 12px;")
         root.addWidget(self._lbl_status)
 
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+
+        self._btn_copy = QPushButton("Copier message")
+        self._btn_copy.clicked.connect(self._copy_message)
+        btn_row.addWidget(self._btn_copy)
+
+        btn_close = QPushButton("Fermer")
+        btn_close.clicked.connect(self.close)
+        btn_row.addWidget(btn_close)
+        root.addLayout(btn_row)
+
         # Remplir la table avec les prix temps réel et lancer l'ajustement
         self._populate_results()
-        bbg_price = self._compute_bbg_strategy_price()
-        if bbg_price is not None:
-            self._lbl_bbg_price.setText(f"{bbg_price:.4f}")
+        contributions = [leg.get_price_contribution() for leg in self._results]
+        if all(c is not None for c in contributions):
+            self._lbl_bbg_price.setText(f"{sum(c for c in contributions if c is not None):.4f}")
         self._run_adjust()
 
     # ── helpers table ──────────────────────────────────────────────────────
@@ -126,6 +115,8 @@ class BlockDialog(QDialog):
             self._set_cell(r, 2, str(leg.quantity))
             for c in range(3, len(self._COLS)):
                 self._set_cell(r, c, "…")
+    
+    
 
     def _populate_results(self) -> None:
         """Remplit la table avec les résultats fetch + ajustement."""
@@ -134,10 +125,10 @@ class BlockDialog(QDialog):
         for lr in self._results:
             r = self._table.rowCount()
             self._table.insertRow(r)
-            self._set_cell(r, 0, lr.leg.ticker or "—")
-            self._set_cell(r, 1, "L" if lr.leg.position == Position.LONG else "S")
-            self._set_cell(r, 2, str(lr.leg.quantity))
-            self._set_cell(r, 3, self._fmt(lr.bbg_mid))
+            self._set_cell(r, 0, lr.ticker or "—")
+            self._set_cell(r, 1, "L" if lr.position == Position.LONG else "S")
+            self._set_cell(r, 2, str(lr.quantity))
+            self._set_cell(r, 3, self._fmt(lr.mid))
             self._set_cell(r, 4, self._fmt(lr.adjusted_mid))
 
         # Mise à jour du status
@@ -160,17 +151,20 @@ class BlockDialog(QDialog):
     def _fmt(val: Optional[float]) -> str:
         return f"{val:.4f}" if val is not None else "—"
 
-    def _compute_bbg_strategy_price(self) -> Optional[float]:
-        """Calcule le prix stratégie à partir des mids Bloomberg disponibles."""
-        total = 0.0
-        has_any = False
-        for lr in self._results:
-            if lr.bbg_mid is None:
-                continue
-            has_any = True
-            sign = 1 if lr.leg.position == Position.LONG else -1
-            total += sign * lr.leg.quantity * lr.bbg_mid
-        return total if has_any else None
+    def _copy_message(self) -> None:
+        clipboard = QApplication.clipboard()
+        if clipboard is None:
+            self._lbl_status.setText("✗ Impossible d'accéder au presse-papiers")
+            self._lbl_status.setStyleSheet(f"color: {theme.WARNING}; font-size: 12px;")
+            return
+
+        clipboard.setText(
+            build_confirmation_message(
+                self._results,
+            )
+        )
+        self._lbl_status.setText("✓ Message copié dans le presse-papiers")
+        self._lbl_status.setStyleSheet(f"color: {theme.SUCCESS}; font-size: 12px;")
 
     def _on_price_changed(self) -> None:
         """Appelé quand le prix cible change — re-ajuste automatiquement."""
@@ -180,7 +174,7 @@ class BlockDialog(QDialog):
         """Ajuste les prix si on a des résultats et un prix cible."""
         if not self._results:
             return
-        step = _tick_for(self._results[0].leg.underlying)
+        step = tick_for_underlying(self._results[0].underlying)
         target = self._spin_price.value()
         self._results = adjust_prices(self._results, step, target)
         self._populate_results()

@@ -67,6 +67,9 @@ class OptionLeg:
     mid: Optional[float] = None
     last_update: Optional[datetime] = None
 
+    # Prix ajusté (block)
+    adjusted_mid: Optional[float] = None
+
     # Greeks temps réel depuis Bloomberg
     delta: Optional[float] = None
     gamma: Optional[float] = None

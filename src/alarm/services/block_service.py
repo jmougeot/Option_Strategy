@@ -7,45 +7,85 @@ corresponde au prix stratégie saisi par l'utilisateur.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+import re
+from dataclasses import replace
 from typing import List, Optional
 from math import gcd
 from functools import reduce
 from alarm.models.strategy import OptionLeg, Position, Strategy
 
+_OPTION_TICKER_RE = re.compile(
+    r"^([A-Z0-9]+[FGHJKMNQUVXZ]\d+)([CP])\s+([\d.]+)\s+COMDTY$",
+    re.IGNORECASE,
+)
 
-@dataclass
-class LegResult:
-    """Résultat pour un leg après fetch + ajustement."""
-    leg: OptionLeg
-    bbg_bid: Optional[float] = None
-    bbg_ask: Optional[float] = None
-    bbg_mid: Optional[float] = None
-    adjusted_mid: Optional[float] = None
+_TICK_BY_UNDERLYING = {
+    "SFR": 0.0025,
+    "SFI": 0.0025,
+    "ER": 0.0025,
+    "0R": 0.0025,
+    "0Q": 0.005,
+    "0N": 0.0025,
+    "RX": 0.01,
+    "OE": 0.005,
+    "DU": 0.005,
+}
 
 
-def _signed_quantity(result: LegResult) -> int:
+def tick_for_underlying(underlying: str) -> float:
+    """Retourne la taille du tick pour un underlying bloc."""
+    return _TICK_BY_UNDERLYING.get(underlying.upper(), 0.0025)
+
+
+def _signed_quantity(leg: OptionLeg) -> int:
     """Quantité signée du leg pour le calcul du prix stratégie."""
-    sign = 1 if result.leg.position == Position.LONG else -1
-    return sign * result.leg.quantity
+    sign = 1 if leg.position == Position.LONG else -1
+    return sign * leg.quantity
+
+def _format_leg_ticker(ticker: str) -> str:
+    raw = (ticker or "").strip().upper()
+    match = _OPTION_TICKER_RE.match(raw)
+    if not match:
+        return raw.replace(" COMDTY", "")
+
+    base, opt_type, strike = match.groups()
+    return f"{base}{opt_type} {strike} {opt_type}"
 
 
-def _clone_results(results: List[LegResult]) -> List[LegResult]:
-    """Clone superficiellement les LegResult pour éviter les effets de bord."""
-    return [replace(result) for result in results]
+def _fmt_price(val: float) -> str:
+    text = f"{val:.4f}".rstrip("0").rstrip(".")
+    return "0" if text in {"", "-0"} else text
 
 
-def _initial_ticks(results: List[LegResult], step: float, target_ticks: int) -> List[int]:
+def build_confirmation_message(results: List[OptionLeg]) -> str:
+    """Construit le message de confirmation bloc à partir des résultats courants."""
+    lines = ["To confirm, Aurel BGC does the following trades:"]
+    overall = 0.0
+
+    for r in results:
+        signed_qty = _signed_quantity(r)
+        price = (r.adjusted_mid or 0.0) / r.quantity if r.quantity else 0.0
+        overall += signed_qty * price
+        ticker_text = _format_leg_ticker(r.ticker or "")
+        lines.append(f"{signed_qty:+d} {ticker_text} @ {_fmt_price(price)}")
+
+    lines.append(f"Overall Price {_fmt_price(overall)}")
+    lines.append("(Leg prices are indicative)")
+    lines.append("** Please check details and confirm **")
+    return "\n".join(lines)
+
+
+def _initial_ticks(results: List[OptionLeg], step: float, target_ticks: int) -> List[int]:
     """Construit une base de ticks cohérente pour tous les legs."""
     priced_ticks: List[Optional[int]] = []
     positive_ticks: List[int] = []
 
     for result in results:
-        if result.bbg_mid is None or result.bbg_mid <= 0:
+        if result.mid is None or result.mid <= 0:
             priced_ticks.append(None)
             continue
 
-        ticks = max(round(result.bbg_mid / step), 0)
+        ticks = max(round(result.mid / step), 0)
         priced_ticks.append(ticks)
         if ticks > 0:
             positive_ticks.append(ticks)
@@ -70,75 +110,10 @@ def _initial_ticks(results: List[LegResult], step: float, target_ticks: int) -> 
     return ticks_out
 
 
-def fetch_legs_prices(strategy: Strategy) -> List[LegResult]:
-    """Fetch les prix Bloomberg pour chaque leg de la stratégie.
-
-    Utilise le fetcher existant (BDP + BDH fallback).
-    Retourne une liste de LegResult avec les prix bruts Bloomberg.
-    """
-    from bloomberg.refdata.fetcher import _bdp_fetch, _bdh_fallback, _has_prices
-    from bloomberg.connection import get_session, get_service
-
-    tickers = [leg.ticker for leg in strategy.legs if leg.ticker]
-    if not tickers:
-        return [LegResult(leg=leg) for leg in strategy.legs]
-
-    session = get_session()
-    service = get_service()
-
-    # BDP pour tous les champs
-    bdp_raw = _bdp_fetch(session, service, tickers, use_overrides=True)
-
-    # BDH fallback pour ceux sans prix
-    missing = [t for t in tickers if not _has_prices(bdp_raw.get(t, {}))]
-    bdh_raw = {}
-    if missing:
-        bdh_raw = _bdh_fallback(session, service, missing, lookback_days=10, use_overrides=True)
-
-    results: List[LegResult] = []
-    for leg in strategy.legs:
-        lr = LegResult(leg=leg)
-        if not leg.ticker:
-            results.append(lr)
-            continue
-
-        data = dict(bdp_raw.get(leg.ticker, {}))
-        if leg.ticker in bdh_raw:
-            data.update(bdh_raw[leg.ticker])
-
-        bid = data.get("PX_BID")
-        ask = data.get("PX_ASK")
-        mid = data.get("PX_MID")
-
-        lr.bbg_bid = float(bid) if bid is not None else None
-        lr.bbg_ask = float(ask) if ask is not None else None
-
-        # Calculer le mid
-        if mid is not None and float(mid) > 0:
-            lr.bbg_mid = float(mid)
-        elif lr.bbg_bid is not None and lr.bbg_ask is not None:
-            lr.bbg_mid = (lr.bbg_bid + lr.bbg_ask) / 2
-        elif lr.bbg_ask is not None:
-            lr.bbg_mid = lr.bbg_ask / 2
-        elif lr.bbg_bid is not None:
-            lr.bbg_mid = lr.bbg_bid
-
-        results.append(lr)
-
-    return results
-
-
-
-def is_possible(target: float, 
-                step : float):
-    if (target / step) :
-        return
-
-
-def adjust_prices(results: List[LegResult], step: float, target_price: float) -> List[LegResult]:
+def adjust_prices(results: List[OptionLeg], step: float, target_price: float) -> List[OptionLeg]:
     tol = 1e-9
-    result_copy = _clone_results(results)
-
+    result_copy = [replace(result) for result in results]
+    
     if not result_copy or step <= 0:
         return result_copy
 
