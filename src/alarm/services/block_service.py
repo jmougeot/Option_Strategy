@@ -31,11 +31,9 @@ _TICK_BY_UNDERLYING = {
     "DU": 0.005,
 }
 
-
 def tick_for_underlying(underlying: str) -> float:
     """Retourne la taille du tick pour un underlying bloc."""
     return _TICK_BY_UNDERLYING.get(underlying.upper(), 0.0025)
-
 
 def _signed_quantity(leg: OptionLeg) -> int:
     """Quantité signée du leg pour le calcul du prix stratégie."""
@@ -64,8 +62,8 @@ def build_confirmation_message(results: List[OptionLeg]) -> str:
 
     for r in results:
         signed_qty = _signed_quantity(r)
-        price = (r.adjusted_mid or 0.0) / r.quantity if r.quantity else 0.0
-        overall += signed_qty * price
+        price = (r.adjusted_mid or 0.0)
+        overall += signed_qty * price * r.quantity
         ticker_text = _format_leg_ticker(r.ticker or "")
         lines.append(f"{signed_qty:+d} {ticker_text} @ {_fmt_price(price)}")
 
