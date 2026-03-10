@@ -91,6 +91,7 @@ def is_possible(target: float,
 
 def adjust_prices(results: List[LegResult], step: float, target_price: float) -> List["LegResult"]:
     tol = 1e-9
+    result_copy = results.copy()
 
     # target doit être multiple de step
     scaled_target = target_price / step
@@ -106,7 +107,7 @@ def adjust_prices(results: List[LegResult], step: float, target_price: float) ->
     # contrainte pgcd
     g = reduce(gcd, qs)
     if T % g != 0:
-        return []
+        return result_copy
 
     # initialisation sur la grille
     ns = []
@@ -151,7 +152,7 @@ def adjust_prices(results: List[LegResult], step: float, target_price: float) ->
         i += 1
 
     if diff != 0:
-        return []
+        return result_copy
 
     # reconstruire les prix
     for l, n in zip(results, ns):

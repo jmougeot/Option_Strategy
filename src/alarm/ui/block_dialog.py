@@ -107,7 +107,6 @@ class BlockDialog(QDialog):
         self._lbl_status.setStyleSheet(f"color: {theme.TEXT_SECONDARY}; font-size: 12px;")
         root.addWidget(self._lbl_status)
 
-
         # Remplir la table avec les prix temps réel et lancer l'ajustement
         self._populate_results()
         bbg_price = self._compute_bbg_strategy_price()
@@ -173,6 +172,10 @@ class BlockDialog(QDialog):
             total += sign * lr.leg.quantity * lr.bbg_mid
         return total if has_any else None
 
+    def _on_price_changed(self) -> None:
+        """Appelé quand le prix cible change — re-ajuste automatiquement."""
+        self._run_adjust()
+
     def _run_adjust(self) -> None:
         """Ajuste les prix si on a des résultats et un prix cible."""
         if not self._results:
@@ -181,8 +184,3 @@ class BlockDialog(QDialog):
         target = self._spin_price.value()
         self._results = adjust_prices(self._results, step, target)
         self._populate_results()
-
-
-    def _on_price_changed(self) -> None:
-        """Appelé quand le prix cible change — re-ajuste automatiquement."""
-        self._run_adjust()
