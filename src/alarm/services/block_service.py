@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List, Optional
+from math import gcd
+from functools import reduce
 from alarm.models.strategy import OptionLeg, Position, Strategy
 
 
@@ -80,37 +82,79 @@ def fetch_legs_prices(strategy: Strategy) -> List[LegResult]:
     return results
 
 
-def adjust_prices(
-    results: List[LegResult],
-    target_price: float,
-) -> List[LegResult]:
-    """Ajuste proportionnellement les mids pour que le prix stratégie = target_price.
 
-    Le prix stratégie Bloomberg = Σ (sign_i × qty_i × mid_i) sur les legs ayant un mid.
-    On calcule un ratio = target_price / prix_bbg et on applique ratio × mid_i.
-    Les legs sans mid sont ignorés (adjusted_mid reste None).
-    """
-    # Calculer le prix stratégie Bloomberg sur les legs disponibles
-    bbg_total = 0.0
-    has_any = False
-    for lr in results:
-        if lr.bbg_mid is None:
-            lr.adjusted_mid = None
-            continue
-        has_any = True
-        sign = 1 if lr.leg.position == Position.LONG else -1
-        bbg_total += sign * lr.leg.quantity * lr.bbg_mid
+def is_possible(target: float, 
+                step : float):
+    if (target / step) :
+        return
 
-    if not has_any or bbg_total == 0:
-        for lr in results:
-            lr.adjusted_mid = lr.bbg_mid
-        return results
 
-    ratio = target_price / bbg_total
+def adjust_prices(results: List[LegResult], step: float, target_price: float) -> List["LegResult"]:
+    tol = 1e-9
 
-    for lr in results:
-        if lr.bbg_mid is not None:
-            lr.adjusted_mid = lr.bbg_mid * ratio
+    # target doit être multiple de step
+    scaled_target = target_price / step
+    T = round(scaled_target)
+    if abs(scaled_target - T) > tol:
+        return []
+
+    # quantités actives
+    qs = [abs(l.leg.quantity) for l in results if l.leg.quantity != 0]
+    if not qs:
+        return results if abs(target_price) < tol else []
+
+    # contrainte pgcd
+    g = reduce(gcd, qs)
+    if T % g != 0:
+        return []
+
+    # initialisation sur la grille
+    ns = []
+    for l in results:
+        if l.bbg_mid is None:
+            n = 0
+        else:
+            n = round(l.bbg_mid / step)
+        ns.append(n)
+
+    # somme actuelle
+    current = sum(l.leg.quantity * n for l, n in zip(results, ns))
+    diff = T - current
+
+    # correction gloutonne
+    max_iter = 10000
+    i = 0
+
+    while diff != 0 and i < max_iter:
+        best_idx = None
+        best_after = abs(diff)
+
+        for idx, l in enumerate(results):
+            q = l.leg.quantity
+
+            after_plus = abs(diff - q)
+            if after_plus < best_after:
+                best_after = after_plus
+                best_idx = (idx, 1)
+
+            after_minus = abs(diff + q)
+            if after_minus < best_after:
+                best_after = after_minus
+                best_idx = (idx, -1)
+
+        if best_idx is None:
+            break
+
+        idx, direction = best_idx
+        ns[idx] += direction
+        diff -= direction * results[idx].leg.quantity
+        i += 1
+
+    if diff != 0:
+        return []
+
+    # reconstruire les prix
+    for l, n in zip(results, ns):
+        l.adjusted_mid = n * step
 
     return results
-

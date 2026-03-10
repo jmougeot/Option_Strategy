@@ -38,13 +38,6 @@ def _tick_for(underlying: str) -> float:
     """Retourne la taille du tick pour un underlying (ex: 'SFR', 'ER', 'RX')."""
     return DATA_UNDERLYING.get(underlying.upper(), 0.0025)
 
-
-def _snap_to_quarter_tick(price: float, tick: float) -> float:
-    """Arrondit un prix au quart de tick le plus proche."""
-    step = tick / 4
-    return round(price / step) * step
-
-
 class BlockDialog(QDialog):
     """Popup qui affiche les legs, fetch Bloomberg, et ajuste les prix."""
 
@@ -53,14 +46,20 @@ class BlockDialog(QDialog):
     def __init__(self, strategy: Strategy, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._strategy = strategy
-        self._results: List[LegResult] = []
+        self._results: List[LegResult] = [
+            LegResult(
+                leg=leg,
+                bbg_bid=leg.bid,
+                bbg_ask=leg.ask,
+                bbg_mid=leg.mid,
+            )
+            for leg in strategy.legs
+        ]
 
-        self.setWindowTitle(f"Block — {strategy.name or 'Sans nom'}")
+        self.setWindowTitle(f"Block {strategy.name or ''}")
         self.setMinimumSize(800, 400)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-
         self._build()
-        self._on_fetch()
 
     # ── construction ───────────────────────────────────────────────────────
     def _build(self) -> None:
@@ -108,25 +107,13 @@ class BlockDialog(QDialog):
         self._lbl_status.setStyleSheet(f"color: {theme.TEXT_SECONDARY}; font-size: 12px;")
         root.addWidget(self._lbl_status)
 
-        # Boutons
-        btn_row = QHBoxLayout()
-        self._btn_fetch = QPushButton("↻ Refresh")
-        self._btn_fetch.setStyleSheet(
-            f"background: {theme.ACCENT}; color: white; padding: 6px 16px;"
-            f" border-radius: {theme.RADIUS_SM};"
-        )
-        self._btn_fetch.clicked.connect(self._on_fetch)
-        btn_row.addWidget(self._btn_fetch)
 
-        btn_row.addStretch()
-
-        btn_close = QPushButton("Fermer")
-        btn_close.clicked.connect(self.close)
-        btn_row.addWidget(btn_close)
-        root.addLayout(btn_row)
-
-        # Pré-remplir la table avec les legs (sans prix)
-        self._populate_legs_only()
+        # Remplir la table avec les prix temps réel et lancer l'ajustement
+        self._populate_results()
+        bbg_price = self._compute_bbg_strategy_price()
+        if bbg_price is not None:
+            self._lbl_bbg_price.setText(f"{bbg_price:.4f}")
+        self._run_adjust()
 
     # ── helpers table ──────────────────────────────────────────────────────
     def _populate_legs_only(self) -> None:
@@ -154,17 +141,6 @@ class BlockDialog(QDialog):
             self._set_cell(r, 3, self._fmt(lr.bbg_mid))
             self._set_cell(r, 4, self._fmt(lr.adjusted_mid))
 
-            # Colorer la ligne selon l'état
-            is_missing = lr.bbg_mid is None
-            if is_missing:
-                missing_count += 1
-            bg = _COLOR_MISSING if is_missing else (_COLOR_OK if lr.adjusted_mid is not None else None)
-            if bg:
-                for c in range(len(self._COLS)):
-                    item = self._table.item(r, c)
-                    if item:
-                        item.setBackground(bg)
-
         # Mise à jour du status
         n = len(self._results)
         if missing_count == 0:
@@ -172,7 +148,7 @@ class BlockDialog(QDialog):
             self._lbl_status.setStyleSheet(f"color: {theme.SUCCESS}; font-size: 12px;")
         else:
             self._lbl_status.setText(
-                f"⚠ {missing_count}/{n} leg(s) sans prix — ajustement sur les legs disponibles"
+                f"{missing_count}/{n} leg(s) sans prix — ajustement sur les legs disponibles"
             )
             self._lbl_status.setStyleSheet(f"color: {theme.WARNING}; font-size: 12px;")
 
@@ -201,31 +177,11 @@ class BlockDialog(QDialog):
         """Ajuste les prix si on a des résultats et un prix cible."""
         if not self._results:
             return
+        step = _tick_for(self._results[0].leg.underlying)
         target = self._spin_price.value()
-        if target != 0:
-            self._results = adjust_prices(self._results, target)
-        else:
-            for lr in self._results:
-                lr.adjusted_mid = lr.bbg_mid
-
-        # Snap chaque prix ajusté au quart de tick de l'instrument
-        for lr in self._results:
-            if lr.adjusted_mid is not None:
-                tick = _tick_for(lr.leg.underlying or "")
-                lr.adjusted_mid = _snap_to_quarter_tick(lr.adjusted_mid, tick)
-
+        self._results = adjust_prices(self._results, step, target)
         self._populate_results()
 
-    # ── actions ────────────────────────────────────────────────────────────
-    def _on_fetch(self) -> None:
-        """Construit les LegResult depuis les prix déjà disponibles dans les legs, puis ajuste."""
-        self._results = [
-            LegResult(leg=leg, bbg_mid=leg.mid)
-            for leg in self._strategy.legs
-        ]
-        bbg_price = self._compute_bbg_strategy_price()
-        self._lbl_bbg_price.setText(f"{bbg_price:.4f}" if bbg_price is not None else "—")
-        self._run_adjust()
 
     def _on_price_changed(self) -> None:
         """Appelé quand le prix cible change — re-ajuste automatiquement."""
