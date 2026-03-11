@@ -10,7 +10,7 @@ from alarm.ui.columns import (
     C_ACTION, C_CLIENT, C_COND, C_LEGS, C_NAME,
     C_STATUS, C_TARGET,
 )
-from alarm.ui.legs_dialog import LegsDialog
+from alarm.ui.block_dialog import BlockDialog
 
 if TYPE_CHECKING:
     from alarm.handlers.alert_handler import AlertHandler
@@ -154,7 +154,7 @@ class EditingMixin(_WidgetBase):
     # ── legs dialog ───────────────────────────────────────────────────────────
     def _edit_legs(self, strategy: Strategy, row: int) -> None:
         old_tickers = set(strategy.get_all_tickers())
-        dlg = LegsDialog(strategy, self)
+        dlg = BlockDialog(strategy, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             new_tickers = set(strategy.get_all_tickers())
             for t in old_tickers - new_tickers:

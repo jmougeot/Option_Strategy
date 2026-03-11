@@ -8,11 +8,10 @@ corresponde au prix stratégie saisi par l'utilisateur.
 from __future__ import annotations
 
 import re
-from dataclasses import replace
 from typing import List, Optional
 from math import gcd
 from functools import reduce
-from alarm.models.strategy import OptionLeg, Position
+from alarm.models.strategy import OptionLeg, Position, Strategy
 
 _OPTION_TICKER_RE = re.compile(
     r"^([A-Z0-9]+[FGHJKMNQUVXZ]\d+)([CP])\s+([\d.]+)\s+COMDTY$",
@@ -42,9 +41,10 @@ def _signed_quantity(leg: OptionLeg) -> int:
 
 
 def compute_total_quantities(
-    legs: List[OptionLeg], base_total: Optional[int]
+    strategy: Strategy, base_total: Optional[int]
 ) -> None:
     """Calcule et stocke total_qty sur chaque leg proportionnellement à base_total."""
+    legs = strategy.legs
     for i, leg in enumerate(legs):
         if base_total is None or not legs:
             leg.total_qty = None
@@ -73,17 +73,17 @@ def _fmt_price(val: float) -> str:
     return "0" if text in {"", "-0"} else text
 
 
-def build_confirmation_message(results: List[OptionLeg], target_price) -> str:
+def build_confirmation_message(strategy: Strategy) -> str:
     """Construit le message de confirmation bloc à partir des résultats courants."""
     lines = ["To confirm, Aurel BGC does the following trades:"]
 
-    for r in results:
+    for r in strategy.legs:
         price = (r.adjusted_mid or 0.0)
         ticker_text = _format_leg_ticker(r.ticker or "")
         qty = r.total_qty if r.total_qty is not None else r.quantity
         lines.append(f"{qty:+d} {ticker_text} @ {_fmt_price(price)}")
 
-    lines.append(f"Overall Price {_fmt_price(target_price)}")
+    lines.append(f"Overall Price {_fmt_price(strategy.target_price or 0.0)}")
     lines.append("(Leg prices are indicative)")
     lines.append("** Please check details and confirm **")
     return "\n".join(lines)
@@ -124,36 +124,43 @@ def _initial_ticks(results: List[OptionLeg], step: float, target_ticks: int) -> 
     return ticks_out
 
 
-def adjust_prices(results: List[OptionLeg], step: float, target_price: float) -> List[OptionLeg]:
+def adjust_prices(strategy: Strategy) -> None:
+    """Ajuste les prix des legs en place pour atteindre strategy.target_price."""
+    legs = strategy.legs
+    target_price = strategy.target_price or 0.0
+
+    if not legs:
+        return
+
+    step = tick_for_underlying(legs[0].underlying)
     tol = 1e-9
-    result_copy = [replace(result) for result in results]
-    
-    if not result_copy or step <= 0:
-        return result_copy
+
+    if step <= 0:
+        return
 
     # target doit être multiple de step
     scaled_target = target_price / step
     T = round(scaled_target)
     if abs(scaled_target - T) > tol:
-        return result_copy
+        return
 
-    coeffs = [_signed_quantity(result) for result in result_copy]
+    coeffs = [_signed_quantity(leg) for leg in legs]
     min_ticks = [1 if coeff != 0 else 0 for coeff in coeffs]
 
     # quantités actives signées
     qs = [abs(coeff) for coeff in coeffs if coeff != 0]
     if not qs:
-        return result_copy
+        return
 
     # contrainte pgcd
     g = reduce(gcd, qs)
-    base_ns = _initial_ticks(result_copy, step, T)
+    base_ns = _initial_ticks(legs, step, T)
     base_ns = [max(base_n, min_n) for base_n, min_n in zip(base_ns, min_ticks)]
     current = sum(coeff * n for coeff, n in zip(coeffs, base_ns))
     diff = T - current
 
     if diff % g != 0:
-        return result_copy
+        return
 
     # initialisation sur la grille
     ns = base_ns.copy()
@@ -196,10 +203,8 @@ def adjust_prices(results: List[OptionLeg], step: float, target_price: float) ->
         i += 1
 
     if diff != 0:
-        return result_copy
+        return
 
-    # reconstruire les prix
-    for result, n in zip(result_copy, ns):
-        result.adjusted_mid = n * step
-
-    return result_copy
+    # mettre à jour les prix directement sur les legs
+    for leg, n in zip(legs, ns):
+        leg.adjusted_mid = n * step
