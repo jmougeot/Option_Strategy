@@ -33,13 +33,17 @@ class AlertHandler:
         current_price: Optional[float],
         target_price: float,
         is_inferior: bool,
-    ) -> None:
-        """Déclenche l'alerte complète (son + popup). Anti-spam intégré."""
+    ) -> bool:
+        """Déclenche l'alerte complète (son + popup). Anti-spam intégré.
+
+        Returns True if the alert was actually fired, False if anti-spam blocked it.
+        """
         if strategy_id in self._alerted:
-            return
+            return False
         self._alerted.add(strategy_id)
         self.play_alert_sound()
         self._show_popup(strategy_name, current_price, target_price, is_inferior, strategy_id)
+        return True
 
     def on_target_left(self, strategy_id: str) -> None:
         """Appelé quand le prix sort de la zone cible — réarme l'anti-spam."""

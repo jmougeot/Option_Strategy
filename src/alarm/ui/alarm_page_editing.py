@@ -13,6 +13,7 @@ from alarm.ui.columns import (
 from alarm.ui.legs_dialog import LegsDialog
 
 if TYPE_CHECKING:
+    from alarm.handlers.alert_handler import AlertHandler
     from alarm.ui.alarm_state import RowState
     from bloomberg.realtime import BloombergService
     _WidgetBase = QWidget
@@ -28,6 +29,7 @@ class EditingMixin(_WidgetBase):
     _table: QTableWidget
     _states: dict[str, RowState]
     _bbg: BloombergService
+    _alert: AlertHandler
 
     if TYPE_CHECKING:
         # Stubs for methods provided by other mixins
@@ -64,6 +66,8 @@ class EditingMixin(_WidgetBase):
             state = self._states.get(s.id)
             if state:
                 state.reset()
+            # Clear anti-spam so alarm can re-fire when set back to "En cours"
+            self._alert.on_target_left(s.id)
             self._table.blockSignals(True)
             item = self._table.item(row, C_STATUS)
             if item:

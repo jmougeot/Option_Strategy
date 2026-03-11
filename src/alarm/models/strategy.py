@@ -127,6 +127,7 @@ class OptionLeg:
     ticker: str = ""  # ex: "SFRH6C 98.00 Comdty"
     position: Position = Position.LONG
     quantity: int = 1
+    total_qty: Optional[int] = None
     underlying: str = ""
     strike: float = 0.0
     # Prix temps réel depuis Bloomberg

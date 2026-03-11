@@ -12,7 +12,7 @@ from dataclasses import replace
 from typing import List, Optional
 from math import gcd
 from functools import reduce
-from alarm.models.strategy import OptionLeg, Position, Strategy
+from alarm.models.strategy import OptionLeg, Position
 
 _OPTION_TICKER_RE = re.compile(
     r"^([A-Z0-9]+[FGHJKMNQUVXZ]\d+)([CP])\s+([\d.]+)\s+COMDTY$",
@@ -40,6 +40,24 @@ def _signed_quantity(leg: OptionLeg) -> int:
     sign = 1 if leg.position == Position.LONG else -1
     return sign * leg.quantity
 
+
+def compute_total_quantities(
+    legs: List[OptionLeg], base_total: Optional[int]
+) -> None:
+    """Calcule et stocke total_qty sur chaque leg proportionnellement à base_total."""
+    for i, leg in enumerate(legs):
+        if base_total is None or not legs:
+            leg.total_qty = None
+        elif i == 0:
+            leg.total_qty = base_total
+        else:
+            base_signed = _signed_quantity(legs[0])
+            if base_signed == 0:
+                leg.total_qty = None
+            else:
+                ratio = _signed_quantity(leg) / base_signed
+                leg.total_qty = int(round(base_total * ratio))
+
 def _format_leg_ticker(ticker: str) -> str:
     raw = (ticker or "").strip().upper()
     match = _OPTION_TICKER_RE.match(raw)
@@ -58,13 +76,12 @@ def _fmt_price(val: float) -> str:
 def build_confirmation_message(results: List[OptionLeg], target_price) -> str:
     """Construit le message de confirmation bloc à partir des résultats courants."""
     lines = ["To confirm, Aurel BGC does the following trades:"]
-    overall = 0.0
 
     for r in results:
-        signed_qty = _signed_quantity(r)
         price = (r.adjusted_mid or 0.0)
         ticker_text = _format_leg_ticker(r.ticker or "")
-        lines.append(f"{signed_qty:+d} {ticker_text} @ {_fmt_price(price)}")
+        qty = r.total_qty if r.total_qty is not None else r.quantity
+        lines.append(f"{qty:+d} {ticker_text} @ {_fmt_price(price)}")
 
     lines.append(f"Overall Price {_fmt_price(target_price)}")
     lines.append("(Leg prices are indicative)")

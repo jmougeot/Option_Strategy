@@ -17,6 +17,7 @@ from alarm.models.strategy import OptionLeg, Position, Strategy
 from alarm.services.block_service import (
     adjust_prices,
     build_confirmation_message,
+    compute_total_quantities,
     tick_for_underlying,
 )
 from app import theme
@@ -107,14 +108,21 @@ class BlockDialog(QDialog):
 
         # Remplir la table avec les prix temps réel et lancer l'ajustement
         self._populate_results()
+        self._refresh_bbg_price()
+        self._run_adjust()
+
+    def _refresh_bbg_price(self) -> None:
+        """Met à jour le label du prix Bloomberg agrégé."""
         contributions = [leg.get_price_contribution() for leg in self._results]
         if all(c is not None for c in contributions):
             self._lbl_bbg_price.setText(f"{sum(c for c in contributions if c is not None):.4f}")
-        self._run_adjust()
+        else:
+            self._lbl_bbg_price.setText("—")
 
     # ── helpers table ──────────────────────────────────────────────────────
     def _populate_results(self) -> None:
         """Remplit la table avec les résultats fetch + ajustement."""
+        compute_total_quantities(self._results, self._base_total)
         self._table.blockSignals(True)
         self._table.setRowCount(0)
         missing_count = 0
@@ -124,7 +132,7 @@ class BlockDialog(QDialog):
             self._set_cell(r, self.C_TICKER, leg.ticker or "—")
             self._set_cell(r, self.C_POS, "L" if leg.position == Position.LONG else "S")
             self._set_cell(r, self.C_QTY, str(leg.quantity))
-            self._set_cell(r, self.C_TOTAL, self._fmt_total(self._row_total(row, leg)), editable=row == 0)
+            self._set_cell(r, self.C_TOTAL, self._fmt_total(leg.total_qty), editable=row == 0)
             self._set_cell(r, self.C_BBG, self._fmt(leg.mid))
             self._set_cell(r, self.C_ADJUSTED, self._fmt(leg.adjusted_mid))
 
@@ -136,7 +144,7 @@ class BlockDialog(QDialog):
         # Mise à jour du status
         n = len(self._results)
         if missing_count == 0:
-            self._lbl_status.setText(f"✓ {n} legs — tous les prix disponibles")
+            self._lbl_status.setText(f"{n} legs — tous les prix disponibles")
             self._lbl_status.setStyleSheet(f"color: {theme.SUCCESS}; font-size: 12px;")
         else:
             self._lbl_status.setText(
@@ -150,24 +158,6 @@ class BlockDialog(QDialog):
         if not editable:
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         self._table.setItem(row, col, item)
-
-    @staticmethod
-    def _signed_quantity(leg: OptionLeg) -> int:
-        return leg.quantity if leg.position == Position.LONG else -leg.quantity
-
-    def _row_total(self, row: int, leg: OptionLeg) -> Optional[int]:
-        if self._base_total is None or not self._results:
-            return None
-
-        if row == 0:
-            return self._base_total
-
-        base_signed_qty = self._signed_quantity(self._results[0])
-        if base_signed_qty == 0:
-            return None
-
-        ratio = self._signed_quantity(leg) / base_signed_qty
-        return int(round(self._base_total * ratio))
 
     @staticmethod
     def _fmt(val: Optional[float]) -> str:

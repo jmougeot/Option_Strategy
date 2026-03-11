@@ -116,7 +116,7 @@ class AlertPopup(QWidget):
         buttons_layout.setSpacing(10)
         
         # Bouton fermer
-        close_btn = QPushButton("✓ OK")
+        close_btn = QPushButton("OK")
         close_btn.setStyleSheet("""
             QPushButton {
                 background-color: #00aa00;
@@ -135,7 +135,7 @@ class AlertPopup(QWidget):
         buttons_layout.addWidget(close_btn)
         
         # Bouton continuer l'alarme
-        continue_btn = QPushButton("🔔 Continuer l'alarme")
+        continue_btn = QPushButton("Continuer l'alarme")
         continue_btn.setStyleSheet("""
             QPushButton {
                 background-color: #aa6600;

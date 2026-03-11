@@ -6,16 +6,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from alarm.models.strategy import Strategy
-
 
 class RowState:
     """Tracks the warning countdown and confirmation for one strategy alarm."""
 
-    def __init__(self, strategy: Strategy) -> None:
-        self.strategy = strategy
+    __slots__ = ("warning_start", "confirmed")
+
+    def __init__(self) -> None:
         self.warning_start: Optional[datetime] = None
-        self.confirmed: bool = False  # True once WARN_DELAY seconds have elapsed
+        self.confirmed: bool = False  # True once alarm fired — prevents retry loop
 
     def reset(self) -> None:
         self.warning_start = None

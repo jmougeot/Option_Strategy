@@ -45,7 +45,7 @@ class TableMixin:
         self._table.setRowCount(0)
         for s in self._pages[self._cur]["strategies"]:
             if s.id not in self._states:
-                self._states[s.id] = RowState(s)
+                self._states[s.id] = RowState()
             self._append_row(s)
         self._fill_ghost_rows()
         self._table.blockSignals(False)
@@ -159,7 +159,7 @@ class TableMixin:
             return None  # not a ghost row
         strategy = Strategy(id=str(uuid.uuid4()), name="")
         strategies.append(strategy)
-        self._states[strategy.id] = RowState(strategy)
+        self._states[strategy.id] = RowState()
 
         # Make non-editable cells functional
         for col in (C_LEGS, C_PRICE, C_COND, C_STATUS, C_DELTA, C_GAMMA, C_THETA, C_IV, C_FUT):
@@ -183,7 +183,7 @@ class TableMixin:
         if strategy is None:
             strategy = Strategy(id=str(uuid.uuid4()), name="")
         self._pages[self._cur]["strategies"].append(strategy)
-        self._states[strategy.id] = RowState(strategy)
+        self._states[strategy.id] = RowState()
         self._append_row(strategy)
 
     def _remove_strategy(self, strategy: Strategy) -> None:
@@ -201,12 +201,20 @@ class TableMixin:
             self._fill_ghost_rows()
 
     # ── row painting ──────────────────────────────────────────────────────────
+    _WARNING_COLOUR = QColor("#fff3e0")  # Amber — target hit, countdown running
+
     def _paint_row(self, row: int, s: Strategy) -> None:
-        hit = s.is_target_reached()
         if s.status == StrategyStatus.ANNULE:
             colour = self._STATUS_COLOUR[StrategyStatus.ANNULE]
-        elif s.status == StrategyStatus.FAIT or hit is True:
+        elif s.status == StrategyStatus.FAIT:
             colour = self._STATUS_COLOUR[StrategyStatus.FAIT]
+        elif s.is_target_reached() is True:
+            state = self._states.get(s.id)
+            # Amber during countdown, green once confirmed
+            if state and state.warning_start is not None and not state.confirmed:
+                colour = self._WARNING_COLOUR
+            else:
+                colour = self._STATUS_COLOUR[StrategyStatus.FAIT]
         else:
             colour = self._STATUS_COLOUR[StrategyStatus.EN_COURS]
 
