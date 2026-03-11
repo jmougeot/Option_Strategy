@@ -8,7 +8,6 @@ from __future__ import annotations
 from typing import Any, List, Optional
 
 import numpy as np
-import pandas as pd
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QAbstractItemView, QHeaderView, QLabel, QPushButton, QTabWidget,
@@ -28,78 +27,50 @@ from option.option_class import Option
 
 def build_smile_figure(calls, puts, underlying_price, sabr_calibration=None) -> Optional[SmileFigureSpec]:
     """Build smile data with market IV points + SABR smooth curve."""
-    # Gather all options by strike
     calls_by_strike = {o.strike: o for o in calls}
     puts_by_strike  = {o.strike: o for o in puts}
     all_strikes = sorted(set(calls_by_strike) | set(puts_by_strike))
     if not all_strikes:
         return None
 
-    # Market IV points (from bid/ask, before SABR)
     mkt_x, mkt_y, mkt_labels = [], [], []
-    # SABR curve (smooth, all strikes)
-    sabr_x, sabr_y = [], []
-    # Corrected points (status=False)
     warn_x, warn_y, warn_labels = [], [], []
 
     for K in all_strikes:
-        c = calls_by_strike.get(K)
-        p = puts_by_strike.get(K)
-        opts = [o for o in (c, p) if o is not None]
+        opts = [o for o in (calls_by_strike.get(K), puts_by_strike.get(K)) if o is not None]
 
-        # SABR vol (always available after calibration)
+        # Market IV: prefer market_implied_volatility, fall back to implied_volatility
+        ivs = [o.market_implied_volatility or o.implied_volatility for o in opts]
+        ivs = [iv for iv in ivs if iv > 0]
+        if not ivs:
+            continue
+
+        mkt_iv = sum(ivs) / len(ivs)
+
+        # SABR annotation
         sabr_vols = [o.sabr_volatility for o in opts if o.sabr_volatility > 0]
-        if sabr_vols:
-            sv = sum(sabr_vols) / len(sabr_vols)
-            sabr_x.append(K)
-            sabr_y.append(sv)
+        sabr_iv = sum(sabr_vols) / len(sabr_vols) if sabr_vols else 0.0
 
-        # Market IV (original from price) — prefer market_implied_volatility,
-        # fall back to implied_volatility when SABR wasn't run
-        mkt_ivs = [
-            o.market_implied_volatility if o.market_implied_volatility > 0
-            else o.implied_volatility
-            for o in opts
-        ]
-        mkt_ivs = [iv for iv in mkt_ivs if iv > 0]
-        is_corrected = any(not o.status for o in opts)
+        lbl = f"K={K:.3f}\nmkt={mkt_iv * 1e4:.1f}bp"
+        if sabr_iv > 0:
+            lbl += f"\nSABR={sabr_iv * 1e4:.1f}bp\n\u0394={(mkt_iv - sabr_iv) * 1e4:+.1f}bp"
 
-        if mkt_ivs:
-            mkt_iv = sum(mkt_ivs) / len(mkt_ivs)
-            sabr_iv = sabr_vols[0] if sabr_vols else 0.0
-            res_bp = (mkt_iv - sabr_iv) * 10_000 if sabr_iv > 0 else 0.0
-            lbl = f"K={K:.3f}\nmkt={mkt_iv*1e4:.1f}bp"
-            if sabr_iv > 0:
-                lbl += f"\nSABR={sabr_iv*1e4:.1f}bp\n\u0394={res_bp:+.1f}bp"
-            if is_corrected:
-                warn_x.append(K); warn_y.append(mkt_iv)
-                warn_labels.append(lbl + "\n! Corrige")
-            else:
-                mkt_x.append(K); mkt_y.append(mkt_iv)
-                mkt_labels.append(lbl)
+        if any(not o.status for o in opts):
+            warn_x.append(K); warn_y.append(mkt_iv)
+            warn_labels.append(lbl + "\n! Corrigé")
+        else:
+            mkt_x.append(K); mkt_y.append(mkt_iv)
+            mkt_labels.append(lbl)
 
-    # Build smooth SABR curve on a dense grid
+    # Dense SABR curve
+    sabr_curve_x, sabr_curve_y = [], []
     if sabr_calibration is not None and len(all_strikes) >= 2:
-        K_min = min(all_strikes) * 0.98
-        K_max = max(all_strikes) * 1.02
-        k_dense = np.linspace(K_min, K_max, 200)
         try:
-            sabr_dense = np.maximum(sabr_calibration.predict(k_dense), 0.0)
-            sabr_curve_x: list = k_dense.tolist()
-            sabr_curve_y: list = sabr_dense.tolist()
+            k_dense = np.linspace(min(all_strikes) * 0.98, max(all_strikes) * 1.02, 200)
+            sabr_curve_y = np.maximum(sabr_calibration.predict(k_dense), 0.0).tolist()
+            sabr_curve_x = k_dense.tolist()
         except Exception:
-            sabr_curve_x = sabr_x
-            sabr_curve_y = sabr_y
-    elif len(sabr_x) >= 4:
-        # Fallback: cubic spline through calibrated points
-        from scipy.interpolate import CubicSpline
-        k_dense = np.linspace(sabr_x[0], sabr_x[-1], 200)
-        cs = CubicSpline(sabr_x, sabr_y)
-        sabr_curve_x = k_dense.tolist()
-        sabr_curve_y = np.maximum(cs(k_dense), 0.0).tolist()
-    else:
-        sabr_curve_x = sabr_x
-        sabr_curve_y = sabr_y
+            pass
 
     return {
         "type": "smile",

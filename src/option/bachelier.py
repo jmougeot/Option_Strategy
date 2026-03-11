@@ -7,7 +7,6 @@ import numpy as np
 from collections import defaultdict
 from scipy.stats import norm
 from scipy.optimize import brentq
-from scipy.interpolate import CubicSpline as CS
 from typing import Any, Dict, Optional, List, Tuple
 from option.option_class import Option
 from option.sabr import SABRCalibration
@@ -152,7 +151,7 @@ class Bachelier:
             opt.underlying_price = F
             opt.implied_volatility = (
                 Bachelier(F, opt.strike, 0.0, T, opt.is_call(), opt.premium).implied_vol()
-                if opt.status and opt.premium > 0
+                if opt.premium > 0
                 else 0.0
             )
 
