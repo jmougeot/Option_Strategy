@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import math
-import re
 from typing import TYPE_CHECKING, Optional
 
 from PyQt6.QtGui import QColor
@@ -45,11 +44,11 @@ class BloombergMixin:
         """(Re)subscribe all tickers across every page."""
         for page in self._pages:
             for s in page["strategies"]:
-                for t in s.get_all_tickers():
-                    self._bbg.subscribe(t)
-                    fut = self._future_ticker_from_option(normalize_ticker(t))
-                    if fut:
-                        self._bbg.subscribe(fut)
+                for leg in s.legs:
+                    if leg.ticker:
+                        self._bbg.subscribe(leg.ticker)
+                    if leg.future_ticker:
+                        self._bbg.subscribe(leg.future_ticker)
 
     # ── Bloomberg price updates ───────────────────────────────────────────────
     def _on_price_updated(self, ticker: str, last: float, bid: float, ask: float) -> None:
@@ -72,9 +71,8 @@ class BloombergMixin:
                     self._update_dot(visible_row, s)
                 else:
                     # Check if this is the underlying future for this strategy
-                    for opt_t in s.get_all_tickers():
-                        fut = self._future_ticker_from_option(normalize_ticker(opt_t))
-                        if fut and normalize_ticker(fut) == ticker_n:
+                    for leg in s.legs:
+                        if leg.future_ticker and normalize_ticker(leg.future_ticker) == ticker_n:
                             price = last if last >= 0 else (
                                 (bid + ask) / 2 if bid >= 0 and ask >= 0 else None
                             )
@@ -122,12 +120,4 @@ class BloombergMixin:
         _set(C_IV,    s.get_average_ivol(), "{:.2%}")
         _set(C_FUT,   s.future_price,       "{:.4f}")
 
-    # ── static helpers ────────────────────────────────────────────────────────
-    @staticmethod
-    def _future_ticker_from_option(option_ticker: str) -> Optional[str]:
-        """Derive the underlying future ticker from a Bloomberg option ticker.
 
-        Example: "SFRH6C 98.0 COMDTY" → "SFRH6 COMDTY"
-        """
-        m = re.match(r'^([A-Z]+[FGHJKMNQUVXZ]\d+)[CP]\s', option_ticker.strip().upper())
-        return f"{m.group(1)} COMDTY" if m else None

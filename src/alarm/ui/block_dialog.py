@@ -224,7 +224,7 @@ class BlockDialog(QDialog):
             if old_future:
                 # Don't unsubscribe the future if another leg still needs it
                 future_still_needed = any(
-                    self._future_ticker_from_option(normalize_ticker(leg.ticker or "")) == old_future
+                    leg.future_ticker == old_future
                     for leg in self._strategy.legs
                     if normalize_ticker(leg.ticker or "") != old_norm
                 )

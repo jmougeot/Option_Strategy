@@ -24,6 +24,10 @@ _OPTION_TICKER_DETAILS_RE = re.compile(
     re.IGNORECASE,
 )
 
+_FUTURE_TICKER_RE = re.compile(
+    r'^([A-Z0-9]+[FGHJKMNQUVXZ]\d+)[CP]\s', re.IGNORECASE
+)
+
 _MONTH_TO_NUMBER = {
     "F": 1,
     "G": 2,
@@ -146,6 +150,12 @@ class OptionLeg:
     theta: Optional[float] = None
     implied_vol: Optional[float] = None
 
+    @property
+    def future_ticker(self) -> Optional[str]:
+        """Ticker du future sous-jacent, dérivé du ticker option."""
+        m = _FUTURE_TICKER_RE.match(normalize_ticker(self.ticker or ""))
+        return f"{m.group(1).upper()} COMDTY" if m else None
+
     def update_price(self, last_price: float, bid: float, ask: float):
         """Met à jour les prix de l'option. Ignore les valeurs négatives (pas de donnée)."""
         if last_price is not None and last_price >= 0:
@@ -264,12 +274,9 @@ class Strategy:
     expiration : Optional[str] = None
     target_price: Optional[float] = None
     target_condition: TargetCondition = TargetCondition.INFERIEUR  # Alarme si prix < ou > cible
-    # Status
     status: StrategyStatus = StrategyStatus.EN_COURS
-    # Timestamps
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
-    # Prix du future sous-jacent (mis à jour via Bloomberg)
     future_price: Optional[float] = None
 
     def add_leg(self, ticker: str = "", position: Position = Position.LONG, quantity: int = 1) -> OptionLeg:
