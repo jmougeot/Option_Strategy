@@ -7,7 +7,8 @@ and from the context-menu "Show Block".
 """
 from __future__ import annotations
 
-from typing import Optional
+import re
+from typing import TYPE_CHECKING, Optional
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor, QKeySequence, QShortcut
@@ -23,7 +24,11 @@ from alarm.services.block_service import (
     build_confirmation_message,
     compute_total_quantities,
 )
+from bloomberg.config import normalize_ticker
 from app import theme
+
+if TYPE_CHECKING:
+    from bloomberg.realtime import BloombergService
 
 # Column indices
 C_TICKER   = 0
@@ -38,11 +43,17 @@ _HEADERS = ["Ticker", "Pos", "Qty", "Total", "Mid BBG", "Mid Ajusté"]
 class BlockDialog(QDialog):
     """Legs editor with live Bloomberg prices and block-price adjustment."""
 
-    def __init__(self, strategy: Strategy, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        strategy: Strategy,
+        parent: QWidget | None = None,
+        bbg: BloombergService | None = None,
+    ) -> None:
         super().__init__(parent)
         self._strategy = strategy
+        self._bbg = bbg
         self._leg_ids: list[str] = []          # parallel to table rows
-        self._base_total: Optional[int] = None
+        self._base_total = strategy.legs[0].total_qty if strategy.legs else None
 
         self.setWindowTitle(f"Block — {strategy.name or 'Sans nom'}")
         self.setMinimumSize(820, 440)
@@ -131,9 +142,7 @@ class BlockDialog(QDialog):
         sc.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         sc.activated.connect(self._del_selected)
 
-        # Initial populate
-        self._populate_table()
-        self._refresh_bbg_price()
+        # Initial populate with price adjustment
         self._run_adjust()
 
     # ── table population ──────────────────────────────────────────────────
@@ -182,6 +191,52 @@ class BlockDialog(QDialog):
     def _fmt_int(val: Optional[int]) -> str:
         return str(val) if val is not None else "—"
 
+    @staticmethod
+    def _future_ticker_from_option(option_ticker: str) -> str | None:
+        match = re.match(r'^([A-Z]+[FGHJKMNQUVXZ]\d+)[CP]\s', normalize_ticker(option_ticker))
+        return f"{match.group(1)} COMDTY" if match else None
+
+    @staticmethod
+    def _clear_leg_market_data(leg: OptionLeg) -> None:
+        leg.last_price = None
+        leg.bid = None
+        leg.ask = None
+        leg.mid = None
+        leg.last_update = None
+        leg.adjusted_mid = None
+        leg.delta = None
+        leg.gamma = None
+        leg.theta = None
+        leg.implied_vol = None
+
+    def _sync_subscriptions(self, old_ticker: str, new_ticker: str) -> None:
+        if self._bbg is None:
+            return
+
+        old_norm = normalize_ticker(old_ticker)
+        new_norm = normalize_ticker(new_ticker)
+        if old_norm == new_norm:
+            return
+
+        if old_norm:
+            self._bbg.unsubscribe(old_norm)
+            old_future = self._future_ticker_from_option(old_norm)
+            if old_future:
+                # Don't unsubscribe the future if another leg still needs it
+                future_still_needed = any(
+                    self._future_ticker_from_option(normalize_ticker(leg.ticker or "")) == old_future
+                    for leg in self._strategy.legs
+                    if normalize_ticker(leg.ticker or "") != old_norm
+                )
+                if not future_still_needed:
+                    self._bbg.unsubscribe(old_future)
+
+        if new_norm:
+            self._bbg.subscribe(new_norm)
+            new_future = self._future_ticker_from_option(new_norm)
+            if new_future:
+                self._bbg.subscribe(new_future)
+
     # ── interactions ──────────────────────────────────────────────────────
     def _on_dbl_click(self, row: int, col: int) -> None:
         if col != C_POS or row < 0 or row >= len(self._leg_ids):
@@ -190,11 +245,7 @@ class BlockDialog(QDialog):
         if leg is None:
             return
         leg.position = Position.SHORT if leg.position == Position.LONG else Position.LONG
-        self._table.blockSignals(True)
-        item = self._table.item(row, C_POS)
-        if item:
-            item.setText("Long" if leg.position == Position.LONG else "Short")
-        self._table.blockSignals(False)
+        self._run_adjust()
 
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
         row, col = item.row(), item.column()
@@ -205,16 +256,22 @@ class BlockDialog(QDialog):
             return
 
         if col == C_TICKER:
+            old_ticker = leg.ticker or ""
             raw = item.text().strip().upper()
             if raw and "COMDTY" not in raw:
                 raw += " COMDTY"
             leg.ticker, leg.underlying, leg.strike = parse_leg_ticker(raw)
+            if normalize_ticker(old_ticker) != normalize_ticker(leg.ticker or ""):
+                self._clear_leg_market_data(leg)
+                self._sync_subscriptions(old_ticker, leg.ticker or "")
+            self._run_adjust()
 
         elif col == C_QTY:
             try:
                 leg.quantity = max(1, int(item.text()))
             except ValueError:
                 leg.quantity = 1
+            self._run_adjust()
 
         elif col == C_TOTAL and row == 0:
             text = item.text().strip().replace(",", ".")
@@ -226,39 +283,56 @@ class BlockDialog(QDialog):
                 except ValueError:
                     self._lbl_status.setText("✗ Total invalide")
                     self._lbl_status.setStyleSheet(f"color: {theme.WARNING}; font-size: 12px;")
+                    self._table.blockSignals(True)
+                    item.setText(self._fmt_int(self._base_total))
+                    self._table.blockSignals(False)
                     return
             self._run_adjust()
 
     def _add_leg(self) -> None:
-        leg = self._strategy.add_leg()
-        self._table.blockSignals(True)
-        self._append_row(leg)
-        self._table.blockSignals(False)
+        self._strategy.add_leg()
+        self._run_adjust()
 
     def _del_selected(self) -> None:
         row = self._table.currentRow()
         if 0 <= row < len(self._leg_ids):
             leg_id = self._leg_ids.pop(row)
+            leg = self._strategy.get_leg(leg_id)
+            old_ticker = leg.ticker if leg is not None else ""
             self._strategy.remove_leg(leg_id)
-            self._table.removeRow(row)
+            self._sync_subscriptions(old_ticker, "")
+            self._run_adjust()
 
     # ── live price refresh ────────────────────────────────────────────────
     def _refresh_live_prices(self) -> None:
+        adjust_prices(self._strategy)
         for r in range(min(self._table.rowCount(), len(self._leg_ids))):
             leg = self._strategy.get_leg(self._leg_ids[r])
             if leg is None:
                 continue
-            it = self._table.item(r, C_BBG)
-            if it:
+            bbg_item = self._table.item(r, C_BBG)
+            if bbg_item:
                 if leg.mid is not None:
-                    it.setText(f"{leg.mid:.4f}")
-                    it.setForeground(QColor(theme.TEXT_PRIMARY))
+                    bbg_item.setText(f"{leg.mid:.4f}")
+                    bbg_item.setForeground(QColor(theme.TEXT_PRIMARY))
                 else:
-                    it.setText("—")
-                    it.setForeground(QColor("#888"))
+                    bbg_item.setText("—")
+                    bbg_item.setForeground(QColor("#888"))
+            adjusted_item = self._table.item(r, C_ADJUSTED)
+            if adjusted_item:
+                if leg.adjusted_mid is not None:
+                    adjusted_item.setText(f"{leg.adjusted_mid:.4f}")
+                    adjusted_item.setForeground(QColor(theme.TEXT_PRIMARY))
+                else:
+                    adjusted_item.setText("—")
+                    adjusted_item.setForeground(QColor("#888"))
         self._refresh_bbg_price()
+        self._update_status()
 
     def _refresh_bbg_price(self) -> None:
+        if not self._strategy.legs:
+            self._lbl_bbg_price.setText("—")
+            return
         contributions = [leg.get_price_contribution() for leg in self._strategy.legs]
         if all(c is not None for c in contributions):
             total = sum(c for c in contributions if c is not None)
@@ -269,6 +343,10 @@ class BlockDialog(QDialog):
 
     def _update_status(self) -> None:
         n = len(self._strategy.legs)
+        if n == 0:
+            self._lbl_status.setText("Aucun leg")
+            self._lbl_status.setStyleSheet(f"color: {theme.TEXT_SECONDARY}; font-size: 12px;")
+            return
         missing = sum(1 for leg in self._strategy.legs if leg.mid is None)
         if missing == 0:
             self._lbl_status.setText(f"{n} legs — tous les prix disponibles")
@@ -285,10 +363,9 @@ class BlockDialog(QDialog):
         self._run_adjust()
 
     def _run_adjust(self) -> None:
-        if not self._strategy.legs:
-            return
         adjust_prices(self._strategy)
         self._populate_table()
+        self._refresh_bbg_price()
 
     def _copy_message(self) -> None:
         clipboard = QApplication.clipboard()
@@ -302,12 +379,7 @@ class BlockDialog(QDialog):
 
     # ── commit ────────────────────────────────────────────────────────────
     def _commit(self) -> None:
-        """Legs are already synced live — just remove deleted legs and accept."""
-        self._strategy.target_price = self._spin_price.value()
-        active_ids = set(self._leg_ids)
-        for leg in list(self._strategy.legs):
-            if leg.id not in active_ids:
-                self._strategy.remove_leg(leg.id)
+        """The dialog edits the shared strategy directly; OK only closes the dialog."""
         self.accept()
 
     # ── cleanup ───────────────────────────────────────────────────────────

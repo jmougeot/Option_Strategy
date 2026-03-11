@@ -220,6 +220,7 @@ class OptionLeg:
             "ticker": self.ticker,
             "position": self.position.value,
             "quantity": self.quantity,
+            "total_qty": self.total_qty,
             "underlying": self.underlying,
             "strike": self.strike,
         }
@@ -229,16 +230,23 @@ class OptionLeg:
         """Crée depuis un dictionnaire"""
         ticker, inferred_underlying, inferred_strike = parse_leg_ticker(data.get("ticker", ""))
         strike_raw = data.get("strike", 0.0)
+        total_qty_raw = data.get("total_qty")
         try:
             strike = float(strike_raw) if strike_raw not in (None, "") else inferred_strike
         except (TypeError, ValueError):
             strike = inferred_strike
+
+        try:
+            total_qty = int(total_qty_raw) if total_qty_raw not in (None, "") else None
+        except (TypeError, ValueError):
+            total_qty = None
 
         return cls(
             id=data.get("id", str(uuid.uuid4())),
             ticker=ticker,
             position=Position(data.get("position", "long")),
             quantity=data.get("quantity", 1),
+            total_qty=total_qty,
             underlying=data.get("underlying", "") or inferred_underlying,
             strike=strike,
         )

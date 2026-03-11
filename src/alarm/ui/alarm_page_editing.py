@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from PyQt6.QtWidgets import QDialog, QTableWidget, QWidget
+from PyQt6.QtWidgets import QTableWidget, QWidget
 
-from alarm.models.strategy import Strategy, TargetCondition, normalize_ticker
+from alarm.models.strategy import Strategy, TargetCondition
 from alarm.ui.columns import (
     C_ACTION, C_CLIENT, C_COND, C_LEGS, C_NAME,
     C_STATUS, C_TARGET,
@@ -36,11 +36,11 @@ class EditingMixin(_WidgetBase):
         def _strategy_at_row(self, row: int) -> Strategy | None: ...
         def _update_dot(self, row: Optional[int], s: Strategy) -> None: ...
         def _paint_row(self, row: int, s: Strategy) -> None: ...
+        def _refresh_price_cell(self, row: int, price: Optional[float]) -> None: ...
+        def _refresh_greeks_cells(self, row: int, s: Strategy) -> None: ...
         def _promote_ghost_row(self, row: int) -> Strategy | None: ...
         def _legs_summary(self, strategy: Strategy) -> str: ...
         def _row_by_sid(self, sid: str) -> int: ...
-        @staticmethod
-        def _future_ticker_from_option(option_ticker: str) -> str | None: ...
 
     # ── double-click cycling ──────────────────────────────────────────────────
     def _on_cell_double_clicked(self, row: int, col: int) -> None:
@@ -153,20 +153,22 @@ class EditingMixin(_WidgetBase):
 
     # ── legs dialog ───────────────────────────────────────────────────────────
     def _edit_legs(self, strategy: Strategy, row: int) -> None:
-        old_tickers = set(strategy.get_all_tickers())
-        dlg = BlockDialog(strategy, self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            new_tickers = set(strategy.get_all_tickers())
-            for t in old_tickers - new_tickers:
-                self._bbg.unsubscribe(t)
-                fut = self._future_ticker_from_option(normalize_ticker(t))
-                if fut:
-                    self._bbg.unsubscribe(fut)
-            for t in new_tickers - old_tickers:
-                self._bbg.subscribe(t)
-                fut = self._future_ticker_from_option(normalize_ticker(t))
-                if fut:
-                    self._bbg.subscribe(fut)
-            legs_item = self._table.item(row, C_LEGS)
-            if legs_item:
-                legs_item.setText(self._legs_summary(strategy))
+        dlg = BlockDialog(strategy, self, bbg=self._bbg)
+        dlg.exec()
+
+        row = self._row_by_sid(strategy.id)
+        if row < 0:
+            return
+
+        legs_item = self._table.item(row, C_LEGS)
+        if legs_item:
+            legs_item.setText(self._legs_summary(strategy))
+
+        target_item = self._table.item(row, C_TARGET)
+        if target_item:
+            target_item.setText(f"{strategy.target_price:.4f}" if strategy.target_price is not None else "")
+
+        self._refresh_price_cell(row, strategy.calculate_strategy_price())
+        self._refresh_greeks_cells(row, strategy)
+        self._paint_row(row, strategy)
+        self._update_dot(row, strategy)

@@ -21,6 +21,7 @@ from alarm.handlers.file_handler import FileHandler
 from alarm.models.strategy import Strategy
 from alarm.ui.alarm_state import RowState
 from alarm.ui.block_dialog import BlockDialog
+from alarm.ui.columns import C_LEGS, C_TARGET
 from alarm.ui.smile_dialog import SmileDialog
 from bloomberg.realtime import BloombergService
 
@@ -135,8 +136,25 @@ class AlarmPage(
         dlg.exec()
 
     def _show_block(self, strategy: Strategy) -> None:
-        dlg = BlockDialog(strategy, parent=self)
+        dlg = BlockDialog(strategy, parent=self, bbg=self._bbg)
         dlg.exec()
+
+        row = self._row_by_sid(strategy.id)
+        if row < 0:
+            return
+
+        legs_item = self._table.item(row, C_LEGS)
+        if legs_item:
+            legs_item.setText(self._legs_summary(strategy))
+
+        target_item = self._table.item(row, C_TARGET)
+        if target_item:
+            target_item.setText(f"{strategy.target_price:.4f}" if strategy.target_price is not None else "")
+
+        self._refresh_price_cell(row, strategy.calculate_strategy_price())
+        self._refresh_greeks_cells(row, strategy)
+        self._paint_row(row, strategy)
+        self._update_dot(row, strategy)
 
     # ── cleanup ───────────────────────────────────────────────────────────────
     def closeEvent(self, event) -> None:  # type: ignore[override]

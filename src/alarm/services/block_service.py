@@ -132,6 +132,9 @@ def adjust_prices(strategy: Strategy) -> None:
     if not legs:
         return
 
+    for leg in legs:
+        leg.adjusted_mid = None
+
     step = tick_for_underlying(legs[0].underlying)
     tol = 1e-9
 
