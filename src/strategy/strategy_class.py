@@ -36,3 +36,8 @@ class StrategyComparison(BaseStrategy):
     rolls_detail: Dict[str, float] = field(default_factory=dict)  # Rolls par expiry (ex: {"H6": 0.5, "M6": 0.3})
     delta_levrage: float = 0.0
     avg_pnl_levrage: float = 0.0  # avg/premium
+
+    @property
+    def strategy_name(self) -> str:
+        """Alias backward-compatible pour self.name (renommé lors du refactoring BaseStrategy)."""
+        return self.name

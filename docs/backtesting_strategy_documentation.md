@@ -270,7 +270,7 @@ Itère sur **8 jeux de poids prédéfinis** (`DEFAULT_WEIGHT_GRID`) :
 
 Enregistrement unitaire d'un trade backtesté :
 - Dates : `entry_date`, `expiry_date`
-- Stratégie : `strategy_name`, `n_legs`, `legs_detail`
+- Stratégie : `name`, `n_legs`, `legs_detail`
 - Entrée : `entry_premium`, `predicted_avg_pnl`, `predicted_score`, `rank_at_entry`
 - Résultats : `realized_pnl`, `underlying_at_entry`, `underlying_at_expiry`
 - Bornes : `max_profit`, `max_loss`, `total_delta`

@@ -566,8 +566,8 @@ class BacktestEngine:
             trade = TradeRecord(
                 entry_date=entry_date,
                 expiry_date=self.config.sfr_config.end_date,
-                strategy_name=strat.strategy_name,
-                n_legs=len(strat.all_options),
+                strategy_name=strat.name,
+                n_legs=len(strat.legs),
                 entry_premium=strat.premium,
                 predicted_avg_pnl=strat.average_pnl or 0.0,
                 predicted_score=strat.score,
