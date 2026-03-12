@@ -195,9 +195,9 @@ def batch_to_strategies(
         
         # Creer la StrategyComparison
         strat = StrategyComparison(
-            strategy_name=strategy_name,
+            name=strategy_name,
             premium=metrics['total_premium'],
-            all_options=opts,
+            legs=opts,
             signs=signs_arr,
             call_count=metrics.get('call_count', 0),
             put_count=metrics.get('put_count', 0),

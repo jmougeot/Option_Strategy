@@ -83,7 +83,7 @@ def create_comparison_table(comparisons: List[StrategyComparison], roll_labels: 
         row = {
             "Rank": idx,
             "Score": comp.score,
-            "Strategy": comp.strategy_name,
+            "Strategy": comp.name,
             "Premium": format_price(comp.premium, unit),
             "Max Profit": format_price(comp.max_profit, unit),
             "Avg P&L": format_price(comp.average_pnl, unit) if comp.average_pnl is not None else "-",

@@ -1,56 +1,38 @@
-from dataclasses import dataclass, field
-from enum import Enum
+from dataclasses import dataclass, field, KW_ONLY
 from typing import Dict, List, Literal, Optional
 import numpy as np
 
-
-class Position(Enum):
-    """Position sur une option : long (acheteur) ou short (vendeur)."""
-    LONG = "long"
-    SHORT = "short"
-
-
-# Alias pour la compatibilité avec les annotations de type existantes
-PositionType = Literal["long", "short"]
+from option.base_option import BaseOption, Position, PositionType  # noqa: F401 – re-exported
 
 
 @dataclass
-class Option:
-    # ============ CHAMPS OBLIGATOIRES ============
-    option_type: str  # 'call' ou 'put'
-    strike: float
-    premium: float
+class Option(BaseOption):
+    # ============ CHAMPS OBLIGATOIRES (keyword-only) ============
+    _: KW_ONLY
+    option_type: str = "call"   # 'call' ou 'put'
+    premium: float = 0.0
     timestamp: Optional[float] = None
     status: bool = True
 
-    # ============ CHAMPS OBLIGATOIRES ============
-    expiration_month: Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"] = ("F")
+    # ============ EXPIRATION ============
+    expiration_month: Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"] = "F"
     expiration_year: int = 6
 
     # =========== STRUCTURE DE POSITION ===========
-    quantity: Optional[int] = 1
     position: Literal["long", "short"] = "short"
 
     # ============= IDENTIFICATION ================
-    ticker: Optional[str] = None
     bloomberg_ticker: Optional[str] = None  # Ticker Bloomberg complet
-    underlying_symbol: Optional[str] = None
     exchange: Optional[str] = None
     currency: Optional[str] = None
 
     # ========== PRIX ET COTATIONS ================
-    bid: Optional[float] = None
-    ask: Optional[float] = None
-    last: Optional[float] = None
-    mid: Optional[float] = None
     roll: List[float] = field(default_factory=list)  # Tous les rolls calculés (ordre des expiries utilisateur)
     rolls_detail: Dict[str, float] = field(default_factory=dict)  # Rolls par expiry (ex: {"H6": 0.5, "M6": 0.3})
 
     # ================== GREEKS ===================
-    delta: float = 0.0
-    gamma: float = 0.0
+    # delta, gamma, theta hérités de BaseOption (Optional[float] = None)
     vega: float = 0.0
-    theta: float = 0.0
     rho: float = 0.0
 
     # ============ METRIQUES ============
@@ -64,10 +46,10 @@ class Option:
     average_mix: float = 0.0
 
     # ============ VOLATILITÉ ============
-    implied_volatility: float = 0.0
+    # implied_volatility héritée de BaseOption (Optional[float] = None)
     market_implied_volatility: float = 0.0   # IV brute issue du prix marché (avant SABR)
-    left_slope : Optional[float]= 0.0
-    right_slope : Optional[float]= 0.0
+    left_slope: Optional[float] = 0.0
+    right_slope: Optional[float] = 0.0
     historical_volatility: Optional[float] = None
 
     # ============ SABR ============

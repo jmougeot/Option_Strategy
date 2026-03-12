@@ -191,7 +191,7 @@ class BlockDialog(QDialog):
 
     @staticmethod
     def _clear_leg_market_data(leg: OptionLeg) -> None:
-        leg.last_price = None
+        leg.last = None
         leg.bid = None
         leg.ask = None
         leg.mid = None
@@ -200,7 +200,7 @@ class BlockDialog(QDialog):
         leg.delta = None
         leg.gamma = None
         leg.theta = None
-        leg.implied_vol = None
+        leg.implied_volatility = None
 
     def _sync_subscriptions(self, old_ticker: str, new_ticker: str) -> None:
         if self._bbg is None:
@@ -253,7 +253,7 @@ class BlockDialog(QDialog):
             raw = item.text().strip().upper()
             if raw and "COMDTY" not in raw:
                 raw += " COMDTY"
-            leg.ticker, leg.underlying, leg.strike = parse_leg_ticker(raw)
+            leg.ticker, leg.underlying_symbol, leg.strike = parse_leg_ticker(raw)
             if normalize_ticker(old_ticker) != normalize_ticker(leg.ticker or ""):
                 self._clear_leg_market_data(leg)
                 self._sync_subscriptions(old_ticker, leg.ticker or "")
@@ -291,7 +291,7 @@ class BlockDialog(QDialog):
         if 0 <= row < len(self._leg_ids):
             leg_id = self._leg_ids.pop(row)
             leg = self._strategy.get_leg(leg_id)
-            old_ticker = leg.ticker if leg is not None else ""
+            old_ticker = (leg.ticker or "") if leg is not None else ""
             self._strategy.remove_leg(leg_id)
             self._sync_subscriptions(old_ticker, "")
             self._run_adjust()

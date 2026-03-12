@@ -18,7 +18,8 @@ from bloomberg.config import (
     third_wednesday as _third_wednesday,
 )
 from option.bachelier import Bachelier
-from option.option_class import Position
+from option.base_option import BaseOption, Position
+from strategy.base_strategy import BaseStrategy
 
 
 def parse_leg_ticker(ticker: str) -> tuple[str, str, float]:
@@ -71,30 +72,17 @@ class TargetCondition(Enum):
 
 
 @dataclass
-class OptionLeg:
-    """Représente une jambe d'option dans une stratégie"""
+class OptionLeg(BaseOption):
+    """Représente une jambe d'option dans une stratégie (alarme live Bloomberg)."""
+    # Champs spécifiques à OptionLeg (ticker, strike, bid/ask/mid, delta/gamma/theta,
+    # implied_volatility, underlying_symbol, quantity hérités de BaseOption)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    ticker: str = ""  # ex: "SFRH6C 98.00 Comdty"
     position: Position = Position.LONG
-    quantity: int = 1
     total_qty: Optional[int] = None
-    underlying: str = ""
-    strike: float = 0.0
-    # Prix temps réel depuis Bloomberg
-    last_price: Optional[float] = None
-    bid: Optional[float] = None
-    ask: Optional[float] = None
-    mid: Optional[float] = None
     last_update: Optional[datetime] = None
 
     # Prix ajusté (block)
     adjusted_mid: Optional[float] = None
-
-    # Greeks temps réel depuis Bloomberg
-    delta: Optional[float] = None
-    gamma: Optional[float] = None
-    theta: Optional[float] = None
-    implied_vol: Optional[float] = None
 
     @property
     def future_ticker(self) -> Optional[str]:
@@ -105,7 +93,7 @@ class OptionLeg:
     def update_price(self, last_price: float, bid: float, ask: float):
         """Met à jour les prix de l'option. Ignore les valeurs négatives (pas de donnée)."""
         if last_price is not None and last_price >= 0:
-            self.last_price = last_price
+            self.last = last_price
         if bid is not None and bid >= 0:
             self.bid = bid
         if ask is not None and ask >= 0:
@@ -118,11 +106,11 @@ class OptionLeg:
         self.delta = None
         self.gamma = None
         self.theta = None
-        self.implied_vol = None
+        self.implied_volatility = None
 
     def recalculate_market_analytics(self, forward_price: Optional[float]) -> None:
         """Recalcule IV, delta, gamma et theta via Bachelier à partir du prix marché."""
-        market_price = self.mid if self.mid is not None and self.mid > 0 else self.last_price
+        market_price = self.mid if self.mid is not None and self.mid > 0 else self.last
         if forward_price is None or forward_price <= 0 or market_price is None or market_price <= 0:
             self._clear_market_analytics()
             return
@@ -155,19 +143,19 @@ class OptionLeg:
         self.delta = model.delta()
         self.gamma = model.gamma()
         self.theta = model.theta()
-        self.implied_vol = implied_vol
+        self.implied_volatility = implied_vol
 
     def get_price_contribution(self) -> Optional[float]:
         """
         Retourne la contribution au prix de la stratégie.
         Long = +prix, Short = -prix
         """
-        price = self.mid if self.mid is not None else self.last_price
+        price = self.mid if self.mid is not None else self.last
         if price is None:
             return None
         
         multiplier = 1 if self.position == Position.LONG else -1
-        return price * multiplier * self.quantity
+        return price * multiplier * (self.quantity or 1)
     
     def to_dict(self) -> dict:
         """Convertit en dictionnaire pour sauvegarde"""
@@ -177,7 +165,7 @@ class OptionLeg:
             "position": self.position.value,
             "quantity": self.quantity,
             "total_qty": self.total_qty,
-            "underlying": self.underlying,
+            "underlying": self.underlying_symbol,
             "strike": self.strike,
         }
     
@@ -203,18 +191,18 @@ class OptionLeg:
             position=Position(data.get("position", "long")),
             quantity=data.get("quantity", 1),
             total_qty=total_qty,
-            underlying=data.get("underlying", "") or inferred_underlying,
+            underlying_symbol=data.get("underlying", "") or inferred_underlying,
             strike=strike,
         )
 
 
 @dataclass 
-class Strategy:
-    """Représente une stratégie d'options (butterfly, condor, etc.)"""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    name: str = "Nouvelle Stratégie"
+class Strategy(BaseStrategy):
+    """Représente une stratégie d'options (butterfly, condor, etc.)."""
+    # name et total_delta/gamma/theta hérités de BaseStrategy
     legs: list[OptionLeg] = field(default_factory=list)
-    client : Optional[str] = None
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    client: Optional[str] = None
     action : Optional[str] = None
     underlying : Optional[str] = None
     expiration : Optional[str] = None
@@ -232,7 +220,7 @@ class Strategy:
             ticker=normalized_ticker,
             position=position,
             quantity=quantity,
-            underlying=underlying,
+            underlying_symbol=underlying,
             strike=strike,
         )
         self.legs.append(leg)
@@ -283,7 +271,7 @@ class Strategy:
         for leg in self.legs:
             if leg.delta is not None:
                 sign = 1 if leg.position == Position.LONG else -1
-                vals.append(leg.delta * leg.quantity * sign)
+                vals.append(leg.delta * (leg.quantity or 1) * sign)
         return sum(vals) if vals else None
 
     def get_total_gamma(self) -> Optional[float]:
@@ -292,7 +280,7 @@ class Strategy:
         for leg in self.legs:
             if leg.gamma is not None:
                 sign = 1 if leg.position == Position.LONG else -1
-                vals.append(leg.gamma * leg.quantity * sign)
+                vals.append(leg.gamma * (leg.quantity or 1) * sign)
         return sum(vals) if vals else None
 
     def get_total_theta(self) -> Optional[float]:
@@ -301,12 +289,11 @@ class Strategy:
         for leg in self.legs:
             if leg.theta is not None:
                 sign = 1 if leg.position == Position.LONG else -1
-                vals.append(leg.theta * leg.quantity * sign)
+                vals.append(leg.theta * (leg.quantity or 1) * sign)
         return sum(vals) if vals else None
 
-    def get_average_ivol(self) -> Optional[float]:
-        """Volatilité implicite moyenne des legs."""
-        ivols = [leg.implied_vol for leg in self.legs if leg.implied_vol is not None]
+    def get_average_ivol(self):
+        ivols = [leg.implied_volatility for leg in self.legs if leg.implied_volatility is not None]
         return sum(ivols) / len(ivols) if ivols else None
 
     def is_target_reached(self) -> Optional[bool]:

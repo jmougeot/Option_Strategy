@@ -311,7 +311,7 @@ def str_to_leg(match, opt_type, strategy_type, strikes) :
         quantity = signs[i][1]
         
         Leg_i = OptionLeg(ticker=ticker, position=position, quantity=quantity,
-                          underlying=underlying, strike=strike)
+                          underlying_symbol=underlying, strike=strike)
         Legs.append(Leg_i)
     return Legs
 

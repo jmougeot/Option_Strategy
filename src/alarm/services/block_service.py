@@ -121,7 +121,7 @@ def adjust_prices(strategy: Strategy) -> None:
     for leg in legs:
         leg.adjusted_mid = None
 
-    step = tick_for_underlying(legs[0].underlying)
+    step = tick_for_underlying(legs[0].underlying_symbol)
     tol = 1e-9
 
     if step <= 0:

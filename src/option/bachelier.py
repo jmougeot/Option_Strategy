@@ -80,7 +80,7 @@ class Bachelier:
 
         try:
             max_vol = self.market_price * np.sqrt(2 * np.pi / self.T) * 10
-            vol = brentq(objective, 1e-8, max(max_vol, 1000.0), xtol=1e-10, maxiter=200)
+            vol: float = brentq(objective, 1e-8, max(max_vol, 1000.0), xtol=1e-10, maxiter=200)  # type: ignore[assignment]
             return float(vol)
         except Exception:
             return 0.0
@@ -124,6 +124,73 @@ class Bachelier:
     # ------------------------------------------------------------------
     # Calcul des volatilités pour une liste d'options
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def find_anomaly(
+    
+    ):
+        return
+
+    @staticmethod
+    def compute_weight(
+        datas: List[Tuple[float, List[Option], List[Option]]],
+        F: float,
+    ) -> Tuple[List[float], List[float], List[float]]:
+        """
+        Le poids est calculé de cette manière :
+          1. w_spread   : 1 / (1 + bid-ask spread)  — liquidité
+          2. w_cp       : exp(-|iv_call - iv_put| / iv_mid)  — cohérence
+                          call/put au même strike (grand écart → faible poids)
+          3. w_moneyness: exp(-k * |strike - F| / F)  — proximité ATM
+                          (loin de F → moins fiable)
+        """
+        strikes_obs: List[float] = []
+        ivs_obs: List[float] = []
+        weights_obs: List[float] = []
+
+        # Coefficient de décroissance moneyness : exp(-3 * |K-F|/F)
+        # → à 10% hors-la-monnaie le poids tombe à ~74%, à 30% il tombe à ~40%
+        MONEYNESS_DECAY = 3.0
+
+        for strike, calls, puts in datas:
+            # ─ 1. IV moyen call vs put au même strike (pour facteur de cohérence) ─
+            call_ivs = [iv for opt in calls if (iv := opt.implied_volatility) is not None and iv > 0]
+            put_ivs  = [iv for opt in puts  if (iv := opt.implied_volatility) is not None and iv > 0]
+            ic = sum(call_ivs) / len(call_ivs) if call_ivs else None
+            ip = sum(put_ivs)  / len(put_ivs)  if put_ivs  else None
+
+            if ic is not None and ip is not None:
+                iv_mid = (ic + ip) / 2.0
+                # Facteur de cohérence : ecart relatif call/put
+                w_cp = float(np.exp(-abs(ic - ip) / iv_mid)) if iv_mid > 0 else 0.0
+            else:
+                w_cp = 1.0  # un seul côté disponible : pas de pénalité
+
+            # ─ 2. Facteur de moneyness : diminue avec la distance au forward ─
+            moneyness_dist = abs(strike - F) / F if F > 0 else 0.0
+            w_moneyness = float(np.exp(-MONEYNESS_DECAY * moneyness_dist))
+
+            # ─ 3. Poids par option ──────────────────────────────────────
+            for opt in calls + puts:
+                iv = opt.implied_volatility
+                if iv is None or iv <= 0:
+                    continue
+
+                # Poids bid-ask
+                if (opt.bid is not None and opt.ask is not None
+                        and opt.ask >= opt.bid >= 0):
+                    spread = opt.ask - opt.bid
+                    w_spread = 1.0 / (1.0 + spread)
+                else:
+                    w_spread = 1.0
+
+                w = w_spread * w_cp * w_moneyness
+
+                strikes_obs.append(strike)
+                ivs_obs.append(float(iv))
+                weights_obs.append(w)
+
+        return strikes_obs, ivs_obs, weights_obs
 
     @staticmethod
     def compute_volatility(
@@ -173,67 +240,51 @@ class Bachelier:
         if n == 0:
             return
 
-        # ── 2. Fusion call+put → iv_merged + poids bid-ask ────────────────
-        iv_merged: List[float] = []
-        ba_weights: List[float] = []
 
-        for _, calls, puts in datas:
-            call_ivs = [opt.implied_volatility for opt in calls if opt.implied_volatility > 0]
-            put_ivs = [opt.implied_volatility for opt in puts if opt.implied_volatility > 0]
-            ic = float(sum(call_ivs) / len(call_ivs)) if call_ivs else 0.0
-            ip = float(sum(put_ivs) / len(put_ivs)) if put_ivs else 0.0
-            if ic > 0 and ip > 0:
-                iv_merged.append((ic + ip) / 2.0)
-            elif ic > 0:
-                iv_merged.append(ic)
-            elif ip > 0:
-                iv_merged.append(ip)
-            else:
-                iv_merged.append(0.0)
+        # ── 2. Collecte des observations individuelles (call et put séparés) ──
+        strikes_obs, ivs_obs, weights_obs = Bachelier.compute_weight(datas, F)
 
-            # Poids basé sur le spread bid-ask : grand spread → faible poids
-            if iv_merged[-1] <= 0:
-                ba_weights.append(0.0)
-            else:
-                spreads = []
-                for opt in calls + puts:
-                    if (opt.bid is not None and opt.ask is not None
-                            and opt.ask >= opt.bid >= 0):
-                        spreads.append(opt.ask - opt.bid)
-                if spreads:
-                    avg_spread = sum(spreads) / len(spreads)
-                    ba_weights.append(1.0 / (1.0 + avg_spread))
-                else:
-                    ba_weights.append(1.0)  # prix dispo mais pas de bid/ask
+        if len(strikes_obs) == 0:
+            return None
 
-        # ── 3. Calibration SABR avec poids bid-ask ───────────────────────────
+        # IV marché par strike (moyenne call+put) pour market_implied_volatility
+        mkt_iv_by_strike: Dict[float, List[float]] = defaultdict(list)
+        for k, iv in zip(strikes_obs, ivs_obs):
+            mkt_iv_by_strike[k].append(iv)
+        mkt_iv_map: Dict[float, float] = {
+            k: sum(vs) / len(vs) for k, vs in mkt_iv_by_strike.items()
+        }
 
-        strikes_arr = np.array([d[0] for d in datas])
-        iv_arr = np.array(iv_merged)
-        w_arr = np.array(ba_weights)
+        # ── 3. Calibration SABR — toutes observations sans merge préalable ────
+        strikes_np = np.array(strikes_obs, dtype=float)
+        iv_np_arr = np.array(ivs_obs, dtype=float)
 
         sabr = SABRCalibration(F=F, T=T, beta=0.0, vol_type="normal")
         sabr_ok = False
 
-        if (iv_arr > 0).sum() >= 3:
+        if (iv_np_arr > 0).sum() >= 3:
             try:
-                sabr.fit(strikes=strikes_arr, sigmas_mkt=iv_arr, weights=w_arr)
+                sabr.fit(strikes=strikes_np, sigmas_mkt=iv_np_arr, weights=weights_obs)
                 sabr_ok = True
                 print(f"  SABR calibré : {sabr.result}")
             except Exception as exc:
                 print(f"  SABR calibration échouée : {exc}")
 
-        # ── 4. Appliquer les IV (SABR si calibré, sinon marché) ─────────────
+        # ── 4. Appliquer les IV par strike (SABR si calibré, sinon moyenne mkt) ─
+        unique_strikes = [d[0] for d in datas]
         if sabr_ok:
-            all_sabr_vols = sabr.predict(strikes_arr)
-            final_ivs = [max(float(v), 0.0) for v in all_sabr_vols]
+            sabr_vols = sabr.predict(unique_strikes)
+            final_iv_map: Dict[float, float] = {
+                k: max(float(v), 0.0) for k, v in zip(unique_strikes, sabr_vols)
+            }
         else:
-            final_ivs = iv_merged
+            final_iv_map = mkt_iv_map
 
-        for i, (_, calls, puts) in enumerate(datas):
-            iv = final_ivs[i]
-            mkt_iv = iv_merged[i]
+        for _, calls, puts in datas:
             for opt in calls + puts:
+                k = opt.strike
+                mkt_iv = mkt_iv_map.get(k, 0.0)
+                iv = final_iv_map.get(k, 0.0)
                 opt.market_implied_volatility = mkt_iv
                 opt.sabr_volatility = iv if sabr_ok else 0.0
                 if iv > 0:
