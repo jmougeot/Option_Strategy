@@ -87,15 +87,21 @@ def detect_vs(strategy_str: str) -> Tuple[str, Optional[str], bool]:
         # Split sur vs
         parts = re.split(vs_pattern, strategy_str, maxsplit=1, flags=re.IGNORECASE)
         if len(parts) == 2:
-            return parts[0].strip(), parts[1].strip()
+            return parts[0].strip(), parts[1].strip(), True
     
-    return strategy_str, None , False
+    return strategy_str, None, False
 
-def detect_plus(strategy_str: str) -> Tuple[str, Optional[str]]
+def detect_plus(strategy_str: str) -> Tuple[str, Optional[str]]:
     """
     Detecte si ma stratégie contient '+' et split en deux parties
+    (contrairement à 'vs', les legs ne sont PAS inversés)
     """
     plus_pattern = r'\s+\+\s+'
+    if re.search(plus_pattern, strategy_str):
+        parts = re.split(plus_pattern, strategy_str, maxsplit=1)
+        if len(parts) == 2:
+            return parts[0].strip(), parts[1].strip()
+    return strategy_str, None
 
 def extract_strikes(strategy_str: str) -> List[float]:
     """Extraction avancée des strikes - gère tous les formats et conversions Bloomberg"""
@@ -334,16 +340,18 @@ def str_to_strat(info_strategy : str) -> Optional[Strategy]:
     if not name:
         return None
     
-    # Détecter si on a un "vs" (deux stratégies)
-    part1, part2, vs= detect_vs(name)
-    
+    # Détecter si on a un "vs" ou un "+" (deux stratégies combinées)
+    part1, part2_vs, is_vs = detect_vs(name)
+    part1, part2_plus = detect_plus(part1) if part2_vs is None else (part1, None)
+    part2 = part2_vs if part2_vs is not None else part2_plus
+
     # Traiter la première partie
     strikes1 = extract_strikes(part1)
-    strategy_type1, opt_type1 = detect_strategy_type(part1, len(strikes1))  # FIXÉ: utiliser part1
+    strategy_type1, opt_type1 = detect_strategy_type(part1, len(strikes1))
 
     # Extraire underlying et expiry de la première partie
-    pattern = r"\b([A-Z]{2,4})([FGHJKMNQUVXZ]\d)\b"
-    match1 = re.search(pattern, part1, re.IGNORECASE)  # FIXÉ: utiliser part1
+    pattern = r"\b([A-Z]{2,4})([FGHJKMNQUVXZ]\d{1,2})\b"
+    match1 = re.search(pattern, part1, re.IGNORECASE)
     
     # Si pas de match, impossible de créer les tickers
     if not match1:
@@ -352,9 +360,9 @@ def str_to_strat(info_strategy : str) -> Optional[Strategy]:
     Legs: List[OptionLeg] = str_to_leg(match1, opt_type1, strategy_type1, strikes1)
 
     # Traiter la deuxième partie si elle existe
-    if part2 is not None : 
+    if part2 is not None:
         strikes2 = extract_strikes(part2)
-        strategy_type2, opt_type2 = detect_strategy_type(part2, len(strikes2))  # FIXÉ: utiliser part2
+        strategy_type2, opt_type2 = detect_strategy_type(part2, len(strikes2))
         
         # Chercher underlying/expiry dans part2, sinon réutiliser match1
         match2 = re.search(pattern, part2, re.IGNORECASE)
@@ -362,12 +370,11 @@ def str_to_strat(info_strategy : str) -> Optional[Strategy]:
             match2 = match1  # Réutiliser le même underlying/expiry
         
         Legs2 = str_to_leg(match2, opt_type2, strategy_type2, strikes2)
-        # Inverser les positions de la deuxième stratégie (après "vs")
-        for leg in Legs2: 
-            if leg.position == Position.LONG:
-                leg.position = Position.SHORT
-            else: 
-                leg.position = Position.LONG
+        # vs → inverser les positions de la deuxième jambe
+        # + → garder les mêmes positions
+        if is_vs:
+            for leg in Legs2:
+                leg.position = Position.SHORT if leg.position == Position.LONG else Position.LONG
         Legs.extend(Legs2)
 
 
