@@ -1,5 +1,5 @@
-"""
-Module SSVI — Surface SVI (Gatheral & Jacquier 2014)
+﻿"""
+Module SVI — Surface SVI (Gatheral & Jacquier 2014)
 
 Paramétrisation : w(k, θ) = θ/2 * [1 + ρ·φ(θ)·k + sqrt((φ(θ)·k + ρ)² + (1-ρ²))]
 où :
@@ -30,8 +30,8 @@ from scipy.optimize import differential_evolution, minimize
 # ============================================================================
 
 @dataclass
-class SSVIResult:
-    """Résultats de la calibration SSVI."""
+class SVIResult:
+    """Résultats de la calibration SVI."""
     theta: float       # ATM variance totale  (σ_ATM² · T)
     rho: float         # corrélation skew
     eta: float         # paramètre power-law
@@ -53,7 +53,7 @@ class SSVIResult:
 
     def __repr__(self) -> str:
         return (
-            f"SSVIResult(θ={self.theta:.6f}, ρ={self.rho:.4f}, "
+            f"SVIResult(θ={self.theta:.6f}, ρ={self.rho:.4f}, "
             f"η={self.eta:.4f}, γ={self.gamma:.4f}, "
             f"RMSE={self.rmse_bps:.2f}bp, converged={self.converged})"
         )
@@ -63,23 +63,23 @@ class SSVIResult:
 # Classe principale
 # ============================================================================
 
-class SSVICalibration:
+class SVICalibration:
     """
-    Modèle SSVI (Surface SVI) — calibration et évaluation.
+    Modèle SVI — calibration et évaluation.
 
     Utilise la vol normale (Bachelier) comme SABR : on calibre sur σ_N(K).
     La conversion variance totale → vol normale est :
         σ_N(K) ≈ F · sqrt(w(k) / T)
-    où w(k) est la variance totale SSVI et k = log(K/F).
+    où w(k) est la variance totale SVI et k = log(K/F).
     """
 
     def __init__(self, F: float, T: float) -> None:
         self.F = F
         self.T = T
-        self.result: Optional[SSVIResult] = None
+        self.result: Optional[SVIResult] = None
 
     # ------------------------------------------------------------------
-    # Formule SSVI
+    # Formule SVI
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -93,10 +93,10 @@ class SSVICalibration:
     def total_variance(
         k: float, theta: float, rho: float, eta: float, gamma: float
     ) -> float:
-        """Variance totale SSVI w(k, θ).
+        """variance totale SVI w(k, θ).
         k = log(K/F), θ = ATM total variance.
         """
-        ph = SSVICalibration.phi(theta, eta, gamma)
+        ph = SVICalibration.phi(theta, eta, gamma)
         inner = ph * k + rho
         w = theta / 2.0 * (1.0 + rho * ph * k + np.sqrt(inner ** 2 + 1.0 - rho ** 2))
         return max(float(w), 1e-12)
@@ -106,11 +106,11 @@ class SSVICalibration:
         F: float, K: float, T: float,
         theta: float, rho: float, eta: float, gamma: float,
     ) -> float:
-        """Vol normale σ_N via SSVI : σ_N = F · sqrt(w / T)."""
+        """Vol normale σ_N via SVI : σ_N = F · sqrt(w / T)."""
         if T <= 0 or K <= 0 or F <= 0:
             return 1e-8
         k = np.log(K / F)
-        w = SSVICalibration.total_variance(k, theta, rho, eta, gamma)
+        w = SVICalibration.total_variance(k, theta, rho, eta, gamma)
         sigma_n = F * np.sqrt(w / T)
         return max(float(sigma_n), 1e-8)
 
@@ -137,7 +137,7 @@ class SSVICalibration:
 
         try:
             sigmas_model = np.array([
-                SSVICalibration.normal_vol(F, K, T, theta, rho, eta, gamma)
+                SVICalibration.normal_vol(F, K, T, theta, rho, eta, gamma)
                 for K in strikes
             ])
         except Exception:
@@ -154,14 +154,14 @@ class SSVICalibration:
         strikes: np.ndarray,
         sigmas_mkt: np.ndarray,
         weights: Optional[Sequence[float]] = None,
-    ) -> SSVIResult:
+    ) -> SVIResult:
         """Calibre θ, ρ, η, γ par moindres carrés pondérés."""
         strikes = np.asarray(strikes, dtype=float)
         sigmas_mkt = np.asarray(sigmas_mkt, dtype=float)
 
         valid = (sigmas_mkt > 0) & np.isfinite(sigmas_mkt) & np.isfinite(strikes)
         if valid.sum() < 4:
-            raise ValueError("Pas assez de points valides pour calibrer SSVI (min 4).")
+            raise ValueError("Pas assez de points valides pour calibrer SVI (min 4).")
         strikes = strikes[valid]
         sigmas_mkt = sigmas_mkt[valid]
 
@@ -188,7 +188,7 @@ class SSVICalibration:
         ]
 
         result_de = differential_evolution(
-            SSVICalibration._objective,
+            SVICalibration._objective,
             bounds=bounds,
             args=(strikes, sigmas_mkt, self.F, self.T, w),
             maxiter=2000,
@@ -202,7 +202,7 @@ class SSVICalibration:
         x0 = result_de.x if result_de.success else np.array([theta0, -0.1, 0.5, 0.5])
 
         result_loc = minimize(
-            SSVICalibration._objective,
+            SVICalibration._objective,
             x0,
             args=(strikes, sigmas_mkt, self.F, self.T, w),
             method="L-BFGS-B",
@@ -214,13 +214,13 @@ class SSVICalibration:
         converged = result_loc.success or result_de.success
 
         sigmas_model = np.array([
-            SSVICalibration.normal_vol(self.F, K, self.T, theta, rho, eta, gamma)
+            SVICalibration.normal_vol(self.F, K, self.T, theta, rho, eta, gamma)
             for K in strikes
         ])
         residuals = sigmas_mkt - sigmas_model
         rmse = float(np.sqrt(np.mean(residuals ** 2)))
 
-        self.result = SSVIResult(
+        self.result = SVIResult(
             theta=float(theta),
             rho=float(rho),
             eta=float(eta),
@@ -244,21 +244,21 @@ class SSVICalibration:
     # ------------------------------------------------------------------
 
     def predict(self, strikes: Sequence[float]) -> np.ndarray:
-        """Retourne la surface SSVI calibrée pour un vecteur de strikes."""
+        """Retourne la surface SVI calibrée pour un vecteur de strikes."""
         if self.result is None:
             raise RuntimeError("Calibrer d'abord avec .fit()")
         r = self.result
         return np.array([
-            SSVICalibration.normal_vol(self.F, K, self.T, r.theta, r.rho, r.eta, r.gamma)
+            SVICalibration.normal_vol(self.F, K, self.T, r.theta, r.rho, r.eta, r.gamma)
             for K in strikes
         ])
 
     def summary(self) -> str:
         if self.result is None:
-            return "SSVICalibration — non calibré"
+            return "SVICalibration — non calibré"
         r = self.result
         return (
-            f"SSVI | F={r.F:.4f}  T={r.T:.3f}a\n"
+            f"SVI | F={r.F:.4f}  T={r.T:.3f}a\n"
             f"  θ={r.theta:.6f}  ρ={r.rho:.4f}  η={r.eta:.4f}  γ={r.gamma:.4f}\n"
             f"  RMSE={r.rmse_bps:.2f}bp  max_err={r.max_error_bps:.2f}bp  "
             f"N={r.n_points}  converged={r.converged}"
@@ -300,7 +300,7 @@ class SSVICalibration:
 
     def check_no_arbitrage(self, n_points: int = 200) -> Tuple[bool, str]:
         """
-        Vérifie les conditions suffisantes d'absence d'arbitrage SSVI :
+        Vérifie les conditions suffisantes d'absence d'arbitrage SVI :
           1. w ≥ 0
           2. (1 - k·φ·ρ/2)² ≥ (φ²/4)(1-ρ²) + φ²k²(1-ρ²)/4  (butterfly)
           3. ∂_k w ≥ 0 pour k > 0 (calendar arbitrage — simplifié)
@@ -313,12 +313,12 @@ class SSVICalibration:
         msgs = []
 
         for k in ks:
-            w = SSVICalibration.total_variance(k, r.theta, r.rho, r.eta, r.gamma)
+            w = SVICalibration.total_variance(k, r.theta, r.rho, r.eta, r.gamma)
             if w < 0:
                 msgs.append(f"w<0 à k={k:.2f}")
                 break
 
-            ph = SSVICalibration.phi(r.theta, r.eta, r.gamma)
+            ph = SVICalibration.phi(r.theta, r.eta, r.gamma)
             # Condition butterfly (prop. 4.1 eq. 4.2)
             lhs = (1.0 - k * ph * r.rho / 2.0) ** 2
             rhs = ph ** 2 / 4.0 * (1.0 - r.rho ** 2) * (1.0 + k ** 2)

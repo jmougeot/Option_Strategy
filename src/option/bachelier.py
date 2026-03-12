@@ -15,27 +15,27 @@ from option.sabr import SABRCalibration
 
 @dataclass
 class CalibrationBundle:
-    """Contient les résultats SABR et/ou SSVI d'une calibration."""
+    """Contient les résultats SABR et/ou SVI d'une calibration."""
     sabr: Optional[Any] = None   # SABRCalibration | None
-    ssvi: Optional[Any] = None   # SSVICalibration | None
+    svi: Optional[Any] = None    # SVICalibration | None
 
     def predict(self, strikes) -> Any:
         """Prédit la vol modèle (moyenne si les deux, sinon celui dispo)."""
         import numpy as np
-        if self.sabr is not None and self.ssvi is not None:
-            return (np.array(self.sabr.predict(strikes)) + np.array(self.ssvi.predict(strikes))) / 2.0
+        if self.sabr is not None and self.svi is not None:
+            return (np.array(self.sabr.predict(strikes)) + np.array(self.svi.predict(strikes))) / 2.0
         if self.sabr is not None:
             return self.sabr.predict(strikes)
-        if self.ssvi is not None:
-            return self.ssvi.predict(strikes)
+        if self.svi is not None:
+            return self.svi.predict(strikes)
         raise RuntimeError("CalibrationBundle vide")
 
     def summary(self) -> str:
         parts = []
         if self.sabr is not None and hasattr(self.sabr, "summary"):
             parts.append(self.sabr.summary())
-        if self.ssvi is not None and hasattr(self.ssvi, "summary"):
-            parts.append(self.ssvi.summary())
+        if self.svi is not None and hasattr(self.svi, "summary"):
+            parts.append(self.svi.summary())
         return "\n".join(parts)
 
 class Bachelier:
@@ -227,8 +227,8 @@ class Bachelier:
         vol_model: str = "sabr",
     ) -> Optional[Any]:
         """
-        Calcule la volatilité Bachelier (+ grecques) via calibration SABR ou SSVI.
-        vol_model : "sabr" | "ssvi" | "both"
+        Calcule la volatilité Bachelier (+ grecques) via calibration SABR ou SVI.
+        vol_model : "sabr" | "svi" | "both"
         Poids de calibration basés sur le spread bid-ask.
         Returns the fitted calibration object, or None if calibration failed.
         """
@@ -283,16 +283,16 @@ class Bachelier:
             k: sum(vs) / len(vs) for k, vs in mkt_iv_by_strike.items()
         }
 
-        # ── 3. Calibration — SABR / SSVI / Both ──────────────────────────────
+        # ── 3. Calibration — SABR / SVI / Both ───────────────────────────────
         strikes_np = np.array(strikes_obs, dtype=float)
         iv_np_arr = np.array(ivs_obs, dtype=float)
         run_sabr = vol_model in ("sabr", "both")
-        run_ssvi = vol_model in ("ssvi", "both")
+        run_svi = vol_model in ("svi", "both")
 
         sabr = SABRCalibration(F=F, T=T, beta=0.0, vol_type="normal")
         sabr_ok = False
-        ssvi_ok = False
-        ssvi = None
+        svi_ok = False
+        svi = None
 
         if run_sabr and (iv_np_arr > 0).sum() >= 3:
             try:
@@ -302,36 +302,36 @@ class Bachelier:
             except Exception as exc:
                 print(f"  SABR calibration échouée : {exc}")
 
-        if run_ssvi and (iv_np_arr > 0).sum() >= 4:
+        if run_svi and (iv_np_arr > 0).sum() >= 4:
             try:
-                from option.ssvi import SSVICalibration
-                ssvi = SSVICalibration(F=F, T=T)
-                ssvi.fit(strikes=strikes_np, sigmas_mkt=iv_np_arr, weights=weights_obs)
-                ssvi_ok = True
-                print(f"  SSVI calibré : {ssvi.result}")
+                from option.svi import SVICalibration
+                svi = SVICalibration(F=F, T=T)
+                svi.fit(strikes=strikes_np, sigmas_mkt=iv_np_arr, weights=weights_obs)
+                svi_ok = True
+                print(f"  SVI calibré : {svi.result}")
             except Exception as exc:
-                print(f"  SSVI calibration échouée : {exc}")
+                print(f"  SVI calibration échouée : {exc}")
 
         # ── 4. Choisir les IV finales ─────────────────────────────────────────
         unique_strikes = [d[0] for d in datas]
-        if sabr_ok and ssvi_ok and ssvi is not None:
+        if sabr_ok and svi_ok and svi is not None:
             # "both" : moyenne des deux surfaces
             sabr_vols = sabr.predict(unique_strikes)
-            ssvi_vols = ssvi.predict(unique_strikes)
+            svi_vols = svi.predict(unique_strikes)
             final_iv_map: Dict[float, float] = {
                 k: max((float(sv) + float(xv)) / 2.0, 0.0)
-                for k, sv, xv in zip(unique_strikes, sabr_vols, ssvi_vols)
+                for k, sv, xv in zip(unique_strikes, sabr_vols, svi_vols)
             }
-        elif ssvi_ok and ssvi is not None:
-            ssvi_vols = ssvi.predict(unique_strikes)
-            final_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, ssvi_vols)}
+        elif svi_ok and svi is not None:
+            svi_vols = svi.predict(unique_strikes)
+            final_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, svi_vols)}
         elif sabr_ok:
             sabr_vols = sabr.predict(unique_strikes)
             final_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, sabr_vols)}
         else:
             final_iv_map = mkt_iv_map
 
-        calibrated = sabr_ok or ssvi_ok
+        calibrated = sabr_ok or svi_ok
 
         for _, calls, puts in datas:
             for opt in calls + puts:
@@ -351,9 +351,9 @@ class Bachelier:
                     opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()
 
         # Retourner un CalibrationBundle
-        if sabr_ok or ssvi_ok:
+        if sabr_ok or svi_ok:
             return CalibrationBundle(
                 sabr=sabr if sabr_ok else None,
-                ssvi=ssvi if ssvi_ok else None,
+                svi=svi if svi_ok else None,
             )
         return None

@@ -39,9 +39,9 @@ class ParamsPanel(QGroupBox):
         self._chk_brut = QCheckBox("Raw code")
         self._chk_recalibrate = QCheckBox("SABR")
         self._chk_recalibrate.setChecked(True)
-        self._chk_ssvi = QCheckBox("SSVI")
-        self._chk_ssvi.setChecked(False)
-        for w in (self._chk_brut, self._chk_recalibrate, self._chk_ssvi):
+        self._chk_svi = QCheckBox("SVI")
+        self._chk_svi.setChecked(False)
+        for w in (self._chk_brut, self._chk_recalibrate, self._chk_svi):
             opts_layout.addWidget(w)
         root.addLayout(opts_layout)
 
@@ -137,7 +137,7 @@ class ParamsPanel(QGroupBox):
         self._lbl_legs.valueChanged.connect(lambda _: self.changed.emit())
         for w in (
             self._chk_recalibrate,
-            self._chk_ssvi,
+            self._chk_svi,
             self._cmb_months, self._cmb_unit,
             self._spn_price_min, self._spn_price_max, self._spn_price_step,
             self._spn_penalty,
@@ -191,11 +191,11 @@ class ParamsPanel(QGroupBox):
         strikes = strike_list(price_min, price_max, price_step)
 
         use_sabr = self._chk_recalibrate.isChecked()
-        use_ssvi = self._chk_ssvi.isChecked()
-        if use_sabr and use_ssvi:
+        use_svi = self._chk_svi.isChecked()
+        if use_sabr and use_svi:
             vol_model = "both"
-        elif use_ssvi:
-            vol_model = "ssvi"
+        elif use_svi:
+            vol_model = "svi"
         else:
             vol_model = "sabr"
 
@@ -211,7 +211,7 @@ class ParamsPanel(QGroupBox):
             unit=self._cmb_unit.currentText(),
             brut_code=brut_code,
             roll_expiries=roll_expiries,
-            recalibrate=use_sabr or use_ssvi,
+            recalibrate=use_sabr or use_svi,
             vol_model=vol_model,
             operation_penalisation=self._spn_penalty.value(),
         )
@@ -221,7 +221,7 @@ class ParamsPanel(QGroupBox):
         to_block = [
             self._cmb_underlying, self._cmb_months, self._txt_years,
             self._spn_price_min, self._spn_price_max, self._spn_price_step,
-            self._lbl_legs, self._chk_recalibrate, self._chk_ssvi, self._spn_penalty,
+            self._lbl_legs, self._chk_recalibrate, self._chk_svi, self._spn_penalty,
         ]
         for w in to_block:
             w.blockSignals(True)

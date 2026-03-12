@@ -123,14 +123,14 @@ class SmileDialog(QDialog):
         model_row = QHBoxLayout()
         model_row.addWidget(QLabel("Modèle :"))
         self._rb_sabr = QRadioButton("SABR")
-        self._rb_ssvi = QRadioButton("SSVI")
-        self._rb_both = QRadioButton("SABR + SSVI")
+        self._rb_svi = QRadioButton("SVI")
+        self._rb_both = QRadioButton("SABR + SVI")
         self._rb_sabr.setChecked(True)
         self._model_group = QButtonGroup(self)
         self._model_group.addButton(self._rb_sabr)
-        self._model_group.addButton(self._rb_ssvi)
+        self._model_group.addButton(self._rb_svi)
         self._model_group.addButton(self._rb_both)
-        for rb in (self._rb_sabr, self._rb_ssvi, self._rb_both):
+        for rb in (self._rb_sabr, self._rb_svi, self._rb_both):
             rb.toggled.connect(lambda checked: self._build_chart() if checked and self._result else None)
             model_row.addWidget(rb)
         model_row.addStretch()
@@ -301,15 +301,15 @@ class SmileDialog(QDialog):
         k_dense = np.linspace(K_min - pad, K_max + pad, 200)
 
         selected_model = (
-            "SABR + SSVI" if self._rb_both.isChecked()
-            else "SSVI" if self._rb_ssvi.isChecked()
+            "SABR + SVI" if self._rb_both.isChecked()
+            else "SVI" if self._rb_svi.isChecked()
             else "SABR"
         )
-        run_sabr = selected_model in ("SABR", "SABR + SSVI")
-        run_ssvi = selected_model in ("SSVI", "SABR + SSVI")
+        run_sabr = selected_model in ("SABR", "SABR + SVI")
+        run_svi = selected_model in ("SVI", "SABR + SVI")
 
         sabr_curve_x, sabr_curve_y = [], []
-        ssvi_curve_x, ssvi_curve_y = [], []
+        svi_curve_x, svi_curve_y = [], []
         warn_x, warn_y, warn_labels = [], [], []
         model_summaries: list[str] = []
 
@@ -344,20 +344,20 @@ class SmileDialog(QDialog):
             except Exception as e:
                 model_summaries.append(f"SABR non calibré : {e}")
 
-        # SSVI
-        if run_ssvi:
+        # SVI
+        if run_svi:
             try:
-                from option.ssvi import SSVICalibration
-                ssvi = SSVICalibration(F=F, T=0.25)
-                ssvi.fit(strikes_arr, ivs_arr, weights=w_arr)
+                from option.svi import SVICalibration
+                svi = SVICalibration(F=F, T=0.25)
+                svi.fit(strikes_arr, ivs_arr, weights=w_arr)
 
-                ssvi_dense = np.maximum(ssvi.predict(k_dense), 0.0)
-                ssvi_curve_x = k_dense.tolist()
-                ssvi_curve_y = ssvi_dense.tolist()
+                svi_dense = np.maximum(svi.predict(k_dense), 0.0)
+                svi_curve_x = k_dense.tolist()
+                svi_curve_y = svi_dense.tolist()
 
-                model_summaries.append(ssvi.summary())
+                model_summaries.append(svi.summary())
             except Exception as e:
-                model_summaries.append(f"SSVI non calibré : {e}")
+                model_summaries.append(f"SVI non calibré : {e}")
 
         self._lbl_sabr.setText("\n".join(model_summaries))
 
@@ -367,7 +367,7 @@ class SmileDialog(QDialog):
             "market": {"x": mkt_x, "y": mkt_y, "labels": mkt_labels} if mkt_x else None,
             "corrected": {"x": warn_x, "y": warn_y, "labels": warn_labels} if warn_x else None,
             "sabr_curve": {"x": sabr_curve_x, "y": sabr_curve_y} if sabr_curve_x else None,
-            "ssvi_curve": {"x": ssvi_curve_x, "y": ssvi_curve_y} if ssvi_curve_x else None,
+            "svi_curve": {"x": svi_curve_x, "y": svi_curve_y} if svi_curve_x else None,
             "spot": float(forward) if forward is not None else None,
         }
 

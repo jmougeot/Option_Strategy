@@ -371,11 +371,11 @@ class ChartWidget(QWidget):
                 ref_x.extend(list(sc_data["x"]))
                 ref_y.extend(list(sc_data["y"]))
 
-        # Plot SSVI curve
-        sv_data = data.get("ssvi_curve")
+        # Plot SVI curve
+        sv_data = data.get("svi_curve")
         if sv_data and sv_data["x"]:
             pi.plot(sv_data["x"], sv_data["y"],
-                    pen=pg.mkPen("#4CAF50", width=2, style=Qt.PenStyle.DashLine), name="SSVI")
+                    pen=pg.mkPen("#4CAF50", width=2, style=Qt.PenStyle.DashLine), name="SVI")
             if ref_x:
                 x_lo, x_hi = min(ref_x), max(ref_x)
                 for sx, sy in zip(sv_data["x"], sv_data["y"]):

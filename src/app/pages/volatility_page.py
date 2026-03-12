@@ -28,9 +28,9 @@ from option.option_class import Option
 def build_smile_figure(
     calls, puts, underlying_price,
     sabr_calibration=None,
-    ssvi_calibration=None,
+    svi_calibration=None,
 ) -> Optional[SmileFigureSpec]:
-    """Build smile data with market IV points + SABR/SSVI smooth curve(s)."""
+    """Build smile data with market IV points + SABR/SVI smooth curve(s)."""
     calls_by_strike = {o.strike: o for o in calls}
     puts_by_strike  = {o.strike: o for o in puts}
     all_strikes = sorted(set(calls_by_strike) | set(puts_by_strike))
@@ -77,13 +77,13 @@ def build_smile_figure(
         except Exception:
             pass
 
-    # Dense SSVI curve
-    ssvi_curve_x, ssvi_curve_y = [], []
-    if ssvi_calibration is not None and len(all_strikes) >= 2:
+    # Dense SVI curve
+    svi_curve_x, svi_curve_y = [], []
+    if svi_calibration is not None and len(all_strikes) >= 2:
         try:
             k_dense = np.linspace(k_lo, k_hi, 200)
-            ssvi_curve_y = np.maximum(ssvi_calibration.predict(k_dense), 0.0).tolist()
-            ssvi_curve_x = k_dense.tolist()
+            svi_curve_y = np.maximum(svi_calibration.predict(k_dense), 0.0).tolist()
+            svi_curve_x = k_dense.tolist()
         except Exception:
             pass
 
@@ -92,7 +92,7 @@ def build_smile_figure(
         "market":     {"x": mkt_x,  "y": mkt_y,  "labels": mkt_labels}  if mkt_x  else None,
         "corrected":  {"x": warn_x, "y": warn_y, "labels": warn_labels} if warn_x else None,
         "sabr_curve": {"x": sabr_curve_x, "y": sabr_curve_y} if sabr_curve_x else None,
-        "ssvi_curve": {"x": ssvi_curve_x, "y": ssvi_curve_y} if ssvi_curve_x else None,
+        "svi_curve": {"x": svi_curve_x, "y": svi_curve_y} if svi_curve_x else None,
         "spot": float(underlying_price) if underlying_price is not None else None,
     }
 
@@ -181,16 +181,16 @@ class VolatilityPage(QWidget):
         )
         calls, puts = split_calls_puts(self._options)
 
-        # Détecter les calibrations (SABR / SSVI / les deux)
+        # Détecter les calibrations (SABR / SVI / les deux)
         raw_cal = getattr(self._state, "sabr_calibration", None)
         sabr_cal: Any = None
-        ssvi_cal: Any = None
+        svi_cal: Any = None
         if raw_cal is not None:
             try:
                 from option.bachelier import CalibrationBundle
                 if isinstance(raw_cal, CalibrationBundle):
                     sabr_cal = raw_cal.sabr
-                    ssvi_cal = raw_cal.ssvi
+                    svi_cal = raw_cal.svi
                 else:
                     # ancien objet (SABRCalibration seul)
                     sabr_cal = raw_cal
@@ -201,8 +201,8 @@ class VolatilityPage(QWidget):
         calib_lines: list[str] = []
         if sabr_cal is not None and hasattr(sabr_cal, "summary"):
             calib_lines.append(sabr_cal.summary())
-        if ssvi_cal is not None and hasattr(ssvi_cal, "summary"):
-            calib_lines.append(ssvi_cal.summary())
+        if svi_cal is not None and hasattr(svi_cal, "summary"):
+            calib_lines.append(svi_cal.summary())
         if calib_lines:
             self._calib_lbl.setText("\n".join(calib_lines))
             self._calib_lbl.setVisible(True)
@@ -213,7 +213,7 @@ class VolatilityPage(QWidget):
         fig = build_smile_figure(
             calls, puts, underlying_price,
             sabr_calibration=sabr_cal,
-            ssvi_calibration=ssvi_cal,
+            svi_calibration=svi_cal,
         )
         if fig is not None:
             self._smile_chart.set_figure(fig)

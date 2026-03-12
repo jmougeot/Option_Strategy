@@ -47,7 +47,7 @@ class SmileFigureSpec(TypedDict):
     market: LabeledXYSeriesSpec | None
     corrected: LabeledXYSeriesSpec | None
     sabr_curve: XYSeriesSpec | None
-    ssvi_curve: XYSeriesSpec | None
+    svi_curve: XYSeriesSpec | None
     spot: float | None
 
 
