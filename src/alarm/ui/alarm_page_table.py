@@ -159,8 +159,8 @@ class TableMixin:
         strategy = Strategy(id=str(uuid.uuid4()), name="")
         strategies.append(strategy)
         self._states[strategy.id] = RowState()
-
-        # Make non-editable cells functional
+        # Block signals so setText calls below don't retrigger _on_cell_changed.
+        self._table.blockSignals(True)
         for col in (C_LEGS, C_PRICE, C_COND, C_STATUS, C_DELTA, C_GAMMA, C_THETA, C_IV, C_FUT):
             item = self._table.item(row, col)
             if item:
@@ -174,7 +174,7 @@ class TableMixin:
                     item.setText("En cours")
                 elif col in (C_DELTA, C_GAMMA, C_THETA, C_IV, C_FUT):
                     item.setText("--")
-
+        self._table.blockSignals(False)
         self._fill_ghost_rows()
         return strategy
 

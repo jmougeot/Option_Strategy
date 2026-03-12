@@ -76,12 +76,12 @@ def convert_strike_decimal(strike_str: str) -> float:
     else:
         return float(strike_str)
     
-def detect_vs(strategy_str: str) -> Tuple[str, Optional[str]]:
+def detect_vs(strategy_str: str) -> Tuple[str, Optional[str], bool]:
     """
     Détecte si la stratégie contient 'vs' et split en deux parties
     """
     # Pattern pour détecter "vs" entouré d'espaces
-    vs_pattern = r'\s+vs\s+|\s+VS\s+'
+    vs_pattern = r'\s+(?:vs|-)\s+'
     
     if re.search(vs_pattern, strategy_str, re.IGNORECASE):
         # Split sur vs
@@ -89,7 +89,13 @@ def detect_vs(strategy_str: str) -> Tuple[str, Optional[str]]:
         if len(parts) == 2:
             return parts[0].strip(), parts[1].strip()
     
-    return strategy_str, None
+    return strategy_str, None , False
+
+def detect_plus(strategy_str: str) -> Tuple[str, Optional[str]]
+    """
+    Detecte si ma stratégie contient '+' et split en deux parties
+    """
+    plus_pattern = r'\s+\+\s+'
 
 def extract_strikes(strategy_str: str) -> List[float]:
     """Extraction avancée des strikes - gère tous les formats et conversions Bloomberg"""
@@ -329,7 +335,7 @@ def str_to_strat(info_strategy : str) -> Optional[Strategy]:
         return None
     
     # Détecter si on a un "vs" (deux stratégies)
-    part1, part2 = detect_vs(name)
+    part1, part2, vs= detect_vs(name)
     
     # Traiter la première partie
     strikes1 = extract_strikes(part1)

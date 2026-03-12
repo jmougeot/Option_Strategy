@@ -15,6 +15,7 @@
               "ticker": "SFRH6C 98.0 COMDTY",
               "position": "long",
               "quantity": 1,
+              "total_qty": null,
               "underlying": "SFR",
               "strike": 0.0
             },
@@ -23,6 +24,7 @@
               "ticker": "SFRH6C 98.97 COMDTY",
               "position": "short",
               "quantity": 2,
+              "total_qty": null,
               "underlying": "SFR",
               "strike": 0.0
             }
@@ -43,14 +45,16 @@
               "ticker": "ERU6C 97.875 COMDTY",
               "position": "long",
               "quantity": 1,
+              "total_qty": 5000,
               "underlying": "ER",
               "strike": 97.875
             },
             {
               "id": "b183202d-9177-4e85-961e-a51ee3173f68",
               "ticker": "ERU6C 97.9375 COMDTY",
-              "position": "short",
+              "position": "long",
               "quantity": 1,
+              "total_qty": 5000,
               "underlying": "ER",
               "strike": 97.9375
             },
@@ -58,20 +62,22 @@
               "id": "770722d7-4106-42bb-a4e8-5a829e004a16",
               "ticker": "ERU6C 98.0 COMDTY",
               "position": "short",
-              "quantity": 1,
+              "quantity": 2,
+              "total_qty": -10000,
               "underlying": "ER",
               "strike": 98.0
             },
             {
               "id": "e409f36f-0e33-42a9-a896-6f058682e9e5",
               "ticker": "ERU6C 98.0625 COMDTY",
-              "position": "long",
+              "position": "short",
               "quantity": 1,
+              "total_qty": -5000,
               "underlying": "ER",
               "strike": 98.0625
             }
           ],
-          "target_price": null,
+          "target_price": 0.52,
           "target_condition": "inferieur",
           "status": "En cours",
           "created_at": "2026-03-11T16:18:57.784304"

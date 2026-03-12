@@ -143,13 +143,14 @@ class AlarmPage(
         if row < 0:
             return
 
+        self._table.blockSignals(True)
         legs_item = self._table.item(row, C_LEGS)
         if legs_item:
             legs_item.setText(self._legs_summary(strategy))
-
         target_item = self._table.item(row, C_TARGET)
         if target_item:
             target_item.setText(f"{strategy.target_price:.4f}" if strategy.target_price is not None else "")
+        self._table.blockSignals(False)
 
         self._refresh_price_cell(row, strategy.calculate_strategy_price())
         self._refresh_greeks_cells(row, strategy)

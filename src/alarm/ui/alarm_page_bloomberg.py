@@ -88,6 +88,7 @@ class BloombergMixin:
         item = self._table.item(row, C_PRICE)
         if item is None:
             return
+        self._table.blockSignals(True)
         if price is None:
             item.setText("--")
             item.setForeground(QColor("#888888"))
@@ -97,6 +98,7 @@ class BloombergMixin:
         else:
             item.setText(f"{price:.4f}")
             item.setForeground(QColor("#cc2200"))
+        self._table.blockSignals(False)
 
     def _refresh_greeks_cells(self, row: int, s: Strategy) -> None:
         """Update the 5 analytic cells for the given row."""
@@ -115,10 +117,12 @@ class BloombergMixin:
             else:
                 item.setForeground(QColor("#333333"))
 
+        self._table.blockSignals(True)
         _set(C_DELTA, s.get_total_delta(), "{:+.4f}", signed_color=True)
         _set(C_GAMMA, s.get_total_gamma(), "{:+.5f}")
         _set(C_THETA, s.get_total_theta(), "{:+.4f}", signed_color=True)
         _set(C_IV,    s.get_average_ivol(), "{:.2%}")
         _set(C_FUT,   s.future_price,       "{:.4f}")
+        self._table.blockSignals(False)
 
 
