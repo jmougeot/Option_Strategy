@@ -52,13 +52,16 @@ class AlertHandler:
     # ── son ───────────────────────────────────────────────────────────────────
     @staticmethod
     def play_alert_sound() -> None:
-        """Joue un son d'alerte (cross-platform)."""
-        try:
-            if sys.platform == "win32":
-                winsound.Beep(1000, 200)
-                winsound.Beep(1500, 200)
-        except Exception:
-            pass
+        """Joue un son d'alerte de façon non-bloquante (thread séparé)."""
+        import threading
+        def _beep():
+            try:
+                if sys.platform == "win32":
+                    winsound.Beep(1000, 200)
+                    winsound.Beep(1500, 200)
+            except Exception:
+                pass
+        threading.Thread(target=_beep, daemon=True).start()
 
     # ── popup ─────────────────────────────────────────────────────────────────
     def _show_popup(

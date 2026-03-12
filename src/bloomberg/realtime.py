@@ -131,7 +131,7 @@ class BloombergWorker(QThread):
                 ticker = msg.correlationId().value()
                 self._handle_price(msg, ticker)
 
-        elif event.eventType() == blpapi.event.Event.SUBSCRIPTION_STATUS:
+        elif event.eventType() == blpapi.Event.SUBSCRIPTION_STATUS:
             for msg in event:
                 ticker = msg.correlationId().value()
                 if msg.messageType() == blpapi.names.Names.SUBSCRIPTION_STARTED:

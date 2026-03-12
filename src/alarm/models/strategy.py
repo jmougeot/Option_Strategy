@@ -162,7 +162,7 @@ class OptionLeg:
         Retourne la contribution au prix de la stratégie.
         Long = +prix, Short = -prix
         """
-        price = self.mid if self.mid else self.last_price
+        price = self.mid if self.mid is not None else self.last_price
         if price is None:
             return None
         

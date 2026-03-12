@@ -39,8 +39,6 @@ class AlarmMixin:
             return
 
         status_item = self._table.item(row, C_STATUS) if row is not None else None
-        if row is not None:
-            self._paint_row(row, s)
 
         if s.status != StrategyStatus.EN_COURS:
             if status_item:
@@ -76,6 +74,9 @@ class AlarmMixin:
                 self._fire_alarm(row, s)
             elif status_item:
                 status_item.setToolTip(f"Alerte dans {WARN_DELAY - elapsed:.1f} s")
+
+        if row is not None:
+            self._paint_row(row, s)
 
     def _fire_alarm(self, row: Optional[int], s: Strategy) -> None:
         if not self._alert.fire(

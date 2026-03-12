@@ -68,7 +68,7 @@ class TableMixin:
 
     @staticmethod
     def _future_ticker_from_option(option_ticker: str) -> str | None:
-        match = re.match(r'^([A-Z]+[FGHJKMNQUVXZ]\d+)[CP]\s', normalize_ticker(option_ticker))
+        match = re.match(r'^([A-Z0-9]+[FGHJKMNQUVXZ]\d+)[CP]\s', normalize_ticker(option_ticker))
         return f"{match.group(1)} COMDTY" if match else None
 
     def _append_row(self, strategy: Strategy) -> None:

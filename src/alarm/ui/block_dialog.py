@@ -128,13 +128,6 @@ class BlockDialog(QDialog):
         self._btn_copy = QPushButton("Copier message")
         self._btn_copy.clicked.connect(self._copy_message)
         btn_row.addWidget(self._btn_copy)
-
-        bb = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        bb.accepted.connect(self._commit)
-        bb.rejected.connect(self.reject)
-        btn_row.addWidget(bb)
         root.addLayout(btn_row)
 
         # Delete key
@@ -376,13 +369,3 @@ class BlockDialog(QDialog):
         clipboard.setText(build_confirmation_message(self._strategy))
         self._lbl_status.setText("✓ Message copié dans le presse-papiers")
         self._lbl_status.setStyleSheet(f"color: {theme.SUCCESS}; font-size: 12px;")
-
-    # ── commit ────────────────────────────────────────────────────────────
-    def _commit(self) -> None:
-        """The dialog edits the shared strategy directly; OK only closes the dialog."""
-        self.accept()
-
-    # ── cleanup ───────────────────────────────────────────────────────────
-    def closeEvent(self, event) -> None:  # type: ignore[override]
-        self._timer.stop()
-        super().closeEvent(event)
