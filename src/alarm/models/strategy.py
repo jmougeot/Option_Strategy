@@ -1,47 +1,24 @@
 """
 Modèles de données pour les stratégies d'options
 """
-import calendar
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 from datetime import date, datetime
 import math
-import re
 import uuid
 
-from bloomberg.config import normalize_ticker
+from bloomberg.config import (
+    normalize_ticker,
+    OPTION_TICKER_RE as _OPTION_TICKER_RE,
+    OPTION_TICKER_DETAILS_RE as _OPTION_TICKER_DETAILS_RE,
+    FUTURE_TICKER_RE as _FUTURE_TICKER_RE,
+    MONTH_TO_NUMBER as _MONTH_TO_NUMBER,
+    resolve_expiry_year as _resolve_expiry_year,
+    third_wednesday as _third_wednesday,
+)
 from option.bachelier import Bachelier
-
-
-_OPTION_TICKER_RE = re.compile(
-    r"^([A-Z0-9]{2,4})[FGHJKMNQUVXZ]\d[CP]\s+(\d+(?:\.\d+)?)\s+COMDTY$",
-    re.IGNORECASE,
-)
-
-_OPTION_TICKER_DETAILS_RE = re.compile(
-    r"^([A-Z0-9]{2,4})([FGHJKMNQUVXZ])(\d{1,2})([CP])\s+(\d+(?:\.\d+)?)\s+COMDTY$",
-    re.IGNORECASE,
-)
-
-_FUTURE_TICKER_RE = re.compile(
-    r'^([A-Z0-9]+[FGHJKMNQUVXZ]\d+)[CP]\s', re.IGNORECASE
-)
-
-_MONTH_TO_NUMBER = {
-    "F": 1,
-    "G": 2,
-    "H": 3,
-    "J": 4,
-    "K": 5,
-    "M": 6,
-    "N": 7,
-    "Q": 8,
-    "U": 9,
-    "V": 10,
-    "X": 11,
-    "Z": 12,
-}
+from option.option_class import Position
 
 
 def parse_leg_ticker(ticker: str) -> tuple[str, str, float]:
@@ -50,36 +27,11 @@ def parse_leg_ticker(ticker: str) -> tuple[str, str, float]:
     match = _OPTION_TICKER_RE.match(normalized)
     if not match:
         return normalized, "", 0.0
-
     try:
         strike = float(match.group(2))
     except ValueError:
         strike = 0.0
     return normalized, match.group(1).upper(), strike
-
-
-def _third_wednesday(year: int, month: int) -> date:
-    weeks = calendar.monthcalendar(year, month)
-    wednesdays = [week[calendar.WEDNESDAY] for week in weeks if week[calendar.WEDNESDAY] != 0]
-    return date(year, month, wednesdays[2])
-
-
-def _resolve_expiry_year(year_code: str) -> int:
-    raw_year = int(year_code)
-    today = date.today()
-
-    if len(year_code) == 1:
-        base_year = (today.year // 10) * 10
-        resolved = base_year + raw_year
-        if resolved < today.year - 1:
-            resolved += 10
-        return resolved
-
-    base_year = (today.year // 100) * 100
-    resolved = base_year + raw_year
-    if resolved < today.year - 20:
-        resolved += 100
-    return resolved
 
 
 def _parse_option_ticker_details(ticker: str) -> Optional[tuple[bool, float, float]]:
@@ -103,12 +55,6 @@ def _parse_option_ticker_details(ticker: str) -> Optional[tuple[bool, float, flo
     time_to_expiry = max((expiry_date - date.today()).days, 1) / 365.0
     is_call = match.group(4).upper() == "C"
     return is_call, strike, time_to_expiry
-
-
-class Position(Enum):
-    """Position sur une option"""
-    LONG = "long"
-    SHORT = "short"
 
 
 class StrategyStatus(Enum):

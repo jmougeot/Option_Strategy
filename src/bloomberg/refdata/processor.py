@@ -4,8 +4,8 @@
 
 import numpy as np 
 
-from typing import Dict, Optional, Tuple, Any, Literal, List
-from option.option_class import Option
+from typing import Dict, Optional, Tuple, Any, List
+from option.option_class import Option, PositionType
 from bloomberg.ticker_builder import TickerBuilder
 from bloomberg.refdata.premium import PremiumFetcher
 from bloomberg.refdata.fetcher import extract_best_values
@@ -14,7 +14,6 @@ from bloomberg.refdata.extractor import create_option_from_bloomberg
 
 TickerMeta = Dict[str, Any]
 PremiumKey = Tuple[float, str, str, int]
-PositionType = Literal["long", "short"]
 
 class OptionProcessor:
     """Traite les données Bloomberg pour créer les objets Option."""

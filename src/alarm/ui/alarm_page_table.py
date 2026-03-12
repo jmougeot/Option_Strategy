@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 from typing import TYPE_CHECKING, Optional
-
+import re
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem
@@ -17,7 +17,6 @@ from alarm.ui.columns import (
     C_FUT, C_GAMMA, C_IV, C_LEGS, C_NAME,
     C_PRICE, C_STATUS, C_TARGET, C_THETA,
 )
-from app import theme
 
 if TYPE_CHECKING:
     from bloomberg.realtime import BloombergService
@@ -33,11 +32,6 @@ class TableMixin:
     _cur: int
     _states: dict[str, RowState]
     _bbg: BloombergService
-
-    if TYPE_CHECKING:
-        # Stubs for methods provided by other mixins
-        @staticmethod
-        def _future_ticker_from_option(option_ticker: str) -> Optional[str]: ...
 
     # ── table population ──────────────────────────────────────────────────────
     def _reload_table(self) -> None:
@@ -71,6 +65,11 @@ class TableMixin:
                     it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(r, col, it)
         self._table.blockSignals(False)
+
+    @staticmethod
+    def _future_ticker_from_option(option_ticker: str) -> str | None:
+        match = re.match(r'^([A-Z]+[FGHJKMNQUVXZ]\d+)[CP]\s', normalize_ticker(option_ticker))
+        return f"{match.group(1)} COMDTY" if match else None
 
     def _append_row(self, strategy: Strategy) -> None:
         r = self._table.rowCount()

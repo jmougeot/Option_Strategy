@@ -6,7 +6,7 @@ Importe les données d'options depuis Bloomberg et les convertit en objets Optio
 from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, Tuple
 import numpy as np
-from option.option_class import Option
+from option.option_class import Option, PositionType
 from option.bachelier import Bachelier
 from app.data_types import FutureData
 from bloomberg.refdata.processor import OptionProcessor
@@ -21,7 +21,6 @@ from bloomberg.refdata.premium import PremiumFetcher
 TickerMeta = Dict[str, Any]
 PremiumKey = Tuple[float, str, str, int]
 OptionTypeChar = Literal["C", "P"]
-PositionType = Literal["long", "short"]
 RollExpiry = Tuple[str, int] 
 
 UNDERLYING_REF = {

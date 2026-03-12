@@ -18,6 +18,7 @@ from alarm.ui.columns import (
     C_PRICE, C_STATUS, C_TARGET, C_THETA,
     HEADERS, C_EXPIRY
 )
+
 from app import theme
 
 if TYPE_CHECKING:

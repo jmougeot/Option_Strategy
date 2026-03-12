@@ -1,6 +1,18 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Dict, List, Literal, Optional
 import numpy as np
+
+
+class Position(Enum):
+    """Position sur une option : long (acheteur) ou short (vendeur)."""
+    LONG = "long"
+    SHORT = "short"
+
+
+# Alias pour la compatibilité avec les annotations de type existantes
+PositionType = Literal["long", "short"]
+
 
 @dataclass
 class Option:

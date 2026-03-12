@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Optional
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QLabel, QTableWidget
 
-from alarm.models.strategy import Strategy, normalize_ticker
+from alarm.models.strategy import Strategy
+from bloomberg.config import normalize_ticker
 from alarm.ui.columns import (
     C_DELTA, C_FUT, C_GAMMA, C_IV, C_PRICE, C_THETA,
 )

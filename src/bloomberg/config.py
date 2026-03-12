@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date
+import calendar
 
 
 # ---------------------------------------------------------------------------
@@ -73,3 +75,65 @@ def normalize_ticker(ticker: str) -> str:
     ticker = re.sub(r'\bCOMDTY\b',   'COMDTY', ticker, flags=re.IGNORECASE)
     ticker = re.sub(r'\s+', ' ', ticker)
     return ticker
+
+
+# ---------------------------------------------------------------------------
+# Option ticker — expressions régulières (source unique de vérité)
+# ---------------------------------------------------------------------------
+
+# Captures: (underlying_2-4_chars, strike) — pour identifier l'underlying et le strike
+OPTION_TICKER_RE = re.compile(
+    r"^([A-Z0-9]{2,4})[FGHJKMNQUVXZ]\d[CP]\s+(\d+(?:\.\d+)?)\s+COMDTY$",
+    re.IGNORECASE,
+)
+
+# Captures: (underlying, month_code, year_1-2_digits, C/P, strike) — pour résoudre l'expiry
+OPTION_TICKER_DETAILS_RE = re.compile(
+    r"^([A-Z0-9]{2,4})([FGHJKMNQUVXZ])(\d{1,2})([CP])\s+(\d+(?:\.\d+)?)\s+COMDTY$",
+    re.IGNORECASE,
+)
+
+# Captures: (future_code_with_expiry_month_year) — pour dériver le ticker future
+FUTURE_TICKER_RE = re.compile(
+    r'^([A-Z0-9]+[FGHJKMNQUVXZ]\d+)[CP]\s', re.IGNORECASE
+)
+
+# Captures: (base_with_expiry, C/P, strike) — pour le formatage des messages bloc
+OPTION_TICKER_BLOCK_RE = re.compile(
+    r"^([A-Z0-9]+[FGHJKMNQUVXZ]\d+)([CP])\s+([\d.]+)\s+COMDTY$",
+    re.IGNORECASE,
+)
+
+# Mapping code mois option → numéro de mois
+MONTH_TO_NUMBER: dict[str, int] = {
+    "F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
+    "N": 7, "Q": 8, "U": 9, "V": 10, "X": 11, "Z": 12,
+}
+
+
+# ---------------------------------------------------------------------------
+# Résolution de la date d'expiration (3e mercredi du mois)
+# ---------------------------------------------------------------------------
+
+def resolve_expiry_year(year_code: str) -> int:
+    """Convertit un code d'année 1 ou 2 chiffres en année calendaire complète."""
+    raw_year = int(year_code)
+    today = date.today()
+    if len(year_code) == 1:
+        base_year = (today.year // 10) * 10
+        resolved = base_year + raw_year
+        if resolved < today.year - 1:
+            resolved += 10
+        return resolved
+    base_year = (today.year // 100) * 100
+    resolved = base_year + raw_year
+    if resolved < today.year - 20:
+        resolved += 100
+    return resolved
+
+
+def third_wednesday(year: int, month: int) -> date:
+    """Retourne la date du 3e mercredi d'un mois donné (date d'expiration standard)."""
+    weeks = calendar.monthcalendar(year, month)
+    wednesdays = [w[calendar.WEDNESDAY] for w in weeks if w[calendar.WEDNESDAY] != 0]
+    return date(year, month, wednesdays[2])

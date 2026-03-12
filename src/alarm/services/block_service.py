@@ -7,32 +7,18 @@ corresponde au prix stratégie saisi par l'utilisateur.
 """
 from __future__ import annotations
 
-import re
 from typing import List, Optional
 from math import gcd
 from functools import reduce
 from alarm.models.strategy import OptionLeg, Position, Strategy
+from bloomberg.config import OPTION_TICKER_BLOCK_RE as _OPTION_TICKER_RE
+from app.data_types import UNDERLYING_PARAMS
 
-_OPTION_TICKER_RE = re.compile(
-    r"^([A-Z0-9]+[FGHJKMNQUVXZ]\d+)([CP])\s+([\d.]+)\s+COMDTY$",
-    re.IGNORECASE,
-)
-
-_TICK_BY_UNDERLYING = {
-    "SFR": 0.0025,
-    "SFI": 0.0025,
-    "ER": 0.0025,
-    "0R": 0.0025,
-    "0Q": 0.005,
-    "0N": 0.0025,
-    "RX": 0.01,
-    "OE": 0.005,
-    "DU": 0.005,
-}
 
 def tick_for_underlying(underlying: str) -> float:
-    """Retourne la taille du tick pour un underlying bloc."""
-    return _TICK_BY_UNDERLYING.get(underlying.upper(), 0.0025)
+    """Retourne la taille du tick pour un underlying bloc (source: UNDERLYING_PARAMS)."""
+    params = UNDERLYING_PARAMS.get(underlying.upper(), {})
+    return params.get("Short", 0.0025)
 
 def _signed_quantity(leg: OptionLeg) -> int:
     """Quantité signée du leg pour le calcul du prix stratégie."""

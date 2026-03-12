@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 from app.pages.history_page import add_to_history
 from app.utils import format_price, create_comparison_table
 from app.widget_payoff import build_payoff_figure
-from app.app_state import AppState
+from app.app_state import AppState, ComputationResult
 from app.chart_widget import ChartWidget
 from app.worker import ProcessingWorker
 
@@ -362,15 +362,15 @@ class OverviewPage(QWidget):
 
         # Update state
         multi = best_strategies
-        self._state.multi_ranking = multi
-        self._state.comparisons = multi.all_strategies_flat()
-        self._state.mixture = mixture
-        self._state.future_data = future_data
-        self._state.stats = stats
-        if "all_options" in stats:
-            self._state.all_imported_options = stats["all_options"]
-        if "sabr_calibration" in stats:
-            self._state.sabr_calibration = stats["sabr_calibration"]
+        self._state.store_result(ComputationResult(
+            multi_ranking=multi,
+            comparisons=multi.all_strategies_flat(),
+            mixture=mixture,
+            future_data=future_data,
+            stats=stats,
+            all_imported_options=stats.get("all_options", []),
+            sabr_calibration=stats.get("sabr_calibration"),
+        ))
 
         # Metrics
         if future_data and future_data.underlying_price is not None:
