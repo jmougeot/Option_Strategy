@@ -168,7 +168,11 @@ class BlockDialog(QDialog):
         # Mid Ajusté — read-only
         self._set_cell(r, C_ADJUSTED, self._fmt(leg.adjusted_mid))
 
-    # ── cell helpers ──────────────────────────────────────────────────────
+
+    # ======================================================================
+    # cell helpers
+    # ======================================================================
+
     def _set_cell(self, row: int, col: int, text: str, editable: bool = False) -> None:
         item = QTableWidgetItem(text)
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -229,8 +233,11 @@ class BlockDialog(QDialog):
             new_future = self._future_ticker_from_option(new_norm)
             if new_future:
                 self._bbg.subscribe(new_future)
+    
+    # ======================================================================
+    # interactions 
+    # ======================================================================
 
-    # ── interactions ──────────────────────────────────────────────────────
     def _on_dbl_click(self, row: int, col: int) -> None:
         if col != C_POS or row < 0 or row >= len(self._leg_ids):
             return

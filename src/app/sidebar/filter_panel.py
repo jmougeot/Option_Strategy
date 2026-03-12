@@ -50,7 +50,7 @@ class FilterPanel(QGroupBox):
         loss_form = QFormLayout(self._loss_widget)
         loss_form.setContentsMargins(0, 0, 0, 0)
 
-        self._spn_loss_left  = _dbl(0, 9999, 0.1)
+        self._spn_loss_left  = _dbl(-9999, 9999, 0.1)
         self._spn_limit_left = _dbl(0, 9999, 98.5)
         self._chk_po_left    = QCheckBox("Premium only")
         self._chk_po_left.toggled.connect(lambda _: self.changed.emit())
@@ -61,7 +61,7 @@ class FilterPanel(QGroupBox):
         lbl_left = QLabel("Max loss ↓ / from / prem.only")
         loss_form.addRow(lbl_left, row_left)
 
-        self._spn_loss_right  = _dbl(0, 9999, 0.1)
+        self._spn_loss_right  = _dbl(-9999, 9999, 0.1)
         self._spn_limit_right = _dbl(0, 9999, 98.0)
         self._chk_po_right    = QCheckBox("Premium only")
         self._chk_po_right.toggled.connect(lambda _: self.changed.emit())
@@ -78,7 +78,7 @@ class FilterPanel(QGroupBox):
         # Premium bounds
         prem_form = QFormLayout()
         prem_form.setContentsMargins(0, 0, 0, 0)
-        self._spn_max_prem  = _dbl(0, 9999, 0.010)
+        self._spn_max_prem  = _dbl(-9999, 9999, 0.010)
         self._spn_min_short = _dbl(0, 9999, 0.005)
         prem_form.addRow("Max premium:", self._spn_max_prem)
         prem_form.addRow("Min short price:", self._spn_min_short)

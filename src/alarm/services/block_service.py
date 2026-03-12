@@ -23,26 +23,31 @@ def tick_for_underlying(underlying: str) -> float:
 def _signed_quantity(leg: OptionLeg) -> int:
     """Quantité signée du leg pour le calcul du prix stratégie."""
     sign = 1 if leg.position == Position.LONG else -1
-    return sign * leg.quantity
+    return sign * (leg.quantity or 1)
 
 
 def compute_total_quantities(
     strategy: Strategy, base_total: Optional[int]
 ) -> None:
-    """Calcule et stocke total_qty sur chaque leg proportionnellement à base_total."""
+    """Calcule et stocke total_qty sur chaque leg proportionnellement à base_total.
+
+    base_total est la taille absolue (non signée) pour la première jambe.
+    Le signe de chaque total_qty est déterminé par la position du leg
+    (LONG → positif, SHORT → négatif).
+    """
     legs = strategy.legs
-    for i, leg in enumerate(legs):
-        if base_total is None or not legs:
+    if not legs or base_total is None:
+        for leg in legs:
             leg.total_qty = None
-        elif i == 0:
-            leg.total_qty = base_total
-        else:
-            base_signed = _signed_quantity(legs[0])
-            if base_signed == 0:
-                leg.total_qty = None
-            else:
-                ratio = _signed_quantity(leg) / base_signed
-                leg.total_qty = int(round(base_total * ratio))
+        return
+
+    abs_base = abs(base_total)
+    base_abs_qty = abs(legs[0].quantity or 1)
+
+    for leg in legs:
+        sign = 1 if leg.position == Position.LONG else -1
+        ratio = abs(leg.quantity or 1) / base_abs_qty
+        leg.total_qty = int(round(abs_base * ratio * sign))
 
 def _format_leg_ticker(ticker: str) -> str:
     raw = (ticker or "").strip().upper()
