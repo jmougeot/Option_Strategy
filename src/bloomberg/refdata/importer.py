@@ -91,6 +91,7 @@ def import_options(
     suffix: str = "Comdty",
     default_position: PositionType = "long",
     recalibrate: bool = True,
+    vol_model: str = "sabr",
 ) -> Tuple[List[Option], FutureData, List[str], Any]:
     """
     Importe un ensemble d'options depuis Bloomberg et retourne des objets Option.
@@ -125,12 +126,13 @@ def import_options(
         future_data = fetcher.future_data
         time_to_expiry = _time_to_expiry_from_future_data(future_data)
         
-        # 3.5. Calculer la volatilité Bachelier + SABR (si demandé)
+        # 3.5. Calculer la volatilité Bachelier + calibration (si demandé)
         if options and recalibrate:
             sabr_calibration = Bachelier.compute_volatility(
                 options,
                 time_to_expiry=time_to_expiry,
                 future_price=future_data.underlying_price,
+                vol_model=vol_model,
             )
         
         if options:

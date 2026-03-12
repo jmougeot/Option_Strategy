@@ -13,8 +13,8 @@ import numpy as np
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QDialog, QHBoxLayout, QHeaderView,
-    QLabel, QPushButton, QSplitter,
+    QButtonGroup, QDialog, QHBoxLayout, QHeaderView,
+    QLabel, QPushButton, QRadioButton, QSplitter,
     QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget,
 )
@@ -118,6 +118,23 @@ class SmileDialog(QDialog):
         self._lbl_sabr = QLabel("")
         self._lbl_sabr.setStyleSheet("font-size: 11px; color: #555; font-family: monospace;")
         root.addWidget(self._lbl_sabr)
+
+        # Sélecteur de modèle — 3 radio buttons toujours visibles
+        model_row = QHBoxLayout()
+        model_row.addWidget(QLabel("Modèle :"))
+        self._rb_sabr = QRadioButton("SABR")
+        self._rb_ssvi = QRadioButton("SSVI")
+        self._rb_both = QRadioButton("SABR + SSVI")
+        self._rb_sabr.setChecked(True)
+        self._model_group = QButtonGroup(self)
+        self._model_group.addButton(self._rb_sabr)
+        self._model_group.addButton(self._rb_ssvi)
+        self._model_group.addButton(self._rb_both)
+        for rb in (self._rb_sabr, self._rb_ssvi, self._rb_both):
+            rb.toggled.connect(lambda checked: self._build_chart() if checked and self._result else None)
+            model_row.addWidget(rb)
+        model_row.addStretch()
+        root.addLayout(model_row)
 
         # Boutons
         btn_row = QHBoxLayout()
@@ -273,47 +290,76 @@ class SmileDialog(QDialog):
             self._lbl_sabr.setText("")
             return
 
-        # ── 3. Calibration SABR avec poids bid-ask ──────────────────────────
+        # ── 3. Calibration des modèles ────────────────────────────────────────
+        strikes_arr = np.array(mkt_x)
+        ivs_arr = np.array(mkt_y)
+        w_arr = [ba_weights[i] for i in valid_indices]
+        F = forward if forward else float(np.median(strikes_arr))
+
+        K_min, K_max = strikes_arr.min(), strikes_arr.max()
+        pad = (K_max - K_min) * 0.05
+        k_dense = np.linspace(K_min - pad, K_max + pad, 200)
+
+        selected_model = (
+            "SABR + SSVI" if self._rb_both.isChecked()
+            else "SSVI" if self._rb_ssvi.isChecked()
+            else "SABR"
+        )
+        run_sabr = selected_model in ("SABR", "SABR + SSVI")
+        run_ssvi = selected_model in ("SSVI", "SABR + SSVI")
+
         sabr_curve_x, sabr_curve_y = [], []
+        ssvi_curve_x, ssvi_curve_y = [], []
         warn_x, warn_y, warn_labels = [], [], []
+        model_summaries: list[str] = []
 
-        try:
-            from option.sabr import SABRCalibration
-            strikes_arr = np.array(mkt_x)
-            ivs_arr = np.array(mkt_y)
-            w_arr = [ba_weights[i] for i in valid_indices]
-            F = forward if forward else float(np.median(strikes_arr))
+        # SABR
+        if run_sabr:
+            try:
+                from option.sabr import SABRCalibration
+                sabr = SABRCalibration(F=F, T=0.25, beta=0.5, vol_type="normal")
+                sabr.fit(strikes_arr, ivs_arr, weights=w_arr)
 
-            sabr = SABRCalibration(F=F, T=0.25, beta=0.5, vol_type="normal")
-            sabr.fit(strikes_arr, ivs_arr, weights=w_arr)
+                sabr_dense = np.maximum(sabr.predict(k_dense), 0.0)
+                sabr_curve_x = k_dense.tolist()
+                sabr_curve_y = sabr_dense.tolist()
 
-            # Courbe lissée
-            K_min, K_max = strikes_arr.min(), strikes_arr.max()
-            pad = (K_max - K_min) * 0.05
-            k_dense = np.linspace(K_min - pad, K_max + pad, 200)
-            sabr_dense = np.maximum(sabr.predict(k_dense), 0.0)
-            sabr_curve_x = k_dense.tolist()
-            sabr_curve_y = sabr_dense.tolist()
+                # Anomalies SABR → points orange
+                anomalies = sabr.anomalies(threshold=2.0, min_error_bps=1.0)
+                anomaly_strikes = {a["strike"] for a in anomalies}
 
-            # Détecter les anomalies
-            anomalies = sabr.anomalies(threshold=2.0, min_error_bps=1.0)
-            anomaly_strikes = {a["strike"] for a in anomalies}
+                new_mkt_x, new_mkt_y, new_mkt_labels = [], [], []
+                for x, y, lbl in zip(mkt_x, mkt_y, mkt_labels):
+                    if round(x, 4) in anomaly_strikes:
+                        warn_x.append(x)
+                        warn_y.append(y)
+                        warn_labels.append(lbl + "\n⚠ Anomalie SABR")
+                    else:
+                        new_mkt_x.append(x)
+                        new_mkt_y.append(y)
+                        new_mkt_labels.append(lbl)
+                mkt_x, mkt_y, mkt_labels = new_mkt_x, new_mkt_y, new_mkt_labels
 
-            new_mkt_x, new_mkt_y, new_mkt_labels = [], [], []
-            for x, y, lbl in zip(mkt_x, mkt_y, mkt_labels):
-                if round(x, 4) in anomaly_strikes:
-                    warn_x.append(x)
-                    warn_y.append(y)
-                    warn_labels.append(lbl + "\n⚠ Anomalie SABR")
-                else:
-                    new_mkt_x.append(x)
-                    new_mkt_y.append(y)
-                    new_mkt_labels.append(lbl)
-            mkt_x, mkt_y, mkt_labels = new_mkt_x, new_mkt_y, new_mkt_labels
+                model_summaries.append(sabr.summary())
+            except Exception as e:
+                model_summaries.append(f"SABR non calibré : {e}")
 
-            self._lbl_sabr.setText(sabr.summary())
-        except Exception as e:
-            self._lbl_sabr.setText(f"SABR non calibré : {e}")
+        # SSVI
+        if run_ssvi:
+            try:
+                from option.ssvi import SSVICalibration
+                ssvi = SSVICalibration(F=F, T=0.25)
+                ssvi.fit(strikes_arr, ivs_arr, weights=w_arr)
+
+                ssvi_dense = np.maximum(ssvi.predict(k_dense), 0.0)
+                ssvi_curve_x = k_dense.tolist()
+                ssvi_curve_y = ssvi_dense.tolist()
+
+                model_summaries.append(ssvi.summary())
+            except Exception as e:
+                model_summaries.append(f"SSVI non calibré : {e}")
+
+        self._lbl_sabr.setText("\n".join(model_summaries))
 
         # ── 4. Envoi au chart ────────────────────────────────────────────────
         smile_data: SmileFigureSpec = {
@@ -321,6 +367,7 @@ class SmileDialog(QDialog):
             "market": {"x": mkt_x, "y": mkt_y, "labels": mkt_labels} if mkt_x else None,
             "corrected": {"x": warn_x, "y": warn_y, "labels": warn_labels} if warn_x else None,
             "sabr_curve": {"x": sabr_curve_x, "y": sabr_curve_y} if sabr_curve_x else None,
+            "ssvi_curve": {"x": ssvi_curve_x, "y": ssvi_curve_y} if ssvi_curve_x else None,
             "spot": float(forward) if forward is not None else None,
         }
 

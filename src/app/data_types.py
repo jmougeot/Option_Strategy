@@ -122,6 +122,7 @@ class UIParams:
     brut_code: Optional[List[str]] = None
     roll_expiries: Optional[List[RollExpiry]] = None
     recalibrate: bool = True
+    vol_model: str = "sabr"  # "sabr" | "ssvi" | "both"
     operation_penalisation: float = 0.0
 
 

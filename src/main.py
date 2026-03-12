@@ -28,6 +28,7 @@ def process_bloomberg_to_strategies(
     brut_code: Optional[List[str]] = None,
     roll_expiries: Optional[List[Tuple[str, int]]] = None,
     recalibrate: bool = True,
+    vol_model: str = "sabr",
     leg_penalty: float = 0.0,
     prefilled_options: Optional[List] = None,
 ) -> Tuple[Union[List[StrategyComparison], MultiRankingResult], Dict, Tuple[np.ndarray, np.ndarray, float], FutureData]:
@@ -93,6 +94,7 @@ def process_bloomberg_to_strategies(
             strikes=strikes,
             default_position="long",
             recalibrate=recalibrate,
+            vol_model=vol_model,
         )
         # En mode offline, définir une date par défaut de 5 mois dans le futur
         default_expiry_date = (datetime.now() + relativedelta(months=5)).strftime("%Y-%m-%d")
@@ -108,6 +110,7 @@ def process_bloomberg_to_strategies(
             brut_code=brut_code,
             default_position="long",
             recalibrate=recalibrate,
+            vol_model=vol_model,
         )
 
     # Tracker du fetch

@@ -327,6 +327,7 @@ class OverviewPage(QWidget):
             "filter": filter_,
             "roll_expiries": params.roll_expiries,
             "recalibrate": params.recalibrate,
+            "vol_model": params.vol_model,
             "operation_penalisation": params.operation_penalisation,
         }
 
@@ -502,6 +503,7 @@ class OverviewPage(QWidget):
             "filter": filter_,
             "roll_expiries": params.roll_expiries,
             "recalibrate": params.recalibrate,
+            "vol_model": params.vol_model,
             "operation_penalisation": params.operation_penalisation,
             "prefilled_options": options,
         }

@@ -245,6 +245,7 @@ def import_options_offline(
     strikes: List[float],
     default_position: Literal["long", "short"] = "long",
     recalibrate: bool = True,
+    vol_model: str = "sabr",
 ) -> Tuple[List[Option], float, Any]:
 
     print("\n🔧 MODE OFFLINE - Simulation des données Bloomberg")
@@ -290,7 +291,7 @@ def import_options_offline(
                         print(f"  ✓ {sym} {strike}: Premium={option.premium:.4f}, "
                               f"Delta={option.delta:.4f}, IV={option.implied_volatility:.1f}%")
     
-    # ── Calibration SABR (même pipeline que le mode online) ──
+    # ── Calibration (même pipeline que le mode online) ──
     sabr_calibration: Any = None
     if options and recalibrate:
         from option.bachelier import Bachelier
@@ -299,6 +300,7 @@ def import_options_offline(
             options,
             time_to_expiry=time_to_expiry,
             future_price=underlying_price,
+            vol_model=vol_model,
         )
 
     return options, underlying_price, sabr_calibration

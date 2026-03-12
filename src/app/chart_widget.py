@@ -371,6 +371,20 @@ class ChartWidget(QWidget):
                 ref_x.extend(list(sc_data["x"]))
                 ref_y.extend(list(sc_data["y"]))
 
+        # Plot SSVI curve
+        sv_data = data.get("ssvi_curve")
+        if sv_data and sv_data["x"]:
+            pi.plot(sv_data["x"], sv_data["y"],
+                    pen=pg.mkPen("#4CAF50", width=2, style=Qt.PenStyle.DashLine), name="SSVI")
+            if ref_x:
+                x_lo, x_hi = min(ref_x), max(ref_x)
+                for sx, sy in zip(sv_data["x"], sv_data["y"]):
+                    if x_lo <= sx <= x_hi:
+                        ref_y.append(sy)
+            if not ref_x:
+                ref_x.extend(list(sv_data["x"]))
+                ref_y.extend(list(sv_data["y"]))
+
         self._apply_smile_ranges(ref_x, ref_y)
 
         spot = data.get("spot")
