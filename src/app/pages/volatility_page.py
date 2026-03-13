@@ -30,6 +30,7 @@ def build_smile_figure(
     calls, puts, underlying_price,
     sabr_calibration=None,
     svi_calibration=None,
+    spline_calibration=None,
 ) -> Optional[SmileFigureSpec]:
     """Build smile data with market IV points + SABR/SVI smooth curve(s)."""
     calls_by_strike = {o.strike: o for o in calls}
@@ -95,6 +96,16 @@ def build_smile_figure(
         except Exception:
             pass
 
+    # Dense Spline curve
+    spline_curve_x, spline_curve_y = [], []
+    if spline_calibration is not None and len(all_strikes) >= 2:
+        try:
+            k_dense = np.linspace(k_lo, k_hi, 200)
+            spline_curve_y = np.maximum(spline_calibration.predict(k_dense), 0.0).tolist()
+            spline_curve_x = k_dense.tolist()
+        except Exception:
+            pass
+
     return {
         "type": "smile",
         "market":     {"x": mkt_x,  "y": mkt_y,  "labels": mkt_labels}  if mkt_x  else None,
@@ -102,6 +113,7 @@ def build_smile_figure(
         "blended":    {"x": blend_x, "y": blend_y} if blend_x else None,
         "sabr_curve": {"x": sabr_curve_x, "y": sabr_curve_y} if sabr_curve_x else None,
         "svi_curve": {"x": svi_curve_x, "y": svi_curve_y} if svi_curve_x else None,
+        "spline_curve": {"x": spline_curve_x, "y": spline_curve_y} if spline_curve_x else None,
         "spot": float(underlying_price) if underlying_price is not None else None,
     }
 
@@ -198,16 +210,18 @@ class VolatilityPage(QWidget):
         )
         calls, puts = split_calls_puts(self._options)
 
-        # Détecter les calibrations (SABR / SVI / les deux)
+        # Détecter les calibrations (SABR / SVI / Spline)
         raw_cal = getattr(self._state, "sabr_calibration", None)
         sabr_cal: Any = None
         svi_cal: Any = None
+        spline_cal: Any = None
         if raw_cal is not None:
             try:
                 from option.bachelier import CalibrationBundle
                 if isinstance(raw_cal, CalibrationBundle):
                     sabr_cal = raw_cal.sabr
                     svi_cal = raw_cal.svi
+                    spline_cal = raw_cal.spline
                 else:
                     # ancien objet (SABRCalibration seul)
                     sabr_cal = raw_cal
@@ -220,6 +234,8 @@ class VolatilityPage(QWidget):
             calib_lines.append(sabr_cal.summary())
         if svi_cal is not None and hasattr(svi_cal, "summary"):
             calib_lines.append(svi_cal.summary())
+        if spline_cal is not None and hasattr(spline_cal, "summary"):
+            calib_lines.append(spline_cal.summary())
         # Surface SVI multi-expiration
         if raw_cal is not None and hasattr(raw_cal, "surface") and raw_cal.surface is not None:
             calib_lines.append(raw_cal.surface.summary())
@@ -234,6 +250,7 @@ class VolatilityPage(QWidget):
             calls, puts, underlying_price,
             sabr_calibration=sabr_cal,
             svi_calibration=svi_cal,
+            spline_calibration=spline_cal,
         )
         if fig is not None:
             self._smile_chart.set_figure(fig)

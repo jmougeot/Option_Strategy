@@ -15,27 +15,27 @@ from option.sabr import SABRCalibration
 
 @dataclass
 class CalibrationBundle:
-    """Contient les résultats SABR et/ou SVI d'une calibration."""
-    sabr: Optional[Any] = None   # SABRCalibration | None
-    svi: Optional[Any] = None    # SVICalibration | None
+    """Contient les résultats SABR, SVI et/ou Spline d'une calibration."""
+    sabr: Optional[Any] = None     # SABRCalibration | None
+    svi: Optional[Any] = None      # SVICalibration | None
+    spline: Optional[Any] = None   # SplineCalibration | None
     surface: Optional[Any] = None  # SVISurfaceResult | None (multi-expiry)
 
     def predict(self, strikes) -> Any:
-        """Prédit la vol modèle (moyenne si les deux, sinon celui dispo)."""
-        if self.sabr is not None and self.svi is not None:
-            return (np.array(self.sabr.predict(strikes)) + np.array(self.svi.predict(strikes))) / 2.0
-        if self.sabr is not None:
-            return self.sabr.predict(strikes)
-        if self.svi is not None:
-            return self.svi.predict(strikes)
-        raise RuntimeError("CalibrationBundle vide")
+        """Prédit la vol modèle (moyenne des modèles disponibles)."""
+        preds = []
+        for cal in (self.sabr, self.svi, self.spline):
+            if cal is not None:
+                preds.append(np.array(cal.predict(strikes)))
+        if not preds:
+            raise RuntimeError("CalibrationBundle vide")
+        return sum(preds) / len(preds)
 
     def summary(self) -> str:
         parts = []
-        if self.sabr is not None and hasattr(self.sabr, "summary"):
-            parts.append(self.sabr.summary())
-        if self.svi is not None and hasattr(self.svi, "summary"):
-            parts.append(self.svi.summary())
+        for cal in (self.sabr, self.svi, self.spline):
+            if cal is not None and hasattr(cal, "summary"):
+                parts.append(cal.summary())
         if self.surface is not None and hasattr(self.surface, "summary"):
             parts.append(self.surface.summary())
         return "\n".join(parts)
@@ -304,8 +304,10 @@ class Bachelier:
             return None
 
         # ── Calibration ──────────────────────────────────────────────────────
-        run_sabr = vol_model in ("sabr", "both")
-        run_svi = vol_model in ("svi", "both")
+        # Backward‑compat: "both" == sabr+svi
+        run_sabr = vol_model in ("sabr", "both") or "sabr" in vol_model
+        run_svi = vol_model in ("svi", "both") or "svi" in vol_model
+        run_spline = "spline" in vol_model
         multi_expiry = len(expiry_blocks) > 1
 
         # SABR : par expiration — grid search sur β pour le meilleur fit
@@ -375,12 +377,33 @@ class Bachelier:
                     except Exception as exc:
                         print(f"  SVI calibration échouée : {exc}")
 
+        # SPLINE : par expiration
+        spline_by_key: Dict[Tuple[str, int], Any] = {}
+        if run_spline:
+            from option.spline import SplineCalibration
+            for key, T, F, datas, s_obs, iv_obs, w_obs in expiry_blocks:
+                iv_arr = np.array(iv_obs, dtype=float)
+                if (iv_arr > 0).sum() >= 4:
+                    try:
+                        cal = SplineCalibration(F=F, T=T)
+                        cal.fit(
+                            strikes=np.array(s_obs),
+                            sigmas_mkt=iv_arr,
+                            weights=w_obs,
+                        )
+                        spline_by_key[key] = cal
+                        print(f"  Spline [{key[0]}{key[1]}] calibré : {cal.result}")
+                    except Exception as exc:
+                        print(f"  Spline [{key[0]}{key[1]}] échoué : {exc}")
+
         # ── Appliquer les IV calibrées par expiration ────────────────────────
         for key, T, F, datas, strikes_obs, ivs_obs, weights_obs in expiry_blocks:
             sabr_cal = sabr_by_key.get(key)
             svi_cal = svi_by_key.get(key)
+            spline_cal = spline_by_key.get(key)
             sabr_ok = sabr_cal is not None
             svi_ok = svi_cal is not None
+            spline_ok = spline_cal is not None
 
             # IV marché par strike
             mkt_iv_by_strike: Dict[float, List[float]] = defaultdict(list)
@@ -410,25 +433,26 @@ class Bachelier:
 
             # IV finales calibrées (modèle pur, avant blending)
             unique_strikes = [d[0] for d in datas]
-            if sabr_ok and svi_ok:
-                sabr_vols = sabr_cal.predict(unique_strikes)
-                svi_vols = svi_cal.predict(unique_strikes)
+            model_preds: list = []
+            if sabr_ok:
+                model_preds.append(np.array(sabr_cal.predict(unique_strikes), dtype=float))
+            if svi_ok:
+                model_preds.append(np.array(svi_cal.predict(unique_strikes), dtype=float))
+            if spline_ok:
+                model_preds.append(np.array(spline_cal.predict(unique_strikes), dtype=float))
+
+            if model_preds:
+                avg: np.ndarray = np.mean(model_preds, axis=0)
                 model_iv_map: Dict[float, float] = {
-                    k: max((float(sv) + float(xv)) / 2.0, 0.0)
-                    for k, sv, xv in zip(unique_strikes, sabr_vols, svi_vols)
+                    k: max(float(v), 0.0)
+                    for k, v in zip(unique_strikes, avg)
                 }
-            elif svi_ok:
-                svi_vols = svi_cal.predict(unique_strikes)
-                model_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, svi_vols)}
-            elif sabr_ok:
-                sabr_vols = sabr_cal.predict(unique_strikes)
-                model_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, sabr_vols)}
             else:
                 model_iv_map = mkt_iv_map
 
             # Blending : iv = w * iv_marché + (1 - w) * iv_modèle
             # w=1 (meilleur poids) → 100% marché, w=0 (pire) → 100% modèle
-            calibrated = sabr_ok or svi_ok
+            calibrated = sabr_ok or svi_ok or spline_ok
             final_iv_map: Dict[float, float] = {}
             for k in unique_strikes:
                 m_iv = mkt_iv_map.get(k, 0.0)
@@ -459,10 +483,12 @@ class Bachelier:
         first_key = expiry_blocks[0][0]
         primary_sabr = sabr_by_key.get(first_key)
         primary_svi = svi_by_key.get(first_key)
-        if primary_sabr or primary_svi or surface_result:
+        primary_spline = spline_by_key.get(first_key)
+        if primary_sabr or primary_svi or primary_spline or surface_result:
             return CalibrationBundle(
                 sabr=primary_sabr,
                 svi=primary_svi,
+                spline=primary_spline,
                 surface=surface_result,
             )
         return None

@@ -396,6 +396,20 @@ class ChartWidget(QWidget):
                 ref_x.extend(list(sv_data["x"]))
                 ref_y.extend(list(sv_data["y"]))
 
+        # Plot Spline curve
+        sp_data = data.get("spline_curve")
+        if sp_data and sp_data["x"]:
+            pi.plot(sp_data["x"], sp_data["y"],
+                    pen=pg.mkPen("#00BCD4", width=2, style=Qt.PenStyle.DotLine), name="Spline")
+            if ref_x:
+                x_lo, x_hi = min(ref_x), max(ref_x)
+                for sx, sy in zip(sp_data["x"], sp_data["y"]):
+                    if x_lo <= sx <= x_hi:
+                        ref_y.append(sy)
+            if not ref_x:
+                ref_x.extend(list(sp_data["x"]))
+                ref_y.extend(list(sp_data["y"]))
+
         self._apply_smile_ranges(ref_x, ref_y)
 
         spot = data.get("spot")

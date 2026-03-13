@@ -49,6 +49,7 @@ class SmileFigureSpec(TypedDict):
     blended: XYSeriesSpec | None
     sabr_curve: XYSeriesSpec | None
     svi_curve: XYSeriesSpec | None
+    spline_curve: XYSeriesSpec | None
     spot: float | None
 
 

@@ -41,7 +41,9 @@ class ParamsPanel(QGroupBox):
         self._chk_recalibrate.setChecked(True)
         self._chk_svi = QCheckBox("SVI")
         self._chk_svi.setChecked(False)
-        for w in (self._chk_brut, self._chk_recalibrate, self._chk_svi):
+        self._chk_spline = QCheckBox("Spline")
+        self._chk_spline.setChecked(False)
+        for w in (self._chk_brut, self._chk_recalibrate, self._chk_svi, self._chk_spline):
             opts_layout.addWidget(w)
         root.addLayout(opts_layout)
 
@@ -138,6 +140,7 @@ class ParamsPanel(QGroupBox):
         for w in (
             self._chk_recalibrate,
             self._chk_svi,
+            self._chk_spline,
             self._cmb_months, self._cmb_unit,
             self._spn_price_min, self._spn_price_max, self._spn_price_step,
             self._spn_penalty,
@@ -192,12 +195,15 @@ class ParamsPanel(QGroupBox):
 
         use_sabr = self._chk_recalibrate.isChecked()
         use_svi = self._chk_svi.isChecked()
-        if use_sabr and use_svi:
-            vol_model = "both"
-        elif use_svi:
-            vol_model = "svi"
-        else:
-            vol_model = "sabr"
+        use_spline = self._chk_spline.isChecked()
+        models = []
+        if use_sabr:
+            models.append("sabr")
+        if use_svi:
+            models.append("svi")
+        if use_spline:
+            models.append("spline")
+        vol_model = "+".join(models) if models else "sabr"
 
         return UIParams(
             underlying=underlying,
@@ -211,7 +217,7 @@ class ParamsPanel(QGroupBox):
             unit=self._cmb_unit.currentText(),
             brut_code=brut_code,
             roll_expiries=roll_expiries,
-            recalibrate=use_sabr or use_svi,
+            recalibrate=use_sabr or use_svi or use_spline,
             vol_model=vol_model,
             operation_penalisation=self._spn_penalty.value(),
         )
