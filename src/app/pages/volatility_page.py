@@ -5,7 +5,8 @@ Shows the vol smile chart and an editable option table with "Rerun" capability.
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -16,7 +17,7 @@ from PyQt6.QtWidgets import (
 
 from app.utils import split_calls_puts
 from app.app_state import AppState
-from app.chart_types import SmileFigureSpec
+from app.chart_types import SmileFigureSpec, SurfaceFigureSpec
 from app.chart_widget import ChartWidget
 from option.option_class import Option
 
@@ -162,6 +163,14 @@ class VolatilityPage(QWidget):
         table_lay.addWidget(self._btn_rerun)
         self._tabs.addTab(self._table_tab, "Table")
 
+        # Surface tab
+        self._surface_tab = QWidget()
+        surface_lay = QVBoxLayout(self._surface_tab)
+        surface_lay.setContentsMargins(0, 0, 0, 0)
+        self._surface_chart = ChartWidget(min_height=450)
+        surface_lay.addWidget(self._surface_chart)
+        self._tabs.addTab(self._surface_tab, "Surface")
+
     # ------------------------------------------------------------------ public
     def refresh(self) -> None:
         """Called when Overview finishes to load fresh data."""
@@ -225,6 +234,75 @@ class VolatilityPage(QWidget):
 
         # Options table
         self._load_table(self._options)
+
+        # Surface chart (multi-expiry SVI)
+        surface = getattr(raw_cal, "surface", None) if raw_cal is not None else None
+        if surface is not None:
+            sfig = self._build_surface_figure(surface, self._options)
+            if sfig is not None:
+                self._surface_chart.set_figure(sfig)
+            else:
+                self._surface_chart.clear()
+        else:
+            self._surface_chart.clear()
+
+    # ------------------------------------------------------------------ surface
+    _SURFACE_COLORS = [
+        "#2196F3", "#F44336", "#4CAF50", "#FF9800",
+        "#9C27B0", "#00BCD4", "#795548", "#607D8B",
+    ]
+
+    @staticmethod
+    def _build_surface_figure(
+        surface, options: List[Option],
+    ) -> Optional[SurfaceFigureSpec]:
+        """Build multi-expiry overlay from SVISurfaceResult + market options."""
+        from option.svi import SVICalibration, SVISurfaceResult
+        if not isinstance(surface, SVISurfaceResult) or not surface.slices:
+            return None
+
+        colors = VolatilityPage._SURFACE_COLORS
+        curves: list = []
+        market: list = []
+
+        # Group options by expiry for market dots
+        by_expiry: Dict[Tuple[str, int], List[Option]] = defaultdict(list)
+        for o in options:
+            by_expiry[(o.expiration_month, o.expiration_year)].append(o)
+
+        # Match surface slices (keyed by T) to option groups
+        # Build (T, label, F, SVIResult) sorted list
+        sorted_slices = sorted(surface.slices.items())  # (T, SVIResult)
+
+        for idx, (T, res) in enumerate(sorted_slices):
+            col = colors[idx % len(colors)]
+            label = f"T={T:.3f}a"
+
+            # Model curve
+            if res.strikes.size > 0:
+                k_lo = res.strikes.min() * 0.98
+                k_hi = res.strikes.max() * 1.02
+            else:
+                continue
+            k_dense = np.linspace(k_lo, k_hi, 200)
+            vols = np.array([
+                SVICalibration.normal_vol(res.F, K, T, res.theta, res.rho, res.eta, res.gamma)
+                for K in k_dense
+            ])
+            curves.append({"label": label, "color": col, "x": k_dense.tolist(), "y": vols.tolist()})
+
+            # Market dots for this T
+            if res.strikes.size and res.sigmas_mkt.size:
+                market.append({
+                    "label": f"{label} mkt",
+                    "color": col,
+                    "x": res.strikes.tolist(),
+                    "y": res.sigmas_mkt.tolist(),
+                })
+
+        if not curves:
+            return None
+        return {"type": "surface", "curves": curves, "market": market}
 
     # ------------------------------------------------------------------ helpers
     COLUMNS = ["Type", "Expiry", "Strike", "Premium", "Bid", "Ask", "IV (%)", "Delta", "Gamma", "Theta", "Status"]

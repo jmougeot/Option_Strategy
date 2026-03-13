@@ -18,6 +18,7 @@ from app.chart_types import (
     PayoffFigureSpec,
     PayoffLineSpec,
     SmileFigureSpec,
+    SurfaceFigureSpec,
     XYSeriesSpec,
 )
 
@@ -75,6 +76,8 @@ class ChartWidget(QWidget):
             self._render_payoff(cast(PayoffFigureSpec, data))
         elif dtype == "smile":
             self._render_smile(cast(SmileFigureSpec, data))
+        elif dtype == "surface":
+            self._render_surface(cast(SurfaceFigureSpec, data))
         else:
             self.clear()
 
@@ -401,6 +404,39 @@ class ChartWidget(QWidget):
 
         pi.setLabel("bottom", "Strike", color=_AX)
         pi.setLabel("left", "Implied Volatility", color=_AX)
+
+    # ------------------------------------------------------------------ surface
+    def _render_surface(self, data: SurfaceFigureSpec) -> None:
+        self.clear()
+        self._style_axes()
+        self._add_legend()
+        pi = self._plot_item()
+
+        all_x: list[float] = []
+        all_y: list[float] = []
+
+        # Market scatter per expiry
+        for mkt in data.get("market", []):
+            xs, ys = list(mkt["x"]), list(mkt["y"])
+            pi.addItem(pg.ScatterPlotItem(
+                xs, ys, symbol="o", size=7,
+                pen=pg.mkPen(mkt["color"], width=1),
+                brush=pg.mkBrush(mkt["color"]),
+                name=mkt["label"],
+            ))
+            all_x.extend(xs)
+            all_y.extend(ys)
+
+        # SVI model curves per expiry
+        for curve in data.get("curves", []):
+            xs, ys = list(curve["x"]), list(curve["y"])
+            pi.plot(xs, ys, pen=pg.mkPen(curve["color"], width=2), name=curve["label"])
+            all_x.extend(xs)
+            all_y.extend(ys)
+
+        self._apply_smile_ranges(all_x, all_y)
+        pi.setLabel("bottom", "Strike", color=_AX)
+        pi.setLabel("left", "Implied Volatility (bps)", color=_AX)
 
 
 PlotlyChart = ChartWidget

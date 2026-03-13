@@ -51,4 +51,24 @@ class SmileFigureSpec(TypedDict):
     spot: float | None
 
 
-ChartFigureSpec: TypeAlias = PayoffFigureSpec | SmileFigureSpec
+class SurfaceCurveSpec(TypedDict):
+    label: str
+    color: str
+    x: NumberSeries
+    y: NumberSeries
+
+
+class SurfaceMarketSpec(TypedDict):
+    label: str
+    color: str
+    x: NumberSeries
+    y: NumberSeries
+
+
+class SurfaceFigureSpec(TypedDict):
+    type: Literal["surface"]
+    curves: list[SurfaceCurveSpec]
+    market: list[SurfaceMarketSpec]
+
+
+ChartFigureSpec: TypeAlias = PayoffFigureSpec | SmileFigureSpec | SurfaceFigureSpec
