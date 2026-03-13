@@ -308,15 +308,20 @@ class Bachelier:
         run_svi = vol_model in ("svi", "both")
         multi_expiry = len(expiry_blocks) > 1
 
-        # SABR : par expiration (pas de surface pour SABR)
+        # SABR : par expiration — grid search sur β pour le meilleur fit
         sabr_by_key: Dict[Tuple[str, int], SABRCalibration] = {}
         if run_sabr:
             for key, T, F, datas, s_obs, iv_obs, w_obs in expiry_blocks:
                 iv_arr = np.array(iv_obs, dtype=float)
                 if (iv_arr > 0).sum() >= 3:
                     try:
-                        cal = SABRCalibration(F=F, T=T, beta=0.0, vol_type="normal")
-                        cal.fit(strikes=np.array(s_obs), sigmas_mkt=iv_arr, weights=w_obs)
+                        cal = SABRCalibration.fit_best_beta(
+                            F=F, T=T,
+                            strikes=np.array(s_obs),
+                            sigmas_mkt=iv_arr,
+                            weights=w_obs,
+                            vol_type="normal",
+                        )
                         sabr_by_key[key] = cal
                         print(f"  SABR [{key[0]}{key[1]}] calibré : {cal.result}")
                     except Exception as exc:

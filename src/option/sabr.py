@@ -319,6 +319,39 @@ class SABRCalibration:
         )
         return self.result
 
+    @classmethod
+    def fit_best_beta(
+        cls,
+        F: float,
+        T: float,
+        strikes: np.ndarray,
+        sigmas_mkt: np.ndarray,
+        weights: Optional[Sequence[float]] = None,
+        betas: Sequence[float] = (0.0, 0.25, 0.5, 0.75, 1.0),
+        vol_type: str = "normal",
+        seed: int = 42,
+    ) -> "SABRCalibration":
+        """Calibre SABR en testant plusieurs β et retient celui avec le meilleur RMSE."""
+        best_cal: Optional[SABRCalibration] = None
+        best_rmse = float("inf")
+
+        for beta in betas:
+            try:
+                cal = cls(F=F, T=T, beta=beta, vol_type=vol_type)
+                cal.fit(strikes=strikes, sigmas_mkt=sigmas_mkt, weights=weights, seed=seed)
+                if cal.result is not None and cal.result.rmse < best_rmse:
+                    best_rmse = cal.result.rmse
+                    best_cal = cal
+            except Exception:
+                continue
+
+        if best_cal is None:
+            # Fallback β=0
+            best_cal = cls(F=F, T=T, beta=0.0, vol_type=vol_type)
+            best_cal.fit(strikes=strikes, sigmas_mkt=sigmas_mkt, weights=weights, seed=seed)
+
+        return best_cal
+
     # ------------------------------------------------------------------
     # Évaluation
     # ------------------------------------------------------------------
