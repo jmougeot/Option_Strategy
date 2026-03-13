@@ -358,6 +358,14 @@ class ChartWidget(QWidget):
         ref_x: list = list(market_x) + list(corrected_x)
         ref_y: list = list(market_y) + list(corrected_y)
 
+        # Blended IV curve (market/model weighted average)
+        bl_data = data.get("blended")
+        if bl_data and bl_data["x"]:
+            pi.plot(bl_data["x"], bl_data["y"],
+                    pen=pg.mkPen("#9C27B0", width=2.5), name="IV blendée")
+            ref_x.extend(list(bl_data["x"]))
+            ref_y.extend(list(bl_data["y"]))
+
         # Plot SABR curve, clipped to market strike range for range calc
         sc_data = data.get("sabr_curve")
         if sc_data and sc_data["x"]:

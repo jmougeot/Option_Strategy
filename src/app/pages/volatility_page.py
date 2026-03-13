@@ -40,18 +40,25 @@ def build_smile_figure(
 
     mkt_x, mkt_y, mkt_labels = [], [], []
     warn_x, warn_y, warn_labels = [], [], []
+    blend_x, blend_y = [], []
 
     for K in all_strikes:
         opts = [o for o in (calls_by_strike.get(K), puts_by_strike.get(K)) if o is not None]
 
-        ivs = [o.market_implied_volatility or o.implied_volatility for o in opts]
-        ivs = [iv for iv in ivs if iv > 0]
-        if not ivs:
+        # IV marché brute (avant blending)
+        raw_ivs = [getattr(o, 'market_implied_volatility', None) or o.implied_volatility for o in opts]
+        raw_ivs = [iv for iv in raw_ivs if iv and iv > 0]
+        if not raw_ivs:
             continue
+        mkt_iv = sum(raw_ivs) / len(raw_ivs)
 
-        mkt_iv = sum(ivs) / len(ivs)
+        # IV blendée (après calibration)
+        blended_ivs = [o.implied_volatility for o in opts if o.implied_volatility and o.implied_volatility > 0]
+        if blended_ivs:
+            blend_x.append(K)
+            blend_y.append(sum(blended_ivs) / len(blended_ivs))
 
-        sabr_vols = [o.sabr_volatility for o in opts if o.sabr_volatility > 0]
+        sabr_vols = [o.sabr_volatility for o in opts if o.sabr_volatility and o.sabr_volatility > 0]
         sabr_iv = sum(sabr_vols) / len(sabr_vols) if sabr_vols else 0.0
 
         lbl = f"K={K:.3f}\nmkt={mkt_iv * 1e4:.1f}bp"
@@ -92,6 +99,7 @@ def build_smile_figure(
         "type": "smile",
         "market":     {"x": mkt_x,  "y": mkt_y,  "labels": mkt_labels}  if mkt_x  else None,
         "corrected":  {"x": warn_x, "y": warn_y, "labels": warn_labels} if warn_x else None,
+        "blended":    {"x": blend_x, "y": blend_y} if blend_x else None,
         "sabr_curve": {"x": sabr_curve_x, "y": sabr_curve_y} if sabr_curve_x else None,
         "svi_curve": {"x": svi_curve_x, "y": svi_curve_y} if svi_curve_x else None,
         "spot": float(underlying_price) if underlying_price is not None else None,
