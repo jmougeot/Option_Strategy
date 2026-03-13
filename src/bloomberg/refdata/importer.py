@@ -108,9 +108,10 @@ def import_options(
     else:
         builder.build_from_brut(brut_code, strikes)
 
-    # 1b. Builder séparé pour les expirations voisines (surface SVI)
+    # 1b. Builder séparé pour les expirations voisines (surface SVI/Spline)
     surface_builder: Optional[TickerBuilder] = None
-    if brut_code is None and vol_model in ("svi", "both"):
+    need_surface = ("svi" in vol_model or "both" in vol_model or "spline" in vol_model)
+    if brut_code is None and need_surface:
         from bloomberg.util.expiry import build_surface_months
         selected = {(m, y) for m in months for y in years}
         extra_pairs = [

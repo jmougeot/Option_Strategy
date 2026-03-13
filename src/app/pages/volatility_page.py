@@ -239,6 +239,9 @@ class VolatilityPage(QWidget):
         # Surface SVI multi-expiration
         if raw_cal is not None and hasattr(raw_cal, "surface") and raw_cal.surface is not None:
             calib_lines.append(raw_cal.surface.summary())
+        # Surface Spline multi-expiration
+        if raw_cal is not None and hasattr(raw_cal, "spline_surface") and raw_cal.spline_surface is not None:
+            calib_lines.append(raw_cal.spline_surface.summary())
         if calib_lines:
             self._calib_lbl.setText("\n".join(calib_lines))
             self._calib_lbl.setVisible(True)

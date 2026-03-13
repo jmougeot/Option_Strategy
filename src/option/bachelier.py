@@ -16,10 +16,11 @@ from option.sabr import SABRCalibration
 @dataclass
 class CalibrationBundle:
     """Contient les résultats SABR, SVI et/ou Spline d'une calibration."""
-    sabr: Optional[Any] = None     # SABRCalibration | None
-    svi: Optional[Any] = None      # SVICalibration | None
-    spline: Optional[Any] = None   # SplineCalibration | None
-    surface: Optional[Any] = None  # SVISurfaceResult | None (multi-expiry)
+    sabr: Optional[Any] = None            # SABRCalibration | None
+    svi: Optional[Any] = None             # SVICalibration | None
+    spline: Optional[Any] = None          # SplineCalibration | None
+    surface: Optional[Any] = None         # SVISurfaceResult | None
+    spline_surface: Optional[Any] = None  # SplineSurfaceResult | None
 
     def predict(self, strikes) -> Any:
         """Prédit la vol modèle (moyenne des modèles disponibles)."""
@@ -36,8 +37,9 @@ class CalibrationBundle:
         for cal in (self.sabr, self.svi, self.spline):
             if cal is not None and hasattr(cal, "summary"):
                 parts.append(cal.summary())
-        if self.surface is not None and hasattr(self.surface, "summary"):
-            parts.append(self.surface.summary())
+        for surf in (self.surface, self.spline_surface):
+            if surf is not None and hasattr(surf, "summary"):
+                parts.append(surf.summary())
         return "\n".join(parts)
 
 class Bachelier:
@@ -377,11 +379,40 @@ class Bachelier:
                     except Exception as exc:
                         print(f"  SVI calibration échouée : {exc}")
 
-        # SPLINE : par expiration
+        # SPLINE : per-slice, surface si multi-expiry
         spline_by_key: Dict[Tuple[str, int], Any] = {}
+        spline_surface_result = None
         if run_spline:
-            from option.spline import SplineCalibration
-            for key, T, F, datas, s_obs, iv_obs, w_obs in expiry_blocks:
+            from option.spline import SplineCalibration, SplineSurfaceCalibration, SplineSliceData
+
+            if multi_expiry:
+                sp_slices: List[SplineSliceData] = []
+                sp_keys: List[Tuple[str, int]] = []
+                for key, T, F, datas, s_obs, iv_obs, w_obs in expiry_blocks:
+                    iv_arr = np.array(iv_obs, dtype=float)
+                    if (iv_arr > 0).sum() >= 4:
+                        sp_slices.append(SplineSliceData(
+                            F=F, T=T,
+                            strikes=np.array(s_obs, dtype=float),
+                            sigmas_mkt=iv_arr,
+                            weights=np.array(w_obs, dtype=float),
+                        ))
+                        sp_keys.append(key)
+                if sp_slices:
+                    try:
+                        sp_surf = SplineSurfaceCalibration()
+                        spline_surface_result = sp_surf.fit(sp_slices)
+                        for i, key in enumerate(sp_keys):
+                            T_i = sp_slices[i].T
+                            if T_i in sp_surf._slices:
+                                spline_by_key[key] = sp_surf._slices[T_i]
+                        print(f"  Spline Surface calibrée : {spline_surface_result.n_slices} slices, "
+                              f"RMSE={spline_surface_result.global_rmse_bps:.2f}bp, "
+                              f"cal_viol={spline_surface_result.n_calendar_violations}")
+                    except Exception as exc:
+                        print(f"  Spline Surface échouée : {exc}")
+            else:
+                key, T, F, datas, s_obs, iv_obs, w_obs = expiry_blocks[0]
                 iv_arr = np.array(iv_obs, dtype=float)
                 if (iv_arr > 0).sum() >= 4:
                     try:
@@ -392,9 +423,9 @@ class Bachelier:
                             weights=w_obs,
                         )
                         spline_by_key[key] = cal
-                        print(f"  Spline [{key[0]}{key[1]}] calibré : {cal.result}")
+                        print(f"  Spline calibré : {cal.result}")
                     except Exception as exc:
-                        print(f"  Spline [{key[0]}{key[1]}] échoué : {exc}")
+                        print(f"  Spline calibration échouée : {exc}")
 
         # ── Appliquer les IV calibrées par expiration ────────────────────────
         for key, T, F, datas, strikes_obs, ivs_obs, weights_obs in expiry_blocks:
@@ -484,11 +515,12 @@ class Bachelier:
         primary_sabr = sabr_by_key.get(first_key)
         primary_svi = svi_by_key.get(first_key)
         primary_spline = spline_by_key.get(first_key)
-        if primary_sabr or primary_svi or primary_spline or surface_result:
+        if primary_sabr or primary_svi or primary_spline or surface_result or spline_surface_result:
             return CalibrationBundle(
                 sabr=primary_sabr,
                 svi=primary_svi,
                 spline=primary_spline,
                 surface=surface_result,
+                spline_surface=spline_surface_result,
             )
         return None
