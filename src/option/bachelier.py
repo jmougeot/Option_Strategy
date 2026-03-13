@@ -5,7 +5,7 @@
 
 import numpy as np
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from scipy.stats import norm
 from scipy.optimize import brentq
 from typing import Any, Dict, Optional, List, Tuple
@@ -18,10 +18,10 @@ class CalibrationBundle:
     """Contient les résultats SABR et/ou SVI d'une calibration."""
     sabr: Optional[Any] = None   # SABRCalibration | None
     svi: Optional[Any] = None    # SVICalibration | None
+    surface: Optional[Any] = None  # SVISurfaceResult | None (multi-expiry)
 
     def predict(self, strikes) -> Any:
         """Prédit la vol modèle (moyenne si les deux, sinon celui dispo)."""
-        import numpy as np
         if self.sabr is not None and self.svi is not None:
             return (np.array(self.sabr.predict(strikes)) + np.array(self.svi.predict(strikes))) / 2.0
         if self.sabr is not None:
@@ -36,6 +36,8 @@ class CalibrationBundle:
             parts.append(self.sabr.summary())
         if self.svi is not None and hasattr(self.svi, "summary"):
             parts.append(self.svi.summary())
+        if self.surface is not None and hasattr(self.surface, "summary"):
+            parts.append(self.surface.summary())
         return "\n".join(parts)
 
 class Bachelier:
@@ -225,135 +227,207 @@ class Bachelier:
         time_to_expiry: float = 0.25,
         future_price: Optional[float] = None,
         vol_model: str = "sabr",
-    ) -> Optional[Any]:
+    ) -> Optional[CalibrationBundle]:
         """
         Calcule la volatilité Bachelier (+ grecques) via calibration SABR ou SVI.
+
+        Gère automatiquement les expirations multiples :
+        - Groupe les options par (expiration_month, expiration_year)
+        - Calcule T et F par groupe (via opt.time_to_expiry et opt.underlying_price)
+        - Calibre SABR par groupe indépendamment
+        - Calibre SVI : Level 1 par groupe, Level 2 surface si multi-expiry
+
         vol_model : "sabr" | "svi" | "both"
-        Poids de calibration basés sur le spread bid-ask.
-        Returns the fitted calibration object, or None if calibration failed.
+        Returns CalibrationBundle ou None si calibration échouée.
         """
         if not future_price:
             return None
 
-        F = future_price
-        T = time_to_expiry
+        F_default = future_price
+        T_default = time_to_expiry
 
-        # ── 1. Calcul IV individuelle ────────────────────────────────────────
-        grouped_by_strike: Dict[float, Dict[str, List[Option]]] = defaultdict(
-            lambda: {"call": [], "put": []}
-        )
+        # ── Collecter les F par expiration AVANT de les écraser ──────────────
+        expiry_forwards: Dict[Tuple[str, int], List[float]] = defaultdict(list)
         for opt in options:
-            opt.underlying_price = F
-            opt.implied_volatility = (
-                Bachelier(F, opt.strike, 0.0, T, opt.is_call(), opt.premium).implied_vol()
-                if opt.premium > 0
-                else 0.0
+            key = (opt.expiration_month, opt.expiration_year)
+            if opt.underlying_price and opt.underlying_price > 0:
+                expiry_forwards[key].append(opt.underlying_price)
+
+        # ── Grouper par expiration ───────────────────────────────────────────
+        by_expiry: Dict[Tuple[str, int], List[Option]] = defaultdict(list)
+        for opt in options:
+            by_expiry[(opt.expiration_month, opt.expiration_year)].append(opt)
+
+        # ── Par groupe : inverser les IV, collecter les données de calib ─────
+        # Chaque entrée : (key, T, F, datas, strikes_obs, ivs_obs, weights_obs)
+        expiry_blocks: list = []
+
+        for key, opts in sorted(by_expiry.items()):
+            # T par groupe : médiane des time_to_expiry des options, ou fallback
+            tts = [o.time_to_expiry for o in opts if o.time_to_expiry and o.time_to_expiry > 0]
+            T = float(np.median(tts)) if tts else T_default
+
+            # F par groupe : médiane des underlying_price, ou fallback
+            fwds = expiry_forwards.get(key, [])
+            F = float(np.median(fwds)) if fwds else F_default
+
+            # Inversion Bachelier individuelle
+            grouped: Dict[float, Dict[str, List[Option]]] = defaultdict(
+                lambda: {"call": [], "put": []}
             )
+            for opt in opts:
+                opt.underlying_price = F
+                opt.implied_volatility = (
+                    Bachelier(F, opt.strike, 0.0, T, opt.is_call(), opt.premium).implied_vol()
+                    if opt.premium > 0 else 0.0
+                )
+                sk = round(opt.strike, 6)
+                grouped[sk]["call" if opt.is_call() else "put"].append(opt)
 
-            strike_key = round(opt.strike, 6)
-            grouped_by_strike[strike_key]["call" if opt.is_call() else "put"].append(opt)
+            datas: List[Tuple[float, List[Option], List[Option]]] = []
+            for sk in sorted(grouped):
+                g = grouped[sk]
+                calls, puts = g["call"], g["put"]
+                if calls or puts:
+                    datas.append((calls[0].strike if calls else puts[0].strike, calls, puts))
 
-        datas: List[Tuple[float, List[Option], List[Option]]] = []
-        for strike_key in sorted(grouped_by_strike):
-            strike_group = grouped_by_strike[strike_key]
-            calls = strike_group["call"]
-            puts = strike_group["put"]
-            if not calls and not puts:
+            if not datas:
                 continue
 
-            strike = calls[0].strike if calls else puts[0].strike
-            datas.append((strike, calls, puts))
+            strikes_obs, ivs_obs, weights_obs = Bachelier.compute_weight(datas, F)
+            if not strikes_obs:
+                continue
 
-        n = len(datas)
-        if n == 0:
-            return
+            expiry_blocks.append((key, T, F, datas, strikes_obs, ivs_obs, weights_obs))
 
-
-        # ── 2. Collecte des observations individuelles (call et put séparés) ──
-        strikes_obs, ivs_obs, weights_obs = Bachelier.compute_weight(datas, F)
-
-        if len(strikes_obs) == 0:
+        if not expiry_blocks:
             return None
 
-        # IV marché par strike (moyenne call+put) pour market_implied_volatility
-        mkt_iv_by_strike: Dict[float, List[float]] = defaultdict(list)
-        for k, iv in zip(strikes_obs, ivs_obs):
-            mkt_iv_by_strike[k].append(iv)
-        mkt_iv_map: Dict[float, float] = {
-            k: sum(vs) / len(vs) for k, vs in mkt_iv_by_strike.items()
-        }
-
-        # ── 3. Calibration — SABR / SVI / Both ───────────────────────────────
-        strikes_np = np.array(strikes_obs, dtype=float)
-        iv_np_arr = np.array(ivs_obs, dtype=float)
+        # ── Calibration ──────────────────────────────────────────────────────
         run_sabr = vol_model in ("sabr", "both")
         run_svi = vol_model in ("svi", "both")
+        multi_expiry = len(expiry_blocks) > 1
 
-        sabr = SABRCalibration(F=F, T=T, beta=0.0, vol_type="normal")
-        sabr_ok = False
-        svi_ok = False
-        svi = None
+        # SABR : par expiration (pas de surface pour SABR)
+        sabr_by_key: Dict[Tuple[str, int], SABRCalibration] = {}
+        if run_sabr:
+            for key, T, F, datas, s_obs, iv_obs, w_obs in expiry_blocks:
+                iv_arr = np.array(iv_obs, dtype=float)
+                if (iv_arr > 0).sum() >= 3:
+                    try:
+                        cal = SABRCalibration(F=F, T=T, beta=0.0, vol_type="normal")
+                        cal.fit(strikes=np.array(s_obs), sigmas_mkt=iv_arr, weights=w_obs)
+                        sabr_by_key[key] = cal
+                        print(f"  SABR [{key[0]}{key[1]}] calibré : {cal.result}")
+                    except Exception as exc:
+                        print(f"  SABR [{key[0]}{key[1]}] échoué : {exc}")
 
-        if run_sabr and (iv_np_arr > 0).sum() >= 3:
-            try:
-                sabr.fit(strikes=strikes_np, sigmas_mkt=iv_np_arr, weights=weights_obs)
-                sabr_ok = True
-                print(f"  SABR calibré : {sabr.result}")
-            except Exception as exc:
-                print(f"  SABR calibration échouée : {exc}")
+        # SVI : Level 1 per-slice, Level 2 surface si multi-expiry
+        svi_by_key: Dict[Tuple[str, int], Any] = {}
+        surface_result = None
+        if run_svi:
+            from option.svi import SVICalibration, SVISurfaceCalibration, SliceData
 
-        if run_svi and (iv_np_arr > 0).sum() >= 4:
-            try:
-                from option.svi import SVICalibration
-                svi = SVICalibration(F=F, T=T)
-                svi.fit(strikes=strikes_np, sigmas_mkt=iv_np_arr, weights=weights_obs)
-                svi_ok = True
-                print(f"  SVI calibré : {svi.result}")
-            except Exception as exc:
-                print(f"  SVI calibration échouée : {exc}")
+            if multi_expiry:
+                # Surface calibration Level 1 + Level 2
+                slice_list: List[SliceData] = []
+                slice_keys: List[Tuple[str, int]] = []
+                for key, T, F, datas, s_obs, iv_obs, w_obs in expiry_blocks:
+                    iv_arr = np.array(iv_obs, dtype=float)
+                    if (iv_arr > 0).sum() >= 4:
+                        slice_list.append(SliceData(
+                            F=F, T=T,
+                            strikes=np.array(s_obs, dtype=float),
+                            sigmas_mkt=iv_arr,
+                            weights=np.array(w_obs, dtype=float),
+                        ))
+                        slice_keys.append(key)
+                if slice_list:
+                    try:
+                        surface_cal = SVISurfaceCalibration()
+                        surface_result = surface_cal.fit(slice_list)
+                        # Extraire un SVICalibration par slice depuis les résultats surface
+                        for i, key in enumerate(slice_keys):
+                            T_i = slice_list[i].T
+                            if T_i in surface_result.slices:
+                                cal = SVICalibration(F=slice_list[i].F, T=T_i)
+                                cal.result = surface_result.slices[T_i]
+                                svi_by_key[key] = cal
+                        print(f"  SVI Surface calibrée : {surface_result.n_slices} slices, "
+                              f"RMSE={surface_result.global_rmse_bps:.2f}bp")
+                    except Exception as exc:
+                        print(f"  SVI Surface échouée : {exc}")
+            else:
+                # Single expiry : Level 1 standard
+                key, T, F, datas, s_obs, iv_obs, w_obs = expiry_blocks[0]
+                iv_arr = np.array(iv_obs, dtype=float)
+                if (iv_arr > 0).sum() >= 4:
+                    try:
+                        cal = SVICalibration(F=F, T=T)
+                        cal.fit(strikes=np.array(s_obs), sigmas_mkt=iv_arr, weights=w_obs)
+                        svi_by_key[key] = cal
+                        print(f"  SVI calibré : {cal.result}")
+                    except Exception as exc:
+                        print(f"  SVI calibration échouée : {exc}")
 
-        # ── 4. Choisir les IV finales ─────────────────────────────────────────
-        unique_strikes = [d[0] for d in datas]
-        if sabr_ok and svi_ok and svi is not None:
-            # "both" : moyenne des deux surfaces
-            sabr_vols = sabr.predict(unique_strikes)
-            svi_vols = svi.predict(unique_strikes)
-            final_iv_map: Dict[float, float] = {
-                k: max((float(sv) + float(xv)) / 2.0, 0.0)
-                for k, sv, xv in zip(unique_strikes, sabr_vols, svi_vols)
+        # ── Appliquer les IV calibrées par expiration ────────────────────────
+        for key, T, F, datas, strikes_obs, ivs_obs, weights_obs in expiry_blocks:
+            sabr_cal = sabr_by_key.get(key)
+            svi_cal = svi_by_key.get(key)
+            sabr_ok = sabr_cal is not None
+            svi_ok = svi_cal is not None
+
+            # IV marché par strike
+            mkt_iv_by_strike: Dict[float, List[float]] = defaultdict(list)
+            for k, iv in zip(strikes_obs, ivs_obs):
+                mkt_iv_by_strike[k].append(iv)
+            mkt_iv_map: Dict[float, float] = {
+                k: sum(vs) / len(vs) for k, vs in mkt_iv_by_strike.items()
             }
-        elif svi_ok and svi is not None:
-            svi_vols = svi.predict(unique_strikes)
-            final_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, svi_vols)}
-        elif sabr_ok:
-            sabr_vols = sabr.predict(unique_strikes)
-            final_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, sabr_vols)}
-        else:
-            final_iv_map = mkt_iv_map
 
-        calibrated = sabr_ok or svi_ok
+            # IV finales calibrées
+            unique_strikes = [d[0] for d in datas]
+            if sabr_ok and svi_ok:
+                sabr_vols = sabr_cal.predict(unique_strikes)
+                svi_vols = svi_cal.predict(unique_strikes)
+                final_iv_map: Dict[float, float] = {
+                    k: max((float(sv) + float(xv)) / 2.0, 0.0)
+                    for k, sv, xv in zip(unique_strikes, sabr_vols, svi_vols)
+                }
+            elif svi_ok:
+                svi_vols = svi_cal.predict(unique_strikes)
+                final_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, svi_vols)}
+            elif sabr_ok:
+                sabr_vols = sabr_cal.predict(unique_strikes)
+                final_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, sabr_vols)}
+            else:
+                final_iv_map = mkt_iv_map
 
-        for _, calls, puts in datas:
-            for opt in calls + puts:
-                k = opt.strike
-                mkt_iv = mkt_iv_map.get(k, 0.0)
-                iv = final_iv_map.get(k, 0.0)
-                opt.market_implied_volatility = mkt_iv
-                opt.sabr_volatility = iv if calibrated else 0.0
-                if iv > 0:
-                    opt.implied_volatility = iv
-                    # Reconstruire le premium seulement s'il manque
-                    if not (opt.status and opt.premium > 0):
-                        opt.sabr_corrected = True
-                        opt.premium = Bachelier(F, opt.strike, iv, T, opt.is_call()).price()
-                    opt.delta = Bachelier(F, opt.strike, iv, T, opt.is_call()).delta()
-                    opt.gamma = Bachelier(F, opt.strike, iv, T, opt.is_call()).gamma()
-                    opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()
+            calibrated = sabr_ok or svi_ok
+            for _, calls, puts in datas:
+                for opt in calls + puts:
+                    k = opt.strike
+                    mkt_iv = mkt_iv_map.get(k, 0.0)
+                    iv = final_iv_map.get(k, 0.0)
+                    opt.market_implied_volatility = mkt_iv
+                    opt.sabr_volatility = iv if calibrated else 0.0
+                    if iv > 0:
+                        opt.implied_volatility = iv
+                        if not (opt.status and opt.premium > 0):
+                            opt.sabr_corrected = True
+                            opt.premium = Bachelier(F, opt.strike, iv, T, opt.is_call()).price()
+                        opt.delta = Bachelier(F, opt.strike, iv, T, opt.is_call()).delta()
+                        opt.gamma = Bachelier(F, opt.strike, iv, T, opt.is_call()).gamma()
+                        opt.theta = Bachelier(F, opt.strike, iv, T, opt.is_call()).theta()
 
-        # Retourner un CalibrationBundle
-        if sabr_ok or svi_ok:
+        # ── CalibrationBundle : primary expiry + surface ─────────────────────
+        first_key = expiry_blocks[0][0]
+        primary_sabr = sabr_by_key.get(first_key)
+        primary_svi = svi_by_key.get(first_key)
+        if primary_sabr or primary_svi or surface_result:
             return CalibrationBundle(
-                sabr=sabr if sabr_ok else None,
-                svi=svi if svi_ok else None,
+                sabr=primary_sabr,
+                svi=primary_svi,
+                surface=surface_result,
             )
         return None

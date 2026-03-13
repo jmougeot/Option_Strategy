@@ -2,7 +2,8 @@
 # Class por créer des options depuis les données blommberg : calcul de roll 
 # =========================================================================
 
-import numpy as np 
+import numpy as np
+from datetime import date, datetime
 
 from typing import Dict, Optional, Tuple, Any, List
 from option.option_class import Option, PositionType
@@ -102,7 +103,8 @@ class OptionProcessor:
             )
             
             self._compute_roll(option, meta)
-            
+            self._set_time_to_expiry(option, raw_data)
+
             if option.strike > 0:
                 self._print_option(option)
                 return option
@@ -110,6 +112,25 @@ class OptionProcessor:
             pass
         return None
     
+    @staticmethod
+    def _set_time_to_expiry(option: Option, raw_data: Dict[str, Any]) -> None:
+        """Calcule T à partir de LAST_TRADEABLE_DT ou OPT_EXPIRE_DT."""
+        raw_dt = raw_data.get("LAST_TRADEABLE_DT") or raw_data.get("OPT_EXPIRE_DT")
+        if not raw_dt:
+            return
+        text = str(raw_dt).strip()
+        if "T" in text:
+            text = text.split("T", 1)[0]
+        if " " in text:
+            text = text.split(" ", 1)[0]
+        for fmt in ("%Y-%m-%d", "%m/%d/%y", "%m/%d/%Y"):
+            try:
+                d = datetime.strptime(text, fmt).date()
+                option.time_to_expiry = max((d - date.today()).days, 1) / 365.0
+                return
+            except ValueError:
+                continue
+
     @staticmethod
     def _print_option(option: Option):
         """Affiche le résumé d'une option."""

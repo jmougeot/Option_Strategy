@@ -17,6 +17,7 @@ class Option(BaseOption):
     # ============ EXPIRATION ============
     expiration_month: Literal["F", "G", "H", "K", "M", "N", "Q", "U", "V", "X", "Z"] = "F"
     expiration_year: int = 6
+    time_to_expiry: Optional[float] = None  # T en années (depuis LAST_TRADEABLE_DT)
 
     # =========== STRUCTURE DE POSITION ===========
     position: Literal["long", "short"] = "short"

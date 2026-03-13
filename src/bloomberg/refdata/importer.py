@@ -104,7 +104,20 @@ def import_options(
     builder._build_underlying(underlying, months[0], years)
 
     if brut_code is None:
-        builder.build_from_standard(underlying, months, years, strikes)
+        if vol_model in ("svi", "both"):
+            # Auto-expansion : construit les expirations trimestrielles voisines
+            from bloomberg.util.expiry import build_surface_months
+            seen: set = set()
+            for y in years:
+                for pair in build_surface_months(months[0], y):
+                    if pair not in seen:
+                        seen.add(pair)
+                        m, yr = pair
+                        for strike in strikes:
+                            for opt_type in ["call", "put"]:
+                                builder.add_option(underlying, m, yr, strike, opt_type)
+        else:
+            builder.build_from_standard(underlying, months, years, strikes)
     else:
         builder.build_from_brut(brut_code, strikes)
 
