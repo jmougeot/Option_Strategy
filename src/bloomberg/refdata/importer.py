@@ -98,29 +98,33 @@ def import_options(
     Returns:
         Tuple (liste d'objets Option, FutureData, warnings, SABRCalibration or None)
     """    
-    # 1. Construction des tickers
+    # 1. Construction des tickers (mois sélectionné uniquement)
     builder = TickerBuilder(suffix, roll_expiries)
 
     builder._build_underlying(underlying, months[0], years)
 
     if brut_code is None:
-        if vol_model in ("svi", "both"):
-            # Auto-expansion : construit les expirations trimestrielles voisines
-            from bloomberg.util.expiry import build_surface_months
-            seen: set = set()
-            for y in years:
-                for pair in build_surface_months(months[0], y):
-                    if pair not in seen:
-                        seen.add(pair)
-                        m, yr = pair
-                        for strike in strikes:
-                            for opt_type in ["call", "put"]:
-                                builder.add_option(underlying, m, yr, strike, opt_type)
-        else:
-            builder.build_from_standard(underlying, months, years, strikes)
+        builder.build_from_standard(underlying, months, years, strikes)
     else:
         builder.build_from_brut(brut_code, strikes)
 
+    # 1b. Builder séparé pour les expirations voisines (surface SVI)
+    surface_builder: Optional[TickerBuilder] = None
+    if brut_code is None and vol_model in ("svi", "both"):
+        from bloomberg.util.expiry import build_surface_months
+        selected = {(m, y) for m in months for y in years}
+        extra_pairs = [
+            (m, yr) for y in years
+            for m, yr in build_surface_months(months[0], y)
+            if (m, yr) not in selected
+        ]
+        if extra_pairs:
+            surface_builder = TickerBuilder(suffix, None)
+            surface_builder._build_underlying(underlying, months[0], years)
+            for m, yr in extra_pairs:
+                for strike in strikes:
+                    for opt_type in ["call", "put"]:
+                        surface_builder.add_option(underlying, m, yr, strike, opt_type)
 
     # 2. Fetch des données
     future_data = FutureData(None, None)
@@ -133,16 +137,29 @@ def import_options(
         fetcher.fetch_all()
         fetch_warnings = fetcher.warnings
         
-        # 3. Traitement des options
+        # 3. Traitement des options (mois sélectionné)
         processor = OptionProcessor(builder, fetcher, mixture, default_position)
         options = processor.process_all()
         future_data = fetcher.future_data
         time_to_expiry = _time_to_expiry_from_future_data(future_data)
+
+        # 3b. Fetch des expirations voisines pour la surface SVI
+        surface_options: List[Option] = []
+        if surface_builder is not None:
+            try:
+                sf = PremiumFetcher(surface_builder)
+                sf.fetch_all()
+                sp = OptionProcessor(surface_builder, sf, mixture, default_position)
+                surface_options = sp.process_all()
+            except Exception as exc:
+                print(f"  ⚠ Surface fetch échoué: {exc}")
         
-        # 3.5. Calculer la volatilité Bachelier + calibration (si demandé)
+        # 3.5. Calibration : SABR/SVI sur le mois sélectionné,
+        #       surface SVI sur toutes les expirations
         if options and recalibrate:
+            all_for_surface = options + surface_options
             sabr_calibration = Bachelier.compute_volatility(
-                options,
+                all_for_surface,
                 time_to_expiry=time_to_expiry,
                 future_price=future_data.underlying_price,
                 vol_model=vol_model,
@@ -157,5 +174,5 @@ def import_options(
         import traceback
         traceback.print_exc()
 
-
+    # Seules les options du mois sélectionné sont retournées
     return options, future_data, fetch_warnings, sabr_calibration

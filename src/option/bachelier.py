@@ -385,32 +385,62 @@ class Bachelier:
                 k: sum(vs) / len(vs) for k, vs in mkt_iv_by_strike.items()
             }
 
-            # IV finales calibrées
+            # Poids normalisés par strike (pour le blending marché/modèle)
+            weight_by_strike: Dict[float, List[float]] = defaultdict(list)
+            for k, w in zip(strikes_obs, weights_obs):
+                weight_by_strike[k].append(w)
+            raw_w_map: Dict[float, float] = {
+                k: sum(ws) / len(ws) for k, ws in weight_by_strike.items()
+            }
+            w_max = max(raw_w_map.values()) if raw_w_map else 1.0
+            w_min = min(raw_w_map.values()) if raw_w_map else 0.0
+            w_range = w_max - w_min
+            # Normaliser min-max entre 0 et 1 :
+            #   w_norm=1 (meilleur point, fiable) → 100% marché
+            #   w_norm=0 (pire point, peu fiable)  → 100% modèle
+            norm_w_map: Dict[float, float] = {
+                k: (v - w_min) / w_range if w_range > 0 else 1.0
+                for k, v in raw_w_map.items()
+            }
+
+            # IV finales calibrées (modèle pur, avant blending)
             unique_strikes = [d[0] for d in datas]
             if sabr_ok and svi_ok:
                 sabr_vols = sabr_cal.predict(unique_strikes)
                 svi_vols = svi_cal.predict(unique_strikes)
-                final_iv_map: Dict[float, float] = {
+                model_iv_map: Dict[float, float] = {
                     k: max((float(sv) + float(xv)) / 2.0, 0.0)
                     for k, sv, xv in zip(unique_strikes, sabr_vols, svi_vols)
                 }
             elif svi_ok:
                 svi_vols = svi_cal.predict(unique_strikes)
-                final_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, svi_vols)}
+                model_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, svi_vols)}
             elif sabr_ok:
                 sabr_vols = sabr_cal.predict(unique_strikes)
-                final_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, sabr_vols)}
+                model_iv_map = {k: max(float(v), 0.0) for k, v in zip(unique_strikes, sabr_vols)}
             else:
-                final_iv_map = mkt_iv_map
+                model_iv_map = mkt_iv_map
 
+            # Blending : iv = w * iv_marché + (1 - w) * iv_modèle
+            # w=1 (meilleur poids) → 100% marché, w=0 (pire) → 100% modèle
             calibrated = sabr_ok or svi_ok
+            final_iv_map: Dict[float, float] = {}
+            for k in unique_strikes:
+                m_iv = mkt_iv_map.get(k, 0.0)
+                mod_iv = model_iv_map.get(k, 0.0)
+                w = norm_w_map.get(k, 1.0)
+                if m_iv > 0 and mod_iv > 0 and calibrated:
+                    final_iv_map[k] = w * m_iv + (1.0 - w) * mod_iv
+                else:
+                    final_iv_map[k] = mod_iv if mod_iv > 0 else m_iv
+
             for _, calls, puts in datas:
                 for opt in calls + puts:
                     k = opt.strike
                     mkt_iv = mkt_iv_map.get(k, 0.0)
                     iv = final_iv_map.get(k, 0.0)
                     opt.market_implied_volatility = mkt_iv
-                    opt.sabr_volatility = iv if calibrated else 0.0
+                    opt.sabr_volatility = model_iv_map.get(k, 0.0) if calibrated else 0.0
                     if iv > 0:
                         opt.implied_volatility = iv
                         if not (opt.status and opt.premium > 0):
