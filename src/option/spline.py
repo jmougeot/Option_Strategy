@@ -67,6 +67,7 @@ class SplineResult:
     n_butterfly_violations: int = 0
     n_monotone_violations: int = 0
     converged: bool = False
+    n_outliers_detected: int = 0
 
     def __repr__(self) -> str:
         arb_parts = []
@@ -199,6 +200,57 @@ def _monotone_penalty_vec(K: np.ndarray, C: np.ndarray) -> float:
     return float(np.sum(np.maximum(dC_dK, 0.0) ** 2))
 
 
+def _detect_outlier_weights(
+    k: np.ndarray,
+    w_obs: np.ndarray,
+    threshold_mad: float = 3.0,
+) -> np.ndarray:
+    """
+    Détecte les points aberrants dans le skew brut via leur courbure locale.
+
+    Pour chaque point i intérieur, calcule la dérivée seconde discrète :
+        d2[i] = 2·[w[i+1]/(h2·(h1+h2)) − w[i]/(h1·h2) + w[i-1]/(h1·(h1+h2))]
+
+    Un point est outlier si |d2[i] − médiane(d2)| > threshold_mad × 1.4826 × MAD.
+    Son poids est alors réduit via une fonction exponentielle (downweighting doux).
+
+    Retourne un tableau de poids dans [0, 1]  (1 = normal, ~0 = outlier fort).
+    """
+    n = len(k)
+    if n < 5:
+        return np.ones(n)
+
+    d2 = np.zeros(n)
+    for i in range(1, n - 1):
+        h1 = k[i] - k[i - 1]
+        h2 = k[i + 1] - k[i]
+        if h1 <= 0 or h2 <= 0:
+            continue
+        d2[i] = 2.0 * (
+            w_obs[i + 1] / (h2 * (h1 + h2))
+            - w_obs[i]     / (h1 * h2)
+            + w_obs[i - 1] / (h1 * (h1 + h2))
+        )
+    # Bords : copier les voisins intérieurs
+    d2[0] = d2[1]
+    d2[-1] = d2[-2]
+
+    # Score MAD robuste
+    med = np.median(d2)
+    mad = np.median(np.abs(d2 - med))
+    if mad < 1e-20:
+        return np.ones(n)
+
+    z = np.abs(d2 - med) / (1.4826 * mad)
+    # Décroissance exponentielle douce au-delà du seuil
+    outlier_weights = np.where(
+        z > threshold_mad,
+        np.exp(-0.5 * (z - threshold_mad) ** 2),
+        1.0,
+    )
+    return outlier_weights
+
+
 def _check_calendar(T_sorted: List[float],
                     w_evals: Dict[float, np.ndarray]) -> int:
     """
@@ -255,18 +307,22 @@ class SplineCalibration:
         lambda_smooth: float = 1e-4,
         mu_butterfly: float = 100.0,
         mu_monotone: float = 50.0,
+        detect_outliers: bool = True,
+        outlier_threshold_mad: float = 3.0,
     ) -> SplineResult:
         """
         Calibre le smoothing spline arbitrage-free.
 
         Parameters
         ----------
-        strikes       : strikes observés (espace réel)
-        sigmas_mkt    : vol normales Bachelier correspondantes
-        weights       : score de fiabilité par point (plus élevé = plus fiable)
-        lambda_smooth : pénalité de lissage  (∫ S''² dk)
-        mu_butterfly  : pénalité butterfly   (∂²C/∂K² ≥ 0)
-        mu_monotone   : pénalité monotonie   (∂C/∂K  ≤ 0)
+        strikes               : strikes observés (espace réel)
+        sigmas_mkt            : vol normales Bachelier correspondantes
+        weights               : score de fiabilité par point (plus élevé = plus fiable)
+        lambda_smooth         : pénalité de lissage  (∫ S''² dk)
+        mu_butterfly          : pénalité butterfly   (∂²C/∂K² ≥ 0)
+        mu_monotone           : pénalité monotonie   (∂C/∂K  ≤ 0)
+        detect_outliers       : active la détection automatique d'outliers par courbure
+        outlier_threshold_mad : seuil MAD au-delà duquel un point est downwighté
         """
         strikes = np.asarray(strikes, dtype=float)
         sigmas_mkt = np.asarray(sigmas_mkt, dtype=float)
@@ -298,6 +354,18 @@ class SplineCalibration:
         # ── Passage en log-moneyness + total variance ─────────────────
         k_obs = _strikes_to_logm(K, F)              # k = log(K/F)
         w_obs = _sigma_to_totalvar(sigma, T)         # w = σ² · T
+
+        # ── Détection d'outliers par courbure locale (MAD) ────────────
+        n_outliers = 0
+        if detect_outliers and n >= 5:
+            rob_w = _detect_outlier_weights(k_obs, w_obs, outlier_threshold_mad)
+            n_outliers = int(np.sum(rob_w < 0.5))
+            w = w * rob_w
+            w_sum = w.sum()
+            if w_sum > 1e-20:
+                w = w / w_sum
+            else:
+                w = np.ones(n) / n  # fallback si tous les points sont outliers
 
         # Grille dense pour pénalités
         k_dense = np.linspace(k_obs[0], k_obs[-1], self._N_DENSE)
@@ -379,6 +447,7 @@ class SplineCalibration:
             n_butterfly_violations=n_bf,
             n_monotone_violations=n_mono,
             converged=result_opt.success,
+            n_outliers_detected=n_outliers,
         )
         return self.result
 
@@ -430,10 +499,11 @@ class SplineCalibration:
         if r.n_monotone_violations:
             arb_parts.append(f"⚠ {r.n_monotone_violations} mono")
         arb = " ".join(arb_parts) or "✓ arb-free"
+        outlier_str = f"  ⚠ {r.n_outliers_detected} outlier(s) détecté(s)" if r.n_outliers_detected else ""
         return (
             f"Spline | F={r.F:.4f}  T={r.T:.3f}a  N={r.n_points}\n"
             f"  RMSE={r.rmse_bps:.2f}bp  max_err={r.max_error_bps:.2f}bp  "
-            f"[{arb}]  converged={r.converged}"
+            f"[{arb}]  converged={r.converged}{outlier_str}"
         )
 
 
@@ -464,6 +534,8 @@ class SplineSurfaceCalibration:
         lambda_smooth: float = 1e-4,
         mu_butterfly: float = 100.0,
         mu_monotone: float = 50.0,
+        detect_outliers: bool = True,
+        outlier_threshold_mad: float = 3.0,
     ) -> SplineSurfaceResult:
         """
         Calibre un spline indépendant par maturité,
@@ -482,6 +554,8 @@ class SplineSurfaceCalibration:
                     lambda_smooth=lambda_smooth,
                     mu_butterfly=mu_butterfly,
                     mu_monotone=mu_monotone,
+                    detect_outliers=detect_outliers,
+                    outlier_threshold_mad=outlier_threshold_mad,
                 )
                 results[sd.T] = res
                 self._slices[sd.T] = cal
