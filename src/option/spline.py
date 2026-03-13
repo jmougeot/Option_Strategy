@@ -12,8 +12,7 @@ Méthodologie :
     3. Poids wᵢ = score de fiabilité par point
     4. Contrainte butterfly  : ∂²C/∂K² ≥ 0  (densité risque-neutre ≥ 0)
     5. Contrainte monotonie  : ∂C/∂K  ≤ 0  (call prices décroissants en K)
-    6. Extrapolation ailes   : pente asymptotique linéaire en w(k)
-    7. Surface multi-maturité: spline par T + interpolation en T
+    6. Surface multi-maturité: spline par T + interpolation en T
        avec vérification calendar : ∂w/∂T ≥ 0
 """
 
@@ -68,9 +67,6 @@ class SplineResult:
     n_butterfly_violations: int = 0
     n_monotone_violations: int = 0
     converged: bool = False
-
-    wing_slope_left: float = 0.0
-    wing_slope_right: float = 0.0
 
     def __repr__(self) -> str:
         arb_parts = []
@@ -232,8 +228,6 @@ class SplineCalibration:
           + λ ∫ S''(k)² dk
           + μ_bf  · penalty_butterfly
           + μ_mon · penalty_monotone
-
-    Extrapolation : pente linéaire dans les ailes (slope left/right).
     """
 
     _N_DENSE: int = 500
@@ -247,10 +241,6 @@ class SplineCalibration:
         self._cs: Optional[CubicSpline] = None
         self._k_min: float = 0.0
         self._k_max: float = 0.0
-        self._w_left: float = 0.0
-        self._w_right: float = 0.0
-        self._slope_left: float = 0.0
-        self._slope_right: float = 0.0
 
     # ------------------------------------------------------------------
     #  Calibration
@@ -356,12 +346,6 @@ class SplineCalibration:
         self._cs = CubicSpline(k_obs, y_opt, bc_type="natural")
         self._k_min = float(k_obs[0])
         self._k_max = float(k_obs[-1])
-        self._w_left = float(y_opt[0])
-        self._w_right = float(y_opt[-1])
-
-        # Pentes aux bords (extrapolation linéaire en w)
-        self._slope_left = float(self._cs(self._k_min, 1))
-        self._slope_right = float(self._cs(self._k_max, 1))
 
         # ── Métriques ─────────────────────────────────────────────────
         w_model_knots = self._cs(k_obs)
@@ -395,8 +379,6 @@ class SplineCalibration:
             n_butterfly_violations=n_bf,
             n_monotone_violations=n_mono,
             converged=result_opt.success,
-            wing_slope_left=self._slope_left,
-            wing_slope_right=self._slope_right,
         )
         return self.result
 
@@ -406,28 +388,13 @@ class SplineCalibration:
 
     def _eval_totalvar(self, k: np.ndarray) -> np.ndarray:
         """
-        Évalue w(k) avec extrapolation linéaire dans les ailes.
-
-        Aile gauche  (k < k_min) : w = w_left  + slope_left  · (k − k_min)
-        Aile droite  (k > k_max) : w = w_right + slope_right · (k − k_max)
-        Intérieur                 : cubic spline naturelle
+        Évalue w(k) — clamp aux bornes du domaine observé (pas d'extrapolation).
         """
         if self._cs is None:
             raise RuntimeError("Calibrer d'abord avec .fit()")
 
-        w = np.empty_like(k, dtype=float)
-        inside = (k >= self._k_min) & (k <= self._k_max)
-        left = k < self._k_min
-        right = k > self._k_max
-
-        if inside.any():
-            w[inside] = self._cs(k[inside])
-        if left.any():
-            w[left] = self._w_left + self._slope_left * (k[left] - self._k_min)
-        if right.any():
-            w[right] = self._w_right + self._slope_right * (k[right] - self._k_max)
-
-        return np.maximum(w, 1e-16)
+        k_clamped = np.clip(k, self._k_min, self._k_max)
+        return np.maximum(self._cs(k_clamped), 1e-16)
 
     def predict(self, strikes: Sequence[float] | np.ndarray) -> np.ndarray:
         """
@@ -466,9 +433,7 @@ class SplineCalibration:
         return (
             f"Spline | F={r.F:.4f}  T={r.T:.3f}a  N={r.n_points}\n"
             f"  RMSE={r.rmse_bps:.2f}bp  max_err={r.max_error_bps:.2f}bp  "
-            f"[{arb}]  converged={r.converged}\n"
-            f"  wings: slope_L={r.wing_slope_left:.4f}  "
-            f"slope_R={r.wing_slope_right:.4f}"
+            f"[{arb}]  converged={r.converged}"
         )
 
 
